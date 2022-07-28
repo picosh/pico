@@ -98,12 +98,6 @@ func main() {
 	}
 	defer rollback()
 
-	logger.Info("delete users where name is null")
-	_, err = tx.Exec("DELETE FROM app_users WHERE name IS NULL")
-	if err != nil {
-		panic(err)
-	}
-
 	proseUsers, err := proseDb.FindUsers()
 	if err != nil {
 		panic(err)
