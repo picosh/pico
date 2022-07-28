@@ -2,10 +2,10 @@ module git.sr.ht/~erock/pico
 
 go 1.18
 
-replace git.sr.ht/~erock/wish => /home/erock/pico/wish
+// replace git.sr.ht/~erock/wish => /home/erock/pico/wish
 
 require (
-	git.sr.ht/~erock/wish v0.0.0-20220723165654-ad295e939d88
+	git.sr.ht/~erock/wish v0.0.0-20220728012620-699415a43292
 	go.uber.org/zap v1.21.0
 )
 
