@@ -262,7 +262,7 @@ func main() {
 
 	logger.Info("Committing transactions to PICO db")
 	// Commit the transaction.
-	/* if err = tx.Commit(); err != nil {
+	if err = tx.Commit(); err != nil {
 		panic(err)
-	} */
+	}
 }
