@@ -9,8 +9,7 @@ test:
 .PHONY: test
 
 build:
-	go build -o build/web ./cmd/web
-	go build -o build/ssh ./cmd/ssh
+	go build -o build/migrate ./cmd/migrate
 .PHONY: build
 
 format:
