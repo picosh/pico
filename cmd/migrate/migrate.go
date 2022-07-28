@@ -137,16 +137,19 @@ func main() {
 	}
 	defer rollback()
 
+	logger.Info("Finding prose users")
 	proseUsers, err := proseDb.FindUsers()
 	if err != nil {
 		panic(err)
 	}
 
+	logger.Info("Finding lists users")
 	listUsers, err := listsDb.FindUsers()
 	if err != nil {
 		panic(err)
 	}
 
+	logger.Info("Adding prose users and public keys to PICO db")
 	userMap := map[string]*db.User{}
 	for _, proseUser := range proseUsers {
 		userMap[proseUser.Name] = proseUser
