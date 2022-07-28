@@ -155,6 +155,18 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
+
+		proseKeys, err := proseDb.FindKeysForUser(proseUser)
+		if err != nil {
+			panic(err)
+		}
+
+		for _, prosePK := range proseKeys {
+			err = insertPublicKey(tx, prosePK)
+			if err != nil {
+				panic(err)
+			}
+		}
 	}
 
 	noconflicts := []*ConflictData{}
@@ -190,11 +202,6 @@ func main() {
 			pkMap := map[string]bool{}
 			for _, prosePK := range proseKeys {
 				pkMap[prosePK.Key] = true
-
-				err = insertPublicKey(tx, prosePK)
-				if err != nil {
-					panic(err)
-				}
 			}
 
 			conflicted := false
@@ -274,7 +281,6 @@ func main() {
 				post.Space = "lists"
 				err = insertPost(tx, post)
 				if err != nil {
-					fmt.Println(post.Filename)
 					panic(err)
 				}
 				updated = true
