@@ -22,7 +22,45 @@ func createLogger() *zap.SugaredLogger {
 	return logger.Sugar()
 }
 
-func InsertUser(tx *sql.Tx, user *db.User) error {
+func findPosts(dbpool *sql.DB) ([]*db.Post, error) {
+	var posts []*db.Post
+	rs, err := dbpool.Query(`SELECT
+		posts.id, user_id, filename, title, text, description,
+		posts.created_at, publish_at, posts.updated_at, hidden, COALESCE(views, 0) as views
+		FROM posts
+		LEFT OUTER JOIN post_analytics ON post_analytics.post_id = posts.id
+	`)
+	if err != nil {
+		return posts, err
+	}
+	for rs.Next() {
+		post := &db.Post{}
+		err := rs.Scan(
+			&post.ID,
+			&post.UserID,
+			&post.Filename,
+			&post.Title,
+			&post.Text,
+			&post.Description,
+			&post.CreatedAt,
+			&post.PublishAt,
+			&post.UpdatedAt,
+			&post.Hidden,
+			&post.Views,
+		)
+		if err != nil {
+			return posts, err
+		}
+
+		posts = append(posts, post)
+	}
+	if rs.Err() != nil {
+		return posts, rs.Err()
+	}
+	return posts, nil
+}
+
+func insertUser(tx *sql.Tx, user *db.User) error {
 	_, err := tx.Exec(
 		"INSERT INTO app_users (id, name, created_at) VALUES($1, $2, $3)",
 		user.ID,
@@ -32,7 +70,7 @@ func InsertUser(tx *sql.Tx, user *db.User) error {
 	return err
 }
 
-func InsertPublicKey(tx *sql.Tx, pk *db.PublicKey) error {
+func insertPublicKey(tx *sql.Tx, pk *db.PublicKey) error {
 	_, err := tx.Exec(
 		"INSERT INTO public_keys (id, user_id, public_key, created_at) VALUES ($1, $2, $3, $4)",
 		pk.ID,
@@ -43,11 +81,11 @@ func InsertPublicKey(tx *sql.Tx, pk *db.PublicKey) error {
 	return err
 }
 
-func InsertPost(tx *sql.Tx, post *db.Post) error {
+func insertPost(tx *sql.Tx, post *db.Post) error {
 	_, err := tx.Exec(
 		`INSERT INTO posts
-			(id, user_id, title, text, created_at, publish_at, updated_at, description, filename, hidden, cur_space)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+			(id, user_id, title, text, created_at, publish_at, updated_at, description, filename, hidden, cur_space, views)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
 		post.ID,
 		post.UserID,
 		post.Title,
@@ -59,6 +97,7 @@ func InsertPost(tx *sql.Tx, post *db.Post) error {
 		post.Filename,
 		post.Hidden,
 		post.Space,
+		post.Views,
 	)
 	return err
 }
@@ -112,7 +151,7 @@ func main() {
 	for _, proseUser := range proseUsers {
 		userMap[proseUser.Name] = proseUser
 
-		err = InsertUser(tx, proseUser)
+		err = insertUser(tx, proseUser)
 		if err != nil {
 			panic(err)
 		}
@@ -152,7 +191,7 @@ func main() {
 			for _, prosePK := range proseKeys {
 				pkMap[prosePK.Key] = true
 
-				err = InsertPublicKey(tx, prosePK)
+				err = insertPublicKey(tx, prosePK)
 				if err != nil {
 					panic(err)
 				}
@@ -176,13 +215,13 @@ func main() {
 
 	logger.Infof("Adding records with no conflicts (%d)", len(noconflicts))
 	for _, data := range noconflicts {
-		err = InsertUser(tx, data.User)
+		err = insertUser(tx, data.User)
 		if err != nil {
 			panic(err)
 		}
 
 		for _, pk := range data.Pks {
-			err = InsertPublicKey(tx, pk)
+			err = insertPublicKey(tx, pk)
 			if err != nil {
 				panic(err)
 			}
@@ -192,20 +231,20 @@ func main() {
 	logger.Infof("Adding records with conflicts (%d)", len(conflicts))
 	for _, data := range conflicts {
 		data.User.Name = fmt.Sprintf("%stmp", data.User.Name)
-		err = InsertUser(tx, data.User)
+		err = insertUser(tx, data.User)
 		if err != nil {
 			panic(err)
 		}
 
 		for _, pk := range data.Pks {
-			err = InsertPublicKey(tx, pk)
+			err = insertPublicKey(tx, pk)
 			if err != nil {
 				panic(err)
 			}
 		}
 	}
 
-	prosePosts, err := proseDb.FindPosts()
+	prosePosts, err := findPosts(proseDb.Db)
 	if err != nil {
 		panic(err)
 	}
@@ -213,13 +252,13 @@ func main() {
 	logger.Info("Adding posts from prose.sh")
 	for _, post := range prosePosts {
 		post.Space = "prose"
-		err = InsertPost(tx, post)
+		err = insertPost(tx, post)
 		if err != nil {
 			panic(err)
 		}
 	}
 
-	listPosts, err := listsDb.FindPosts()
+	listPosts, err := findPosts(listsDb.Db)
 	if err != nil {
 		panic(err)
 	}
@@ -233,7 +272,7 @@ func main() {
 				// because we were able to determine it was the same user
 				post.UserID = alreadyAdded.ReplaceWithID
 				post.Space = "lists"
-				err = InsertPost(tx, post)
+				err = insertPost(tx, post)
 				if err != nil {
 					fmt.Println(post.Filename)
 					panic(err)
@@ -248,7 +287,7 @@ func main() {
 		}
 
 		post.Space = "lists"
-		err = InsertPost(tx, post)
+		err = insertPost(tx, post)
 		if err != nil {
 			panic(err)
 		}
