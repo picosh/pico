@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"git.sr.ht/~erock/lists.sh/pkg"
-	"git.sr.ht/~erock/wish/cms/db"
-	"git.sr.ht/~erock/wish/cms/util"
-	sendutils "git.sr.ht/~erock/wish/send/utils"
+	"git.sr.ht/~erock/pico/wish/cms/db"
+	"git.sr.ht/~erock/pico/wish/cms/util"
+	sendutils "git.sr.ht/~erock/pico/wish/send/utils"
 	"github.com/gliderlabs/ssh"
 	"golang.org/x/exp/slices"
 )

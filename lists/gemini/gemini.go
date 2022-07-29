@@ -18,8 +18,8 @@ import (
 	feeds "git.sr.ht/~aw/gorilla-feeds"
 	"git.sr.ht/~erock/lists.sh/internal"
 	"git.sr.ht/~erock/lists.sh/pkg"
-	"git.sr.ht/~erock/wish/cms/db"
-	"git.sr.ht/~erock/wish/cms/db/postgres"
+	"git.sr.ht/~erock/pico/wish/cms/db"
+	"git.sr.ht/~erock/pico/wish/cms/db/postgres"
 	"golang.org/x/exp/slices"
 )
 

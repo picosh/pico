@@ -3,7 +3,7 @@ package internal
 import (
 	"time"
 
-	"git.sr.ht/~erock/wish/cms/db"
+	"git.sr.ht/~erock/pico/wish/cms/db"
 )
 
 func deleteExpiredPosts(cfg *ConfigSite, dbpool db.DB) error {

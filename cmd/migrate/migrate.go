@@ -7,9 +7,9 @@ import (
 	"log"
 	"os"
 
-	"git.sr.ht/~erock/wish/cms/config"
-	"git.sr.ht/~erock/wish/cms/db"
-	"git.sr.ht/~erock/wish/cms/db/postgres"
+	"git.sr.ht/~erock/pico/wish/cms/config"
+	"git.sr.ht/~erock/pico/wish/cms/db"
+	"git.sr.ht/~erock/pico/wish/cms/db/postgres"
 	"go.uber.org/zap"
 )
 

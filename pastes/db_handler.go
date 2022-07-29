@@ -5,9 +5,9 @@ import (
 	"io"
 	"time"
 
-	"git.sr.ht/~erock/wish/cms/db"
-	"git.sr.ht/~erock/wish/cms/util"
-	"git.sr.ht/~erock/wish/send/utils"
+	"git.sr.ht/~erock/pico/wish/cms/db"
+	"git.sr.ht/~erock/pico/wish/cms/util"
+	"git.sr.ht/~erock/pico/wish/send/utils"
 	"github.com/gliderlabs/ssh"
 )
 
