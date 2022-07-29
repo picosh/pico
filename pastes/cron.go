@@ -3,10 +3,11 @@ package pastes
 import (
 	"time"
 
+	"git.sr.ht/~erock/pico/shared"
 	"git.sr.ht/~erock/pico/wish/cms/db"
 )
 
-func deleteExpiredPosts(cfg *ConfigSite, dbpool db.DB) error {
+func deleteExpiredPosts(cfg *shared.ConfigSite, dbpool db.DB) error {
 	cfg.Logger.Infof("checking for expired posts")
 	now := time.Now()
 	// delete posts that are older than three days
@@ -30,7 +31,7 @@ func deleteExpiredPosts(cfg *ConfigSite, dbpool db.DB) error {
 	return nil
 }
 
-func CronDeleteExpiredPosts(cfg *ConfigSite, dbpool db.DB) {
+func CronDeleteExpiredPosts(cfg *shared.ConfigSite, dbpool db.DB) {
 	for {
 		err := deleteExpiredPosts(cfg, dbpool)
 		if err != nil {

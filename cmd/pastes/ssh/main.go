@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"git.sr.ht/~erock/pico/pastes"
+	"git.sr.ht/~erock/pico/shared"
 	"git.sr.ht/~erock/pico/wish/cms"
 	"git.sr.ht/~erock/pico/wish/cms/db/postgres"
 	"git.sr.ht/~erock/pico/wish/proxy"
@@ -56,8 +57,8 @@ func withProxy(handler *pastes.DbHandler) ssh.Option {
 }
 
 func main() {
-	host := pastes.GetEnv("PROSE_HOST", "0.0.0.0")
-	port := pastes.GetEnv("PROSE_SSH_PORT", "2222")
+	host := shared.GetEnv("PROSE_HOST", "0.0.0.0")
+	port := shared.GetEnv("PROSE_SSH_PORT", "2222")
 	cfg := pastes.NewConfigSite()
 	logger := cfg.Logger
 	dbh := postgres.NewDB(&cfg.ConfigCms)

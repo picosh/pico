@@ -3,13 +3,24 @@ package pastes
 import (
 	"fmt"
 	"io"
+	"math"
 	"time"
 
+	"git.sr.ht/~erock/pico/shared"
 	"git.sr.ht/~erock/pico/wish/cms/db"
 	"git.sr.ht/~erock/pico/wish/cms/util"
 	"git.sr.ht/~erock/pico/wish/send/utils"
 	"github.com/gliderlabs/ssh"
 )
+
+// IsTextFile reports whether the file has a known extension indicating
+// a text file, or if a significant chunk of the specified file looks like
+// correct UTF-8; that is, if it is likely that the file contains human-
+// readable text.
+func IsTextFile(text string, filename string) bool {
+	num := math.Min(float64(len(text)), 1024)
+	return shared.IsText(text[0:int(num)])
+}
 
 type Opener struct {
 	entry *utils.FileEntry
@@ -22,10 +33,10 @@ func (o *Opener) Open(name string) (io.Reader, error) {
 type DbHandler struct {
 	User   *db.User
 	DBPool db.DB
-	Cfg    *ConfigSite
+	Cfg    *shared.ConfigSite
 }
 
-func NewDbHandler(dbpool db.DB, cfg *ConfigSite) *DbHandler {
+func NewDbHandler(dbpool db.DB, cfg *shared.ConfigSite) *DbHandler {
 	return &DbHandler{
 		DBPool: dbpool,
 		Cfg:    cfg,

@@ -1,4 +1,4 @@
-package prose
+package shared
 
 import (
 	"context"

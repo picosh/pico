@@ -41,6 +41,7 @@ build-prose:
 build-lists:
 	go build -o build/lists-web ./cmd/lists/web
 	go build -o build/lists-ssh ./cmd/lists/ssh
+	go build -o build/lists-gemini ./cmd/lists/gemini
 .PHONY: build-lists
 
 build-pastes:

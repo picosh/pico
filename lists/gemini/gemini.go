@@ -18,12 +18,13 @@ import (
 	feeds "git.sr.ht/~aw/gorilla-feeds"
 	"git.sr.ht/~erock/pico/lists"
 	"git.sr.ht/~erock/pico/lists/pkg"
+	"git.sr.ht/~erock/pico/shared"
 	"git.sr.ht/~erock/pico/wish/cms/db"
 	"git.sr.ht/~erock/pico/wish/cms/db/postgres"
 	"golang.org/x/exp/slices"
 )
 
-func renderTemplate(cfg *lists.ConfigSite, templates []string) (*template.Template, error) {
+func renderTemplate(cfg *shared.ConfigSite, templates []string) (*template.Template, error) {
 	files := make([]string, len(templates))
 	copy(files, templates)
 	files = append(
@@ -82,6 +83,12 @@ func blogHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Request
 		return
 	}
 
+	hostDomain := strings.Split(r.Host, ":")[0]
+	appDomain := strings.Split(cfg.ConfigCms.Domain, ":")[0]
+
+	onSubdomain := cfg.IsSubdomains() && strings.Contains(hostDomain, appDomain)
+	withUserName := (!onSubdomain && hostDomain == appDomain) || !cfg.IsCustomdomains()
+
 	ts, err := renderTemplate(cfg, []string{
 		cfg.StaticPath("gmi/blog.page.tmpl"),
 		cfg.StaticPath("gmi/list.partial.tmpl"),
@@ -124,12 +131,12 @@ func blogHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Request
 			}
 		} else {
 			p := lists.PostItemData{
-				URL:            html.URL(cfg.PostURL(post.Username, post.Filename)),
-				BlogURL:        html.URL(cfg.BlogURL(post.Username)),
-				Title:          lists.FilenameToTitle(post.Filename, post.Title),
+				URL:            html.URL(cfg.FullPostURL(post.Username, post.Filename, onSubdomain, withUserName)),
+				BlogURL:        html.URL(cfg.FullBlogURL(post.Username, onSubdomain, withUserName)),
+				Title:          shared.FilenameToTitle(post.Filename, post.Title),
 				PublishAt:      post.PublishAt.Format("02 Jan, 2006"),
 				PublishAtISO:   post.PublishAt.Format(time.RFC3339),
-				UpdatedTimeAgo: lists.TimeAgo(post.UpdatedAt),
+				UpdatedTimeAgo: shared.TimeAgo(post.UpdatedAt),
 				UpdatedAtISO:   post.UpdatedAt.Format(time.RFC3339),
 			}
 			postCollection = append(postCollection, p)
@@ -139,8 +146,8 @@ func blogHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Request
 	data := lists.BlogPageData{
 		Site:      *cfg.GetSiteData(),
 		PageTitle: headerTxt.Title,
-		URL:       html.URL(cfg.BlogURL(username)),
-		RSSURL:    html.URL(cfg.RssBlogURL(username)),
+		URL:       html.URL(cfg.FullBlogURL(username, onSubdomain, withUserName)),
+		RSSURL:    html.URL(cfg.RssBlogURL(username, onSubdomain, withUserName)),
 		Readme:    readmeTxt,
 		Header:    headerTxt,
 		Username:  username,
@@ -194,7 +201,7 @@ func readHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Request
 
 	longest := 0
 	for _, post := range pager.Data {
-		size := len(lists.TimeAgo(post.UpdatedAt))
+		size := len(shared.TimeAgo(post.UpdatedAt))
 		if size > longest {
 			longest = size
 		}
@@ -204,12 +211,12 @@ func readHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Request
 		item := lists.PostItemData{
 			URL:            html.URL(cfg.PostURL(post.Username, post.Filename)),
 			BlogURL:        html.URL(cfg.BlogURL(post.Username)),
-			Title:          lists.FilenameToTitle(post.Filename, post.Title),
+			Title:          shared.FilenameToTitle(post.Filename, post.Title),
 			Description:    post.Description,
 			Username:       post.Username,
 			PublishAt:      post.PublishAt.Format("02 Jan, 2006"),
 			PublishAtISO:   post.PublishAt.Format(time.RFC3339),
-			UpdatedTimeAgo: lists.TimeAgo(post.UpdatedAt),
+			UpdatedTimeAgo: shared.TimeAgo(post.UpdatedAt),
 			UpdatedAtISO:   post.UpdatedAt.Format(time.RFC3339),
 		}
 
@@ -278,7 +285,7 @@ func postHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Request
 		BlogURL:      html.URL(cfg.BlogURL(username)),
 		Description:  post.Description,
 		ListType:     parsedText.MetaData.ListType,
-		Title:        lists.FilenameToTitle(post.Filename, post.Title),
+		Title:        shared.FilenameToTitle(post.Filename, post.Title),
 		PublishAt:    post.PublishAt.Format("02 Jan, 2006"),
 		PublishAtISO: post.PublishAt.Format(time.RFC3339),
 		Username:     username,
@@ -411,7 +418,7 @@ func rssBlogHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Requ
 
 		item := &feeds.Item{
 			Id:      cfg.PostURL(post.Username, post.Filename),
-			Title:   lists.FilenameToTitle(post.Filename, post.Title),
+			Title:   shared.FilenameToTitle(post.Filename, post.Title),
 			Link:    &feeds.Link{Href: cfg.PostURL(post.Username, post.Filename)},
 			Content: tpl.String(),
 			Created: *post.PublishAt,

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"git.sr.ht/~erock/pico/shared"
 	"git.sr.ht/~erock/pico/wish/cms/db"
 	"git.sr.ht/~erock/pico/wish/cms/util"
 	"git.sr.ht/~erock/pico/wish/send/utils"
@@ -14,6 +15,7 @@ import (
 )
 
 var hiddenPosts = []string{"_readme.md", "_styles.css"}
+var allowedExtensions = []string{".md", ".css"}
 
 type Opener struct {
 	entry *utils.FileEntry
@@ -26,10 +28,10 @@ func (o *Opener) Open(name string) (io.Reader, error) {
 type DbHandler struct {
 	User   *db.User
 	DBPool db.DB
-	Cfg    *ConfigSite
+	Cfg    *shared.ConfigSite
 }
 
-func NewDbHandler(dbpool db.DB, cfg *ConfigSite) *DbHandler {
+func NewDbHandler(dbpool db.DB, cfg *shared.ConfigSite) *DbHandler {
 	return &DbHandler{
 		DBPool: dbpool,
 		Cfg:    cfg,
@@ -59,7 +61,7 @@ func (h *DbHandler) Validate(s ssh.Session) error {
 func (h *DbHandler) Write(s ssh.Session, entry *utils.FileEntry) (string, error) {
 	logger := h.Cfg.Logger
 	userID := h.User.ID
-	filename := SanitizeFileExt(entry.Name)
+	filename := shared.SanitizeFileExt(entry.Name)
 	title := filename
 	var err error
 	post, err := h.DBPool.FindPostWithFilename(filename, userID, h.Cfg.Space)
@@ -77,7 +79,7 @@ func (h *DbHandler) Write(s ssh.Session, entry *utils.FileEntry) (string, error)
 		text = string(b)
 	}
 
-	if !IsTextFile(text, entry.Filepath) {
+	if !shared.IsTextFile(text, entry.Filepath, allowedExtensions) {
 		extStr := strings.Join(allowedExtensions, ",")
 		logger.Errorf("WARNING: (%s) invalid file, format must be (%s) and the contents must be plain text, skipping", entry.Name, extStr)
 		return "", fmt.Errorf("WARNING: (%s) invalid file, format must be (%s) and the contents must be plain text, skipping", entry.Name, extStr)

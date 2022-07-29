@@ -6,14 +6,16 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
+	"git.sr.ht/~erock/pico/shared"
 	"git.sr.ht/~erock/pico/wish/cms/db"
 	"git.sr.ht/~erock/pico/wish/cms/db/postgres"
 )
 
 type PageData struct {
-	Site SitePageData
+	Site shared.SitePageData
 }
 
 type PostItemData struct {
@@ -30,7 +32,7 @@ type PostItemData struct {
 }
 
 type BlogPageData struct {
-	Site      SitePageData
+	Site      shared.SitePageData
 	PageTitle string
 	URL       template.URL
 	RSSURL    template.URL
@@ -40,7 +42,7 @@ type BlogPageData struct {
 }
 
 type PostPageData struct {
-	Site         SitePageData
+	Site         shared.SitePageData
 	PageTitle    string
 	URL          template.URL
 	RawURL       template.URL
@@ -55,11 +57,11 @@ type PostPageData struct {
 }
 
 type TransparencyPageData struct {
-	Site      SitePageData
+	Site      shared.SitePageData
 	Analytics *db.Analytics
 }
 
-func renderTemplate(cfg *ConfigSite, templates []string) (*template.Template, error) {
+func renderTemplate(cfg *shared.ConfigSite, templates []string) (*template.Template, error) {
 	files := make([]string, len(templates))
 	copy(files, templates)
 	files = append(
@@ -78,8 +80,8 @@ func renderTemplate(cfg *ConfigSite, templates []string) (*template.Template, er
 
 func createPageHandler(fname string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		logger := GetLogger(r)
-		cfg := GetCfg(r)
+		logger := shared.GetLogger(r)
+		cfg := shared.GetCfg(r)
 		ts, err := renderTemplate(cfg, []string{cfg.StaticPath(fname)})
 
 		if err != nil {
@@ -112,20 +114,20 @@ type HeaderTxt struct {
 }
 
 func GetUsernameFromRequest(r *http.Request) string {
-	subdomain := GetSubdomain(r)
-	cfg := GetCfg(r)
+	subdomain := shared.GetSubdomain(r)
+	cfg := shared.GetCfg(r)
 
 	if !cfg.IsSubdomains() || subdomain == "" {
-		return GetField(r, 0)
+		return shared.GetField(r, 0)
 	}
 	return subdomain
 }
 
 func blogHandler(w http.ResponseWriter, r *http.Request) {
 	username := GetUsernameFromRequest(r)
-	dbpool := GetDB(r)
-	logger := GetLogger(r)
-	cfg := GetCfg(r)
+	dbpool := shared.GetDB(r)
+	logger := shared.GetLogger(r)
+	cfg := shared.GetCfg(r)
 
 	user, err := dbpool.FindUserForName(username)
 	if err != nil {
@@ -139,6 +141,12 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "could not fetch posts for blog", http.StatusInternalServerError)
 		return
 	}
+
+	hostDomain := strings.Split(r.Host, ":")[0]
+	appDomain := strings.Split(cfg.ConfigCms.Domain, ":")[0]
+
+	onSubdomain := cfg.IsSubdomains() && strings.Contains(hostDomain, appDomain)
+	withUserName := (!onSubdomain && hostDomain == appDomain) || !cfg.IsCustomdomains()
 
 	ts, err := renderTemplate(cfg, []string{
 		cfg.StaticPath("html/blog.page.tmpl"),
@@ -158,12 +166,12 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	postCollection := make([]PostItemData, 0, len(posts))
 	for _, post := range posts {
 		p := PostItemData{
-			URL:            template.URL(cfg.PostURL(post.Username, post.Filename)),
-			BlogURL:        template.URL(cfg.BlogURL(post.Username)),
-			Title:          FilenameToTitle(post.Filename, post.Title),
+			URL:            template.URL(cfg.FullPostURL(post.Username, post.Filename, onSubdomain, withUserName)),
+			BlogURL:        template.URL(cfg.FullBlogURL(post.Username, onSubdomain, withUserName)),
+			Title:          shared.FilenameToTitle(post.Filename, post.Title),
 			PublishAt:      post.PublishAt.Format("02 Jan, 2006"),
 			PublishAtISO:   post.PublishAt.Format(time.RFC3339),
-			UpdatedTimeAgo: TimeAgo(post.UpdatedAt),
+			UpdatedTimeAgo: shared.TimeAgo(post.UpdatedAt),
 			UpdatedAtISO:   post.UpdatedAt.Format(time.RFC3339),
 		}
 		postCollection = append(postCollection, p)
@@ -172,8 +180,8 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	data := BlogPageData{
 		Site:      *cfg.GetSiteData(),
 		PageTitle: headerTxt.Title,
-		URL:       template.URL(cfg.BlogURL(username)),
-		RSSURL:    template.URL(cfg.RssBlogURL(username)),
+		URL:       template.URL(cfg.FullBlogURL(username, onSubdomain, withUserName)),
+		RSSURL:    template.URL(cfg.RssBlogURL(username, onSubdomain, withUserName)),
 		Header:    headerTxt,
 		Username:  username,
 		Posts:     postCollection,
@@ -200,18 +208,18 @@ func GetBlogName(username string) string {
 
 func postHandler(w http.ResponseWriter, r *http.Request) {
 	username := GetUsernameFromRequest(r)
-	subdomain := GetSubdomain(r)
-	cfg := GetCfg(r)
+	subdomain := shared.GetSubdomain(r)
+	cfg := shared.GetCfg(r)
 
 	var filename string
 	if !cfg.IsSubdomains() || subdomain == "" {
-		filename, _ = url.PathUnescape(GetField(r, 1))
+		filename, _ = url.PathUnescape(shared.GetField(r, 1))
 	} else {
-		filename, _ = url.PathUnescape(GetField(r, 0))
+		filename, _ = url.PathUnescape(shared.GetField(r, 0))
 	}
 
-	dbpool := GetDB(r)
-	logger := GetLogger(r)
+	dbpool := shared.GetDB(r)
+	logger := shared.GetLogger(r)
 
 	user, err := dbpool.FindUserForName(username)
 	if err != nil {
@@ -237,7 +245,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			RawURL:       template.URL(cfg.RawPostURL(post.Username, post.Filename)),
 			BlogURL:      template.URL(cfg.BlogURL(username)),
 			Description:  post.Description,
-			Title:        FilenameToTitle(post.Filename, post.Title),
+			Title:        shared.FilenameToTitle(post.Filename, post.Title),
 			PublishAt:    post.PublishAt.Format("02 Jan, 2006"),
 			PublishAtISO: post.PublishAt.Format(time.RFC3339),
 			Username:     username,
@@ -277,18 +285,18 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 
 func postHandlerRaw(w http.ResponseWriter, r *http.Request) {
 	username := GetUsernameFromRequest(r)
-	subdomain := GetSubdomain(r)
-	cfg := GetCfg(r)
+	subdomain := shared.GetSubdomain(r)
+	cfg := shared.GetCfg(r)
 
 	var filename string
 	if !cfg.IsSubdomains() || subdomain == "" {
-		filename, _ = url.PathUnescape(GetField(r, 1))
+		filename, _ = url.PathUnescape(shared.GetField(r, 1))
 	} else {
-		filename, _ = url.PathUnescape(GetField(r, 0))
+		filename, _ = url.PathUnescape(shared.GetField(r, 0))
 	}
 
-	dbpool := GetDB(r)
-	logger := GetLogger(r)
+	dbpool := shared.GetDB(r)
+	logger := shared.GetLogger(r)
 
 	user, err := dbpool.FindUserForName(username)
 	if err != nil {
@@ -312,9 +320,9 @@ func postHandlerRaw(w http.ResponseWriter, r *http.Request) {
 }
 
 func transparencyHandler(w http.ResponseWriter, r *http.Request) {
-	dbpool := GetDB(r)
-	logger := GetLogger(r)
-	cfg := GetCfg(r)
+	dbpool := shared.GetDB(r)
+	logger := shared.GetLogger(r)
+	cfg := shared.GetCfg(r)
 
 	analytics, err := dbpool.FindSiteAnalytics(cfg.Space)
 	if err != nil {
@@ -347,8 +355,8 @@ func transparencyHandler(w http.ResponseWriter, r *http.Request) {
 
 func serveFile(file string, contentType string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		logger := GetLogger(r)
-		cfg := GetCfg(r)
+		logger := shared.GetLogger(r)
+		cfg := shared.GetCfg(r)
 
 		contents, err := ioutil.ReadFile(cfg.StaticPath(fmt.Sprintf("public/%s", file)))
 		if err != nil {
@@ -365,27 +373,27 @@ func serveFile(file string, contentType string) http.HandlerFunc {
 	}
 }
 
-func createStaticRoutes() []Route {
-	return []Route{
-		NewRoute("GET", "/main.css", serveFile("main.css", "text/css")),
-		NewRoute("GET", "/syntax.css", serveFile("syntax.css", "text/css")),
-		NewRoute("GET", "/card.png", serveFile("card.png", "image/png")),
-		NewRoute("GET", "/favicon-16x16.png", serveFile("favicon-16x16.png", "image/png")),
-		NewRoute("GET", "/favicon-32x32.png", serveFile("favicon-32x32.png", "image/png")),
-		NewRoute("GET", "/apple-touch-icon.png", serveFile("apple-touch-icon.png", "image/png")),
-		NewRoute("GET", "/favicon.ico", serveFile("favicon.ico", "image/x-icon")),
-		NewRoute("GET", "/robots.txt", serveFile("robots.txt", "text/plain")),
+func createStaticRoutes() []shared.Route {
+	return []shared.Route{
+		shared.NewRoute("GET", "/main.css", serveFile("main.css", "text/css")),
+		shared.NewRoute("GET", "/syntax.css", serveFile("syntax.css", "text/css")),
+		shared.NewRoute("GET", "/card.png", serveFile("card.png", "image/png")),
+		shared.NewRoute("GET", "/favicon-16x16.png", serveFile("favicon-16x16.png", "image/png")),
+		shared.NewRoute("GET", "/favicon-32x32.png", serveFile("favicon-32x32.png", "image/png")),
+		shared.NewRoute("GET", "/apple-touch-icon.png", serveFile("apple-touch-icon.png", "image/png")),
+		shared.NewRoute("GET", "/favicon.ico", serveFile("favicon.ico", "image/x-icon")),
+		shared.NewRoute("GET", "/robots.txt", serveFile("robots.txt", "text/plain")),
 	}
 }
 
-func createMainRoutes(staticRoutes []Route) []Route {
-	routes := []Route{
-		NewRoute("GET", "/", createPageHandler("html/marketing.page.tmpl")),
-		NewRoute("GET", "/spec", createPageHandler("html/spec.page.tmpl")),
-		NewRoute("GET", "/ops", createPageHandler("html/ops.page.tmpl")),
-		NewRoute("GET", "/privacy", createPageHandler("html/privacy.page.tmpl")),
-		NewRoute("GET", "/help", createPageHandler("html/help.page.tmpl")),
-		NewRoute("GET", "/transparency", transparencyHandler),
+func createMainRoutes(staticRoutes []shared.Route) []shared.Route {
+	routes := []shared.Route{
+		shared.NewRoute("GET", "/", createPageHandler("html/marketing.page.tmpl")),
+		shared.NewRoute("GET", "/spec", createPageHandler("html/spec.page.tmpl")),
+		shared.NewRoute("GET", "/ops", createPageHandler("html/ops.page.tmpl")),
+		shared.NewRoute("GET", "/privacy", createPageHandler("html/privacy.page.tmpl")),
+		shared.NewRoute("GET", "/help", createPageHandler("html/help.page.tmpl")),
+		shared.NewRoute("GET", "/transparency", transparencyHandler),
 	}
 
 	routes = append(
@@ -395,18 +403,18 @@ func createMainRoutes(staticRoutes []Route) []Route {
 
 	routes = append(
 		routes,
-		NewRoute("GET", "/([^/]+)", blogHandler),
-		NewRoute("GET", "/([^/]+)/([^/]+)", postHandler),
-		NewRoute("GET", "/([^/]+)/([^/]+)/raw", postHandlerRaw),
-		NewRoute("GET", "/raw/([^/]+)/([^/]+)", postHandlerRaw),
+		shared.NewRoute("GET", "/([^/]+)", blogHandler),
+		shared.NewRoute("GET", "/([^/]+)/([^/]+)", postHandler),
+		shared.NewRoute("GET", "/([^/]+)/([^/]+)/raw", postHandlerRaw),
+		shared.NewRoute("GET", "/raw/([^/]+)/([^/]+)", postHandlerRaw),
 	)
 
 	return routes
 }
 
-func createSubdomainRoutes(staticRoutes []Route) []Route {
-	routes := []Route{
-		NewRoute("GET", "/", blogHandler),
+func createSubdomainRoutes(staticRoutes []shared.Route) []shared.Route {
+	routes := []shared.Route{
+		shared.NewRoute("GET", "/", blogHandler),
 	}
 
 	routes = append(
@@ -416,9 +424,9 @@ func createSubdomainRoutes(staticRoutes []Route) []Route {
 
 	routes = append(
 		routes,
-		NewRoute("GET", "/([^/]+)", postHandler),
-		NewRoute("GET", "/([^/]+)/raw", postHandlerRaw),
-		NewRoute("GET", "/raw/([^/]+)", postHandlerRaw),
+		shared.NewRoute("GET", "/([^/]+)", postHandler),
+		shared.NewRoute("GET", "/([^/]+)/raw", postHandlerRaw),
+		shared.NewRoute("GET", "/raw/([^/]+)", postHandlerRaw),
 	)
 
 	return routes
@@ -436,7 +444,7 @@ func StartApiServer() {
 	mainRoutes := createMainRoutes(staticRoutes)
 	subdomainRoutes := createSubdomainRoutes(staticRoutes)
 
-	handler := CreateServe(mainRoutes, subdomainRoutes, cfg, db, logger)
+	handler := shared.CreateServe(mainRoutes, subdomainRoutes, cfg, db, logger)
 	router := http.HandlerFunc(handler)
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)

@@ -1,4 +1,4 @@
-package lists
+package shared
 
 import (
 	"encoding/base64"
@@ -70,13 +70,11 @@ func IsText(s string) bool {
 	return true
 }
 
-var allowedExtensions = []string{".txt"}
-
 // IsTextFile reports whether the file has a known extension indicating
 // a text file, or if a significant chunk of the specified file looks like
 // correct UTF-8; that is, if it is likely that the file contains human-
 // readable text.
-func IsTextFile(text string, filename string) bool {
+func IsTextFile(text string, filename string, allowedExtensions []string) bool {
 	ext := pathpkg.Ext(filename)
 	if !slices.Contains(allowedExtensions, ext) {
 		return false
