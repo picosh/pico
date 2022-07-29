@@ -1,0 +1,13 @@
+{{template "base" .}}
+
+{{define "body"}}
+# read
+recently updated lists
+
+{{if .NextPage}}=> {{.NextPage}} next{{end}}
+{{if .PrevPage}}=> {{.PrevPage}} prev{{end}}
+{{range .Posts}}
+=> {{.URL}} {{.UpdatedTimeAgo}}{{.Padding}} {{.Title}} ({{.Username}})
+{{- end}}
+{{template "marketing-footer" .}}
+{{end}}

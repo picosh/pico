@@ -1,0 +1,44 @@
+{
+	on_demand_tls {
+		ask http://web:3000/check
+		interval 1m
+		burst 10
+	}
+}
+
+*.prose.sh, prose.sh {
+	reverse_proxy web:3000
+	tls hello@prose.sh {
+		dns cloudflare {env.CF_API_TOKEN}
+	}
+	encode zstd gzip
+
+    header {
+        # disable FLoC tracking
+        Permissions-Policy interest-cohort=()
+
+        # enable HSTS
+        Strict-Transport-Security max-age=31536000;
+
+        # disable clients from sniffing the media type
+        X-Content-Type-Options nosniff
+
+        # clickjacking protection
+        X-Frame-Options DENY
+
+        # keep referrer data off of HTTP connections
+        Referrer-Policy no-referrer-when-downgrade
+
+        Content-Security-Policy "default-src 'self'; img-src * 'unsafe-inline'; style-src * 'unsafe-inline'"
+
+        X-XSS-Protection "1; mode=block"
+    }
+}
+
+:443 {
+	reverse_proxy web:3000
+	tls hello@prose.sh {
+		on_demand
+	}
+	encode zstd gzip
+}

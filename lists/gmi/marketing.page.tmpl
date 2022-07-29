@@ -1,0 +1,95 @@
+{{template "base" .}}
+
+{{define "body"}}
+# {{.Site.Domain}}
+A microblog for lists
+
+=> /read discover some interesting lists
+
+---
+
+## Examples
+
+=> /news official blog
+=> https://git.sr.ht/~erock/lists-official-blog blog source
+
+## Create your account
+
+We don't want your email address.
+
+To get started, simply ssh into our content management system:
+
+```
+ssh new@{{.Site.Domain}}
+```
+
+=> /help#permission-denied note: getting permission denied?
+
+After that, just set a username and you're ready to start writing!  When you SSH again, use your username that you set in the CMS.
+
+## You control the source files
+
+Create lists using your favorite editor in plain text files.
+
+`~/blog/days-in-week.txt`
+
+```
+Sunday
+Monday
+Tuesday
+Wednesday
+Thursday
+Friday
+Saturday
+```
+
+## Publish your posts with one command
+
+When your post is ready to be published, copy the file to our server with a familiar command:
+
+```
+scp ~/blog/*.txt {{.Site.Domain}}
+```
+
+We'll either create or update the lists for you.
+
+## Terminal workflow without installation
+
+Since we are leveraging tools you already have on your computer (`ssh` and `scp`), there is nothing to install. This provides the convenience of a web app, but from inside your terminal!
+
+## Plain text format
+
+A simple specification that is flexible and with no frills.
+
+=> /spec specification
+
+## Features
+
+* Just lists
+* Looks great on any device
+* Bring your own editor
+* You control the source files
+* Terminal workflow with no installation
+* Public-key based authentication
+* No ads, zero tracking
+* No platform lock-in
+* No javascript
+* Subscriptions via RSS
+* Not a platform for todos
+* Minimalist design
+* 100% open source
+
+## Philosophy
+
+I love writing lists.  I think restricting writing to a set of lists can really help improve clarity in thought.  The goal of this blogging platform is to make it simple to use the tools you love to write and publish lists.  There is no installation, signup is as easy as SSH'ing into our CMS, and publishing content is as easy as copying files to our server.
+
+Another goal of this microblog platform is to satisfy my own needs.  I like to write and share lists with people because I find it's one of the best way to disseminate knowledge.  Whether it's a list of links or a list of paragraphs, writing in lists is very satisfying and I welcome you to explore it on this site!
+
+Other blogging platforms support writing lists, but they don't emphasize them.  Writing lists is pretty popular on Twitter, but discoverability is terrible.  Other blogging platforms focus on prose, but there really is nothing out there catered specifically for lists ... until now.
+
+## Roadmap
+
+* Feature complete?
+
+{{template "marketing-footer" .}}
+{{end}}

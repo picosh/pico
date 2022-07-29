@@ -1,0 +1,12 @@
+{{template "base" .}}
+
+{{define "body"}}
+# {{.Title}}
+{{.PublishAt}}
+{{if .Description}}{{.Description}}{{end}}
+=> {{.BlogURL}} on {{.BlogName}}
+
+---
+{{- template "list" . -}}
+{{- template "footer" . -}}
+{{end}}

@@ -1,0 +1,124 @@
+{{template "base" .}}
+
+{{define "body"}}
+# Need help?
+
+Here are some common questions on using this platform that we would like to answer.
+
+## I get a permission denied when trying to SSH
+
+Unfortunately, due to a shortcoming in Go’s x/crypto/ssh package, Soft Serve does not currently support access via new SSH RSA keys: only the old SHA-1 ones will work. Until we sort this out you’ll either need an SHA-1 RSA key or a key with another algorithm, e.g. Ed25519. Not sure what type of keys you have? You can check with the following:
+
+```
+$ find ~/.ssh/id_*.pub -exec ssh-keygen -l -f {} \;
+```
+
+If you’re curious about the inner workings of this problem have a look at:
+
+=> https://github.com/golang/go/issues/37278 golang/go#37278
+=> https://go-review.googlesource.com/c/crypto/+/220037 go-review
+=> https://github.com/golang/crypto/pull/197 golang/crypto#197
+
+## Generating a new SSH key
+
+=> https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent Github reference
+
+```
+ssh-keygen -t ed25519 -C "your_email@example.com"
+```
+
+* When you're prompted to "Enter a file in which to save the key," press Enter. This accepts the default file location.
+* At the prompt, type a secure passphrase.
+
+## What should my blog folder look like?
+
+Currently {{.Site.Domain}} only supports a flat folder structure.  Therefore, `scp -r` is not permitted.  We also only allow `.txt` files to be uploaded.
+
+=> https://github.com/neurosnap/lists-blog Here is the source to my blog on this platform
+
+Below is an example of what your blog folder should look like:
+
+```
+blog/
+  first-post.txt
+  second-post.txt
+  third-post.txt
+```
+
+Underscores and hyphens are permitted and will be automatically removed from the title of the list.
+
+## How do I update a list?
+
+Updating a list requires that you update the source document and then run the `scp` command again.  If the filename remains the same, then the list will be updated.
+
+## How do I delete a list?
+
+Because `scp` does not natively support deleting files, I didn't want to bake that behavior into my ssh server.
+
+However, if a user wants to delete a post they can delete the contents of the file and then upload it to our server.  If the file contains 0 bytes, we will remove the post. For example, if you want to delete `delete.txt` you could:
+
+```
+cp /dev/null delete.txt
+scp ./delete.txt {{.Site.Domain}}:/
+```
+
+Alternatively, you can go to `ssh <username>@{{.Site.Domain}}` and select "Manage posts." Then you can highlight the post you want to delete and then press "X."  It will ask for confirmation before actually removing the list.
+
+## When I want to publish a new post, do I have to upload all posts everytime?
+
+Nope!  Just `scp` the file you want to publish.  For example, if you created a new post called `taco-tuesday.txt` then you would publish it like this:
+
+```
+scp ./taco-tuesday.txt {{.Site.Domain}}:/
+```
+
+## How do I change my blog's name?
+
+All you have to do is create a post titled `_header.txt` and add some information to the list.
+
+```
+=: title My new blog!
+=: description My blog description!
+=> https://xyz.com website
+=> https://twitter.com/xyz twitter
+```
+
+* `title` will change your blog name
+* `description` will add a blurb right under your blog name (and add meta descriptions)
+* The links will show up next to the `rss` link to your blog
+
+## How do I add an introduction to my blog?
+
+All you have to do is create a post titled `_readme.txt` and add some information to the list.
+
+```
+=: list_type none
+# Hi my name is Bob!
+I like to sing. Dance. And I like to have fun fun fun!
+```
+
+Whatever is inside the `_readme` file will get rendered (as a list) right above your blog posts. Neat!
+
+## What is my blog URL?
+
+```
+gemini://{{.Site.Domain}}/{username}
+```
+
+## How can I automatically publish my post?
+
+There is a github action that we built to make it easy to publish your blog automatically.
+
+=> https://github.com/marketplace/actions/scp-publish-action github marketplace
+=> https://github.com/neurosnap/lists-official-blog/blob/main/.github/workflows/publish.yml example workflow
+
+A user also created a systemd task to automatically publish new posts.
+
+=> https://github.com/neurosnap/lists.sh/discussions/24 Check out this github discussion for more details.
+
+## Can I create multiple accounts?
+
+Yes!  You can either a) create a new keypair and use that for authentication or b) use the same keypair and ssh into our CMS using our special username `ssh new@{{.Site.Domain}}`.
+Please note that if you use the same keypair for multiple accounts, you will need to always specify the user when logging into our CMS.
+{{template "marketing-footer" .}}
+{{end}}

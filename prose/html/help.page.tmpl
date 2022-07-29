@@ -1,0 +1,277 @@
+{{template "base" .}}
+
+{{define "title"}}help -- {{.Site.Domain}}{{end}}
+
+{{define "meta"}}
+<meta name="description" content="questions and answers" />
+{{end}}
+
+{{define "attrs"}}{{end}}
+
+{{define "body"}}
+<header>
+    <h1 class="text-2xl">Need help?</h1>
+    <p>Here are some common questions on using this platform that we would like to answer.</p>
+</header>
+<main>
+    <section id="permission-denied">
+        <h2 class="text-xl">
+            <a href="#permission-denied" rel="nofollow noopener">#</a>
+            I get a permission denied when trying to SSH
+        </h2>
+        <p>
+            Unfortunately SHA-2 RSA keys are <strong>not</strong> currently supported.
+        </p>
+        <p>
+            Unfortunately, due to a shortcoming in Go’s x/crypto/ssh package, we
+            not currently support access via new SSH RSA keys: only the old SHA-1 ones will work.
+            Until we sort this out you’ll either need an SHA-1 RSA key or a key with another
+            algorithm, e.g. Ed25519. Not sure what type of keys you have? You can check with the
+            following:
+        </p>
+        <pre>$ find ~/.ssh/id_*.pub -exec ssh-keygen -l -f {} \;</pre>
+        <p>If you’re curious about the inner workings of this problem have a look at:</p>
+        <ul>
+            <li><a href="https://github.com/golang/go/issues/37278">golang/go#37278</a></li>
+            <li><a href="https://go-review.googlesource.com/c/crypto/+/220037">go-review</a></li>
+            <li><a href="https://github.com/golang/crypto/pull/197">golang/crypto#197</a></li>
+        </ul>
+    </section>
+
+    <section id="blog-ssh-key">
+        <h2 class="text-xl">
+            <a href="#blog-ssh-key" rel="nofollow noopener">#</a>
+            Generating a new SSH key
+        </h2>
+        <p>
+            <a href="https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent">Github reference</a>
+        </p>
+        <pre>ssh-keygen -t ed25519 -C "your_email@example.com"</pre>
+        <ol>
+            <li>When you're prompted to "Enter a file in which to save the key," press Enter. This accepts the default file location.</li>
+            <li>At the prompt, type a secure passphrase.</li>
+        </ol>
+    </section>
+
+    <section id="blog-structure">
+        <h2 class="text-xl">
+            <a href="#blog-structure" rel="nofollow noopener">#</a>
+            What should my blog folder look like?
+        </h2>
+        <p>
+            Currently {{.Site.Domain}} only supports a flat folder structure.  Therefore,
+            <code>scp -r</code> is not permitted.  We also only allow <code>.md</code> files to be
+            uploaded.
+        </p>
+        <p>
+            <a href="https://github.com/neurosnap/prose-blog">Here is the source to my blog on this platform</a>
+        </p>
+        <p>
+        Below is an example of what your blog folder should look like:
+        </p>
+            <pre>blog/
+first-post.md
+second-post.md
+third-post.md</pre>
+        </p>
+        <p>
+            Underscores and hyphens are permitted and will be automatically removed from the title of the post.
+        </p>
+    </section>
+
+    <section id="post-metadata">
+        <h2 class="text-xl">
+            <a href="#post-metadata" rel="nofollow noopener">#</a>
+            How do I update metadata like publish date and title?
+        </h2>
+        <p>
+        We support adding frontmatter to the top of your markdown posts.  A frontmatter looks like the following:
+        <pre>---
+title: some title!
+description: this is a great description
+date: 2022-06-28
+---</pre>
+        </p>
+        <p>
+            List of available variables:
+            <ul>
+                <li>title (custom title not dependent on filename)</li>
+                <li>description (what is the purpose of this post?  It's also added to meta tag)</li>
+                <li>date (format must be YYYY-MM-DD)</li>
+            </ul>
+        </p>
+    </section>
+
+    <section id="post-update">
+        <h2 class="text-xl">
+            <a href="#post-update" rel="nofollow noopener">#</a>
+            How do I update a post?
+        </h2>
+        <p>
+            Updating a post requires that you update the source document and then run the <code>scp</code>
+            command again.  If the filename remains the same, then the post will be updated.
+        </p>
+    </section>
+
+    <section id="post-delete">
+        <h2 class="text-xl">
+            <a href="#post-delete" rel="nofollow noopener">#</a>
+            How do I delete a post?
+        </h2>
+        <p>
+            Because <code>scp</code> does not natively support deleting files, I didn't want to bake
+            that behavior into my ssh server.
+        </p>
+
+        <p>
+            However, if a user wants to delete a post they can delete the contents of the file and
+            then upload it to our server.  If the file contains 0 bytes, we will remove the post.
+            For example, if you want to delete <code>delete.md</code> you could:
+        </p>
+
+        <pre>
+cp /dev/null delete.md
+scp ./delete.md {{.Site.Domain}}:/</pre>
+
+        <p>
+            Alternatively, you can go to <code>ssh {{.Site.Domain}}</code> and select "Manage posts."
+            Then you can highlight the post you want to delete and then press "X."  It will ask for
+            confirmation before actually removing the post.
+        </p>
+    </section>
+
+    <section id="blog-upload-single-file">
+        <h2 class="text-xl">
+            <a href="#blog-upload-single-file" rel="nofollow noopener">#</a>
+            When I want to publish a new post, do I have to upload all posts everytime?
+        </h2>
+        <p>
+            Nope!  Just <code>scp</code> the file you want to publish.  For example, if you created
+            a new post called <code>taco-tuesday.md</code> then you would publish it like this:
+        </p>
+        <pre>scp ./taco-tuesday.md {{.Site.Domain}}:</pre>
+    </section>
+
+    <section id="blog-readme">
+        <h2 class="text-xl">
+            <a href="#blog-readme" rel="nofollow noopener">#</a>
+            How can I customize my blog page?
+        </h2>
+        <p>
+        There's a special file you can upload `_readme.md` which will allow
+        users to add a bio and links to their blog landing page.
+        <pre>---
+title: some title!
+description: this is a great description
+nav:
+    - google: https://google.com
+    - site: https://some.site
+---
+
+Here is a quick intro to my personal blog!
+This will show up on the blog landing page.
+</pre>
+        </p>
+        <p>
+            List of available variables:
+            <ul>
+                <li>title (name of the blog, default: "X's blog")</li>
+                <li>description (description of blog)</li>
+                <li>nav (key=value pair that corresponds to text=href in html)</li>
+            </ul>
+        </p>
+    </section>
+
+    <section id="blog-style">
+        <h2 class="text-xl">
+            <a href="#blog-style" rel="nofollow noopener">#</a>
+            How can I change the theme of my blog?
+        </h2>
+        <p>
+            There's a special file you can upload `_styles.css` which will allow
+            users to add a CSS file to their page.  It will be the final CSS file
+            loaded on the page so it will overwrite whatever styles have previously
+            been added.  We've also added a couple of convenience id's attached to the
+            body element for the blog and post pages.
+        </p>
+        <pre>/* _styles.css */
+#post {
+    color: green;
+}
+
+#blog {
+    color: tomato;
+}</pre>
+        <p>Then just upload the file:</p>
+        <pre>scp _styles.css <username>@prose.sh:/</pre>
+    </section>
+
+    <section id="blog-url">
+        <h2 class="text-xl">
+            <a href="#blog-url" rel="nofollow noopener">#</a>
+            What is my blog URL?
+        </h2>
+        <pre>https://{username}.{{.Site.Domain}}</pre>
+    </section>
+
+    <section id="continuous-deployment">
+        <h2 class="text-xl">
+            <a href="#continuous-deployment" rel="nofollow noopener">#</a>
+            How can I automatically publish my post?
+        </h2>
+        <p>
+            There is a github action that we built to make it easy to publish your blog automatically.
+        </p>
+        <ul>
+            <li>
+                <a href="https://github.com/marketplace/actions/scp-publish-action">github marketplace</a>
+            </li>
+            <li>
+                <a href="https://github.com/neurosnap/lists-official-blog/blob/main/.github/workflows/publish.yml">example workflow</a>
+            </li>
+        </ul>
+        <p>
+            A user also created a systemd task to automatically publish new posts.  <a href="https://github.com/neurosnap/lists.sh/discussions/24">Check out this github discussion for more details.</a>
+        </p>
+    </section>
+
+    <section id="multiple-accounts">
+        <h2 class="text-xl">
+            <a href="#multiple-accounts" rel="nofollow noopener">#</a>
+            Can I create multiple accounts?
+        </h2>
+        <p>
+           Yes!  You can either a) create a new keypair and use that for authentication
+           or b) use the same keypair and ssh into our CMS using our special username
+           <code>ssh new@{{.Site.Domain}}</code>.
+        </p>
+        <p>
+            Please note that if you use the same keypair for multiple accounts, you will need to
+            always specify the user when logging into our CMS.
+        </p>
+    </section>
+
+    <section id="custom-domain">
+        <h2 class="text-xl">
+            <a href="#custom-domain" rel="nofollow noopener">#</a>
+            Setup a custom domain
+        </h2>
+        <p>
+            A blog can be accessed from a custom domain.
+            HTTPS will be automatically enabled and a certificate will be retrieved
+            from <a href="https://letsencrypt.org/">Let's Encrypt</a>. In order for this to work,
+            2 DNS records need to be created:
+        </p>
+
+        <p>CNAME for the domain to prose (subdomains or DNS hosting with CNAME flattening) or A record</p>
+        <pre>CNAME subdomain.yourcustomdomain.com -> prose.sh</pre>
+        <p>Resulting in:</p>
+        <pre>subdomain.yourcustomdomain.com.         300     IN      CNAME   prose.sh.</pre>
+        <p>And a TXT record to tell Prose what blog is hosted on that domain at the subdomain entry _prose</p>
+        <pre>TXT _prose.subdomain.yourcustomdomain.com -> yourproseusername</pre>
+        <p>Resulting in:</p>
+        <pre>_prose.subdomain.yourcustomdomain.com.         300     IN      TXT     "hey"</pre>
+    </section>
+</main>
+{{template "marketing-footer" .}}
+{{end}}

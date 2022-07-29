@@ -1,0 +1,41 @@
+{{template "base" .}}
+
+{{define "title"}}{{.PageTitle}}{{end}}
+
+{{define "meta"}}
+<meta name="description" content="{{.Description}}" />
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="{{.Site.Domain}}">
+<meta property="og:url" content="{{.URL}}">
+<meta property="og:title" content="{{.Title}}">
+{{if .Description}}<meta property="og:description" content="{{.Description}}">{{end}}
+<meta property="og:image:width" content="300" />
+<meta property="og:image:height" content="300" />
+<meta itemprop="image" content="https://{{.Site.Domain}}/card.png" />
+<meta property="og:image" content="https://{{.Site.Domain}}/card.png" />
+
+<meta property="twitter:card" content="summary">
+<meta property="twitter:url" content="{{.URL}}">
+<meta property="twitter:title" content="{{.Title}}">
+{{if .Description}}<meta property="twitter:description" content="{{.Description}}">{{end}}
+<meta name="twitter:image" content="https://{{.Site.Domain}}/card.png" />
+<meta name="twitter:image:src" content="https://{{.Site.Domain}}/card.png" />
+{{end}}
+
+{{define "body"}}
+<header>
+    <h1 class="text-2xl font-bold">{{.Title}}</h1>
+    <p class="font-bold m-0">
+        <time datetime="{{.PublishAtISO}}">{{.PublishAt}}</time>
+        <span> on </span>
+        <a href="{{.BlogURL}}">{{.BlogName}}</a></p>
+    {{if .Description}}<div class="my font-italic">{{.Description}}</div>{{end}}
+</header>
+<main>
+    <article>
+        {{template "list" .}}
+    </article>
+</main>
+{{template "footer" .}}
+{{end}}

@@ -1,0 +1,27 @@
+*.pastes.sh, pastes.sh {
+	reverse_proxy web:3000
+	tls hello@pastes.sh
+	tls {
+		dns cloudflare {env.CF_API_TOKEN}
+	}
+	encode zstd gzip
+
+    header {
+        # disable FLoC tracking
+        Permissions-Policy interest-cohort=()
+
+        # enable HSTS
+        Strict-Transport-Security max-age=31536000;
+
+        # disable clients from sniffing the media type
+        X-Content-Type-Options nosniff
+
+        # clickjacking protection
+        X-Frame-Options DENY
+
+        # keep referrer data off of HTTP connections
+        Referrer-Policy no-referrer-when-downgrade
+
+        X-XSS-Protection "1; mode=block"
+    }
+}

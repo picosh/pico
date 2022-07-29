@@ -1,0 +1,178 @@
+{{template "base" .}}
+
+{{define "title"}}specification -- {{.Site.Domain}}{{end}}
+
+{{define "meta"}}
+<meta name="description" content="a specification for lists" />
+{{end}}
+
+{{define "body"}}
+<header>
+    <h1 class="text-2xl">Plain text list</h1>
+    <h2 class="text-xl">Speculative specification</h2>
+    <dl>
+        <dt>Version</dt>
+        <dd>2022.05.02.dev</dd>
+
+        <dt>Status</dt>
+        <dd>Draft</dd>
+
+        <dt>Author</dt>
+        <dd>Eric Bower</dd>
+    </dl>
+</header>
+<main>
+    <section id="overview">
+        <p>
+            The goal of this specification is to understand how we render plain text lists.
+            The overall design of this format is to be easy to parse and render.
+        </p>
+
+        <p>
+            The format is line-oriented, and a satisfactory rendering can be achieved with a single
+            pass of a document, processing each line independently. As per gopher, links can only be
+            displayed one per line, encouraging neat, list-like structure.
+        </p>
+
+        <p>
+            Feedback on any part of this is extremely welcome, please email
+            <a href="mailto:{{.Site.Email}}">{{.Site.Email}}</a>.
+        </p>
+
+        <p>
+            The source code for our parser can be found
+            <a href="https://github.com/neurosnap/lists.sh/blob/main/pkg/parser.go">here</a>.
+        </p>
+
+        <p>
+            The source code for an example list demonstrating all the features can be found
+            <a href="https://github.com/neurosnap/lists-official-blog/blob/main/spec-example.txt">here</a>.
+        </p>
+    </section>
+
+    <section id="parameters">
+        <p>
+            As a subtype of the top-level media type "text", "text/plain" inherits the "charset"
+            parameter defined in <a href="https://datatracker.ietf.org/doc/html/rfc2046#section-4.1">RFC 2046</a>.
+            The default value of "charset" is "UTF-8" for "text" content.
+        </p>
+    </section>
+
+    <section id="line-orientation">
+        <p>
+            As mentioned, the text format is line-oriented. Each line of a document has a single
+            "line type". It is possible to unambiguously determine a line's type purely by
+            inspecting its first (3) characters. A line's type determines the manner in which it
+            should be presented to the user. Any details of presentation or rendering associated
+            with a particular line type are strictly limited in scope to that individual line.
+        </p>
+    </section>
+
+    <section id="file-extensions">
+        <h2 class="text-xl">File extension</h2>
+        <p>
+            {{.Site.Domain}} only supports the <code>.txt</code> file extension and will
+            ignore all other file extensions.
+        </p>
+    </section>
+
+    <section id="list-item">
+        <h2 class="text-xl">List item</h2>
+        <p>
+            List items are separated by newline characters <code>\n</code>.
+            Each list item is on its own line.  A list item does not require any special formatting.
+            A list item can contain as much text as it wants.  We encourage soft wrapping for readability
+            in your editor of choice.  Hard wrapping is not permitted as it will create a new list item.
+        </p>
+        <p>
+            Empty lines will be completely removed and not rendered to the end user.
+        </p>
+    </section>
+
+    <section id="hyperlinks">
+        <h2 class="text-xl">Hyperlinks</h2>
+        <p>
+            Hyperlinks are denoted by the prefix <code>=></code>.  The following text should then be
+            the hyperlink.
+        </p>
+        <pre>=> https://{{.Site.Domain}}</pre>
+        <p>Optionally you can supply the hyperlink text immediately following the link.</p>
+        <pre>=> https://{{.Site.Domain}} microblog for lists</pre>
+    </section>
+
+    <section id="images">
+        <h2 class="text-xl">Images</h2>
+        <p>
+            List items can be represented as images by prefixing the line with <code>=<</code>.
+        </p>
+        <pre>=< https://i.imgur.com/iXMNUN5.jpg</pre>
+        <p>Optionally you can supply the image alt text immediately following the link.</p>
+        <pre>=< https://i.imgur.com/iXMNUN5.jpg I use arch, btw</pre>
+    </section>
+
+    <section id="headers">
+        <h2 class="text-xl">Headers</h2>
+        <p>
+            List items can be represented as headers.  We support two headers currently.  Headers
+            will end the previous list and then create a new one after it.  This allows a single
+            document to contain multiple lists.
+        </p>
+        <pre># Header One
+## Header Two</pre>
+    </section>
+
+    <section id="blockquotes">
+        <h2 class="text-xl">Blockquotes</h2>
+        <p>
+            List items can be represented as blockquotes.
+        </p>
+        <pre>> This is a blockquote.</pre>
+    </section>
+
+    <section id="preformatted">
+        <h2 class="text-xl">Preformatted</h2>
+        <p>
+            List items can be represented as preformatted text where newline characters are not
+            considered part of new list items.  They can be represented by prefixing the line with
+            <code>```</code>.
+        </p>
+        <pre>```
+#!/usr/bin/env bash
+
+set -x
+
+echo "this is a preformatted list item!
+```</pre>
+        <p>
+            You must also close the preformatted text with another <code>```</code> on its own line. The
+            next example with NOT work.
+        </p>
+        <pre>```
+#!/usr/bin/env bash
+
+echo "This will not render properly"```</pre>
+    </section>
+
+    <section id="variables">
+        <h2 class="text-xl">Variables</h2>
+        <p>
+            Variables allow us to store metadata within our system.  Variables are list items with
+            key value pairs denoted by <code>=:</code> followed by the key, a whitespace character,
+            and then the value.
+        </p>
+        <pre>=: publish_at 2022-04-20</pre>
+        <p>These variables will not be rendered to the user inside the list.</p>
+        <h3 class="text-lg">List of available variables:</h3>
+        <ul>
+            <li><code>title</code> (custom title not dependent on filename)</li>
+            <li><code>description</code> (what is the purpose of this list?)</li>
+            <li><code>publish_at</code> (format must be <code>YYYY-MM-DD</code>)</li>
+            <li>
+                <code>list_type</code> (customize bullets; value gets sent directly to css property
+                <a href="https://developer.mozilla.org/en-US/docs/Web/CSS/list-style-type">list-style-type</a>)
+            </li>
+        </ul>
+    </section>
+</main>
+{{template "marketing-footer" .}}
+{{end}}

@@ -1,0 +1,28 @@
+{{template "base" .}}
+
+{{define "body"}}
+# Privacy
+
+Details on our privacy and security approach.
+
+## Account Data
+
+In order to have a functional account at {{.Site.Domain}}, we need to store your public key.  That is the only piece of information we record for a user.
+
+Because we use public-key cryptography, our security posture is a battle-tested and proven technique for authentication.
+
+## Third parties
+
+We have a strong commitment to never share any user data with any third-parties.
+
+## Service Providers
+
+We host our server on digital ocean [0]
+
+=> https://digitalocean.com [0]
+
+## Cookies
+
+We do not use any cookies, not even account authentication.
+{{template "marketing-footer" .}}
+{{end}}

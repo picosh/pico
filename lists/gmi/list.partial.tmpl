@@ -1,0 +1,25 @@
+{{define "list"}}
+{{range .Items}}
+{{- if .IsText}}
+{{- if .Value}}
+* {{.Value}}
+{{- end}}
+{{- else if .IsURL}}
+=> {{.URL}} {{.Value}}
+{{- else if .IsImg}}
+=> {{.URL}} {{.Value}}
+{{- else if .IsBlock}}
+> {{.Value}}
+{{- else if .IsHeaderOne}}
+
+## {{.Value}}
+{{- else if .IsHeaderTwo}}
+
+### {{.Value}}
+{{- else if .IsPre}}
+```
+{{.Value}}
+```
+{{- end}}
+{{- end}}
+{{end}}

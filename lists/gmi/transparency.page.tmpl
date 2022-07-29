@@ -1,0 +1,31 @@
+{{template "base" .}}
+
+{{define "body"}}
+# Transparency
+
+## Analytics
+
+Here are some interesting stats on usage.
+
+Total users:
+{{.Analytics.TotalUsers}}
+
+New users in the last month:
+{{.Analytics.UsersLastMonth}}
+
+Total posts:
+{{.Analytics.TotalPosts}}
+
+New posts in the last month:
+{{.Analytics.PostsLastMonth}}
+
+Users with at least one post:
+{{.Analytics.UsersWithPost}}
+
+Service maintenance costs:
+
+* Server $5.00/mo
+* Domain name $3.25/mo
+* Programmer $0.00/mo
+{{template "marketing-footer" .}}
+{{end}}

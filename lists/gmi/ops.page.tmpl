@@ -1,0 +1,60 @@
+{{template "base" .}}
+
+{{define "body"}}
+# Operations
+
+=> /privacy privacy
+=> /transparency transparency
+
+## Purpose
+
+{{.Site.Domain}} exists to allow people to create and share their lists without the need to set up their own server or be part of a platform that shows ads or tracks its users.
+
+## Ethics
+
+We are committed to:
+
+* No tracking of user or visitor behaviour.
+* Never sell any user or visitor data.
+* No ads — ever.
+
+## Code of Content Publication
+
+Content in {{.Site.Domain}} blogs is unfiltered and unmonitored. Users are free to publish any combination of words and pixels except for: content of animosity or disparagement of an individual or a group on account of a group characteristic such as race, color, national origin, sex, disability, religion, or sexual orientation, which will be taken down immediately.
+
+If one notices something along those lines in a blog please let us know at {{.Site.Email}}.
+
+## Liability
+
+The user expressly understands and agrees that Eric Bower, the operator of this website shall not be liable, in law or in equity, to them or to any third party for any direct, indirect, incidental, lost profits, special, consequential, punitive or exemplary damages.
+
+## Account Terms
+
+* The user is responsible for all content posted and all actions performed with their account.
+* We reserve the right to disable or delete a user's account for any reason at any time. We have this clause because, statistically speaking, there will be people trying to do something nefarious.
+
+## Service Availability
+
+We provide the {{.Site.Domain}} service on an "as is" and "as available" basis. We do not offer service-level agreements but do take uptime seriously.
+
+## Contact and Support
+
+Email us at {{.Site.Email}} with any questions.
+
+## Acknowledgments
+
+{{.Site.Domain}} was inspired by Mataroa Blog[0] and Bear Blog[1].
+
+=> https://mataroa.blog [0]mataroa blog
+=> https://bearblog.dev [1]bearblog
+
+{{.Site.Domain}} is built with many open source technologies.
+
+In particular we would like to thank:
+
+=> https://charm.sh The charm community
+=> https://go.dev The golang community
+=> https://www.postgresql.org The postgresql community
+=> https://github.com/caddyserver/caddy The caddy community
+{{template "marketing-footer" .}}
+{{end}}

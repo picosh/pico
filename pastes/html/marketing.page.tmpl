@@ -1,0 +1,101 @@
+{{template "base" .}}
+
+{{define "title"}}{{.Site.Domain}} -- a pastebin for hackers{{end}}
+
+{{define "meta"}}
+<meta name="description" content="a pastebin for hackers" />
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="{{.Site.Domain}}">
+<meta property="og:url" content="https://{{.Site.Domain}}">
+<meta property="og:title" content="{{.Site.Domain}}">
+<meta property="og:description" content="a pastebin for hackers">
+
+<meta name="twitter:card" content="summary" />
+<meta property="twitter:url" content="https://{{.Site.Domain}}">
+<meta property="twitter:title" content="{{.Site.Domain}}">
+<meta property="twitter:description" content="a pastebin platform for hackers">
+<meta name="twitter:image" content="https://{{.Site.Domain}}/card.png" />
+<meta name="twitter:image:src" content="https://{{.Site.Domain}}/card.png" />
+
+<meta property="og:image:width" content="300" />
+<meta property="og:image:height" content="300" />
+<meta itemprop="image" content="https://{{.Site.Domain}}/card.png" />
+<meta property="og:image" content="https://{{.Site.Domain}}/card.png" />
+{{end}}
+
+{{define "attrs"}}{{end}}
+
+{{define "body"}}
+<header class="text-center">
+    <h1 class="text-2xl font-bold">{{.Site.Domain}}</h1>
+    <p class="text-lg">a pastebin for hackers</p>
+    <hr />
+</header>
+
+<main>
+    <section>
+        <h2 class="text-lg font-bold">Create your account with Public-Key Cryptography</h2>
+        <p>We don't want your email address.</p>
+        <p>To get started, simply ssh into our content management system:</p>
+        <pre>ssh new@{{.Site.Domain}}</pre>
+        <div class="text-sm font-italic note">
+            note: <code>new</code> is a special username that will always send you to account
+            creation, even with multiple accounts associated with your key-pair.
+        </div>
+        <div class="text-sm font-italic note">
+            note: getting permission denied? <a href="/help#permission-denied">read this</a>
+        </div>
+        <p>
+            After that, just set a username and you're ready to start writing! When you SSH
+            again, use your username that you set in the CMS.
+        </p>
+    </section>
+
+    <section>
+        <h2 class="text-lg font-bold">Publish your pastes with one command</h2>
+        <p>
+            When your post is ready to be published, copy the file to our server with a familiar
+            command:
+        </p>
+        <pre>scp ./changes.patch {{.Site.Domain}}:/</pre>
+        <p>We'll return the URL back to you so you never have to leave the terminal!</p>
+    </section>
+
+    <section>
+        <h2 class="text-lg font-bold">Terminal workflow without installation</h2>
+        <p>
+            Since we are leveraging tools you already have on your computer
+            (<code>ssh</code> and <code>scp</code>), there is nothing to install.
+        </p>
+        <p>
+            This provides the convenience of a web app, but from inside your terminal!
+        </p>
+    </section>
+
+    <section>
+        <h2 class="text-lg font-bold">Features</h2>
+        <ul>
+            <li>Pastes last 3 days</li>
+            <li>Bring your own editor</li>
+            <li>You control the source files</li>
+            <li>Terminal workflow with no installation</li>
+            <li>Public-key based authentication</li>
+            <li>No ads, zero tracking</li>
+            <li>No platform lock-in</li>
+            <li>No javascript</li>
+            <li>Minimalist design</li>
+            <li>100% open source</li>
+        </ul>
+    </section>
+
+    <section>
+        <h2 class="text-lg font-bold">Roadmap</h2>
+        <ol>
+          <li>Ability to customize expiration</li>
+        </ol>
+    </section>
+</main>
+
+{{template "marketing-footer" .}}
+{{end}}
