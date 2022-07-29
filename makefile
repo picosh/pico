@@ -4,7 +4,6 @@ PGUSER?="postgres"
 PORT?="5432"
 DB_CONTAINER?=pico-services_db_1
 DOCKER_TAG?=$(shell git log --format="%H" -n 1)
-PROJ?="prose"
 
 test:
 	docker run --rm -v $(shell pwd):/app -w /app golangci/golangci-lint:latest golangci-lint run -E goimports -E godot
@@ -19,9 +18,20 @@ bp-caddy: bp-setup
 	docker buildx build --push --platform linux/amd64,linux/arm64 -t neurosnap/cloudflare-caddy:$(DOCKER_TAG) -f Dockerfile.caddy .
 .PHONY: bp-caddy
 
-bp:
-	$(MAKE) -C $(PROJ) bp
-.PHONY: bp
+bp-prose:
+	$(MAKE) -C prose bp
+.PHONY: bp-prose
+
+bp-pastes:
+	$(MAKE) -C pastes bp
+.PHONY: bp-pastes
+
+bp-lists:
+	$(MAKE) -C lists bp
+.PHONY: bp-lists
+
+bp-all: bp-prose bp-lists bp-pastes
+.PHONY: bp-all
 
 build-prose:
 	go build -o build/prose-web ./cmd/prose/web
