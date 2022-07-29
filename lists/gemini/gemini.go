@@ -16,21 +16,21 @@ import (
 	"git.sr.ht/~adnano/go-gemini"
 	"git.sr.ht/~adnano/go-gemini/certificate"
 	feeds "git.sr.ht/~aw/gorilla-feeds"
-	"git.sr.ht/~erock/lists.sh/internal"
-	"git.sr.ht/~erock/lists.sh/pkg"
+	"git.sr.ht/~erock/pico/lists"
+	"git.sr.ht/~erock/pico/lists/pkg"
 	"git.sr.ht/~erock/pico/wish/cms/db"
 	"git.sr.ht/~erock/pico/wish/cms/db/postgres"
 	"golang.org/x/exp/slices"
 )
 
-func renderTemplate(templates []string) (*template.Template, error) {
+func renderTemplate(cfg *internal.ConfigSite, templates []string) (*template.Template, error) {
 	files := make([]string, len(templates))
 	copy(files, templates)
 	files = append(
 		files,
-		"./gmi/footer.partial.tmpl",
-		"./gmi/marketing-footer.partial.tmpl",
-		"./gmi/base.layout.tmpl",
+		cfg.StaticPath("gmi/footer.partial.tmpl"),
+		cfg.StaticPath("gmi/marketing-footer.partial.tmpl"),
+		cfg.StaticPath("gmi/base.layout.tmpl"),
 	)
 
 	ts, err := template.ParseFiles(files...)
@@ -44,7 +44,7 @@ func createPageHandler(fname string) gemini.HandlerFunc {
 	return func(ctx context.Context, w gemini.ResponseWriter, r *gemini.Request) {
 		logger := GetLogger(ctx)
 		cfg := GetCfg(ctx)
-		ts, err := renderTemplate([]string{fname})
+		ts, err := renderTemplate(cfg, []string{cfg.StaticPath(fname)})
 
 		if err != nil {
 			logger.Error(err)
@@ -82,9 +82,9 @@ func blogHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Request
 		return
 	}
 
-	ts, err := renderTemplate([]string{
-		"./gmi/blog.page.tmpl",
-		"./gmi/list.partial.tmpl",
+	ts, err := renderTemplate(cfg, []string{
+		cfg.StaticPath("gmi/blog.page.tmpl"),
+		cfg.StaticPath("gmi/list.partial.tmpl"),
 	})
 
 	if err != nil {
@@ -167,8 +167,8 @@ func readHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Request
 		return
 	}
 
-	ts, err := renderTemplate([]string{
-		"./gmi/read.page.tmpl",
+	ts, err := renderTemplate(cfg, []string{
+		cfg.StaticPath("gmi/read.page.tmpl"),
 	})
 
 	if err != nil {
@@ -286,9 +286,9 @@ func postHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Request
 		Items:        parsedText.Items,
 	}
 
-	ts, err := renderTemplate([]string{
-		"./gmi/post.page.tmpl",
-		"./gmi/list.partial.tmpl",
+	ts, err := renderTemplate(cfg, []string{
+		cfg.StaticPath("gmi/post.page.tmpl"),
+		cfg.StaticPath("gmi/list.partial.tmpl"),
 	})
 
 	if err != nil {
@@ -316,10 +316,10 @@ func transparencyHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini
 	}
 
 	ts, err := template.ParseFiles(
-		"./gmi/transparency.page.tmpl",
-		"./gmi/footer.partial.tmpl",
-		"./gmi/marketing-footer.partial.tmpl",
-		"./gmi/base.layout.tmpl",
+		cfg.StaticPath("gmi/transparency.page.tmpl"),
+		cfg.StaticPath("gmi/footer.partial.tmpl"),
+		cfg.StaticPath("gmi/marketing-footer.partial.tmpl"),
+		cfg.StaticPath("gmi/base.layout.tmpl"),
 	)
 
 	if err != nil {
@@ -357,7 +357,10 @@ func rssBlogHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Requ
 		return
 	}
 
-	ts, err := template.ParseFiles("./gmi/rss.page.tmpl", "./gmi/list.partial.tmpl")
+	ts, err := template.ParseFiles(
+		cfg.StaticPath("gmi/rss.page.tmpl"),
+		cfg.StaticPath("gmi/list.partial.tmpl"),
+	)
 	if err != nil {
 		logger.Error(err)
 		w.WriteHeader(gemini.StatusTemporaryFailure, err.Error())
@@ -448,7 +451,10 @@ func rssHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Request)
 		return
 	}
 
-	ts, err := template.ParseFiles("./gmi/rss.page.tmpl", "./gmi/list.partial.tmpl")
+	ts, err := template.ParseFiles(
+		cfg.StaticPath("gmi/rss.page.tmpl"),
+		cfg.StaticPath("gmi/list.partial.tmpl"),
+	)
 	if err != nil {
 		logger.Error(err)
 		w.WriteHeader(gemini.StatusTemporaryFailure, err.Error())
@@ -518,11 +524,11 @@ func StartServer() {
 	}
 
 	routes := []Route{
-		NewRoute("/", createPageHandler("./gmi/marketing.page.tmpl")),
-		NewRoute("/spec", createPageHandler("./gmi/spec.page.tmpl")),
-		NewRoute("/help", createPageHandler("./gmi/help.page.tmpl")),
-		NewRoute("/ops", createPageHandler("./gmi/ops.page.tmpl")),
-		NewRoute("/privacy", createPageHandler("./gmi/privacy.page.tmpl")),
+		NewRoute("/", createPageHandler("gmi/marketing.page.tmpl")),
+		NewRoute("/spec", createPageHandler("gmi/spec.page.tmpl")),
+		NewRoute("/help", createPageHandler("gmi/help.page.tmpl")),
+		NewRoute("/ops", createPageHandler("gmi/ops.page.tmpl")),
+		NewRoute("/privacy", createPageHandler("gmi/privacy.page.tmpl")),
 		NewRoute("/transparency", transparencyHandler),
 		NewRoute("/read", readHandler),
 		NewRoute("/rss", rssHandler),

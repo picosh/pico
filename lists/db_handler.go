@@ -5,7 +5,7 @@ import (
 	"io"
 	"time"
 
-	"git.sr.ht/~erock/lists.sh/pkg"
+	"git.sr.ht/~erock/pico/lists/pkg"
 	"git.sr.ht/~erock/pico/wish/cms/db"
 	"git.sr.ht/~erock/pico/wish/cms/util"
 	sendutils "git.sr.ht/~erock/pico/wish/send/utils"

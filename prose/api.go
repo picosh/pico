@@ -80,14 +80,14 @@ func isRequestTrackable(r *http.Request) bool {
 	return true
 }
 
-func renderTemplate(templates []string) (*template.Template, error) {
+func renderTemplate(cfg *ConfigSite, templates []string) (*template.Template, error) {
 	files := make([]string, len(templates))
 	copy(files, templates)
 	files = append(
 		files,
-		"./html/footer.partial.tmpl",
-		"./html/marketing-footer.partial.tmpl",
-		"./html/base.layout.tmpl",
+		cfg.StaticPath("html/footer.partial.tmpl"),
+		cfg.StaticPath("html/marketing-footer.partial.tmpl"),
+		cfg.StaticPath("html/base.layout.tmpl"),
 	)
 
 	ts, err := template.ParseFiles(files...)
@@ -101,7 +101,7 @@ func createPageHandler(fname string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := GetLogger(r)
 		cfg := GetCfg(r)
-		ts, err := renderTemplate([]string{fname})
+		ts, err := renderTemplate(cfg, []string{cfg.StaticPath(fname)})
 
 		if err != nil {
 			logger.Error(err)
@@ -200,8 +200,8 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	onSubdomain := cfg.IsSubdomains() && strings.Contains(hostDomain, appDomain)
 	withUserName := (!onSubdomain && hostDomain == appDomain) || !cfg.IsCustomdomains()
 
-	ts, err := renderTemplate([]string{
-		"./html/blog.page.tmpl",
+	ts, err := renderTemplate(cfg, []string{
+		cfg.StaticPath("html/blog.page.tmpl"),
 	})
 
 	if err != nil {
@@ -416,8 +416,8 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 		logger.Infof("post not found %s/%s", username, filename)
 	}
 
-	ts, err := renderTemplate([]string{
-		"./html/post.page.tmpl",
+	ts, err := renderTemplate(cfg, []string{
+		cfg.StaticPath("html/post.page.tmpl"),
 	})
 
 	if err != nil {
@@ -444,10 +444,10 @@ func transparencyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ts, err := template.ParseFiles(
-		"./html/transparency.page.tmpl",
-		"./html/footer.partial.tmpl",
-		"./html/marketing-footer.partial.tmpl",
-		"./html/base.layout.tmpl",
+		cfg.StaticPath("html/transparency.page.tmpl"),
+		cfg.StaticPath("html/footer.partial.tmpl"),
+		cfg.StaticPath("html/marketing-footer.partial.tmpl"),
+		cfg.StaticPath("html/base.layout.tmpl"),
 	)
 
 	if err != nil {
@@ -501,8 +501,8 @@ func readHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ts, err := renderTemplate([]string{
-		"./html/read.page.tmpl",
+	ts, err := renderTemplate(cfg, []string{
+		cfg.StaticPath("html/read.page.tmpl"),
 	})
 
 	if err != nil {
@@ -566,7 +566,7 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ts, err := template.ParseFiles("./html/rss.page.tmpl")
+	ts, err := template.ParseFiles(cfg.StaticPath("html/rss.page.tmpl"))
 	if err != nil {
 		logger.Error(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -672,7 +672,7 @@ func rssHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ts, err := template.ParseFiles("./html/rss.page.tmpl")
+	ts, err := template.ParseFiles(cfg.StaticPath("html/rss.page.tmpl"))
 	if err != nil {
 		logger.Error(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -745,8 +745,9 @@ func rssHandler(w http.ResponseWriter, r *http.Request) {
 func serveFile(file string, contentType string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := GetLogger(r)
+		cfg := GetCfg(r)
 
-		contents, err := ioutil.ReadFile(fmt.Sprintf("./public/%s", file))
+		contents, err := ioutil.ReadFile(cfg.StaticPath(fmt.Sprintf("public/%s", file)))
 		if err != nil {
 			logger.Error(err)
 			http.Error(w, "file not found", 404)
@@ -776,11 +777,11 @@ func createStaticRoutes() []Route {
 
 func createMainRoutes(staticRoutes []Route) []Route {
 	routes := []Route{
-		NewRoute("GET", "/", createPageHandler("./html/marketing.page.tmpl")),
-		NewRoute("GET", "/spec", createPageHandler("./html/spec.page.tmpl")),
-		NewRoute("GET", "/ops", createPageHandler("./html/ops.page.tmpl")),
-		NewRoute("GET", "/privacy", createPageHandler("./html/privacy.page.tmpl")),
-		NewRoute("GET", "/help", createPageHandler("./html/help.page.tmpl")),
+		NewRoute("GET", "/", createPageHandler("html/marketing.page.tmpl")),
+		NewRoute("GET", "/spec", createPageHandler("html/spec.page.tmpl")),
+		NewRoute("GET", "/ops", createPageHandler("html/ops.page.tmpl")),
+		NewRoute("GET", "/privacy", createPageHandler("html/privacy.page.tmpl")),
+		NewRoute("GET", "/help", createPageHandler("html/help.page.tmpl")),
 		NewRoute("GET", "/transparency", transparencyHandler),
 		NewRoute("GET", "/read", readHandler),
 		NewRoute("GET", "/check", checkHandler),

@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"log"
 	"net/url"
+	"path"
 
 	"git.sr.ht/~erock/pico/wish/cms/config"
 	"go.uber.org/zap"
@@ -157,6 +158,10 @@ func (c *ConfigSite) CssURL(username string) string {
 	}
 
 	return fmt.Sprintf("/%s/styles.css", username)
+}
+
+func (c *ConfigSite) StaticPath(fname string) string {
+	return path.Join(c.Space, fname)
 }
 
 func CreateLogger() *zap.SugaredLogger {

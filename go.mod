@@ -7,7 +7,6 @@ go 1.18
 require (
 	git.sr.ht/~adnano/go-gemini v0.2.3
 	git.sr.ht/~aw/gorilla-feeds v1.1.4
-	git.sr.ht/~erock/lists.sh v0.0.0-20220729004305-bc7f4fd43f42
 	github.com/alecthomas/chroma v0.10.0
 	github.com/charmbracelet/bubbles v0.13.0
 	github.com/charmbracelet/bubbletea v0.22.0
@@ -28,7 +27,6 @@ require (
 )
 
 require (
-	git.sr.ht/~erock/wish v0.0.0-20220729004215-0881364c2120 // indirect
 	github.com/anmitsu/go-shlex v0.0.0-20200514113438-38f4b401e2be // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/caarlos0/sshmarshal v0.1.0 // indirect
