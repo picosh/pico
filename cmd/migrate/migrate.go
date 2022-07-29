@@ -131,11 +131,9 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	rollback := func() {
-		// Defer a rollback in case anything fails.
-		defer tx.Rollback()
-	}
-	defer rollback()
+	defer func() {
+		err = tx.Rollback()
+	}()
 
 	logger.Info("Finding prose users")
 	proseUsers, err := proseDb.FindUsers()

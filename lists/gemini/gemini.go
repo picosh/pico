@@ -23,7 +23,7 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-func renderTemplate(cfg *internal.ConfigSite, templates []string) (*template.Template, error) {
+func renderTemplate(cfg *lists.ConfigSite, templates []string) (*template.Template, error) {
 	files := make([]string, len(templates))
 	copy(files, templates)
 	files = append(
@@ -52,7 +52,7 @@ func createPageHandler(fname string) gemini.HandlerFunc {
 			return
 		}
 
-		data := internal.PageData{
+		data := lists.PageData{
 			Site: *cfg.GetSiteData(),
 		}
 		err = ts.Execute(w, data)
@@ -93,13 +93,13 @@ func blogHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Request
 		return
 	}
 
-	headerTxt := &internal.HeaderTxt{
-		Title: internal.GetBlogName(username),
+	headerTxt := &lists.HeaderTxt{
+		Title: lists.GetBlogName(username),
 		Bio:   "",
 	}
-	readmeTxt := &internal.ReadmeTxt{}
+	readmeTxt := &lists.ReadmeTxt{}
 
-	postCollection := make([]internal.PostItemData, 0, len(posts))
+	postCollection := make([]lists.PostItemData, 0, len(posts))
 	for _, post := range posts {
 		if post.Filename == "_header" {
 			parsedText := pkg.ParseText(post.Text)
@@ -123,20 +123,20 @@ func blogHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Request
 				readmeTxt.HasItems = true
 			}
 		} else {
-			p := internal.PostItemData{
+			p := lists.PostItemData{
 				URL:            html.URL(cfg.PostURL(post.Username, post.Filename)),
 				BlogURL:        html.URL(cfg.BlogURL(post.Username)),
-				Title:          internal.FilenameToTitle(post.Filename, post.Title),
+				Title:          lists.FilenameToTitle(post.Filename, post.Title),
 				PublishAt:      post.PublishAt.Format("02 Jan, 2006"),
 				PublishAtISO:   post.PublishAt.Format(time.RFC3339),
-				UpdatedTimeAgo: internal.TimeAgo(post.UpdatedAt),
+				UpdatedTimeAgo: lists.TimeAgo(post.UpdatedAt),
 				UpdatedAtISO:   post.UpdatedAt.Format(time.RFC3339),
 			}
 			postCollection = append(postCollection, p)
 		}
 	}
 
-	data := internal.BlogPageData{
+	data := lists.BlogPageData{
 		Site:      *cfg.GetSiteData(),
 		PageTitle: headerTxt.Title,
 		URL:       html.URL(cfg.BlogURL(username)),
@@ -186,7 +186,7 @@ func readHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Request
 		prevPage = fmt.Sprintf("/read?page=%d", page-1)
 	}
 
-	data := internal.ReadPageData{
+	data := lists.ReadPageData{
 		Site:     *cfg.GetSiteData(),
 		NextPage: nextPage,
 		PrevPage: prevPage,
@@ -194,22 +194,22 @@ func readHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Request
 
 	longest := 0
 	for _, post := range pager.Data {
-		size := len(internal.TimeAgo(post.UpdatedAt))
+		size := len(lists.TimeAgo(post.UpdatedAt))
 		if size > longest {
 			longest = size
 		}
 	}
 
 	for _, post := range pager.Data {
-		item := internal.PostItemData{
+		item := lists.PostItemData{
 			URL:            html.URL(cfg.PostURL(post.Username, post.Filename)),
 			BlogURL:        html.URL(cfg.BlogURL(post.Username)),
-			Title:          internal.FilenameToTitle(post.Filename, post.Title),
+			Title:          lists.FilenameToTitle(post.Filename, post.Title),
 			Description:    post.Description,
 			Username:       post.Username,
 			PublishAt:      post.PublishAt.Format("02 Jan, 2006"),
 			PublishAtISO:   post.PublishAt.Format(time.RFC3339),
-			UpdatedTimeAgo: internal.TimeAgo(post.UpdatedAt),
+			UpdatedTimeAgo: lists.TimeAgo(post.UpdatedAt),
 			UpdatedAtISO:   post.UpdatedAt.Format(time.RFC3339),
 		}
 
@@ -240,7 +240,7 @@ func postHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Request
 	}
 
 	header, _ := dbpool.FindPostWithFilename("_header", user.ID, cfg.Space)
-	blogName := internal.GetBlogName(username)
+	blogName := lists.GetBlogName(username)
 	if header != nil {
 		headerParsed := pkg.ParseText(header.Text)
 		if headerParsed.MetaData.Title != "" {
@@ -271,14 +271,14 @@ func postHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Request
 		logger.Error(err)
 	}
 
-	data := internal.PostPageData{
+	data := lists.PostPageData{
 		Site:         *cfg.GetSiteData(),
-		PageTitle:    internal.GetPostTitle(post),
+		PageTitle:    lists.GetPostTitle(post),
 		URL:          html.URL(cfg.PostURL(post.Username, post.Filename)),
 		BlogURL:      html.URL(cfg.BlogURL(username)),
 		Description:  post.Description,
 		ListType:     parsedText.MetaData.ListType,
-		Title:        internal.FilenameToTitle(post.Filename, post.Title),
+		Title:        lists.FilenameToTitle(post.Filename, post.Title),
 		PublishAt:    post.PublishAt.Format("02 Jan, 2006"),
 		PublishAtISO: post.PublishAt.Format(time.RFC3339),
 		Username:     username,
@@ -327,7 +327,7 @@ func transparencyHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini
 		return
 	}
 
-	data := internal.TransparencyPageData{
+	data := lists.TransparencyPageData{
 		Site:      *cfg.GetSiteData(),
 		Analytics: analytics,
 	}
@@ -367,8 +367,8 @@ func rssBlogHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Requ
 		return
 	}
 
-	headerTxt := &internal.HeaderTxt{
-		Title: internal.GetBlogName(username),
+	headerTxt := &lists.HeaderTxt{
+		Title: lists.GetBlogName(username),
 	}
 
 	for _, post := range posts {
@@ -396,12 +396,12 @@ func rssBlogHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Requ
 
 	var feedItems []*feeds.Item
 	for _, post := range posts {
-		if slices.Contains(internal.HiddenPosts, post.Filename) {
+		if slices.Contains(lists.HiddenPosts, post.Filename) {
 			continue
 		}
 		parsed := pkg.ParseText(post.Text)
 		var tpl bytes.Buffer
-		data := &internal.PostPageData{
+		data := &lists.PostPageData{
 			ListType: parsed.MetaData.ListType,
 			Items:    parsed.Items,
 		}
@@ -411,7 +411,7 @@ func rssBlogHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Requ
 
 		item := &feeds.Item{
 			Id:      cfg.PostURL(post.Username, post.Filename),
-			Title:   internal.FilenameToTitle(post.Filename, post.Title),
+			Title:   lists.FilenameToTitle(post.Filename, post.Title),
 			Link:    &feeds.Link{Href: cfg.PostURL(post.Username, post.Filename)},
 			Content: tpl.String(),
 			Created: *post.PublishAt,
@@ -473,7 +473,7 @@ func rssHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Request)
 	for _, post := range pager.Data {
 		parsed := pkg.ParseText(post.Text)
 		var tpl bytes.Buffer
-		data := &internal.PostPageData{
+		data := &lists.PostPageData{
 			ListType: parsed.MetaData.ListType,
 			Items:    parsed.Items,
 		}
@@ -511,7 +511,7 @@ func rssHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Request)
 }
 
 func StartServer() {
-	cfg := internal.NewConfigSite()
+	cfg := lists.NewConfigSite()
 	db := postgres.NewDB(&cfg.ConfigCms)
 	logger := cfg.Logger
 

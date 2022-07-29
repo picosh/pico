@@ -26,7 +26,7 @@ func (me *SSHServer) authHandler(ctx ssh.Context, key ssh.PublicKey) bool {
 	return true
 }
 
-func createRouter(handler *internal.DbHandler) proxy.Router {
+func createRouter(handler *pastes.DbHandler) proxy.Router {
 	return func(sh ssh.Handler, s ssh.Session) []wish.Middleware {
 		cmd := s.Command()
 		mdw := []wish.Middleware{}
@@ -44,7 +44,7 @@ func createRouter(handler *internal.DbHandler) proxy.Router {
 	}
 }
 
-func withProxy(handler *internal.DbHandler) ssh.Option {
+func withProxy(handler *pastes.DbHandler) ssh.Option {
 	return func(server *ssh.Server) error {
 		err := sftp.SSHOption(handler)(server)
 		if err != nil {
@@ -56,13 +56,13 @@ func withProxy(handler *internal.DbHandler) ssh.Option {
 }
 
 func main() {
-	host := internal.GetEnv("PROSE_HOST", "0.0.0.0")
-	port := internal.GetEnv("PROSE_SSH_PORT", "2222")
-	cfg := internal.NewConfigSite()
+	host := pastes.GetEnv("PROSE_HOST", "0.0.0.0")
+	port := pastes.GetEnv("PROSE_SSH_PORT", "2222")
+	cfg := pastes.NewConfigSite()
 	logger := cfg.Logger
 	dbh := postgres.NewDB(&cfg.ConfigCms)
 	defer dbh.Close()
-	handler := internal.NewDbHandler(dbh, cfg)
+	handler := pastes.NewDbHandler(dbh, cfg)
 
 	sshServer := &SSHServer{}
 	s, err := wish.NewServer(

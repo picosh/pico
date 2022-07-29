@@ -1,4 +1,4 @@
-package internal
+package pastes
 
 import (
 	"fmt"
@@ -305,7 +305,10 @@ func postHandlerRaw(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/plain")
-	w.Write([]byte(post.Text))
+	_, err = w.Write([]byte(post.Text))
+	if err != nil {
+		logger.Error(err)
+	}
 }
 
 func transparencyHandler(w http.ResponseWriter, r *http.Request) {

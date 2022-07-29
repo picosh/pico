@@ -19,8 +19,8 @@ func GetLogger(ctx context.Context) *zap.SugaredLogger {
 	return ctx.Value(ctxLoggerKey{}).(*zap.SugaredLogger)
 }
 
-func GetCfg(ctx context.Context) *internal.ConfigSite {
-	return ctx.Value(ctxCfgKey{}).(*internal.ConfigSite)
+func GetCfg(ctx context.Context) *lists.ConfigSite {
+	return ctx.Value(ctxCfgKey{}).(*lists.ConfigSite)
 }
 
 func GetDB(ctx context.Context) db.DB {
@@ -46,7 +46,7 @@ func NewRoute(pattern string, handler gemini.HandlerFunc) Route {
 
 type ServeFn func(context.Context, gemini.ResponseWriter, *gemini.Request)
 
-func CreateServe(routes []Route, cfg *internal.ConfigSite, dbpool db.DB, logger *zap.SugaredLogger) ServeFn {
+func CreateServe(routes []Route, cfg *lists.ConfigSite, dbpool db.DB, logger *zap.SugaredLogger) ServeFn {
 	return func(ctx context.Context, w gemini.ResponseWriter, r *gemini.Request) {
 		curRoutes := routes
 

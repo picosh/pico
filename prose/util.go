@@ -1,4 +1,4 @@
-package internal
+package prose
 
 import (
 	"encoding/base64"

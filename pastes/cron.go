@@ -1,4 +1,4 @@
-package internal
+package pastes
 
 import (
 	"time"
@@ -32,7 +32,10 @@ func deleteExpiredPosts(cfg *ConfigSite, dbpool db.DB) error {
 
 func CronDeleteExpiredPosts(cfg *ConfigSite, dbpool db.DB) {
 	for {
-		deleteExpiredPosts(cfg, dbpool)
+		err := deleteExpiredPosts(cfg, dbpool)
+		if err != nil {
+			cfg.Logger.Error(err)
+		}
 		time.Sleep(1 * time.Hour)
 	}
 }

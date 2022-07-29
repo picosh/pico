@@ -1,4 +1,4 @@
-package internal
+package pastes
 
 import (
 	"encoding/base64"
