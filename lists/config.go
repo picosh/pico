@@ -36,6 +36,8 @@ func NewConfigSite() *shared.ConfigSite {
 			Description: "A microblog for your lists.",
 			IntroText:   intro,
 			Space:       "lists",
+			AllowedExt:  []string{".txt"},
+			HiddenPosts: []string{"_header.txt", "_readme.txt"},
 			Logger:      shared.CreateLogger(),
 		},
 	}

@@ -403,7 +403,7 @@ func rssBlogHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Requ
 
 	var feedItems []*feeds.Item
 	for _, post := range posts {
-		if slices.Contains(lists.HiddenPosts, post.Filename) {
+		if slices.Contains(cfg.HiddenPosts, post.Filename) {
 			continue
 		}
 		parsed := pkg.ParseText(post.Text)

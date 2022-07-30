@@ -505,7 +505,7 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 
 	var feedItems []*feeds.Item
 	for _, post := range posts {
-		if slices.Contains(HiddenPosts, post.Filename) {
+		if slices.Contains(cfg.HiddenPosts, post.Filename) {
 			continue
 		}
 

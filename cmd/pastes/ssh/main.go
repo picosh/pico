@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"git.sr.ht/~erock/pico/filehandlers"
 	"git.sr.ht/~erock/pico/pastes"
 	"git.sr.ht/~erock/pico/shared"
 	"git.sr.ht/~erock/pico/wish/cms"
@@ -27,7 +28,7 @@ func (me *SSHServer) authHandler(ctx ssh.Context, key ssh.PublicKey) bool {
 	return true
 }
 
-func createRouter(handler *pastes.DbHandler) proxy.Router {
+func createRouter(handler *filehandlers.ScpUploadHandler) proxy.Router {
 	return func(sh ssh.Handler, s ssh.Session) []wish.Middleware {
 		cmd := s.Command()
 		mdw := []wish.Middleware{}
@@ -45,7 +46,7 @@ func createRouter(handler *pastes.DbHandler) proxy.Router {
 	}
 }
 
-func withProxy(handler *pastes.DbHandler) ssh.Option {
+func withProxy(handler *filehandlers.ScpUploadHandler) ssh.Option {
 	return func(server *ssh.Server) error {
 		err := sftp.SSHOption(handler)(server)
 		if err != nil {
@@ -57,13 +58,16 @@ func withProxy(handler *pastes.DbHandler) ssh.Option {
 }
 
 func main() {
-	host := shared.GetEnv("PROSE_HOST", "0.0.0.0")
-	port := shared.GetEnv("PROSE_SSH_PORT", "2222")
+	host := shared.GetEnv("PASTES_HOST", "0.0.0.0")
+	port := shared.GetEnv("PASTES_SSH_PORT", "2222")
 	cfg := pastes.NewConfigSite()
 	logger := cfg.Logger
 	dbh := postgres.NewDB(&cfg.ConfigCms)
 	defer dbh.Close()
-	handler := pastes.NewDbHandler(dbh, cfg)
+	fileHandler := pastes.PastesHandler{
+		Cfg: cfg,
+	}
+	handler := filehandlers.NewScpPostHandler(dbh, cfg, &fileHandler)
 
 	sshServer := &SSHServer{}
 	s, err := wish.NewServer(

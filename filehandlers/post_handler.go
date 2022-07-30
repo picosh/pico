@@ -1,9 +1,8 @@
-package pastes
+package filehandlers
 
 import (
 	"fmt"
 	"io"
-	"math"
 	"time"
 
 	"git.sr.ht/~erock/pico/shared"
@@ -13,37 +12,36 @@ import (
 	"github.com/gliderlabs/ssh"
 )
 
-// IsTextFile reports whether the file has a known extension indicating
-// a text file, or if a significant chunk of the specified file looks like
-// correct UTF-8; that is, if it is likely that the file contains human-
-// readable text.
-func IsTextFile(text string, filename string) bool {
-	num := math.Min(float64(len(text)), 1024)
-	return shared.IsText(text[0:int(num)])
+type PostMetaData struct {
+	Text        string
+	Title       string
+	Description string
+	PublishAt   *time.Time
+	Hidden      bool
+	Filename    string
 }
 
-type Opener struct {
-	entry *utils.FileEntry
+type ScpFileHooks interface {
+	FileValidate(text string, filename string) (bool, error)
+	FileMeta(text string, data *PostMetaData) error
 }
 
-func (o *Opener) Open(name string) (io.Reader, error) {
-	return o.entry.Reader, nil
-}
-
-type DbHandler struct {
+type ScpUploadHandler struct {
 	User   *db.User
 	DBPool db.DB
 	Cfg    *shared.ConfigSite
+	Hooks  ScpFileHooks
 }
 
-func NewDbHandler(dbpool db.DB, cfg *shared.ConfigSite) *DbHandler {
-	return &DbHandler{
+func NewScpPostHandler(dbpool db.DB, cfg *shared.ConfigSite, hooks ScpFileHooks) *ScpUploadHandler {
+	return &ScpUploadHandler{
 		DBPool: dbpool,
 		Cfg:    cfg,
+		Hooks:  hooks,
 	}
 }
 
-func (h *DbHandler) Validate(s ssh.Session) error {
+func (h *ScpUploadHandler) Validate(s ssh.Session) error {
 	var err error
 	key, err := util.KeyText(s)
 	if err != nil {
@@ -63,16 +61,10 @@ func (h *DbHandler) Validate(s ssh.Session) error {
 	return nil
 }
 
-func (h *DbHandler) Write(s ssh.Session, entry *utils.FileEntry) (string, error) {
+func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string, error) {
 	logger := h.Cfg.Logger
 	userID := h.User.ID
 	filename := entry.Name
-	title := filename
-	var err error
-	post, err := h.DBPool.FindPostWithFilename(filename, userID, h.Cfg.Space)
-	if err != nil {
-		logger.Debug("unable to load post, continuing:", err)
-	}
 
 	user, err := h.DBPool.FindUser(userID)
 	if err != nil {
@@ -84,9 +76,31 @@ func (h *DbHandler) Write(s ssh.Session, entry *utils.FileEntry) (string, error)
 		text = string(b)
 	}
 
-	if !IsTextFile(text, entry.Filepath) {
-		logger.Errorf("WARNING: (%s) invalid file, the contents must be plain text, skipping", entry.Name)
-		return "", fmt.Errorf("WARNING: (%s) invalid file, the contents must be plain text, skipping", entry.Name)
+	valid, err := h.Hooks.FileValidate(text, entry.Filepath)
+	if !valid {
+		return "", err
+	}
+
+	post, err := h.DBPool.FindPostWithFilename(filename, userID, h.Cfg.Space)
+	if err != nil {
+		logger.Debugf("unable to load post (%s), continuing", filename)
+		logger.Debug(err)
+	}
+
+	now := time.Now()
+	metadata := PostMetaData{
+		Filename:  filename,
+		Title:     shared.SanitizeFileExt(filename),
+		PublishAt: &now,
+	}
+	if post != nil {
+		metadata.PublishAt = post.PublishAt
+	}
+
+	err = h.Hooks.FileMeta(text, &metadata)
+	if err != nil {
+		logger.Error(err)
+		return "", err
 	}
 
 	// if the file is empty we remove it from our database
@@ -104,27 +118,40 @@ func (h *DbHandler) Write(s ssh.Session, entry *utils.FileEntry) (string, error)
 			return "", fmt.Errorf("error for %s: %v", filename, err)
 		}
 	} else if post == nil {
-		publishAt := time.Now()
 		logger.Infof("(%s) not found, adding record", filename)
-		_, err = h.DBPool.InsertPost(userID, filename, title, text, "", &publishAt, false, h.Cfg.Space)
+		_, err = h.DBPool.InsertPost(
+			userID,
+			filename,
+			metadata.Title,
+			text,
+			metadata.Description,
+			metadata.PublishAt,
+			metadata.Hidden,
+			h.Cfg.Space,
+		)
 		if err != nil {
 			logger.Errorf("error for %s: %v", filename, err)
 			return "", fmt.Errorf("error for %s: %v", filename, err)
 		}
 	} else {
-		publishAt := post.PublishAt
 		if text == post.Text {
 			logger.Infof("(%s) found, but text is identical, skipping", filename)
-			return h.Cfg.PostURL(user.Name, filename), nil
+			return h.Cfg.FullPostURL(user.Name, filename, h.Cfg.IsSubdomains(), true), nil
 		}
 
 		logger.Infof("(%s) found, updating record", filename)
-		_, err = h.DBPool.UpdatePost(post.ID, title, text, "", publishAt)
+		_, err = h.DBPool.UpdatePost(
+			post.ID,
+			metadata.Title,
+			text,
+			metadata.Description,
+			metadata.PublishAt,
+		)
 		if err != nil {
 			logger.Errorf("error for %s: %v", filename, err)
 			return "", fmt.Errorf("error for %s: %v", filename, err)
 		}
 	}
 
-	return h.Cfg.PostURL(user.Name, filename), nil
+	return h.Cfg.FullPostURL(user.Name, filename, h.Cfg.IsSubdomains(), true), nil
 }

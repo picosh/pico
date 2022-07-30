@@ -75,9 +75,11 @@ func IsText(s string) bool {
 // correct UTF-8; that is, if it is likely that the file contains human-
 // readable text.
 func IsTextFile(text string, filename string, allowedExtensions []string) bool {
-	ext := pathpkg.Ext(filename)
-	if !slices.Contains(allowedExtensions, ext) {
-		return false
+	if len(allowedExtensions) > 0 {
+		ext := pathpkg.Ext(filename)
+		if !slices.Contains(allowedExtensions, ext) {
+			return false
+		}
 	}
 
 	num := math.Min(float64(len(text)), 1024)

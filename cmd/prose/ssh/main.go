@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"git.sr.ht/~erock/pico/filehandlers"
 	"git.sr.ht/~erock/pico/prose"
 	"git.sr.ht/~erock/pico/shared"
 	"git.sr.ht/~erock/pico/wish/cms"
@@ -27,7 +28,7 @@ func (me *SSHServer) authHandler(ctx ssh.Context, key ssh.PublicKey) bool {
 	return true
 }
 
-func createRouter(handler *prose.DbHandler) proxy.Router {
+func createRouter(handler *filehandlers.ScpUploadHandler) proxy.Router {
 	return func(sh ssh.Handler, s ssh.Session) []wish.Middleware {
 		cmd := s.Command()
 		mdw := []wish.Middleware{}
@@ -45,7 +46,7 @@ func createRouter(handler *prose.DbHandler) proxy.Router {
 	}
 }
 
-func withProxy(handler *prose.DbHandler) ssh.Option {
+func withProxy(handler *filehandlers.ScpUploadHandler) ssh.Option {
 	return func(server *ssh.Server) error {
 		err := sftp.SSHOption(handler)(server)
 		if err != nil {
@@ -63,7 +64,10 @@ func main() {
 	logger := cfg.Logger
 	dbh := postgres.NewDB(&cfg.ConfigCms)
 	defer dbh.Close()
-	handler := prose.NewDbHandler(dbh, cfg)
+	fileHandler := &prose.ProseHandler{
+		Cfg: cfg,
+	}
+	handler := filehandlers.NewScpPostHandler(dbh, cfg, fileHandler)
 
 	sshServer := &SSHServer{}
 	s, err := wish.NewServer(
