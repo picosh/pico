@@ -10,15 +10,23 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-type ListsHandler struct {
+type ListHooks struct {
 	Cfg *shared.ConfigSite
 }
 
-func (p *ListsHandler) FileValidate(text string, filename string) (bool, error) {
-	if !shared.IsTextFile(text, filename, p.Cfg.AllowedExt) {
+func (p *ListHooks) FileValidate(text string, filename string) (bool, error) {
+	if !shared.IsTextFile(text) {
+		err := fmt.Errorf(
+			"WARNING: (%s) invalid file must be plain text (utf-8), skipping",
+			filename,
+		)
+		return false, err
+	}
+
+	if !shared.IsExtAllowed(filename, p.Cfg.AllowedExt) {
 		extStr := strings.Join(p.Cfg.AllowedExt, ",")
 		err := fmt.Errorf(
-			"WARNING: (%s) invalid file, format must be (%s) and the contents must be plain text, skipping",
+			"WARNING: (%s) invalid file, format must be (%s), skipping",
 			filename,
 			extStr,
 		)
@@ -28,7 +36,7 @@ func (p *ListsHandler) FileValidate(text string, filename string) (bool, error) 
 	return true, nil
 }
 
-func (p *ListsHandler) FileMeta(text string, data *filehandlers.PostMetaData) error {
+func (p *ListHooks) FileMeta(text string, data *filehandlers.PostMetaData) error {
 	parsedText := pkg.ParseText(text)
 
 	if parsedText.MetaData.Title != "" {

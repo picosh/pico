@@ -65,10 +65,10 @@ func main() {
 	dbh := postgres.NewDB(&cfg.ConfigCms)
 	defer dbh.Close()
 
-	fileHandler := lists.ListsHandler{
+	hooks := &lists.ListHooks{
 		Cfg: cfg,
 	}
-	handler := filehandlers.NewScpPostHandler(dbh, cfg, &fileHandler)
+	handler := filehandlers.NewScpPostHandler(dbh, cfg, hooks)
 
 	sshServer := &SSHServer{}
 	s, err := wish.NewServer(

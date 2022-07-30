@@ -9,18 +9,28 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-// var hiddenPosts = []string{"_readme.md", "_styles.css"}
-// var allowedExtensions = []string{".md", ".css"}
-
-type ProseHandler struct {
+type MarkdownHooks struct {
 	Cfg *shared.ConfigSite
 }
 
-func (p *ProseHandler) FileValidate(text string, filename string) (bool, error) {
-	if !shared.IsTextFile(text, filename, p.Cfg.AllowedExt) {
+func (p *MarkdownHooks) FileValidate(text string, filename string) (bool, error) {
+	if !shared.IsTextFile(text) {
+		err := fmt.Errorf(
+			"WARNING: (%s) invalid file must be plain text (utf-8), skipping",
+			filename,
+		)
+		return false, err
+	}
+
+	// special styles css file we want to permit but no other css file
+	if filename == "_styles.css" {
+		return true, nil
+	}
+
+	if !shared.IsExtAllowed(filename, p.Cfg.AllowedExt) {
 		extStr := strings.Join(p.Cfg.AllowedExt, ",")
 		err := fmt.Errorf(
-			"WARNING: (%s) invalid file, format must be (%s) and the contents must be plain text, skipping",
+			"WARNING: (%s) invalid file, format must be (%s), skipping",
 			filename,
 			extStr,
 		)
@@ -30,7 +40,7 @@ func (p *ProseHandler) FileValidate(text string, filename string) (bool, error) 
 	return true, nil
 }
 
-func (p *ProseHandler) FileMeta(text string, data *filehandlers.PostMetaData) error {
+func (p *MarkdownHooks) FileMeta(text string, data *filehandlers.PostMetaData) error {
 	parsedText, err := ParseText(text)
 	if err != nil {
 		return err

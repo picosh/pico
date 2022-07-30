@@ -64,10 +64,10 @@ func main() {
 	logger := cfg.Logger
 	dbh := postgres.NewDB(&cfg.ConfigCms)
 	defer dbh.Close()
-	fileHandler := pastes.PastesHandler{
+	hooks := &pastes.FileHooks{
 		Cfg: cfg,
 	}
-	handler := filehandlers.NewScpPostHandler(dbh, cfg, &fileHandler)
+	handler := filehandlers.NewScpPostHandler(dbh, cfg, hooks)
 
 	sshServer := &SSHServer{}
 	s, err := wish.NewServer(

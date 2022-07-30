@@ -43,7 +43,7 @@ func NewConfigSite() *shared.ConfigSite {
 			Description: "a blog platform for hackers.",
 			IntroText:   intro,
 			Space:       "prose",
-			AllowedExt:  []string{".md", ".css"},
+			AllowedExt:  []string{".md"},
 			HiddenPosts: []string{"_readme.md", "_styles.css"},
 			Logger:      shared.CreateLogger(),
 		},

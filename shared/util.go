@@ -70,18 +70,20 @@ func IsText(s string) bool {
 	return true
 }
 
+func IsExtAllowed(filename string, allowedExt []string) bool {
+	ext := pathpkg.Ext(filename)
+	if !slices.Contains(allowedExt, ext) {
+		return false
+	}
+
+	return true
+}
+
 // IsTextFile reports whether the file has a known extension indicating
 // a text file, or if a significant chunk of the specified file looks like
 // correct UTF-8; that is, if it is likely that the file contains human-
 // readable text.
-func IsTextFile(text string, filename string, allowedExtensions []string) bool {
-	if len(allowedExtensions) > 0 {
-		ext := pathpkg.Ext(filename)
-		if !slices.Contains(allowedExtensions, ext) {
-			return false
-		}
-	}
-
+func IsTextFile(text string) bool {
 	num := math.Min(float64(len(text)), 1024)
 	return IsText(text[0:int(num)])
 }
