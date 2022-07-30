@@ -2,7 +2,7 @@ PGDATABASE?="pico"
 PGHOST?="db"
 PGUSER?="postgres"
 PORT?="5432"
-DB_CONTAINER?=pico-services_db_1
+DB_CONTAINER?=pico-db-1
 DOCKER_TAG?=$(shell git log --format="%H" -n 1)
 DOCKER_PLATFORM?=linux/amd64,linux/arm64
 DOCKER_BUILDX_BUILD?=docker buildx build --push --platform $(DOCKER_PLATFORM)
@@ -58,10 +58,11 @@ migrate:
 	docker exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./db/migrations/20220523_timestamp_with_tz.sql
 	docker exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./db/migrations/20220721_analytics.sql
 	docker exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./db/migrations/20220722_post_hidden.sql
+	docker exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./db/migrations/20220727_post_change_post_contraints.sql
 .PHONY: migrate
 
 latest:
-	docker exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./db/migrations/20220722_post_hidden.sql
+	docker exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./db/migrations/20220727_post_change_post_contraints.sql
 .PHONY: latest
 
 psql:
