@@ -52,8 +52,8 @@ func (c *ConfigSite) FullBlogURL(username string, onSubdomain bool, withUserName
 	return "/"
 }
 
-func (c *ConfigSite) PostURL(username, filename string) string {
-	fname := url.PathEscape(filename)
+func (c *ConfigSite) PostURL(username, slug string) string {
+	fname := url.PathEscape(slug)
 	if c.IsSubdomains() {
 		return fmt.Sprintf("%s://%s.%s/%s", c.Protocol, username, c.Domain, fname)
 	}
@@ -62,8 +62,8 @@ func (c *ConfigSite) PostURL(username, filename string) string {
 
 }
 
-func (c *ConfigSite) FullPostURL(username, filename string, onSubdomain bool, withUserName bool) string {
-	fname := url.PathEscape(filename)
+func (c *ConfigSite) FullPostURL(username, slug string, onSubdomain bool, withUserName bool) string {
+	fname := url.PathEscape(slug)
 	if c.IsSubdomains() && onSubdomain {
 		return fmt.Sprintf("%s://%s.%s/%s", c.Protocol, username, c.Domain, fname)
 	}
@@ -123,8 +123,8 @@ func (c *ConfigSite) StaticPath(fname string) string {
 	return path.Join(c.Space, fname)
 }
 
-func (c *ConfigSite) RawPostURL(username, filename string) string {
-	fname := url.PathEscape(filename)
+func (c *ConfigSite) RawPostURL(username, slug string) string {
+	fname := url.PathEscape(slug)
 	if c.IsSubdomains() {
 		return fmt.Sprintf("%s://%s.%s/raw/%s", c.Protocol, username, c.Domain, fname)
 	}

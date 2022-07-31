@@ -208,7 +208,7 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		} else {
 			p := PostItemData{
-				URL:            template.URL(cfg.FullPostURL(post.Username, post.Filename, onSubdomain, withUserName)),
+				URL:            template.URL(cfg.FullPostURL(post.Username, post.Slug, onSubdomain, withUserName)),
 				BlogURL:        template.URL(cfg.FullBlogURL(post.Username, onSubdomain, withUserName)),
 				Title:          shared.FilenameToTitle(post.Filename, post.Title),
 				PublishAt:      post.PublishAt.Format("02 Jan, 2006"),
@@ -306,7 +306,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 		data = PostPageData{
 			Site:         *cfg.GetSiteData(),
 			PageTitle:    GetPostTitle(post),
-			URL:          template.URL(cfg.PostURL(post.Username, post.Filename)),
+			URL:          template.URL(cfg.PostURL(post.Username, post.Slug)),
 			BlogURL:      template.URL(cfg.BlogURL(username)),
 			Description:  post.Description,
 			ListType:     parsedText.MetaData.ListType,
@@ -427,7 +427,7 @@ func readHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, post := range pager.Data {
 		item := PostItemData{
-			URL:            template.URL(cfg.PostURL(post.Username, post.Filename)),
+			URL:            template.URL(cfg.PostURL(post.Username, post.Slug)),
 			BlogURL:        template.URL(cfg.BlogURL(post.Username)),
 			Title:          shared.FilenameToTitle(post.Filename, post.Title),
 			Description:    post.Description,
@@ -520,9 +520,9 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		item := &feeds.Item{
-			Id:      cfg.PostURL(post.Username, post.Filename),
+			Id:      cfg.PostURL(post.Username, post.Slug),
 			Title:   shared.FilenameToTitle(post.Filename, post.Title),
-			Link:    &feeds.Link{Href: cfg.PostURL(post.Username, post.Filename)},
+			Link:    &feeds.Link{Href: cfg.PostURL(post.Username, post.Slug)},
 			Content: tpl.String(),
 			Created: *post.PublishAt,
 		}
@@ -591,9 +591,9 @@ func rssHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		item := &feeds.Item{
-			Id:      cfg.PostURL(post.Username, post.Filename),
+			Id:      cfg.PostURL(post.Username, post.Slug),
 			Title:   post.Title,
-			Link:    &feeds.Link{Href: cfg.PostURL(post.Username, post.Filename)},
+			Link:    &feeds.Link{Href: cfg.PostURL(post.Username, post.Slug)},
 			Content: tpl.String(),
 			Created: *post.PublishAt,
 		}

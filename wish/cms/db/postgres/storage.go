@@ -68,7 +68,7 @@ const (
 	LIMIT $1 OFFSET $2`
 
 	sqlInsertPublicKey = `INSERT INTO public_keys (user_id, public_key) VALUES ($1, $2)`
-	sqlInsertPost      = `INSERT INTO posts (user_id, filename, slug, title, text, description, publish_at, hidden, cur_space) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`
+	sqlInsertPost      = `INSERT INTO posts (user_id, filename, slug, title, text, description, publish_at, hidden, cur_space) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`
 	sqlInsertUser      = `INSERT INTO app_users DEFAULT VALUES returning id`
 
 	sqlUpdatePost     = `UPDATE posts SET slug = $1, title = $2, text = $3, description = $4, updated_at = $5, publish_at = $6 WHERE id = $7`

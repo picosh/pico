@@ -131,7 +131,7 @@ func blogHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Request
 			}
 		} else {
 			p := lists.PostItemData{
-				URL:            html.URL(cfg.FullPostURL(post.Username, post.Filename, onSubdomain, withUserName)),
+				URL:            html.URL(cfg.FullPostURL(post.Username, post.Slug, onSubdomain, withUserName)),
 				BlogURL:        html.URL(cfg.FullBlogURL(post.Username, onSubdomain, withUserName)),
 				Title:          shared.FilenameToTitle(post.Filename, post.Title),
 				PublishAt:      post.PublishAt.Format("02 Jan, 2006"),
@@ -209,7 +209,7 @@ func readHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Request
 
 	for _, post := range pager.Data {
 		item := lists.PostItemData{
-			URL:            html.URL(cfg.PostURL(post.Username, post.Filename)),
+			URL:            html.URL(cfg.PostURL(post.Username, post.Slug)),
 			BlogURL:        html.URL(cfg.BlogURL(post.Username)),
 			Title:          shared.FilenameToTitle(post.Filename, post.Title),
 			Description:    post.Description,
@@ -281,7 +281,7 @@ func postHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Request
 	data := lists.PostPageData{
 		Site:         *cfg.GetSiteData(),
 		PageTitle:    lists.GetPostTitle(post),
-		URL:          html.URL(cfg.PostURL(post.Username, post.Filename)),
+		URL:          html.URL(cfg.PostURL(post.Username, post.Slug)),
 		BlogURL:      html.URL(cfg.BlogURL(username)),
 		Description:  post.Description,
 		ListType:     parsedText.MetaData.ListType,
@@ -417,9 +417,9 @@ func rssBlogHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Requ
 		}
 
 		item := &feeds.Item{
-			Id:      cfg.PostURL(post.Username, post.Filename),
+			Id:      cfg.PostURL(post.Username, post.Slug),
 			Title:   shared.FilenameToTitle(post.Filename, post.Title),
-			Link:    &feeds.Link{Href: cfg.PostURL(post.Username, post.Filename)},
+			Link:    &feeds.Link{Href: cfg.PostURL(post.Username, post.Slug)},
 			Content: tpl.String(),
 			Created: *post.PublishAt,
 		}
@@ -489,9 +489,9 @@ func rssHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Request)
 		}
 
 		item := &feeds.Item{
-			Id:      cfg.PostURL(post.Username, post.Filename),
+			Id:      cfg.PostURL(post.Username, post.Slug),
 			Title:   post.Title,
-			Link:    &feeds.Link{Href: cfg.PostURL(post.Username, post.Filename)},
+			Link:    &feeds.Link{Href: cfg.PostURL(post.Username, post.Slug)},
 			Content: tpl.String(),
 			Created: *post.PublishAt,
 		}

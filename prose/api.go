@@ -238,7 +238,7 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		} else {
 			p := PostItemData{
-				URL:            template.URL(cfg.FullPostURL(post.Username, post.Filename, onSubdomain, withUserName)),
+				URL:            template.URL(cfg.FullPostURL(post.Username, post.Slug, onSubdomain, withUserName)),
 				BlogURL:        template.URL(cfg.FullBlogURL(post.Username, onSubdomain, withUserName)),
 				Title:          shared.FilenameToTitle(post.Filename, post.Title),
 				PublishAt:      post.PublishAt.Format("02 Jan, 2006"),
@@ -389,7 +389,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 		data = PostPageData{
 			Site:         *cfg.GetSiteData(),
 			PageTitle:    GetPostTitle(post),
-			URL:          template.URL(cfg.FullPostURL(post.Username, post.Filename, onSubdomain, withUserName)),
+			URL:          template.URL(cfg.FullPostURL(post.Username, post.Slug, onSubdomain, withUserName)),
 			BlogURL:      template.URL(cfg.FullBlogURL(username, onSubdomain, withUserName)),
 			Description:  post.Description,
 			Title:        shared.FilenameToTitle(post.Filename, post.Title),
@@ -527,7 +527,7 @@ func readHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, post := range pager.Data {
 		item := PostItemData{
-			URL:            template.URL(cfg.FullPostURL(post.Username, post.Filename, true, true)),
+			URL:            template.URL(cfg.FullPostURL(post.Username, post.Slug, true, true)),
 			BlogURL:        template.URL(cfg.FullBlogURL(post.Username, true, true)),
 			Title:          shared.FilenameToTitle(post.Filename, post.Title),
 			Description:    post.Description,
@@ -627,7 +627,7 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		realUrl := cfg.FullPostURL(post.Username, post.Filename, onSubdomain, withUserName)
+		realUrl := cfg.FullPostURL(post.Username, post.Slug, onSubdomain, withUserName)
 		if !onSubdomain && !withUserName {
 			realUrl = fmt.Sprintf("%s://%s%s", cfg.Protocol, r.Host, realUrl)
 		}
@@ -709,7 +709,7 @@ func rssHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		realUrl := cfg.FullPostURL(post.Username, post.Filename, onSubdomain, withUserName)
+		realUrl := cfg.FullPostURL(post.Username, post.Slug, onSubdomain, withUserName)
 		if !onSubdomain && !withUserName {
 			realUrl = fmt.Sprintf("%s://%s%s", cfg.Protocol, r.Host, realUrl)
 		}

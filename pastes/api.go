@@ -166,7 +166,7 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	postCollection := make([]PostItemData, 0, len(posts))
 	for _, post := range posts {
 		p := PostItemData{
-			URL:            template.URL(cfg.FullPostURL(post.Username, post.Filename, onSubdomain, withUserName)),
+			URL:            template.URL(cfg.FullPostURL(post.Username, post.Slug, onSubdomain, withUserName)),
 			BlogURL:        template.URL(cfg.FullBlogURL(post.Username, onSubdomain, withUserName)),
 			Title:          shared.FilenameToTitle(post.Filename, post.Title),
 			PublishAt:      post.PublishAt.Format("02 Jan, 2006"),
@@ -241,8 +241,8 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 		data = PostPageData{
 			Site:         *cfg.GetSiteData(),
 			PageTitle:    GetPostTitle(post),
-			URL:          template.URL(cfg.PostURL(post.Username, post.Filename)),
-			RawURL:       template.URL(cfg.RawPostURL(post.Username, post.Filename)),
+			URL:          template.URL(cfg.PostURL(post.Username, post.Slug)),
+			RawURL:       template.URL(cfg.RawPostURL(post.Username, post.Slug)),
 			BlogURL:      template.URL(cfg.BlogURL(username)),
 			Description:  post.Description,
 			Title:        shared.FilenameToTitle(post.Filename, post.Title),

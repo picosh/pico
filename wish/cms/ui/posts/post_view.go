@@ -32,7 +32,7 @@ func (m Model) newStyledKey(styles common.Styles, post *db.Post, urls config.Con
 		dateVal:   styles.LabelDim.Render(publishAt.Format("02 Jan, 2006")),
 		title:     post.Title,
 		urlLabel:  "url:",
-		url:       urls.PostURL(post.Username, post.Filename),
+		url:       urls.PostURL(post.Username, post.Slug),
 	}
 }
 
