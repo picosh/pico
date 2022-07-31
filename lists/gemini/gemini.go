@@ -108,7 +108,7 @@ func blogHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Request
 
 	postCollection := make([]lists.PostItemData, 0, len(posts))
 	for _, post := range posts {
-		if post.Filename == "_header" {
+		if post.Filename == "_header.txt" {
 			parsedText := pkg.ParseText(post.Text)
 			if parsedText.MetaData.Title != "" {
 				headerTxt.Title = parsedText.MetaData.Title
@@ -122,7 +122,7 @@ func blogHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Request
 			if len(headerTxt.Nav) > 0 {
 				headerTxt.HasItems = true
 			}
-		} else if post.Filename == "_readme" {
+		} else if post.Filename == "_readme.txt" {
 			parsedText := pkg.ParseText(post.Text)
 			readmeTxt.Items = parsedText.Items
 			readmeTxt.ListType = parsedText.MetaData.ListType
@@ -233,7 +233,7 @@ func readHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Request
 
 func postHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Request) {
 	username := GetField(ctx, 0)
-	filename, _ := url.PathUnescape(GetField(ctx, 1))
+	slug, _ := url.PathUnescape(GetField(ctx, 1))
 
 	dbpool := GetDB(ctx)
 	logger := GetLogger(ctx)
@@ -246,7 +246,7 @@ func postHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Request
 		return
 	}
 
-	header, _ := dbpool.FindPostWithFilename("_header", user.ID, cfg.Space)
+	header, _ := dbpool.FindPostWithFilename("_header.txt", user.ID, cfg.Space)
 	blogName := lists.GetBlogName(username)
 	if header != nil {
 		headerParsed := pkg.ParseText(header.Text)
@@ -255,9 +255,9 @@ func postHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Request
 		}
 	}
 
-	post, err := dbpool.FindPostWithFilename(filename, user.ID, cfg.Space)
+	post, err := dbpool.FindPostWithSlug(slug, user.ID, cfg.Space)
 	if err != nil {
-		logger.Infof("post not found %s/%s", username, filename)
+		logger.Infof("post not found %s/%s", username, slug)
 		w.WriteHeader(gemini.StatusNotFound, "post not found")
 		return
 	}
@@ -265,7 +265,7 @@ func postHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Request
 	parsedText := pkg.ParseText(post.Text)
 
 	// we need the blog name from the readme unfortunately
-	readme, err := dbpool.FindPostWithFilename("_readme", user.ID, cfg.Space)
+	readme, err := dbpool.FindPostWithFilename("_readme.txt", user.ID, cfg.Space)
 	if err == nil {
 		readmeParsed := pkg.ParseText(readme.Text)
 		if readmeParsed.MetaData.Title != "" {
@@ -379,7 +379,7 @@ func rssBlogHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Requ
 	}
 
 	for _, post := range posts {
-		if post.Filename == "_header" {
+		if post.Filename == "_header.txt" {
 			parsedText := pkg.ParseText(post.Text)
 			if parsedText.MetaData.Title != "" {
 				headerTxt.Title = parsedText.MetaData.Title

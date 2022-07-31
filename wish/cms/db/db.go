@@ -26,6 +26,7 @@ type Post struct {
 	ID          string     `json:"id"`
 	UserID      string     `json:"user_id"`
 	Filename    string     `json:"filename"`
+	Slug        string     `json:"slug"`
 	Title       string     `json:"title"`
 	Text        string     `json:"text"`
 	Description string     `json:"description"`
@@ -108,10 +109,11 @@ type DB interface {
 	FindPostsBeforeDate(date *time.Time, space string) ([]*Post, error)
 	FindUpdatedPostsForUser(userID string, space string) ([]*Post, error)
 	FindPostWithFilename(filename string, userID string, space string) (*Post, error)
+	FindPostWithSlug(slug string, userID string, space string) (*Post, error)
 	FindAllPosts(pager *Pager, space string) (*Paginate[*Post], error)
 	FindAllUpdatedPosts(pager *Pager, space string) (*Paginate[*Post], error)
-	InsertPost(userID string, filename string, title string, text string, description string, publishAt *time.Time, hidden bool, space string) (*Post, error)
-	UpdatePost(postID string, title string, text string, description string, publishAt *time.Time) (*Post, error)
+	InsertPost(userID string, filename string, slug string, title string, text string, description string, publishAt *time.Time, hidden bool, space string) (*Post, error)
+	UpdatePost(postID string, slug string, title string, text string, description string, publishAt *time.Time) (*Post, error)
 	RemovePosts(postIDs []string) error
 
 	AddViewCount(postID string) (int, error)

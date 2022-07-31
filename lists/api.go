@@ -185,7 +185,7 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 
 	postCollection := make([]PostItemData, 0, len(posts))
 	for _, post := range posts {
-		if post.Filename == "_header" {
+		if post.Filename == "_header.txt" {
 			parsedText := pkg.ParseText(post.Text)
 			if parsedText.MetaData.Title != "" {
 				headerTxt.Title = parsedText.MetaData.Title
@@ -199,7 +199,7 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 			if len(headerTxt.Nav) > 0 {
 				headerTxt.HasItems = true
 			}
-		} else if post.Filename == "_readme" {
+		} else if post.Filename == "_readme.txt" {
 			parsedText := pkg.ParseText(post.Text)
 			readmeTxt.Items = parsedText.Items
 			readmeTxt.ListType = parsedText.MetaData.ListType
@@ -255,11 +255,11 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	subdomain := shared.GetSubdomain(r)
 	cfg := shared.GetCfg(r)
 
-	var filename string
+	var slug string
 	if !cfg.IsSubdomains() || subdomain == "" {
-		filename, _ = url.PathUnescape(shared.GetField(r, 1))
+		slug, _ = url.PathUnescape(shared.GetField(r, 1))
 	} else {
-		filename, _ = url.PathUnescape(shared.GetField(r, 0))
+		slug, _ = url.PathUnescape(shared.GetField(r, 0))
 	}
 
 	dbpool := shared.GetDB(r)
@@ -272,7 +272,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	header, _ := dbpool.FindPostWithFilename("_header", user.ID, cfg.Space)
+	header, _ := dbpool.FindPostWithFilename("_header.txt", user.ID, cfg.Space)
 	blogName := GetBlogName(username)
 	if header != nil {
 		headerParsed := pkg.ParseText(header.Text)
@@ -282,12 +282,12 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var data PostPageData
-	post, err := dbpool.FindPostWithFilename(filename, user.ID, cfg.Space)
+	post, err := dbpool.FindPostWithSlug(slug, user.ID, cfg.Space)
 	if err == nil {
 		parsedText := pkg.ParseText(post.Text)
 
 		// we need the blog name from the readme unfortunately
-		readme, err := dbpool.FindPostWithFilename("_readme", user.ID, cfg.Space)
+		readme, err := dbpool.FindPostWithFilename("_readme.txt", user.ID, cfg.Space)
 		if err == nil {
 			readmeParsed := pkg.ParseText(readme.Text)
 			if readmeParsed.MetaData.Title != "" {
@@ -318,7 +318,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			Items:        parsedText.Items,
 		}
 	} else {
-		logger.Infof("post not found %s/%s", username, filename)
+		logger.Infof("post not found %s/%s", username, slug)
 		data = PostPageData{
 			Site:         *cfg.GetSiteData(),
 			PageTitle:    "Post not found",
@@ -481,7 +481,7 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, post := range posts {
-		if post.Filename == "_header" {
+		if post.Filename == "_header.txt" {
 			parsedText := pkg.ParseText(post.Text)
 			if parsedText.MetaData.Title != "" {
 				headerTxt.Title = parsedText.MetaData.Title

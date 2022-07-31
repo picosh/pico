@@ -30,19 +30,21 @@ const (
 	sqlSelectTotalPostsAfterDate = `SELECT count(id) FROM posts WHERE created_at >= $1 AND cur_space = $2`
 	sqlSelectUsersWithPost       = `SELECT count(app_users.id) FROM app_users WHERE EXISTS (SELECT 1 FROM posts WHERE user_id = app_users.id AND cur_space = $1);`
 
-	sqlSelectPosts               = `SELECT id, user_id, filename, title, text, description, created_at, publish_at, updated_at, hidden FROM posts`
-	sqlSelectPostsBeforeDate     = `SELECT posts.id, user_id, filename, title, text, description, publish_at, app_users.name as username, posts.updated_at FROM posts LEFT OUTER JOIN app_users ON app_users.id = posts.user_id WHERE publish_at::date <= $1 AND cur_space = $2`
-	sqlSelectPostWithFilename    = `SELECT posts.id, user_id, filename, title, text, description, publish_at, app_users.name as username, posts.updated_at FROM posts LEFT OUTER JOIN app_users ON app_users.id = posts.user_id WHERE filename = $1 AND user_id = $2 AND cur_space = $3`
-	sqlSelectPost                = `SELECT posts.id, user_id, filename, title, text, description, publish_at, app_users.name as username, posts.updated_at FROM posts LEFT OUTER JOIN app_users ON app_users.id = posts.user_id WHERE posts.id = $1`
-	sqlSelectPostsForUser        = `SELECT posts.id, user_id, filename, title, text, description, publish_at, app_users.name as username, posts.updated_at FROM posts LEFT OUTER JOIN app_users ON app_users.id = posts.user_id WHERE user_id = $1 AND publish_at::date <= CURRENT_DATE AND cur_space = $2 ORDER BY publish_at DESC`
-	sqlSelectUpdatedPostsForUser = `SELECT posts.id, user_id, filename, title, text, description, publish_at, app_users.name as username, posts.updated_at FROM posts LEFT OUTER JOIN app_users ON app_users.id = posts.user_id WHERE user_id = $1 AND publish_at::date <= CURRENT_DATE AND cur_space = $2 ORDER BY updated_at DESC`
-	sqlSelectAllUpdatedPosts     = `SELECT posts.id, user_id, filename, title, text, description, publish_at, app_users.name as username, posts.updated_at, 0 as score FROM posts LEFT OUTER JOIN app_users ON app_users.id = posts.user_id WHERE hidden = FALSE AND publish_at::date <= CURRENT_DATE AND cur_space = $3 ORDER BY updated_at DESC LIMIT $1 OFFSET $2`
+	sqlSelectPosts               = `SELECT id, user_id, filename, slug, title, text, description, created_at, publish_at, updated_at, hidden FROM posts`
+	sqlSelectPostsBeforeDate     = `SELECT posts.id, user_id, filename, slug, title, text, description, publish_at, app_users.name as username, posts.updated_at FROM posts LEFT OUTER JOIN app_users ON app_users.id = posts.user_id WHERE publish_at::date <= $1 AND cur_space = $2`
+	sqlSelectPostWithFilename    = `SELECT posts.id, user_id, filename, slug, title, text, description, publish_at, app_users.name as username, posts.updated_at FROM posts LEFT OUTER JOIN app_users ON app_users.id = posts.user_id WHERE filename = $1 AND user_id = $2 AND cur_space = $3`
+	sqlSelectPostWithSlug        = `SELECT posts.id, user_id, filename, slug, title, text, description, publish_at, app_users.name as username, posts.updated_at FROM posts LEFT OUTER JOIN app_users ON app_users.id = posts.user_id WHERE slug = $1 AND user_id = $2 AND cur_space = $3`
+	sqlSelectPost                = `SELECT posts.id, user_id, filename, slug, title, text, description, publish_at, app_users.name as username, posts.updated_at FROM posts LEFT OUTER JOIN app_users ON app_users.id = posts.user_id WHERE posts.id = $1`
+	sqlSelectPostsForUser        = `SELECT posts.id, user_id, filename, slug, title, text, description, publish_at, app_users.name as username, posts.updated_at FROM posts LEFT OUTER JOIN app_users ON app_users.id = posts.user_id WHERE user_id = $1 AND publish_at::date <= CURRENT_DATE AND cur_space = $2 ORDER BY publish_at DESC`
+	sqlSelectUpdatedPostsForUser = `SELECT posts.id, user_id, filename, slug, title, text, description, publish_at, app_users.name as username, posts.updated_at FROM posts LEFT OUTER JOIN app_users ON app_users.id = posts.user_id WHERE user_id = $1 AND publish_at::date <= CURRENT_DATE AND cur_space = $2 ORDER BY updated_at DESC`
+	sqlSelectAllUpdatedPosts     = `SELECT posts.id, user_id, filename, slug, title, text, description, publish_at, app_users.name as username, posts.updated_at, 0 as score FROM posts LEFT OUTER JOIN app_users ON app_users.id = posts.user_id WHERE hidden = FALSE AND publish_at::date <= CURRENT_DATE AND cur_space = $3 ORDER BY updated_at DESC LIMIT $1 OFFSET $2`
 	sqlSelectPostCount           = `SELECT count(id) FROM posts WHERE hidden = FALSE AND cur_space=$1`
 	sqlSelectPostsByRank         = `
 	SELECT
 		posts.id,
 		user_id,
 		filename,
+		slug,
 		title,
 		text,
 		description,
@@ -66,10 +68,10 @@ const (
 	LIMIT $1 OFFSET $2`
 
 	sqlInsertPublicKey = `INSERT INTO public_keys (user_id, public_key) VALUES ($1, $2)`
-	sqlInsertPost      = `INSERT INTO posts (user_id, filename, title, text, description, publish_at, hidden, cur_space) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`
+	sqlInsertPost      = `INSERT INTO posts (user_id, filename, slug, title, text, description, publish_at, hidden, cur_space) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`
 	sqlInsertUser      = `INSERT INTO app_users DEFAULT VALUES returning id`
 
-	sqlUpdatePost     = `UPDATE posts SET title = $1, text = $2, description = $3, updated_at = $4, publish_at = $5 WHERE id = $6`
+	sqlUpdatePost     = `UPDATE posts SET slug = $1, title = $2, text = $3, description = $4, updated_at = $5, publish_at = $6 WHERE id = $7`
 	sqlUpdateUserName = `UPDATE app_users SET name = $1 WHERE id = $2`
 	sqlIncrementViews = `UPDATE posts SET views = views + 1 WHERE id = $1 RETURNING views`
 
@@ -235,6 +237,7 @@ func (me *PsqlDB) FindPostsBeforeDate(date *time.Time, space string) ([]*db.Post
 			&post.ID,
 			&post.UserID,
 			&post.Filename,
+			&post.Slug,
 			&post.Title,
 			&post.Text,
 			&post.Description,
@@ -350,6 +353,29 @@ func (me *PsqlDB) FindPostWithFilename(filename string, persona_id string, space
 		&post.ID,
 		&post.UserID,
 		&post.Filename,
+		&post.Slug,
+		&post.Title,
+		&post.Text,
+		&post.Description,
+		&post.PublishAt,
+		&post.Username,
+		&post.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return post, nil
+}
+
+func (me *PsqlDB) FindPostWithSlug(slug string, user_id string, space string) (*db.Post, error) {
+	post := &db.Post{}
+	r := me.Db.QueryRow(sqlSelectPostWithSlug, slug, user_id, space)
+	err := r.Scan(
+		&post.ID,
+		&post.UserID,
+		&post.Filename,
+		&post.Slug,
 		&post.Title,
 		&post.Text,
 		&post.Description,
@@ -371,6 +397,7 @@ func (me *PsqlDB) FindPost(postID string) (*db.Post, error) {
 		&post.ID,
 		&post.UserID,
 		&post.Filename,
+		&post.Slug,
 		&post.Title,
 		&post.Text,
 		&post.Description,
@@ -393,6 +420,7 @@ func (me *PsqlDB) postPager(rs *sql.Rows, pageNum int, space string) (*db.Pagina
 			&post.ID,
 			&post.UserID,
 			&post.Filename,
+			&post.Slug,
 			&post.Title,
 			&post.Text,
 			&post.Description,
@@ -441,9 +469,9 @@ func (me *PsqlDB) FindAllUpdatedPosts(page *db.Pager, space string) (*db.Paginat
 	return me.postPager(rs, page.Num, space)
 }
 
-func (me *PsqlDB) InsertPost(userID string, filename string, title string, text string, description string, publishAt *time.Time, hidden bool, space string) (*db.Post, error) {
+func (me *PsqlDB) InsertPost(userID, filename, slug, title, text, description string, publishAt *time.Time, hidden bool, space string) (*db.Post, error) {
 	var id string
-	err := me.Db.QueryRow(sqlInsertPost, userID, filename, title, text, description, publishAt, hidden, space).Scan(&id)
+	err := me.Db.QueryRow(sqlInsertPost, userID, filename, slug, title, text, description, publishAt, hidden, space).Scan(&id)
 	if err != nil {
 		return nil, err
 	}
@@ -451,8 +479,8 @@ func (me *PsqlDB) InsertPost(userID string, filename string, title string, text 
 	return me.FindPost(id)
 }
 
-func (me *PsqlDB) UpdatePost(postID string, title string, text string, description string, publishAt *time.Time) (*db.Post, error) {
-	_, err := me.Db.Exec(sqlUpdatePost, title, text, description, time.Now(), publishAt, postID)
+func (me *PsqlDB) UpdatePost(postID, slug, title, text, description string, publishAt *time.Time) (*db.Post, error) {
+	_, err := me.Db.Exec(sqlUpdatePost, slug, title, text, description, time.Now(), publishAt, postID)
 	if err != nil {
 		return nil, err
 	}
@@ -478,6 +506,7 @@ func (me *PsqlDB) FindPostsForUser(userID string, space string) ([]*db.Post, err
 			&post.ID,
 			&post.UserID,
 			&post.Filename,
+			&post.Slug,
 			&post.Title,
 			&post.Text,
 			&post.Description,
@@ -509,6 +538,7 @@ func (me *PsqlDB) FindPosts() ([]*db.Post, error) {
 			&post.ID,
 			&post.UserID,
 			&post.Filename,
+			&post.Slug,
 			&post.Title,
 			&post.Text,
 			&post.Description,
@@ -541,6 +571,7 @@ func (me *PsqlDB) FindUpdatedPostsForUser(userID string, space string) ([]*db.Po
 			&post.ID,
 			&post.UserID,
 			&post.Filename,
+			&post.Slug,
 			&post.Title,
 			&post.Text,
 			&post.Description,

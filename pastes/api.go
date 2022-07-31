@@ -211,11 +211,11 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	subdomain := shared.GetSubdomain(r)
 	cfg := shared.GetCfg(r)
 
-	var filename string
+	var slug string
 	if !cfg.IsSubdomains() || subdomain == "" {
-		filename, _ = url.PathUnescape(shared.GetField(r, 1))
+		slug, _ = url.PathUnescape(shared.GetField(r, 1))
 	} else {
-		filename, _ = url.PathUnescape(shared.GetField(r, 0))
+		slug, _ = url.PathUnescape(shared.GetField(r, 0))
 	}
 
 	dbpool := shared.GetDB(r)
@@ -231,7 +231,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	blogName := GetBlogName(username)
 
 	var data PostPageData
-	post, err := dbpool.FindPostWithFilename(filename, user.ID, cfg.Space)
+	post, err := dbpool.FindPostWithSlug(slug, user.ID, cfg.Space)
 	if err == nil {
 		parsedText, err := ParseText(post.Filename, post.Text)
 		if err != nil {
@@ -253,7 +253,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			Contents:     template.HTML(parsedText),
 		}
 	} else {
-		logger.Infof("post not found %s/%s", username, filename)
+		logger.Infof("post not found %s/%s", username, slug)
 		data = PostPageData{
 			Site:         *cfg.GetSiteData(),
 			PageTitle:    "Paste not found",
@@ -288,11 +288,11 @@ func postHandlerRaw(w http.ResponseWriter, r *http.Request) {
 	subdomain := shared.GetSubdomain(r)
 	cfg := shared.GetCfg(r)
 
-	var filename string
+	var slug string
 	if !cfg.IsSubdomains() || subdomain == "" {
-		filename, _ = url.PathUnescape(shared.GetField(r, 1))
+		slug, _ = url.PathUnescape(shared.GetField(r, 1))
 	} else {
-		filename, _ = url.PathUnescape(shared.GetField(r, 0))
+		slug, _ = url.PathUnescape(shared.GetField(r, 0))
 	}
 
 	dbpool := shared.GetDB(r)
@@ -305,9 +305,9 @@ func postHandlerRaw(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	post, err := dbpool.FindPostWithFilename(filename, user.ID, cfg.Space)
+	post, err := dbpool.FindPostWithSlug(slug, user.ID, cfg.Space)
 	if err != nil {
-		logger.Infof("post not found %s/%s", username, filename)
+		logger.Infof("post not found %s/%s", username, slug)
 		http.Error(w, "post not found", http.StatusNotFound)
 		return
 	}

@@ -24,5 +24,7 @@ func (p *FileHooks) FileValidate(text string, filename string) (bool, error) {
 }
 
 func (p *FileHooks) FileMeta(text string, data *filehandlers.PostMetaData) error {
+	// we want the slug to be the filename for pastes
+	data.Slug = data.Filename
 	return nil
 }

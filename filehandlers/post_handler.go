@@ -13,12 +13,13 @@ import (
 )
 
 type PostMetaData struct {
+	Filename    string
+	Slug        string
 	Text        string
 	Title       string
 	Description string
 	PublishAt   *time.Time
 	Hidden      bool
-	Filename    string
 }
 
 type ScpFileHooks interface {
@@ -88,9 +89,11 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 	}
 
 	now := time.Now()
+	slug := shared.SanitizeFileExt(filename)
 	metadata := PostMetaData{
 		Filename:  filename,
-		Title:     shared.SanitizeFileExt(filename),
+		Slug:      slug,
+		Title:     shared.ToUpper(slug),
 		PublishAt: &now,
 	}
 	if post != nil {
@@ -122,6 +125,7 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		_, err = h.DBPool.InsertPost(
 			userID,
 			filename,
+			metadata.Slug,
 			metadata.Title,
 			text,
 			metadata.Description,
@@ -142,6 +146,7 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		logger.Infof("(%s) found, updating record", filename)
 		_, err = h.DBPool.UpdatePost(
 			post.ID,
+			metadata.Slug,
 			metadata.Title,
 			text,
 			metadata.Description,

@@ -160,7 +160,7 @@ func blogStyleHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "blog not found", http.StatusNotFound)
 		return
 	}
-	styles, err := dbpool.FindPostWithFilename("_styles", user.ID, cfg.Space)
+	styles, err := dbpool.FindPostWithFilename("_styles.css", user.ID, cfg.Space)
 	if err != nil {
 		logger.Infof("css not found for: %s", username)
 		http.Error(w, "css not found", http.StatusNotFound)
@@ -220,9 +220,9 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	hasCSS := false
 	postCollection := make([]PostItemData, 0, len(posts))
 	for _, post := range posts {
-		if post.Filename == "_styles" && len(post.Text) > 0 {
+		if post.Filename == "_styles.css" && len(post.Text) > 0 {
 			hasCSS = true
-		} else if post.Filename == "_readme" {
+		} else if post.Filename == "_readme.md" {
 			parsedText, err := ParseText(post.Text)
 			if err != nil {
 				logger.Error(err)
@@ -287,11 +287,11 @@ func postRawHandler(w http.ResponseWriter, r *http.Request) {
 	subdomain := shared.GetSubdomain(r)
 	cfg := shared.GetCfg(r)
 
-	var filename string
+	var slug string
 	if !cfg.IsSubdomains() || subdomain == "" {
-		filename, _ = url.PathUnescape(shared.GetField(r, 1))
+		slug, _ = url.PathUnescape(shared.GetField(r, 1))
 	} else {
-		filename, _ = url.PathUnescape(shared.GetField(r, 0))
+		slug, _ = url.PathUnescape(shared.GetField(r, 0))
 	}
 
 	dbpool := shared.GetDB(r)
@@ -304,7 +304,7 @@ func postRawHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	post, err := dbpool.FindPostWithFilename(filename, user.ID, cfg.Space)
+	post, err := dbpool.FindPostWithSlug(slug, user.ID, cfg.Space)
 	if err != nil {
 		logger.Infof("post not found")
 		http.Error(w, "post not found", http.StatusNotFound)
@@ -325,11 +325,11 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	subdomain := shared.GetSubdomain(r)
 	cfg := shared.GetCfg(r)
 
-	var filename string
+	var slug string
 	if !cfg.IsSubdomains() || subdomain == "" {
-		filename, _ = url.PathUnescape(shared.GetField(r, 1))
+		slug, _ = url.PathUnescape(shared.GetField(r, 1))
 	} else {
-		filename, _ = url.PathUnescape(shared.GetField(r, 0))
+		slug, _ = url.PathUnescape(shared.GetField(r, 0))
 	}
 
 	dbpool := shared.GetDB(r)
@@ -351,7 +351,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 
 	hasCSS := false
 	var data PostPageData
-	post, err := dbpool.FindPostWithFilename(filename, user.ID, cfg.Space)
+	post, err := dbpool.FindPostWithSlug(slug, user.ID, cfg.Space)
 	if err == nil {
 		parsedText, err := ParseText(post.Text)
 		if err != nil {
@@ -359,7 +359,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// we need the blog name from the readme unfortunately
-		readme, err := dbpool.FindPostWithFilename("_readme", user.ID, cfg.Space)
+		readme, err := dbpool.FindPostWithFilename("_readme.md", user.ID, cfg.Space)
 		if err == nil {
 			readmeParsed, err := ParseText(readme.Text)
 			if err != nil {
@@ -371,7 +371,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// we need the blog name from the readme unfortunately
-		css, err := dbpool.FindPostWithFilename("_styles", user.ID, cfg.Space)
+		css, err := dbpool.FindPostWithFilename("_styles.css", user.ID, cfg.Space)
 		if err == nil {
 			if len(css.Text) > 0 {
 				hasCSS = true
@@ -414,7 +414,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			BlogName:     blogName,
 			Contents:     "Oops!  we can't seem to find this post.",
 		}
-		logger.Infof("post not found %s/%s", username, filename)
+		logger.Infof("post not found %s/%s", username, slug)
 	}
 
 	ts, err := renderTemplate(cfg, []string{
@@ -579,7 +579,7 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, post := range posts {
-		if post.Filename == "_readme" {
+		if post.Filename == "_readme.md" {
 			parsedText, err := ParseText(post.Text)
 			if err != nil {
 				logger.Error(err)

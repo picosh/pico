@@ -24,7 +24,11 @@ func FilenameToTitle(filename string, title string) string {
 		return title
 	}
 
-	pre := fnameRe.ReplaceAllString(title, " ")
+	return ToUpper(title)
+}
+
+func ToUpper(str string) string {
+	pre := fnameRe.ReplaceAllString(str, " ")
 	r := []rune(pre)
 	r[0] = unicode.ToUpper(r[0])
 	return string(r)
