@@ -17,7 +17,7 @@ bp-setup:
 .PHONY: bp-setup
 
 bp-caddy: bp-setup
-	$(DOCKER_BUILDX_BUILD) -t neurosnap/cloudflare-caddy:$(DOCKER_TAG) -f Dockerfile.caddy .
+	$(DOCKER_BUILDX_BUILD) -t neurosnap/pico-caddy:$(DOCKER_TAG) -f Dockerfile.caddy .
 .PHONY: bp-caddy
 
 bp-%: bp-setup
