@@ -6,10 +6,10 @@
 	}
 }
 
-*.prose.sh, prose.sh {
+*.{$APP_DOMAIN}, {$APP_DOMAIN} {
 	reverse_proxy web:3000
-	tls hello@prose.sh {
-		dns cloudflare {env.CF_API_TOKEN}
+	tls hello@{$APP_DOMAIN} {
+		dns cloudflare {$CF_API_TOKEN}
 	}
 	encode zstd gzip
 
@@ -37,7 +37,7 @@
 
 :443 {
 	reverse_proxy web:3000
-	tls hello@prose.sh {
+	tls hello@{$APP_DOMAIN} {
 		on_demand
 	}
 	encode zstd gzip
