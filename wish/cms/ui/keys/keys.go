@@ -411,6 +411,7 @@ func unlinkKey(m Model) tea.Cmd {
 func deleteAccount(m Model) tea.Cmd {
 	return func() tea.Msg {
 		id := m.keys[m.getSelectedIndex()].UserID
+		m.cfg.Logger.Infof("User (%s) requested account deletion (%s)", m.user.Name, id)
 		err := m.dbpool.RemoveUsers([]string{id})
 		if err != nil {
 			return errMsg{err}
