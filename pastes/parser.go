@@ -2,6 +2,7 @@ package pastes
 
 import (
 	"bytes"
+
 	"github.com/alecthomas/chroma/formatters/html"
 	"github.com/alecthomas/chroma/lexers"
 	"github.com/alecthomas/chroma/styles"

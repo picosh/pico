@@ -38,15 +38,17 @@ func CreateServe(routes []Route, subdomainRoutes []Route, cfg *ConfigSite, dbpoo
 			hostDomain := strings.ToLower(strings.Split(r.Host, ":")[0])
 			appDomain := strings.ToLower(strings.Split(cfg.ConfigCms.Domain, ":")[0])
 
-			if hostDomain != appDomain && strings.Contains(hostDomain, appDomain) {
-				subdomain = strings.TrimSuffix(hostDomain, fmt.Sprintf(".%s", appDomain))
-				if subdomain != "" {
-					curRoutes = subdomainRoutes
-				}
-			} else {
-				subdomain = GetCustomDomain(hostDomain)
-				if subdomain != "" {
-					curRoutes = subdomainRoutes
+			if hostDomain != appDomain {
+				if strings.Contains(hostDomain, appDomain) {
+					subdomain = strings.TrimSuffix(hostDomain, fmt.Sprintf(".%s", appDomain))
+					if subdomain != "" {
+						curRoutes = subdomainRoutes
+					}
+				} else {
+					subdomain = GetCustomDomain(hostDomain)
+					if subdomain != "" {
+						curRoutes = subdomainRoutes
+					}
 				}
 			}
 		}

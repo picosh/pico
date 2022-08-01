@@ -40,7 +40,7 @@ func SanitizeFileExt(fname string) string {
 
 func KeyText(s ssh.Session) (string, error) {
 	if s.PublicKey() == nil {
-		return "", fmt.Errorf("Session doesn't have public key")
+		return "", fmt.Errorf("session doesn't have public key")
 	}
 	kb := base64.StdEncoding.EncodeToString(s.PublicKey().Marshal())
 	return fmt.Sprintf("%s %s", s.PublicKey().Type(), kb), nil
@@ -76,11 +76,7 @@ func IsText(s string) bool {
 
 func IsExtAllowed(filename string, allowedExt []string) bool {
 	ext := pathpkg.Ext(filename)
-	if !slices.Contains(allowedExt, ext) {
-		return false
-	}
-
-	return true
+	return slices.Contains(allowedExt, ext)
 }
 
 // IsTextFile reports whether the file has a known extension indicating
