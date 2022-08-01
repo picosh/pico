@@ -61,46 +61,6 @@ type TransparencyPageData struct {
 	Analytics *db.Analytics
 }
 
-func renderTemplate(cfg *shared.ConfigSite, templates []string) (*template.Template, error) {
-	files := make([]string, len(templates))
-	copy(files, templates)
-	files = append(
-		files,
-		cfg.StaticPath("html/footer.partial.tmpl"),
-		cfg.StaticPath("html/marketing-footer.partial.tmpl"),
-		cfg.StaticPath("html/base.layout.tmpl"),
-	)
-
-	ts, err := template.ParseFiles(files...)
-	if err != nil {
-		return nil, err
-	}
-	return ts, nil
-}
-
-func createPageHandler(fname string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := shared.GetLogger(r)
-		cfg := shared.GetCfg(r)
-		ts, err := renderTemplate(cfg, []string{cfg.StaticPath(fname)})
-
-		if err != nil {
-			logger.Error(err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		data := PageData{
-			Site: *cfg.GetSiteData(),
-		}
-		err = ts.Execute(w, data)
-		if err != nil {
-			logger.Error(err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-	}
-}
-
 type Link struct {
 	URL  string
 	Text string
@@ -113,18 +73,8 @@ type HeaderTxt struct {
 	HasLinks bool
 }
 
-func GetUsernameFromRequest(r *http.Request) string {
-	subdomain := shared.GetSubdomain(r)
-	cfg := shared.GetCfg(r)
-
-	if !cfg.IsSubdomains() || subdomain == "" {
-		return shared.GetField(r, 0)
-	}
-	return subdomain
-}
-
 func blogHandler(w http.ResponseWriter, r *http.Request) {
-	username := GetUsernameFromRequest(r)
+	username := shared.GetUsernameFromRequest(r)
 	dbpool := shared.GetDB(r)
 	logger := shared.GetLogger(r)
 	cfg := shared.GetCfg(r)
@@ -148,7 +98,7 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	onSubdomain := cfg.IsSubdomains() && strings.Contains(hostDomain, appDomain)
 	withUserName := (!onSubdomain && hostDomain == appDomain) || !cfg.IsCustomdomains()
 
-	ts, err := renderTemplate(cfg, []string{
+	ts, err := shared.RenderTemplate(cfg, []string{
 		cfg.StaticPath("html/blog.page.tmpl"),
 	})
 
@@ -207,7 +157,7 @@ func GetBlogName(username string) string {
 }
 
 func postHandler(w http.ResponseWriter, r *http.Request) {
-	username := GetUsernameFromRequest(r)
+	username := shared.GetUsernameFromRequest(r)
 	subdomain := shared.GetSubdomain(r)
 	cfg := shared.GetCfg(r)
 
@@ -268,7 +218,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	ts, err := renderTemplate(cfg, []string{
+	ts, err := shared.RenderTemplate(cfg, []string{
 		cfg.StaticPath("html/post.page.tmpl"),
 	})
 
@@ -284,7 +234,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func postHandlerRaw(w http.ResponseWriter, r *http.Request) {
-	username := GetUsernameFromRequest(r)
+	username := shared.GetUsernameFromRequest(r)
 	subdomain := shared.GetSubdomain(r)
 	cfg := shared.GetCfg(r)
 
@@ -388,12 +338,13 @@ func createStaticRoutes() []shared.Route {
 
 func createMainRoutes(staticRoutes []shared.Route) []shared.Route {
 	routes := []shared.Route{
-		shared.NewRoute("GET", "/", createPageHandler("html/marketing.page.tmpl")),
-		shared.NewRoute("GET", "/spec", createPageHandler("html/spec.page.tmpl")),
-		shared.NewRoute("GET", "/ops", createPageHandler("html/ops.page.tmpl")),
-		shared.NewRoute("GET", "/privacy", createPageHandler("html/privacy.page.tmpl")),
-		shared.NewRoute("GET", "/help", createPageHandler("html/help.page.tmpl")),
+		shared.NewRoute("GET", "/", shared.CreatePageHandler("html/marketing.page.tmpl")),
+		shared.NewRoute("GET", "/spec", shared.CreatePageHandler("html/spec.page.tmpl")),
+		shared.NewRoute("GET", "/ops", shared.CreatePageHandler("html/ops.page.tmpl")),
+		shared.NewRoute("GET", "/privacy", shared.CreatePageHandler("html/privacy.page.tmpl")),
+		shared.NewRoute("GET", "/help", shared.CreatePageHandler("html/help.page.tmpl")),
 		shared.NewRoute("GET", "/transparency", transparencyHandler),
+		shared.NewRoute("GET", "/check", shared.CheckHandler),
 	}
 
 	routes = append(

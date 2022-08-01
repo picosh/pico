@@ -45,7 +45,7 @@ func CreateServe(routes []Route, subdomainRoutes []Route, cfg *ConfigSite, dbpoo
 						curRoutes = subdomainRoutes
 					}
 				} else {
-					subdomain = GetCustomDomain(hostDomain)
+					subdomain = GetCustomDomain(hostDomain, cfg.Space)
 					if subdomain != "" {
 						curRoutes = subdomainRoutes
 					}
@@ -105,8 +105,8 @@ func GetSubdomain(r *http.Request) string {
 	return r.Context().Value(ctxSubdomainKey{}).(string)
 }
 
-func GetCustomDomain(host string) string {
-	records, err := net.LookupTXT(fmt.Sprintf("_prose.%s", host))
+func GetCustomDomain(host string, space string) string {
+	records, err := net.LookupTXT(fmt.Sprintf("_%s.%s", host, space))
 	if err != nil {
 		return ""
 	}

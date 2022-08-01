@@ -17,6 +17,10 @@ type SitePageData struct {
 	Email   string
 }
 
+type PageData struct {
+	Site SitePageData
+}
+
 type ConfigSite struct {
 	config.ConfigCms
 	config.ConfigURL

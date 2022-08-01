@@ -53,7 +53,7 @@ func createPageHandler(fname string) gemini.HandlerFunc {
 			return
 		}
 
-		data := lists.PageData{
+		data := shared.PageData{
 			Site: *cfg.GetSiteData(),
 		}
 		err = ts.Execute(w, data)

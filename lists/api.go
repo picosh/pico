@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"html/template"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -18,10 +17,6 @@ import (
 	"github.com/gorilla/feeds"
 	"golang.org/x/exp/slices"
 )
-
-type PageData struct {
-	Site shared.SitePageData
-}
 
 type PostItemData struct {
 	URL            template.URL
@@ -74,50 +69,6 @@ type TransparencyPageData struct {
 	Analytics *db.Analytics
 }
 
-func isRequestTrackable(r *http.Request) bool {
-	return true
-}
-
-func renderTemplate(cfg *shared.ConfigSite, templates []string) (*template.Template, error) {
-	files := make([]string, len(templates))
-	copy(files, templates)
-	files = append(
-		files,
-		cfg.StaticPath("html/footer.partial.tmpl"),
-		cfg.StaticPath("html/marketing-footer.partial.tmpl"),
-		cfg.StaticPath("html/base.layout.tmpl"),
-	)
-
-	ts, err := template.ParseFiles(files...)
-	if err != nil {
-		return nil, err
-	}
-	return ts, nil
-}
-
-func createPageHandler(fname string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := shared.GetLogger(r)
-		cfg := shared.GetCfg(r)
-		ts, err := renderTemplate(cfg, []string{cfg.StaticPath(fname)})
-
-		if err != nil {
-			logger.Error(err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		data := PageData{
-			Site: *cfg.GetSiteData(),
-		}
-		err = ts.Execute(w, data)
-		if err != nil {
-			logger.Error(err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-	}
-}
-
 type HeaderTxt struct {
 	Title    string
 	Bio      string
@@ -131,18 +82,12 @@ type ReadmeTxt struct {
 	Items    []*pkg.ListItem
 }
 
-func GetUsernameFromRequest(r *http.Request) string {
-	subdomain := shared.GetSubdomain(r)
-	cfg := shared.GetCfg(r)
-
-	if !cfg.IsSubdomains() || subdomain == "" {
-		return shared.GetField(r, 0)
-	}
-	return subdomain
+func isRequestTrackable(r *http.Request) bool {
+	return true
 }
 
 func blogHandler(w http.ResponseWriter, r *http.Request) {
-	username := GetUsernameFromRequest(r)
+	username := shared.GetUsernameFromRequest(r)
 	dbpool := shared.GetDB(r)
 	logger := shared.GetLogger(r)
 	cfg := shared.GetCfg(r)
@@ -166,7 +111,7 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	onSubdomain := cfg.IsSubdomains() && strings.Contains(hostDomain, appDomain)
 	withUserName := (!onSubdomain && hostDomain == appDomain) || !cfg.IsCustomdomains()
 
-	ts, err := renderTemplate(cfg, []string{
+	ts, err := shared.RenderTemplate(cfg, []string{
 		cfg.StaticPath("html/blog.page.tmpl"),
 		cfg.StaticPath("html/list.partial.tmpl"),
 	})
@@ -251,7 +196,7 @@ func GetBlogName(username string) string {
 }
 
 func postHandler(w http.ResponseWriter, r *http.Request) {
-	username := GetUsernameFromRequest(r)
+	username := shared.GetUsernameFromRequest(r)
 	subdomain := shared.GetSubdomain(r)
 	cfg := shared.GetCfg(r)
 
@@ -339,7 +284,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	ts, err := renderTemplate(cfg, []string{
+	ts, err := shared.RenderTemplate(cfg, []string{
 		cfg.StaticPath("html/post.page.tmpl"),
 		cfg.StaticPath("html/list.partial.tmpl"),
 	})
@@ -402,7 +347,7 @@ func readHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ts, err := renderTemplate(cfg, []string{
+	ts, err := shared.RenderTemplate(cfg, []string{
 		cfg.StaticPath("html/read.page.tmpl"),
 	})
 
@@ -448,7 +393,7 @@ func readHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
-	username := GetUsernameFromRequest(r)
+	username := shared.GetUsernameFromRequest(r)
 	dbpool := shared.GetDB(r)
 	logger := shared.GetLogger(r)
 	cfg := shared.GetCfg(r)
@@ -619,47 +564,28 @@ func rssHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func serveFile(file string, contentType string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := shared.GetLogger(r)
-		cfg := shared.GetCfg(r)
-
-		contents, err := ioutil.ReadFile(cfg.StaticPath(fmt.Sprintf("public/%s", file)))
-		if err != nil {
-			logger.Error(err)
-			http.Error(w, "file not found", 404)
-		}
-
-		w.Header().Add("Content-Type", contentType)
-
-		_, err = w.Write(contents)
-		if err != nil {
-			logger.Error(err)
-		}
-	}
-}
-
 func createStaticRoutes() []shared.Route {
 	return []shared.Route{
-		shared.NewRoute("GET", "/main.css", serveFile("main.css", "text/css")),
-		shared.NewRoute("GET", "/card.png", serveFile("card.png", "image/png")),
-		shared.NewRoute("GET", "/favicon-16x16.png", serveFile("favicon-16x16.png", "image/png")),
-		shared.NewRoute("GET", "/favicon-32x32.png", serveFile("favicon-32x32.png", "image/png")),
-		shared.NewRoute("GET", "/apple-touch-icon.png", serveFile("apple-touch-icon.png", "image/png")),
-		shared.NewRoute("GET", "/favicon.ico", serveFile("favicon.ico", "image/x-icon")),
-		shared.NewRoute("GET", "/robots.txt", serveFile("robots.txt", "text/plain")),
+		shared.NewRoute("GET", "/main.css", shared.ServeFile("main.css", "text/css")),
+		shared.NewRoute("GET", "/card.png", shared.ServeFile("card.png", "image/png")),
+		shared.NewRoute("GET", "/favicon-16x16.png", shared.ServeFile("favicon-16x16.png", "image/png")),
+		shared.NewRoute("GET", "/favicon-32x32.png", shared.ServeFile("favicon-32x32.png", "image/png")),
+		shared.NewRoute("GET", "/apple-touch-icon.png", shared.ServeFile("apple-touch-icon.png", "image/png")),
+		shared.NewRoute("GET", "/favicon.ico", shared.ServeFile("favicon.ico", "image/x-icon")),
+		shared.NewRoute("GET", "/robots.txt", shared.ServeFile("robots.txt", "text/plain")),
 	}
 }
 
 func createMainRoutes(staticRoutes []shared.Route) []shared.Route {
 	routes := []shared.Route{
-		shared.NewRoute("GET", "/", createPageHandler("html/marketing.page.tmpl")),
-		shared.NewRoute("GET", "/spec", createPageHandler("html/spec.page.tmpl")),
-		shared.NewRoute("GET", "/ops", createPageHandler("html/ops.page.tmpl")),
-		shared.NewRoute("GET", "/privacy", createPageHandler("html/privacy.page.tmpl")),
-		shared.NewRoute("GET", "/help", createPageHandler("html/help.page.tmpl")),
+		shared.NewRoute("GET", "/", shared.CreatePageHandler("html/marketing.page.tmpl")),
+		shared.NewRoute("GET", "/spec", shared.CreatePageHandler("html/spec.page.tmpl")),
+		shared.NewRoute("GET", "/ops", shared.CreatePageHandler("html/ops.page.tmpl")),
+		shared.NewRoute("GET", "/privacy", shared.CreatePageHandler("html/privacy.page.tmpl")),
+		shared.NewRoute("GET", "/help", shared.CreatePageHandler("html/help.page.tmpl")),
 		shared.NewRoute("GET", "/transparency", transparencyHandler),
 		shared.NewRoute("GET", "/read", readHandler),
+		shared.NewRoute("GET", "/check", shared.CheckHandler),
 	}
 
 	routes = append(
