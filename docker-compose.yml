@@ -1,9 +1,50 @@
-version: "3.4"
+version: "3.8"
 services:
-  db:
+  postgres:
     image: postgres
     restart: always
-    ports:
-      - "5432:5432"
-    env_file:
-      - .env
+    profiles:
+      - db
+      - all
+  lists-web:
+    image: neurosnap/lists-web:latest
+    restart: always
+    profiles:
+      - lists
+      - services
+      - all
+  lists-ssh:
+    image: neurosnap/lists-ssh:latest
+    restart: always
+    profiles:
+      - lists
+      - services
+      - all
+  pastes-web:
+    image: neurosnap/pastes-web:latest
+    restart: always
+    profiles:
+      - pastes
+      - services
+      - all
+  pastes-ssh:
+    image: neurosnap/pastes-ssh:latest
+    restart: always
+    profiles:
+      - pastes
+      - services
+      - all
+  prose-web:
+    image: neurosnap/prose-web:latest
+    restart: always
+    profiles:
+      - prose
+      - services
+      - all
+  prose-ssh:
+    image: neurosnap/prose-ssh:latest
+    restart: always
+    profiles:
+      - prose
+      - services
+      - all

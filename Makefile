@@ -2,7 +2,7 @@ PGDATABASE?="pico"
 PGHOST?="db"
 PGUSER?="postgres"
 PORT?="5432"
-DB_CONTAINER?=pico-db-1
+DB_CONTAINER?=pico-postgres-1
 DOCKER_TAG?=$(shell git log --format="%H" -n 1)
 DOCKER_PLATFORM?=linux/amd64,linux/arm64
 DOCKER_BUILDX_BUILD?=docker buildx build --push --platform $(DOCKER_PLATFORM)
@@ -17,7 +17,7 @@ bp-setup:
 .PHONY: bp-setup
 
 bp-caddy: bp-setup
-	$(DOCKER_BUILDX_BUILD) -t neurosnap/pico-caddy:$(DOCKER_TAG) -f Dockerfile.caddy .
+	$(DOCKER_BUILDX_BUILD) -t neurosnap/pico-caddy:$(DOCKER_TAG) -f caddy/Dockerfile .
 .PHONY: bp-caddy
 
 bp-%: bp-setup

@@ -1,0 +1,69 @@
+version: "3.8"
+services:
+  postgres:
+    env_file:
+      - .env.example
+    volumes:
+      - ./data/postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+  lists-web:
+    build:
+      args:
+        APP: lists
+      target: release-web
+    env_file:
+      - .env.example
+    ports:
+      - "3000:3000"
+  lists-ssh:
+    build:
+      args:
+        APP: lists
+      target: release-ssh
+    env_file:
+      - .env.example
+    volumes:
+      - ./data/lists-ssh/data:/app/ssh_data
+    ports:
+      - "2220:2222"
+  pastes-web:
+    build:
+      args:
+        APP: pastes
+      target: release-web
+    env_file:
+      - .env.example
+    ports:
+      - "3001:3000"
+  pastes-ssh:
+    build:
+      args:
+        APP: pastes
+      target: release-ssh
+    env_file:
+      - .env.example
+    volumes:
+      - ./data/pastes-ssh/data:/app/ssh_data
+    ports:
+      - "2221:2222"
+  prose-web:
+    build:
+      args:
+        APP: prose
+      target: release-web
+    env_file:
+      - .env.example
+    ports:
+      - "3002:3000"
+  prose-ssh:
+    build:
+      args:
+        APP: prose
+      target: release-ssh
+    env_file:
+      - .env.example
+    volumes:
+      - ./data/prose-ssh/data:/app/ssh_data
+    ports:
+      - "2222:2222"

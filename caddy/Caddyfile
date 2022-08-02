@@ -1,17 +1,17 @@
 {
-	on_demand_tls {
-		ask http://web:3000/check
-		interval 1m
-		burst 10
-	}
+    on_demand_tls {
+        ask http://web:3000/check
+        interval 1m
+        burst 10
+    }
 }
 
 *.{$APP_DOMAIN}, {$APP_DOMAIN} {
-	reverse_proxy web:3000
-	tls hello@{$APP_DOMAIN} {
-		dns cloudflare {$CF_API_TOKEN}
-	}
-	encode zstd gzip
+    reverse_proxy web:3000
+    tls {$APP_EMAIL} {
+        dns cloudflare {$CF_API_TOKEN}
+    }
+    encode zstd gzip
 
     header {
         # disable FLoC tracking
@@ -33,12 +33,21 @@
 
         X-XSS-Protection "1; mode=block"
     }
+
+    @caddymetrics {
+        host {$APP_DOMAIN}
+        path /_caddy/metrics
+    }
+
+    metrics @caddymetrics {
+        disable_openmetrics
+    }
 }
 
 :443 {
-	reverse_proxy web:3000
-	tls hello@{$APP_DOMAIN} {
-		on_demand
-	}
-	encode zstd gzip
+    reverse_proxy web:3000
+    tls {$APP_EMAIL} {
+            on_demand
+    }
+    encode zstd gzip
 }
