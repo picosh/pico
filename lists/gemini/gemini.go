@@ -17,7 +17,6 @@ import (
 	"git.sr.ht/~adnano/go-gemini/certificate"
 	feeds "git.sr.ht/~aw/gorilla-feeds"
 	"git.sr.ht/~erock/pico/lists"
-	"git.sr.ht/~erock/pico/lists/pkg"
 	"git.sr.ht/~erock/pico/shared"
 	"git.sr.ht/~erock/pico/wish/cms/db"
 	"git.sr.ht/~erock/pico/wish/cms/db/postgres"
@@ -109,7 +108,7 @@ func blogHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Request
 	postCollection := make([]lists.PostItemData, 0, len(posts))
 	for _, post := range posts {
 		if post.Filename == "_header.txt" {
-			parsedText := pkg.ParseText(post.Text)
+			parsedText := lists.ParseText(post.Text)
 			if parsedText.MetaData.Title != "" {
 				headerTxt.Title = parsedText.MetaData.Title
 			}
@@ -123,7 +122,7 @@ func blogHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Request
 				headerTxt.HasItems = true
 			}
 		} else if post.Filename == "_readme.txt" {
-			parsedText := pkg.ParseText(post.Text)
+			parsedText := lists.ParseText(post.Text)
 			readmeTxt.Items = parsedText.Items
 			readmeTxt.ListType = parsedText.MetaData.ListType
 			if len(readmeTxt.Items) > 0 {
@@ -249,7 +248,7 @@ func postHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Request
 	header, _ := dbpool.FindPostWithFilename("_header.txt", user.ID, cfg.Space)
 	blogName := lists.GetBlogName(username)
 	if header != nil {
-		headerParsed := pkg.ParseText(header.Text)
+		headerParsed := lists.ParseText(header.Text)
 		if headerParsed.MetaData.Title != "" {
 			blogName = headerParsed.MetaData.Title
 		}
@@ -262,12 +261,12 @@ func postHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Request
 		return
 	}
 
-	parsedText := pkg.ParseText(post.Text)
+	parsedText := lists.ParseText(post.Text)
 
 	// we need the blog name from the readme unfortunately
 	readme, err := dbpool.FindPostWithFilename("_readme.txt", user.ID, cfg.Space)
 	if err == nil {
-		readmeParsed := pkg.ParseText(readme.Text)
+		readmeParsed := lists.ParseText(readme.Text)
 		if readmeParsed.MetaData.Title != "" {
 			blogName = readmeParsed.MetaData.Title
 		}
@@ -380,7 +379,7 @@ func rssBlogHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Requ
 
 	for _, post := range posts {
 		if post.Filename == "_header.txt" {
-			parsedText := pkg.ParseText(post.Text)
+			parsedText := lists.ParseText(post.Text)
 			if parsedText.MetaData.Title != "" {
 				headerTxt.Title = parsedText.MetaData.Title
 			}
@@ -406,7 +405,7 @@ func rssBlogHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Requ
 		if slices.Contains(cfg.HiddenPosts, post.Filename) {
 			continue
 		}
-		parsed := pkg.ParseText(post.Text)
+		parsed := lists.ParseText(post.Text)
 		var tpl bytes.Buffer
 		data := &lists.PostPageData{
 			ListType: parsed.MetaData.ListType,
@@ -478,7 +477,7 @@ func rssHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Request)
 
 	var feedItems []*feeds.Item
 	for _, post := range pager.Data {
-		parsed := pkg.ParseText(post.Text)
+		parsed := lists.ParseText(post.Text)
 		var tpl bytes.Buffer
 		data := &lists.PostPageData{
 			ListType: parsed.MetaData.ListType,

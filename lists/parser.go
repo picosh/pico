@@ -1,10 +1,12 @@
-package pkg
+package lists
 
 import (
 	"fmt"
 	"html/template"
 	"strings"
 	"time"
+
+	"github.com/araddon/dateparse"
 )
 
 type ParsedText struct {
@@ -73,7 +75,7 @@ func SplitByNewline(text string) []string {
 }
 
 func PublishAtDate(date string) (*time.Time, error) {
-	t, err := time.Parse("2006-01-02", date)
+	t, err := dateparse.ParseStrict(date)
 	return &t, err
 }
 

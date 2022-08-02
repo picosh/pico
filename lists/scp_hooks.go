@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"git.sr.ht/~erock/pico/filehandlers"
-	"git.sr.ht/~erock/pico/lists/pkg"
 	"git.sr.ht/~erock/pico/shared"
 	"golang.org/x/exp/slices"
 )
@@ -37,7 +36,7 @@ func (p *ListHooks) FileValidate(text string, filename string) (bool, error) {
 }
 
 func (p *ListHooks) FileMeta(text string, data *filehandlers.PostMetaData) error {
-	parsedText := pkg.ParseText(text)
+	parsedText := ParseText(text)
 
 	if parsedText.MetaData.Title != "" {
 		data.Title = parsedText.MetaData.Title

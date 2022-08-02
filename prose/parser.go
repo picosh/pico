@@ -3,11 +3,11 @@ package prose
 import (
 	"bytes"
 	"fmt"
-	"regexp"
 	"strings"
 	"time"
 
 	"github.com/alecthomas/chroma/formatters/html"
+	"github.com/araddon/dateparse"
 	"github.com/yuin/goldmark"
 	highlighting "github.com/yuin/goldmark-highlighting"
 	meta "github.com/yuin/goldmark-meta"
@@ -92,8 +92,6 @@ func toTags(obj interface{}) ([]string, error) {
 	return arr, nil
 }
 
-var reTimestamp = regexp.MustCompile(`T.+`)
-
 func ParseText(text string) (*ParsedText, error) {
 	parsed := ParsedText{
 		MetaData: &MetaData{
@@ -127,11 +125,7 @@ func ParseText(text string) (*ParsedText, error) {
 	var err error
 	date := toString(metaData["date"])
 	if date != "" {
-		if strings.Contains(date, "T") {
-			date = reTimestamp.ReplaceAllString(date, "")
-		}
-
-		nextDate, err := time.Parse("2006-01-02", date)
+		nextDate, err := dateparse.ParseStrict(date)
 		if err != nil {
 			return &parsed, err
 		}

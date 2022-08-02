@@ -80,7 +80,8 @@ func main() {
 			continue
 		}
 		if len(parsed.Tags) > 0 {
-			picoDb.ReplaceTagsForPost(parsed.Tags, post.ID)
+			err := picoDb.ReplaceTagsForPost(parsed.Tags, post.ID)
+			panic(err)
 		}
 	}
 }
