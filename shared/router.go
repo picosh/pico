@@ -106,7 +106,7 @@ func GetSubdomain(r *http.Request) string {
 }
 
 func GetCustomDomain(host string, space string) string {
-	records, err := net.LookupTXT(fmt.Sprintf("_%s.%s", host, space))
+	records, err := net.LookupTXT(fmt.Sprintf("_%s.%s", space, host))
 	if err != nil {
 		return ""
 	}
