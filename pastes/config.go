@@ -11,12 +11,18 @@ func NewConfigSite() *shared.ConfigSite {
 	domain := shared.GetEnv("PASTES_DOMAIN", "pastes.sh")
 	email := shared.GetEnv("PASTES_EMAIL", "hello@pastes.sh")
 	subdomains := shared.GetEnv("PASTES_SUBDOMAINS", "0")
+	customdomains := shared.GetEnv("PASTES_CUSTOMDOMAINS", "0")
 	port := shared.GetEnv("PASTES_WEB_PORT", "3000")
 	dbURL := shared.GetEnv("DATABASE_URL", "")
 	protocol := shared.GetEnv("PASTES_PROTOCOL", "https")
 	subdomainsEnabled := false
 	if subdomains == "1" {
 		subdomainsEnabled = true
+	}
+
+	customdomainsEnabled := false
+	if customdomains == "1" {
+		customdomainsEnabled = true
 	}
 
 	intro := "To get started, enter a username.\n"
@@ -26,7 +32,8 @@ func NewConfigSite() *shared.ConfigSite {
 	intro += fmt.Sprintf("scp ~/pastes/* %s:/", domain)
 
 	return &shared.ConfigSite{
-		SubdomainsEnabled: subdomainsEnabled,
+		SubdomainsEnabled:    subdomainsEnabled,
+		CustomdomainsEnabled: customdomainsEnabled,
 		ConfigCms: config.ConfigCms{
 			Domain:      domain,
 			Port:        port,
