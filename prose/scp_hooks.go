@@ -44,8 +44,9 @@ func (p *MarkdownHooks) FileValidate(text string, filename string) (bool, error)
 
 func (p *MarkdownHooks) FileMeta(text string, data *filehandlers.PostMetaData) error {
 	parsedText, err := ParseText(text)
+	// we return nil here because we don't want the file upload to fail
 	if err != nil {
-		return err
+		return nil
 	}
 
 	if parsedText.Title != "" {

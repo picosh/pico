@@ -80,6 +80,11 @@ func toTags(obj interface{}) ([]string, error) {
 		for _, tag := range raw {
 			arr = append(arr, tag.(string))
 		}
+	case string:
+		tags := strings.Split(raw, " ")
+		for _, tag := range tags {
+			arr = append(arr, strings.TrimSpace(tag))
+		}
 	default:
 		return arr, fmt.Errorf("unsupported type for `tags` variable: %T", raw)
 	}
@@ -90,6 +95,11 @@ func toTags(obj interface{}) ([]string, error) {
 var reTimestamp = regexp.MustCompile(`T.+`)
 
 func ParseText(text string) (*ParsedText, error) {
+	parsed := ParsedText{
+		MetaData: &MetaData{
+			Tags: []string{},
+		},
+	}
 	var buf bytes.Buffer
 	hili := highlighting.NewHighlighting(
 		highlighting.WithFormatOptions(
@@ -106,9 +116,12 @@ func ParseText(text string) (*ParsedText, error) {
 	)
 	context := parser.NewContext()
 	if err := md.Convert([]byte(text), &buf, parser.WithContext(context)); err != nil {
-		return &ParsedText{}, err
+		return &parsed, err
 	}
+	parsed.Html = buf.String()
 	metaData := meta.Get(context)
+	parsed.MetaData.Title = toString(metaData["title"])
+	parsed.MetaData.Description = toString(metaData["description"])
 
 	var publishAt *time.Time = nil
 	var err error
@@ -120,29 +133,23 @@ func ParseText(text string) (*ParsedText, error) {
 
 		nextDate, err := time.Parse("2006-01-02", date)
 		if err != nil {
-			return &ParsedText{}, err
+			return &parsed, err
 		}
 		publishAt = &nextDate
 	}
+	parsed.MetaData.PublishAt = publishAt
 
 	nav, err := toLinks(metaData["nav"])
 	if err != nil {
-		return &ParsedText{}, err
+		return &parsed, err
 	}
+	parsed.MetaData.Nav = nav
 
 	tags, err := toTags(metaData["tags"])
 	if err != nil {
-		return &ParsedText{}, err
+		return &parsed, err
 	}
+	parsed.MetaData.Tags = tags
 
-	return &ParsedText{
-		Html: buf.String(),
-		MetaData: &MetaData{
-			PublishAt:   publishAt,
-			Title:       toString(metaData["title"]),
-			Description: toString(metaData["description"]),
-			Nav:         nav,
-			Tags:        tags,
-		},
-	}, nil
+	return &parsed, nil
 }
