@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -40,6 +41,7 @@ type BlogPageData struct {
 	Readme    *ReadmeTxt
 	Header    *HeaderTxt
 	Posts     []PostItemData
+	HasFilter bool
 }
 
 type ReadPageData struct {
@@ -62,6 +64,7 @@ type PostPageData struct {
 	Items        []*pkg.ListItem
 	PublishAtISO string
 	PublishAt    string
+	Tags         []string
 }
 
 type TransparencyPageData struct {
@@ -82,6 +85,29 @@ type ReadmeTxt struct {
 	Items    []*pkg.ListItem
 }
 
+func getPostsForUser(r *http.Request, user *db.User, tag string) ([]*db.Post, error) {
+	dbpool := shared.GetDB(r)
+	cfg := shared.GetCfg(r)
+	var err error
+
+	posts := make([]*db.Post, 0)
+	if tag == "" {
+		posts, err = dbpool.FindPostsForUser(user.ID, cfg.Space)
+	} else {
+		posts, err = dbpool.FindUserPostsByTag(tag, user.ID, cfg.Space)
+	}
+
+	if err != nil {
+		return posts, err
+	}
+
+	sort.Slice(posts, func(i, j int) bool {
+		return posts[i].UpdatedAt.After(*posts[j].UpdatedAt)
+	})
+
+	return posts, nil
+}
+
 func isRequestTrackable(r *http.Request) bool {
 	return true
 }
@@ -98,7 +124,9 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "blog not found", http.StatusNotFound)
 		return
 	}
-	posts, err := dbpool.FindUpdatedPostsForUser(user.ID, cfg.Space)
+
+	tag := r.URL.Query().Get("tag")
+	posts, err := getPostsForUser(r, user, tag)
 	if err != nil {
 		logger.Error(err)
 		http.Error(w, "could not fetch posts for blog", http.StatusInternalServerError)
@@ -169,11 +197,12 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 		Site:      *cfg.GetSiteData(),
 		PageTitle: headerTxt.Title,
 		URL:       template.URL(cfg.FullBlogURL(username, onSubdomain, withUserName)),
-		RSSURL:    template.URL(cfg.RssBlogURL(username, onSubdomain, withUserName)),
+		RSSURL:    template.URL(cfg.RssBlogURL(username, onSubdomain, withUserName, tag)),
 		Readme:    readmeTxt,
 		Header:    headerTxt,
 		Username:  username,
 		Posts:     postCollection,
+		HasFilter: tag != "",
 	}
 
 	err = ts.Execute(w, data)
@@ -261,6 +290,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			Username:     username,
 			BlogName:     blogName,
 			Items:        parsedText.Items,
+			Tags:         parsedText.MetaData.Tags,
 		}
 	} else {
 		logger.Infof("post not found %s/%s", username, slug)
@@ -404,10 +434,12 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "rss feed not found", http.StatusNotFound)
 		return
 	}
-	posts, err := dbpool.FindUpdatedPostsForUser(user.ID, cfg.Space)
+
+	tag := r.URL.Query().Get("tag")
+	posts, err := getPostsForUser(r, user, tag)
 	if err != nil {
 		logger.Error(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "could not fetch posts for blog", http.StatusInternalServerError)
 		return
 	}
 

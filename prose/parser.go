@@ -20,6 +20,7 @@ type MetaData struct {
 	Title       string
 	Description string
 	Nav         []Link
+	Tags        []string
 }
 
 type ParsedText struct {
@@ -68,6 +69,24 @@ func toLinks(obj interface{}) ([]Link, error) {
 	return links, nil
 }
 
+func toTags(obj interface{}) ([]string, error) {
+	arr := make([]string, 0)
+	if obj == nil {
+		return arr, nil
+	}
+
+	switch raw := obj.(type) {
+	case []interface{}:
+		for _, tag := range raw {
+			arr = append(arr, tag.(string))
+		}
+	default:
+		return arr, fmt.Errorf("unsupported type for `tags` variable: %T", raw)
+	}
+
+	return arr, nil
+}
+
 var reTimestamp = regexp.MustCompile(`T.+`)
 
 func ParseText(text string) (*ParsedText, error) {
@@ -111,6 +130,11 @@ func ParseText(text string) (*ParsedText, error) {
 		return &ParsedText{}, err
 	}
 
+	tags, err := toTags(metaData["tags"])
+	if err != nil {
+		return &ParsedText{}, err
+	}
+
 	return &ParsedText{
 		Html: buf.String(),
 		MetaData: &MetaData{
@@ -118,6 +142,7 @@ func ParseText(text string) (*ParsedText, error) {
 			Title:       toString(metaData["title"]),
 			Description: toString(metaData["description"]),
 			Nav:         nav,
+			Tags:        tags,
 		},
 	}, nil
 }

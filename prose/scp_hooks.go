@@ -52,6 +52,7 @@ func (p *MarkdownHooks) FileMeta(text string, data *filehandlers.PostMetaData) e
 		data.Title = parsedText.Title
 	}
 
+	data.Tags = parsedText.Tags
 	data.Description = parsedText.Description
 
 	if parsedText.PublishAt != nil && !parsedText.PublishAt.IsZero() {

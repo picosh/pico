@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"math"
@@ -35,11 +36,44 @@ const (
 	sqlSelectPostWithFilename    = `SELECT posts.id, user_id, filename, slug, title, text, description, publish_at, app_users.name as username, posts.updated_at FROM posts LEFT OUTER JOIN app_users ON app_users.id = posts.user_id WHERE filename = $1 AND user_id = $2 AND cur_space = $3`
 	sqlSelectPostWithSlug        = `SELECT posts.id, user_id, filename, slug, title, text, description, publish_at, app_users.name as username, posts.updated_at FROM posts LEFT OUTER JOIN app_users ON app_users.id = posts.user_id WHERE slug = $1 AND user_id = $2 AND cur_space = $3`
 	sqlSelectPost                = `SELECT posts.id, user_id, filename, slug, title, text, description, publish_at, app_users.name as username, posts.updated_at FROM posts LEFT OUTER JOIN app_users ON app_users.id = posts.user_id WHERE posts.id = $1`
-	sqlSelectPostsForUser        = `SELECT posts.id, user_id, filename, slug, title, text, description, publish_at, app_users.name as username, posts.updated_at FROM posts LEFT OUTER JOIN app_users ON app_users.id = posts.user_id WHERE user_id = $1 AND publish_at::date <= CURRENT_DATE AND cur_space = $2 ORDER BY publish_at DESC`
 	sqlSelectUpdatedPostsForUser = `SELECT posts.id, user_id, filename, slug, title, text, description, publish_at, app_users.name as username, posts.updated_at FROM posts LEFT OUTER JOIN app_users ON app_users.id = posts.user_id WHERE user_id = $1 AND publish_at::date <= CURRENT_DATE AND cur_space = $2 ORDER BY updated_at DESC`
 	sqlSelectAllUpdatedPosts     = `SELECT posts.id, user_id, filename, slug, title, text, description, publish_at, app_users.name as username, posts.updated_at, 0 as score FROM posts LEFT OUTER JOIN app_users ON app_users.id = posts.user_id WHERE hidden = FALSE AND publish_at::date <= CURRENT_DATE AND cur_space = $3 ORDER BY updated_at DESC LIMIT $1 OFFSET $2`
 	sqlSelectPostCount           = `SELECT count(id) FROM posts WHERE hidden = FALSE AND cur_space=$1`
-	sqlSelectPostsByRank         = `
+	sqlSelectPostsForUser        = `
+	SELECT posts.id, user_id, filename, slug, title, text, description, publish_at,
+		app_users.name as username, posts.updated_at
+	FROM posts
+	LEFT OUTER JOIN app_users ON app_users.id = posts.user_id
+	WHERE
+		user_id = $1 AND
+		publish_at::date <= CURRENT_DATE AND
+		cur_space = $2
+	ORDER BY publish_at DESC`
+	sqlSelectPostsByTag = `
+	SELECT posts.id, user_id, filename, slug, title, text, description, publish_at,
+		app_users.name as username, posts.updated_at
+	FROM posts
+	LEFT OUTER JOIN app_users ON app_users.id = posts.user_id
+	LEFT OUTER JOIN post_tags ON post_tags.post_id = posts.id
+	WHERE
+		post_tags.name = '$1' AND
+		publish_at::date <= CURRENT_DATE AND
+		cur_space = $2
+	ORDER BY publish_at DESC`
+	sqlSelectUserPostsByTag = `
+	SELECT
+		posts.id, user_id, filename, slug, title, text, description, publish_at,
+		app_users.name as username, posts.updated_at
+	FROM posts
+	LEFT OUTER JOIN app_users ON app_users.id = posts.user_id
+	LEFT OUTER JOIN post_tags ON post_tags.post_id = posts.id
+	WHERE
+		user_id = $1 AND
+		(post_tags.name = $2 OR hidden = true) AND
+		publish_at::date <= CURRENT_DATE AND
+		cur_space = $3
+	ORDER BY publish_at DESC`
+	sqlSelectPostsByRank = `
 	SELECT
 		posts.id,
 		user_id,
@@ -67,17 +101,21 @@ const (
 	ORDER BY score DESC
 	LIMIT $1 OFFSET $2`
 
+	sqlSelectPopularTags = `SELECT name, count(post_id) as tally FROM post_tags GROUP_BY name, post_id ORDER BY tally DESC LIMIT 10`
+
 	sqlInsertPublicKey = `INSERT INTO public_keys (user_id, public_key) VALUES ($1, $2)`
 	sqlInsertPost      = `INSERT INTO posts (user_id, filename, slug, title, text, description, publish_at, hidden, cur_space) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`
 	sqlInsertUser      = `INSERT INTO app_users DEFAULT VALUES returning id`
+	sqlInsertTag       = `INSERT INTO post_tags (post_id, name) VALUES($1, $2) RETURNING id;`
 
 	sqlUpdatePost     = `UPDATE posts SET slug = $1, title = $2, text = $3, description = $4, updated_at = $5, publish_at = $6 WHERE id = $7`
 	sqlUpdateUserName = `UPDATE app_users SET name = $1 WHERE id = $2`
 	sqlIncrementViews = `UPDATE posts SET views = views + 1 WHERE id = $1 RETURNING views`
 
-	sqlRemovePosts = `DELETE FROM posts WHERE id = ANY($1::uuid[])`
-	sqlRemoveKeys  = `DELETE FROM public_keys WHERE id = ANY($1::uuid[])`
-	sqlRemoveUsers = `DELETE FROM app_users WHERE id = ANY($1::uuid[])`
+	sqlRemoveTagsByPost = `DELETE FROM post_tags WHERE post_id = $1`
+	sqlRemovePosts      = `DELETE FROM posts WHERE id = ANY($1::uuid[])`
+	sqlRemoveKeys       = `DELETE FROM public_keys WHERE id = ANY($1::uuid[])`
+	sqlRemoveUsers      = `DELETE FROM app_users WHERE id = ANY($1::uuid[])`
 )
 
 type PsqlDB struct {
@@ -628,4 +666,132 @@ func (me *PsqlDB) FindUsers() ([]*db.User, error) {
 		return users, rs.Err()
 	}
 	return users, nil
+}
+
+func (me *PsqlDB) removeTagsForPost(tx *sql.Tx, postID string) error {
+	_, err := tx.Exec(sqlRemoveTagsByPost, postID)
+	return err
+}
+
+func (me *PsqlDB) insertTagsForPost(tx *sql.Tx, tags []string, postID string) ([]string, error) {
+	ids := make([]string, 0)
+	for _, tag := range tags {
+		id := ""
+		err := tx.QueryRow(sqlInsertTag, postID, tag).Scan(&id)
+		if err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+
+	return ids, nil
+}
+
+func (me *PsqlDB) ReplaceTagsForPost(tags []string, postID string) error {
+	ctx := context.Background()
+	tx, err := me.Db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		err = tx.Rollback()
+	}()
+
+	err = me.removeTagsForPost(tx, postID)
+	if err != nil {
+		return err
+	}
+
+	_, err = me.insertTagsForPost(tx, tags, postID)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit()
+	return err
+}
+
+func (me *PsqlDB) FindUserPostsByTag(tag, userID, space string) ([]*db.Post, error) {
+	var posts []*db.Post
+	rs, err := me.Db.Query(sqlSelectUserPostsByTag, userID, tag, space)
+	if err != nil {
+		return posts, err
+	}
+	for rs.Next() {
+		post := &db.Post{}
+		err := rs.Scan(
+			&post.ID,
+			&post.UserID,
+			&post.Filename,
+			&post.Slug,
+			&post.Title,
+			&post.Text,
+			&post.Description,
+			&post.PublishAt,
+			&post.Username,
+			&post.UpdatedAt,
+		)
+		if err != nil {
+			return posts, err
+		}
+
+		posts = append(posts, post)
+	}
+	if rs.Err() != nil {
+		return posts, rs.Err()
+	}
+	return posts, nil
+}
+
+func (me *PsqlDB) FindPostsByTag(tag, space string) ([]*db.Post, error) {
+	var posts []*db.Post
+	rs, err := me.Db.Query(sqlSelectPostsByTag, tag, space)
+	if err != nil {
+		return posts, err
+	}
+	for rs.Next() {
+		post := &db.Post{}
+		err := rs.Scan(
+			&post.ID,
+			&post.UserID,
+			&post.Filename,
+			&post.Slug,
+			&post.Title,
+			&post.Text,
+			&post.Description,
+			&post.PublishAt,
+			&post.Username,
+			&post.UpdatedAt,
+		)
+		if err != nil {
+			return posts, err
+		}
+
+		posts = append(posts, post)
+	}
+	if rs.Err() != nil {
+		return posts, rs.Err()
+	}
+	return posts, nil
+}
+
+func (me *PsqlDB) FindPopularTags() ([]string, error) {
+	tags := make([]string, 0)
+	rs, err := me.Db.Query(sqlSelectPopularTags)
+	if err != nil {
+		return tags, err
+	}
+	for rs.Next() {
+		name := ""
+		err := rs.Scan(name)
+		if err != nil {
+			return tags, err
+		}
+
+		tags = append(tags, name)
+	}
+	if rs.Err() != nil {
+		return tags, rs.Err()
+	}
+	return tags, nil
 }

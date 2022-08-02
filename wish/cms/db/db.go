@@ -116,6 +116,11 @@ type DB interface {
 	UpdatePost(postID string, slug string, title string, text string, description string, publishAt *time.Time) (*Post, error)
 	RemovePosts(postIDs []string) error
 
+	ReplaceTagsForPost(tags []string, postID string) error
+	FindUserPostsByTag(tag, userID, space string) ([]*Post, error)
+	FindPostsByTag(tag, space string) ([]*Post, error)
+	FindPopularTags() ([]string, error)
+
 	AddViewCount(postID string) (int, error)
 
 	Close() error

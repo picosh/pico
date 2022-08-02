@@ -29,6 +29,7 @@ type MetaData struct {
 	PublishAt   *time.Time
 	Title       string
 	Description string
+	Tags        []string
 	ListType    string // https://developer.mozilla.org/en-US/docs/Web/CSS/list-style-type
 }
 
@@ -88,6 +89,12 @@ func TokenToMetaField(meta *MetaData, token *SplitToken) {
 		meta.Description = token.Value
 	} else if token.Key == "list_type" {
 		meta.ListType = token.Value
+	} else if token.Key == "tags" {
+		tags := strings.Split(token.Value, ",")
+		meta.Tags = make([]string, 0)
+		for _, tag := range tags {
+			meta.Tags = append(meta.Tags, strings.TrimSpace(tag))
+		}
 	}
 }
 
@@ -101,8 +108,9 @@ func KeyAsValue(token *SplitToken) string {
 func ParseText(text string) *ParsedText {
 	textItems := SplitByNewline(text)
 	items := []*ListItem{}
-	meta := &MetaData{
+	meta := MetaData{
 		ListType: "disc",
+		Tags:     []string{},
 	}
 	pre := false
 	skip := false
@@ -115,7 +123,7 @@ func ParseText(text string) *ParsedText {
 			prevItem = items[len(items)-1]
 		}
 
-		li := &ListItem{
+		li := ListItem{
 			Value: strings.Trim(t, " "),
 		}
 
@@ -147,7 +155,7 @@ func ParseText(text string) *ParsedText {
 			li.Value = KeyAsValue(split)
 		} else if strings.HasPrefix(li.Value, varToken) {
 			split := TextToSplitToken(strings.Replace(li.Value, varToken, "", 1))
-			TokenToMetaField(meta, split)
+			TokenToMetaField(&meta, split)
 			continue
 		} else if strings.HasPrefix(li.Value, headerTwoToken) {
 			li.IsHeaderTwo = true
@@ -164,12 +172,12 @@ func ParseText(text string) *ParsedText {
 		}
 
 		if !skip {
-			items = append(items, li)
+			items = append(items, &li)
 		}
 	}
 
 	return &ParsedText{
 		Items:    items,
-		MetaData: meta,
+		MetaData: &meta,
 	}
 }

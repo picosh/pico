@@ -3,6 +3,7 @@ package filehandlers
 import (
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"git.sr.ht/~erock/pico/shared"
@@ -20,6 +21,7 @@ type PostMetaData struct {
 	Description string
 	PublishAt   *time.Time
 	Hidden      bool
+	Tags        []string
 }
 
 type ScpFileHooks interface {
@@ -122,7 +124,7 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		}
 	} else if post == nil {
 		logger.Infof("(%s) not found, adding record", filename)
-		_, err = h.DBPool.InsertPost(
+		post, err = h.DBPool.InsertPost(
 			userID,
 			filename,
 			metadata.Slug,
@@ -136,6 +138,18 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		if err != nil {
 			logger.Errorf("error for %s: %v", filename, err)
 			return "", fmt.Errorf("error for %s: %v", filename, err)
+		}
+
+		if len(metadata.Tags) > 0 {
+			logger.Infof(
+				"Found (%s) post tags, replacing with old tags",
+				strings.Join(metadata.Tags, ","),
+			)
+			err = h.DBPool.ReplaceTagsForPost(metadata.Tags, post.ID)
+			if err != nil {
+				logger.Errorf("error for %s: %v", filename, err)
+				return "", fmt.Errorf("error for %s: %v", filename, err)
+			}
 		}
 	} else {
 		if text == post.Text {
@@ -152,6 +166,16 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 			metadata.Description,
 			metadata.PublishAt,
 		)
+		if err != nil {
+			logger.Errorf("error for %s: %v", filename, err)
+			return "", fmt.Errorf("error for %s: %v", filename, err)
+		}
+
+		logger.Infof(
+			"Found (%s) post tags, replacing with old tags",
+			strings.Join(metadata.Tags, ","),
+		)
+		err = h.DBPool.ReplaceTagsForPost(metadata.Tags, post.ID)
 		if err != nil {
 			logger.Errorf("error for %s: %v", filename, err)
 			return "", fmt.Errorf("error for %s: %v", filename, err)

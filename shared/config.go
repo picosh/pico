@@ -87,16 +87,21 @@ func (c *ConfigSite) IsCustomdomains() bool {
 	return c.CustomdomainsEnabled
 }
 
-func (c *ConfigSite) RssBlogURL(username string, onSubdomain bool, withUserName bool) string {
+func (c *ConfigSite) RssBlogURL(username string, onSubdomain bool, withUserName bool, tag string) string {
+	url := ""
 	if c.IsSubdomains() && onSubdomain {
-		return fmt.Sprintf("%s://%s.%s/rss", c.Protocol, username, c.Domain)
+		url = fmt.Sprintf("%s://%s.%s/rss", c.Protocol, username, c.Domain)
+	} else if withUserName {
+		url = fmt.Sprintf("/%s/rss", username)
+	} else {
+		url = "/rss"
 	}
 
-	if withUserName {
-		return fmt.Sprintf("/%s/rss", username)
+	if tag != "" {
+		return fmt.Sprintf("%s?tag=%s", url, tag)
 	}
 
-	return "/rss"
+	return url
 }
 
 func (c *ConfigSite) HomeURL() string {

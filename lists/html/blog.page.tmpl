@@ -48,6 +48,9 @@
     {{end}}
 
     <section class="posts">
+        {{if .HasFilter}}
+            <a href="{{.URL}}">clear filters</a>
+        {{end}}
         {{range .Posts}}
         <article>
             <div class="flex items-center">

@@ -44,6 +44,7 @@ func (p *ListHooks) FileMeta(text string, data *filehandlers.PostMetaData) error
 	}
 
 	data.Description = parsedText.MetaData.Description
+	data.Tags = parsedText.MetaData.Tags
 
 	if parsedText.MetaData.PublishAt != nil && !parsedText.MetaData.PublishAt.IsZero() {
 		data.PublishAt = parsedText.MetaData.PublishAt

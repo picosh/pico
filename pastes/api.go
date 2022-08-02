@@ -131,7 +131,7 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 		Site:      *cfg.GetSiteData(),
 		PageTitle: headerTxt.Title,
 		URL:       template.URL(cfg.FullBlogURL(username, onSubdomain, withUserName)),
-		RSSURL:    template.URL(cfg.RssBlogURL(username, onSubdomain, withUserName)),
+		RSSURL:    template.URL(cfg.RssBlogURL(username, onSubdomain, withUserName, "")),
 		Header:    headerTxt,
 		Username:  username,
 		Posts:     postCollection,

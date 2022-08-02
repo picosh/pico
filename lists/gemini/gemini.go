@@ -147,7 +147,7 @@ func blogHandler(ctx context.Context, w gemini.ResponseWriter, r *gemini.Request
 		Site:      *cfg.GetSiteData(),
 		PageTitle: headerTxt.Title,
 		URL:       html.URL(cfg.FullBlogURL(username, onSubdomain, withUserName)),
-		RSSURL:    html.URL(cfg.RssBlogURL(username, onSubdomain, withUserName)),
+		RSSURL:    html.URL(cfg.RssBlogURL(username, onSubdomain, withUserName, "")),
 		Readme:    readmeTxt,
 		Header:    headerTxt,
 		Username:  username,

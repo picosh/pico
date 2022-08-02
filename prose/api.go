@@ -47,6 +47,7 @@ type BlogPageData struct {
 	Posts     []PostItemData
 	HasCSS    bool
 	CssURL    template.URL
+	HasFilter bool
 }
 
 type ReadPageData struct {
@@ -70,6 +71,7 @@ type PostPageData struct {
 	PublishAt    string
 	HasCSS       bool
 	CssURL       template.URL
+	Tags         []string
 }
 
 type TransparencyPageData struct {
@@ -150,7 +152,15 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "blog not found", http.StatusNotFound)
 		return
 	}
-	posts, err := dbpool.FindPostsForUser(user.ID, cfg.Space)
+
+	tag := r.URL.Query().Get("tag")
+	var posts []*db.Post
+	if tag == "" {
+		posts, err = dbpool.FindPostsForUser(user.ID, cfg.Space)
+	} else {
+		posts, err = dbpool.FindUserPostsByTag(tag, user.ID, cfg.Space)
+	}
+
 	if err != nil {
 		logger.Error(err)
 		http.Error(w, "could not fetch posts for blog", http.StatusInternalServerError)
@@ -216,13 +226,14 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 		Site:      *cfg.GetSiteData(),
 		PageTitle: headerTxt.Title,
 		URL:       template.URL(cfg.FullBlogURL(username, onSubdomain, withUserName)),
-		RSSURL:    template.URL(cfg.RssBlogURL(username, onSubdomain, withUserName)),
+		RSSURL:    template.URL(cfg.RssBlogURL(username, onSubdomain, withUserName, tag)),
 		Readme:    readmeTxt,
 		Header:    headerTxt,
 		Username:  username,
 		Posts:     postCollection,
 		HasCSS:    hasCSS,
 		CssURL:    template.URL(cfg.CssURL(username)),
+		HasFilter: tag != "",
 	}
 
 	err = ts.Execute(w, data)
@@ -350,6 +361,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			Contents:     template.HTML(parsedText.Html),
 			HasCSS:       hasCSS,
 			CssURL:       template.URL(cfg.CssURL(username)),
+			Tags:         parsedText.Tags,
 		}
 	} else {
 		data = PostPageData{
@@ -487,7 +499,15 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "rss feed not found", http.StatusNotFound)
 		return
 	}
-	posts, err := dbpool.FindPostsForUser(user.ID, cfg.Space)
+
+	tag := r.URL.Query().Get("tag")
+	var posts []*db.Post
+	if tag == "" {
+		posts, err = dbpool.FindPostsForUser(user.ID, cfg.Space)
+	} else {
+		posts, err = dbpool.FindUserPostsByTag(tag, user.ID, cfg.Space)
+	}
+
 	if err != nil {
 		logger.Error(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
