@@ -1,0 +1,155 @@
+version: "3.8"
+services:
+  postgres:
+    env_file:
+      - .env.prod
+    volumes:
+      - ./data/postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+  lists-caddy:
+    image: neurosnap/pico-caddy:latest
+    restart: always
+    networks:
+      - lists
+    env_file:
+      - .env.prod
+    environment:
+      APP_DOMAIN: ${LISTS_DOMAIN:-lists.sh}
+      APP_EMAIL: ${LISTS_EMAIL:-hello@pico.sh}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+      - ./data/lists-caddy/data:/data
+      - ./data/lists-caddy/config:/config
+    ports:
+      - "${LISTS_HTTPS_V4:-443}:443"
+      - "${LISTS_HTTP_V4:-80}:80"
+      - "${LISTS_HTTPS_V6:-[::1]:443}:443"
+      - "${LISTS_HTTP_V6:-[::1]:80}:80"
+    profiles:
+      - lists
+      - caddy
+      - all
+  lists-web:
+    networks:
+      lists:
+        aliases:
+          - web
+    env_file:
+      - .env.prod
+  lists-ssh:
+    networks:
+      lists:
+        aliases:
+          - ssh
+    env_file:
+      - .env.prod
+    volumes:
+      - ./data/lists-ssh/data:/app/ssh_data
+    ports:
+      - "${LISTS_SSH_V4:-22}:2222"
+      - "${LISTS_SSH_V6:-[::1]:22}:2222"
+  pastes-caddy:
+    image: neurosnap/pico-caddy:latest
+    restart: always
+    networks:
+      - pastes
+    env_file:
+      - .env.prod
+    environment:
+      APP_DOMAIN: ${PASTES_DOMAIN:-pastes.sh}
+      APP_EMAIL: ${PASTES_EMAIL:-hello@pico.sh}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+      - ./data/pastes-caddy/data:/data
+      - ./data/pastes-caddy/config:/config
+    ports:
+      - "${PASTES_HTTPS_V4:-443}:443"
+      - "${PASTES_HTTP_V4:-80}:80"
+      - "${PASTES_HTTPS_V6:-[::1]:443}:443"
+      - "${PASTES_HTTP_V6:-[::1]:80}:80"
+    profiles:
+      - pastes
+      - caddy
+      - all
+  pastes-web:
+    networks:
+      pastes:
+        aliases:
+          - web
+    env_file:
+      - .env.prod
+  pastes-ssh:
+    networks:
+      pastes:
+        aliases:
+          - ssh
+    env_file:
+      - .env.prod
+    volumes:
+      - ./data/pastes-ssh/data:/app/ssh_data
+    ports:
+      - "${PASTES_SSH_V4:-22}:2222"
+      - "${PASTES_SSH_V6:-[::1]:22}:2222"
+  prose-caddy:
+    image: neurosnap/pico-caddy:latest
+    restart: always
+    networks:
+      - prose
+    env_file:
+      - .env.prod
+    environment:
+      APP_DOMAIN: ${PROSE_DOMAIN:-prose.sh}
+      APP_EMAIL: ${PROSE_EMAIL:-hello@pico.sh}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+      - ./data/prose-caddy/data:/data
+      - ./data/prose-caddy/config:/config
+    ports:
+      - "${PROSE_HTTPS_V4:-443}:443"
+      - "${PROSE_HTTP_V4:-80}:80"
+      - "${PROSE_HTTPS_V6:-[::1]:443}:443"
+      - "${PROSE_HTTP_V6:-[::1]:80}:80"
+    profiles:
+      - prose
+      - caddy
+      - all
+  prose-web:
+    networks:
+      prose:
+        aliases:
+          - web
+    env_file:
+      - .env.prod
+  prose-ssh:
+    networks:
+      prose:
+        aliases:
+          - ssh
+    env_file:
+      - .env.prod
+    volumes:
+      - ./data/prose-ssh/data:/app/ssh_data
+    ports:
+      - "${PROSE_SSH_V4:-22}:2222"
+      - "${PROSE_SSH_V6:-[::1]:22}:2222"
+
+networks:
+  prose:
+    driver_opts:
+      com.docker.network.bridge.name: prose
+    ipam:
+      config:
+        - subnet: 172.18.0.0/16
+  pastes:
+    driver_opts:
+      com.docker.network.bridge.name: pastes
+    ipam:
+      config:
+        - subnet: 172.19.0.0/16
+  lists:
+    driver_opts:
+      com.docker.network.bridge.name: lists
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
