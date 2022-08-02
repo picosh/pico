@@ -6,6 +6,8 @@ DB_CONTAINER?=pico-postgres-1
 DOCKER_TAG?=$(shell git log --format="%H" -n 1)
 DOCKER_PLATFORM?=linux/amd64,linux/arm64
 DOCKER_BUILDX_BUILD?=docker buildx build --push --platform $(DOCKER_PLATFORM)
+DOCKER_COMPOSE_PROD?=docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile services --profile caddy --env-file .env.prod
+DOCKER_COMPOSE_DEV?=docker compose --profile services --env-file .env.example
 
 lint:
 	docker run --rm -v $(shell pwd):/app -w /app golangci/golangci-lint:latest golangci-lint run -E goimports -E godot
@@ -80,3 +82,35 @@ restore:
 	docker exec -it $(DB_CONTAINER) /bin/bash
 	# psql postgres -U postgres -d pico < /backup.sql
 .PHONY: restore
+
+compose-prod-up:
+	$(DOCKER_COMPOSE_PROD) up -d
+.PHONY: compose-prod-up
+
+compose-prod-down:
+	$(DOCKER_COMPOSE_PROD) down
+.PHONY: compose-prod-down
+
+compose-prod-pull:
+	$(DOCKER_COMPOSE_PROD) pull
+.PHONY: compose-prod-pull
+
+compose-prod-logs:
+	$(DOCKER_COMPOSE_PROD) logs -f
+.PHONY: compose-prod-logs
+
+compose-dev-up:
+	$(DOCKER_COMPOSE_DEV) up -d
+.PHONY: compose-dev-up
+
+compose-dev-down:
+	$(DOCKER_COMPOSE_DEV) down
+.PHONY: compose-dev-down
+
+compose-dev-pull:
+	$(DOCKER_COMPOSE_DEV) pull
+.PHONY: compose-dev-pull
+
+compose-dev-logs:
+	$(DOCKER_COMPOSE_DEV) logs -f
+.PHONY: compose-dev-logs
