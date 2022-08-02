@@ -22,8 +22,10 @@ func (p *MarkdownHooks) FileValidate(text string, filename string) (bool, error)
 		return false, err
 	}
 
-	// special styles css file we want to permit but no other css file
-	if filename == "_styles.css" {
+	// special styles css file we want to permit but no other css file.
+	// sometimes the directory is provided in the filename, so we want to
+	// remove that before we perform this check.
+	if strings.Replace(filename, "/", "", 1) == "_styles.css" {
 		return true, nil
 	}
 
