@@ -26,7 +26,7 @@ cp ./.env.example .env
 Boot up database
 
 ```bash
-docker compose up -d
+docker compose up --profile db -d
 ```
 
 Create db and migrate
@@ -61,12 +61,28 @@ We use an image based deployment, so all of our images are uploaded to
 DOCKER_TAG=latest make bp-all
 ```
 
-Then ssh into the production server and run:
+Once images are built, docker compose is used to stand up the services:
 
 ```bash
-./start.sh pull
-./start.sh
+docker compose up -d
 ```
 
-For any migrations, right dropping into `psql` on our production database and
-pasting the SQL.  This process is a WIP and will update over time.
+This makes use of a production `.env.prod` environment file which defines
+the various listening addresses and services that will be started. For production,
+we add a `.envrc` containing the following:
+
+```bash
+export COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml
+export COMPOSE_PROFILES=services,caddy
+```
+
+And symlink `.env` to `.env.prod`:
+
+```bash
+ln -s .env.prod .env
+```
+
+This allows us to use docker-compose normally as we would in development.
+
+For any migrations, logging into the our database server, pulling the changes
+to migrations and running `make latest` is all that is needed.
