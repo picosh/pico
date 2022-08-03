@@ -23,7 +23,6 @@ bp-caddy: bp-setup
 bp-%: bp-setup
 	$(DOCKER_BUILDX_BUILD) --build-arg "APP=$*" -t "neurosnap/$*-ssh:$(DOCKER_TAG)" --target release-ssh .
 	$(DOCKER_BUILDX_BUILD) --build-arg "APP=$*" -t "neurosnap/$*-web:$(DOCKER_TAG)" --target release-web .
-	[[ "$*" == "lists" ]] && $(DOCKER_BUILDX_BUILD) --build-arg "APP=$*" -t "neurosnap/$*-gemini:$(DOCKER_TAG)" --target release-gemini . || true
 .PHONY: bp-%
 
 bp-all: bp-prose bp-lists bp-pastes
@@ -32,7 +31,6 @@ bp-all: bp-prose bp-lists bp-pastes
 build-%:
 	go build -o "build/$*-web" "./cmd/$*/web"
 	go build -o "build/$*-ssh" "./cmd/$*/ssh"
-	[[ "$*" == "lists" ]] && go build -o "build/$*-gemini" "./cmd/$*/gemini" || true
 .PHONY: build-%
 
 build: build-prose build-lists build-pastes

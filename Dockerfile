@@ -23,7 +23,6 @@ ENV GOOS=${TARGETOS} GOARCH=${TARGETARCH}
 
 RUN go build -o /go/bin/${APP}-ssh -ldflags="-s -w" ./cmd/${APP}/ssh
 RUN go build -o /go/bin/${APP}-web -ldflags="-s -w" ./cmd/${APP}/web
-RUN [[ "${APP}" == "lists" ]] && go build -o /go/bin/${APP}-gemini -ldflags="-s -w" ./cmd/${APP}/gemini || true
 
 FROM scratch as release-ssh
 
@@ -46,16 +45,3 @@ COPY --from=builder /app/${APP}/html ./${APP}/html
 COPY --from=builder /app/${APP}/public ./${APP}/public
 
 ENTRYPOINT ["/app/web"]
-
-FROM scratch as release-gemini
-
-WORKDIR /app
-
-ARG APP=lists
-
-ENV LISTS_SUBDOMAINS=0
-
-COPY --from=builder /go/bin/${APP}-gemini ./gemini
-COPY --from=builder /app/lists/gmi ./${APP}/gmi
-
-ENTRYPOINT ["/app/gemini"]
