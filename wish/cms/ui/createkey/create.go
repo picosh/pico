@@ -92,7 +92,7 @@ func NewModel(cfg *config.ConfigCms, dbpool db.DB, user *db.User) Model {
 	im.CursorStyle = st.Cursor
 	im.Placeholder = "ssh-ed25519 AAAA..."
 	im.Prompt = st.FocusedPrompt.String()
-	im.CharLimit = 1000
+	im.CharLimit = 2049
 	im.Focus()
 
 	return Model{
