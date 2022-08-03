@@ -14,6 +14,7 @@ func NewConfigSite() *shared.ConfigSite {
 	customdomains := shared.GetEnv("LISTS_CUSTOMDOMAINS", "0")
 	port := shared.GetEnv("LISTS_WEB_PORT", "3000")
 	protocol := shared.GetEnv("LISTS_PROTOCOL", "https")
+	allowRegister := shared.GetEnv("LISTS_ALLOW_REGISTER", "1")
 	dbURL := shared.GetEnv("DATABASE_URL", "")
 	subdomainsEnabled := false
 	if subdomains == "1" {
@@ -35,17 +36,18 @@ func NewConfigSite() *shared.ConfigSite {
 		SubdomainsEnabled:    subdomainsEnabled,
 		CustomdomainsEnabled: customdomainsEnabled,
 		ConfigCms: config.ConfigCms{
-			Domain:      domain,
-			Email:       email,
-			Port:        port,
-			Protocol:    protocol,
-			DbURL:       dbURL,
-			Description: "A microblog for your lists.",
-			IntroText:   intro,
-			Space:       "lists",
-			AllowedExt:  []string{".txt"},
-			HiddenPosts: []string{"_header.txt", "_readme.txt"},
-			Logger:      shared.CreateLogger(),
+			Domain:        domain,
+			Email:         email,
+			Port:          port,
+			Protocol:      protocol,
+			DbURL:         dbURL,
+			Description:   "A microblog for your lists.",
+			IntroText:     intro,
+			Space:         "lists",
+			AllowedExt:    []string{".txt"},
+			HiddenPosts:   []string{"_header.txt", "_readme.txt"},
+			Logger:        shared.CreateLogger(),
+			AllowRegister: allowRegister == "1",
 		},
 	}
 }

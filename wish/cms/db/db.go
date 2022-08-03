@@ -6,7 +6,9 @@ import (
 	"time"
 )
 
-var ErrNameTaken = errors.New("name taken")
+var ErrNameTaken = errors.New("username has already been claimed")
+var ErrNameDenied = errors.New("username is on the denylist")
+var ErrNameInvalid = errors.New("username has invalid characters in it")
 
 type PublicKey struct {
 	ID        string     `json:"id"`
@@ -100,7 +102,7 @@ type DB interface {
 	FindUserForNameAndKey(name string, key string) (*User, error)
 	FindUserForKey(name string, key string) (*User, error)
 	FindUser(userID string) (*User, error)
-	ValidateName(name string) bool
+	ValidateName(name string) (bool, error)
 	SetUserName(userID string, name string) error
 
 	FindPosts() ([]*Post, error)

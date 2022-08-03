@@ -15,6 +15,7 @@ func NewConfigSite() *shared.ConfigSite {
 	port := shared.GetEnv("PASTES_WEB_PORT", "3000")
 	dbURL := shared.GetEnv("DATABASE_URL", "")
 	protocol := shared.GetEnv("PASTES_PROTOCOL", "https")
+	allowRegister := shared.GetEnv("PASTES_ALLOW_REGISTER", "1")
 	subdomainsEnabled := false
 	if subdomains == "1" {
 		subdomainsEnabled = true
@@ -35,15 +36,16 @@ func NewConfigSite() *shared.ConfigSite {
 		SubdomainsEnabled:    subdomainsEnabled,
 		CustomdomainsEnabled: customdomainsEnabled,
 		ConfigCms: config.ConfigCms{
-			Domain:      domain,
-			Port:        port,
-			Protocol:    protocol,
-			Email:       email,
-			DbURL:       dbURL,
-			Description: "a pastebin for hackers.",
-			IntroText:   intro,
-			Space:       "pastes",
-			Logger:      shared.CreateLogger(),
+			Domain:        domain,
+			Port:          port,
+			Protocol:      protocol,
+			Email:         email,
+			DbURL:         dbURL,
+			Description:   "a pastebin for hackers.",
+			IntroText:     intro,
+			Space:         "pastes",
+			Logger:        shared.CreateLogger(),
+			AllowRegister: allowRegister == "1",
 		},
 	}
 }

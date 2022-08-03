@@ -1,6 +1,7 @@
 package username
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -262,16 +263,19 @@ func spinnerView(m Model) string {
 // Attempt to update the username on the server.
 func setName(m Model) tea.Cmd {
 	return func() tea.Msg {
+		valid, err := m.dbpool.ValidateName(m.newName)
 		// Validate before resetting the session to potentially save some
 		// network traffic and keep things feeling speedy.
-		if !m.dbpool.ValidateName(m.newName) {
-			return NameInvalidMsg{}
+		if !valid {
+			if errors.Is(err, db.ErrNameTaken) {
+				return NameTakenMsg{}
+			} else {
+				return NameInvalidMsg{}
+			}
 		}
 
-		err := m.dbpool.SetUserName(m.user.ID, m.newName)
-		if err == db.ErrNameTaken {
-			return NameTakenMsg{}
-		} else if err != nil {
+		err = m.dbpool.SetUserName(m.user.ID, m.newName)
+		if err != nil {
 			return errMsg{err}
 		}
 

@@ -14,6 +14,7 @@ func NewConfigSite() *shared.ConfigSite {
 	customdomains := shared.GetEnv("PROSE_CUSTOMDOMAINS", "0")
 	port := shared.GetEnv("PROSE_WEB_PORT", "3000")
 	protocol := shared.GetEnv("PROSE_PROTOCOL", "https")
+	allowRegister := shared.GetEnv("PROSE_ALLOW_REGISTER", "1")
 	dbURL := shared.GetEnv("DATABASE_URL", "")
 	subdomainsEnabled := false
 	if subdomains == "1" {
@@ -35,17 +36,18 @@ func NewConfigSite() *shared.ConfigSite {
 		SubdomainsEnabled:    subdomainsEnabled,
 		CustomdomainsEnabled: customdomainsEnabled,
 		ConfigCms: config.ConfigCms{
-			Domain:      domain,
-			Email:       email,
-			Port:        port,
-			Protocol:    protocol,
-			DbURL:       dbURL,
-			Description: "a blog platform for hackers.",
-			IntroText:   intro,
-			Space:       "prose",
-			AllowedExt:  []string{".md"},
-			HiddenPosts: []string{"_readme.md", "_styles.css"},
-			Logger:      shared.CreateLogger(),
+			Domain:        domain,
+			Email:         email,
+			Port:          port,
+			Protocol:      protocol,
+			DbURL:         dbURL,
+			Description:   "a blog platform for hackers.",
+			IntroText:     intro,
+			Space:         "prose",
+			AllowedExt:    []string{".md"},
+			HiddenPosts:   []string{"_readme.md", "_styles.css"},
+			Logger:        shared.CreateLogger(),
+			AllowRegister: allowRegister == "1",
 		},
 	}
 }

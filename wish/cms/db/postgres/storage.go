@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"math"
 	"strings"
 	"time"
@@ -337,17 +338,20 @@ func (me *PsqlDB) FindUser(userID string) (*db.User, error) {
 	return user, nil
 }
 
-func (me *PsqlDB) ValidateName(name string) bool {
+func (me *PsqlDB) ValidateName(name string) (bool, error) {
 	lower := strings.ToLower(name)
 	if slices.Contains(db.DenyList, lower) {
-		return false
+		return false, fmt.Errorf("%s is invalid: %w", lower, db.ErrNameDenied)
 	}
 	v := db.NameValidator.MatchString(lower)
 	if !v {
-		return false
+		return false, fmt.Errorf("%s is invalid: %w", lower, db.ErrNameInvalid)
 	}
 	user, _ := me.FindUserForName(lower)
-	return user == nil
+	if user == nil {
+		return true, nil
+	}
+	return false, fmt.Errorf("%s is invalid: %w", lower, db.ErrNameTaken)
 }
 
 func (me *PsqlDB) FindUserForName(name string) (*db.User, error) {
@@ -376,11 +380,12 @@ func (me *PsqlDB) FindUserForNameAndKey(name string, key string) (*db.User, erro
 
 func (me *PsqlDB) SetUserName(userID string, name string) error {
 	lowerName := strings.ToLower(name)
-	if !me.ValidateName(lowerName) {
-		return errors.New("name is already taken")
+	valid, err := me.ValidateName(lowerName)
+	if !valid {
+		return err
 	}
 
-	_, err := me.Db.Exec(sqlUpdateUserName, lowerName, userID)
+	_, err = me.Db.Exec(sqlUpdateUserName, lowerName, userID)
 	return err
 }
 

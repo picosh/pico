@@ -1,6 +1,7 @@
 package account
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -134,11 +135,8 @@ func Update(msg tea.Msg, m CreateModel) (CreateModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.Type {
-		case tea.KeyCtrlC: // quit
+		case tea.KeyCtrlC, tea.KeyEscape:
 			m.Quit = true
-			return m, nil
-		case tea.KeyEscape: // exit this mini-app
-			m.Done = true
 			return m, nil
 
 		default:
@@ -240,6 +238,10 @@ func Update(msg tea.Msg, m CreateModel) (CreateModel, tea.Cmd) {
 
 // View renders current view from the model.
 func View(m CreateModel) string {
+	if !m.cfg.AllowRegister {
+		return "Registration is closed for this service.  Press 'esc' to exit."
+	}
+
 	s := fmt.Sprintf("%s\n\n%s\n\n", m.cfg.Description, m.cfg.IntroText)
 	s += "Enter a username\n\n"
 	s += m.input.View() + "\n\n"
@@ -288,10 +290,15 @@ func createAccount(m CreateModel) tea.Cmd {
 			return NameInvalidMsg{}
 		}
 
+		valid, err := m.dbpool.ValidateName(m.newName)
 		// Validate before resetting the session to potentially save some
 		// network traffic and keep things feeling speedy.
-		if !m.dbpool.ValidateName(m.newName) {
-			return NameInvalidMsg{}
+		if !valid {
+			if errors.Is(err, db.ErrNameTaken) {
+				return NameTakenMsg{}
+			} else {
+				return NameInvalidMsg{}
+			}
 		}
 
 		user, err := registerUser(m)
@@ -300,9 +307,7 @@ func createAccount(m CreateModel) tea.Cmd {
 		}
 
 		err = m.dbpool.SetUserName(user.ID, m.newName)
-		if err == db.ErrNameTaken {
-			return NameTakenMsg{}
-		} else if err != nil {
+		if err != nil {
 			return errMsg{err}
 		}
 
