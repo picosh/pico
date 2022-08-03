@@ -3,8 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -16,6 +19,7 @@ import (
 	"git.sr.ht/~erock/pico/wish/proxy"
 	"git.sr.ht/~erock/pico/wish/send/scp"
 	"git.sr.ht/~erock/pico/wish/send/sftp"
+	"git.sr.ht/~erock/pico/wish/send/utils"
 	"github.com/charmbracelet/wish"
 	bm "github.com/charmbracelet/wish/bubbletea"
 	lm "github.com/charmbracelet/wish/logging"
@@ -33,16 +37,64 @@ func createRouter(handler *filehandlers.ScpUploadHandler) proxy.Router {
 		cmd := s.Command()
 		mdw := []wish.Middleware{}
 
-		if len(cmd) == 0 {
+		if len(cmd) > 0 && cmd[0] == "scp" {
+			mdw = append(mdw, scp.Middleware(handler))
+		} else {
 			mdw = append(mdw,
+				pasteMiddleware(handler),
 				bm.Middleware(cms.Middleware(&handler.Cfg.ConfigCms, handler.Cfg)),
 				lm.Middleware(),
 			)
-		} else if cmd[0] == "scp" {
-			mdw = append(mdw, scp.Middleware(handler))
 		}
 
 		return mdw
+	}
+}
+
+func pasteMiddleware(writeHandler *filehandlers.ScpUploadHandler) wish.Middleware {
+	return func(sshHandler ssh.Handler) ssh.Handler {
+		return func(session ssh.Session) {
+			_, _, activePty := session.Pty()
+			if activePty {
+				_ = session.Exit(0)
+				_ = session.Close()
+				return
+			}
+
+			err := writeHandler.Validate(session)
+			if err != nil {
+				utils.ErrorHandler(session, err)
+				return
+			}
+
+			name := strings.TrimSpace(strings.Join(session.Command(), " "))
+			postTime := time.Now()
+
+			if name == "" {
+				name = strconv.Itoa(int(postTime.UnixNano()))
+			}
+
+			result, err := writeHandler.Write(session, &utils.FileEntry{
+				Name:     name,
+				Filepath: name,
+				Mode:     fs.FileMode(0777),
+				Size:     0,
+				Mtime:    postTime.Unix(),
+				Atime:    postTime.Unix(),
+				Reader:   session,
+			})
+			if err != nil {
+				utils.ErrorHandler(session, err)
+				return
+			}
+
+			if result != "" {
+				session.Write([]byte(fmt.Sprintf("%s\n", result)))
+				return
+			}
+
+			sshHandler(session)
+		}
 	}
 }
 
