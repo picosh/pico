@@ -89,7 +89,8 @@ func main() {
 	}
 
 	defer func() {
-		tx.Rollback()
+		err = tx.Rollback()
+		panic(err)
 	}()
 
 	datesFixed := []string{}
@@ -129,6 +130,9 @@ func main() {
 		}
 	}
 
-	tx.Commit()
+	err = tx.Commit()
+	if err != nil {
+		panic(err)
+	}
 	logger.Infof("(%d) dates fixed!", len(datesFixed))
 }

@@ -89,7 +89,10 @@ func pasteMiddleware(writeHandler *filehandlers.ScpUploadHandler) wish.Middlewar
 			}
 
 			if result != "" {
-				session.Write([]byte(fmt.Sprintf("%s\n", result)))
+				_, err = session.Write([]byte(fmt.Sprintf("%s\n", result)))
+				if err != nil {
+					utils.ErrorHandler(session, err)
+				}
 				return
 			}
 
