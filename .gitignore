@@ -8,3 +8,4 @@ build/*
 *.bak
 data/*
 !data/.gitkeep
+ssh_data
