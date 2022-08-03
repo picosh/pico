@@ -68,7 +68,7 @@ latest:
 .PHONY: latest
 
 psql:
-	docker exec -it $(DB_CONTAINER) psql -U $(PGUSER)
+	docker exec -it $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE)
 .PHONY: psql
 
 dump:
