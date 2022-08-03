@@ -16,10 +16,10 @@ import (
 	"git.sr.ht/~adnano/go-gemini"
 	"git.sr.ht/~adnano/go-gemini/certificate"
 	feeds "git.sr.ht/~aw/gorilla-feeds"
+	"git.sr.ht/~erock/pico/db"
+	"git.sr.ht/~erock/pico/db/postgres"
 	"git.sr.ht/~erock/pico/lists"
 	"git.sr.ht/~erock/pico/shared"
-	"git.sr.ht/~erock/pico/wish/cms/db"
-	"git.sr.ht/~erock/pico/wish/cms/db/postgres"
 	"golang.org/x/exp/slices"
 )
 

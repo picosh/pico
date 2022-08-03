@@ -11,11 +11,11 @@ import (
 	"syscall"
 	"time"
 
+	"git.sr.ht/~erock/pico/db/postgres"
 	"git.sr.ht/~erock/pico/filehandlers"
 	"git.sr.ht/~erock/pico/pastes"
 	"git.sr.ht/~erock/pico/shared"
 	"git.sr.ht/~erock/pico/wish/cms"
-	"git.sr.ht/~erock/pico/wish/cms/db/postgres"
 	"git.sr.ht/~erock/pico/wish/proxy"
 	"git.sr.ht/~erock/pico/wish/send/scp"
 	"git.sr.ht/~erock/pico/wish/send/sftp"

@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"git.sr.ht/~erock/pico/db"
 	"git.sr.ht/~erock/pico/wish/cms/config"
-	"git.sr.ht/~erock/pico/wish/cms/db"
 	_ "github.com/lib/pq"
 	"go.uber.org/zap"
 	"golang.org/x/exp/slices"

@@ -7,8 +7,8 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 
+	"git.sr.ht/~erock/pico/db"
 	"git.sr.ht/~erock/pico/wish/cms/config"
-	"git.sr.ht/~erock/pico/wish/cms/db"
 	"git.sr.ht/~erock/pico/wish/cms/ui/common"
 
 	"go.uber.org/zap"

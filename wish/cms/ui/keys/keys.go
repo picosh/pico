@@ -3,8 +3,8 @@ package keys
 import (
 	"fmt"
 
+	"git.sr.ht/~erock/pico/db"
 	"git.sr.ht/~erock/pico/wish/cms/config"
-	"git.sr.ht/~erock/pico/wish/cms/db"
 	"git.sr.ht/~erock/pico/wish/cms/ui/common"
 	"git.sr.ht/~erock/pico/wish/cms/ui/createkey"
 	pager "github.com/charmbracelet/bubbles/paginator"

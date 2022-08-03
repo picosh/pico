@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"git.sr.ht/~erock/pico/db"
 	"git.sr.ht/~erock/pico/wish/cms/config"
-	"git.sr.ht/~erock/pico/wish/cms/db"
 	"git.sr.ht/~erock/pico/wish/cms/ui/common"
 	"github.com/charmbracelet/bubbles/spinner"
 	input "github.com/charmbracelet/bubbles/textinput"

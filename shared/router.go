@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"strings"
 
-	"git.sr.ht/~erock/pico/wish/cms/db"
+	"git.sr.ht/~erock/pico/db"
 	"go.uber.org/zap"
 )
 

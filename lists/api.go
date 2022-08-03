@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
+	"git.sr.ht/~erock/pico/db"
+	"git.sr.ht/~erock/pico/db/postgres"
 	"git.sr.ht/~erock/pico/shared"
-	"git.sr.ht/~erock/pico/wish/cms/db"
-	"git.sr.ht/~erock/pico/wish/cms/db/postgres"
 	"github.com/gorilla/feeds"
 	"golang.org/x/exp/slices"
 )

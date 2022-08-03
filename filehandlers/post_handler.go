@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"git.sr.ht/~erock/pico/db"
 	"git.sr.ht/~erock/pico/shared"
-	"git.sr.ht/~erock/pico/wish/cms/db"
 	"git.sr.ht/~erock/pico/wish/cms/util"
 	"git.sr.ht/~erock/pico/wish/send/utils"
 	"github.com/gliderlabs/ssh"

@@ -4,9 +4,9 @@ import (
 	"errors"
 	"fmt"
 
+	"git.sr.ht/~erock/pico/db"
+	"git.sr.ht/~erock/pico/db/postgres"
 	"git.sr.ht/~erock/pico/wish/cms/config"
-	"git.sr.ht/~erock/pico/wish/cms/db"
-	"git.sr.ht/~erock/pico/wish/cms/db/postgres"
 	"git.sr.ht/~erock/pico/wish/cms/ui/account"
 	"git.sr.ht/~erock/pico/wish/cms/ui/common"
 	"git.sr.ht/~erock/pico/wish/cms/ui/info"
