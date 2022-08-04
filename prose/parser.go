@@ -8,11 +8,13 @@ import (
 
 	"github.com/alecthomas/chroma/formatters/html"
 	"github.com/araddon/dateparse"
+	"github.com/microcosm-cc/bluemonday"
 	"github.com/yuin/goldmark"
 	highlighting "github.com/yuin/goldmark-highlighting"
 	meta "github.com/yuin/goldmark-meta"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
+	ghtml "github.com/yuin/goldmark/renderer/html"
 )
 
 type MetaData struct {
@@ -27,6 +29,8 @@ type ParsedText struct {
 	Html string
 	*MetaData
 }
+
+var policy = bluemonday.UGCPolicy()
 
 func toString(obj interface{}) string {
 	if obj == nil {
@@ -111,12 +115,19 @@ func ParseText(text string) (*ParsedText, error) {
 			meta.Meta,
 			hili,
 		),
+		goldmark.WithParserOptions(
+			parser.WithAutoHeadingID(),
+		),
+		goldmark.WithRendererOptions(
+			ghtml.WithUnsafe(),
+		),
 	)
 	context := parser.NewContext()
 	if err := md.Convert([]byte(text), &buf, parser.WithContext(context)); err != nil {
 		return &parsed, err
 	}
-	parsed.Html = buf.String()
+
+	parsed.Html = policy.Sanitize(buf.String())
 	metaData := meta.Get(context)
 	parsed.MetaData.Title = toString(metaData["title"])
 	parsed.MetaData.Description = toString(metaData["description"])

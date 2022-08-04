@@ -3,8 +3,6 @@ services:
   postgres:
     env_file:
       - .env.example
-    volumes:
-      - ./data/postgres-data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
   lists-web:
