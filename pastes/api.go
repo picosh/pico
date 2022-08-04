@@ -118,7 +118,7 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 		p := PostItemData{
 			URL:            template.URL(cfg.FullPostURL(post.Username, post.Slug, onSubdomain, withUserName)),
 			BlogURL:        template.URL(cfg.FullBlogURL(post.Username, onSubdomain, withUserName)),
-			Title:          shared.FilenameToTitle(post.Filename, post.Title),
+			Title:          post.Filename,
 			PublishAt:      post.PublishAt.Format("02 Jan, 2006"),
 			PublishAtISO:   post.PublishAt.Format(time.RFC3339),
 			UpdatedTimeAgo: shared.TimeAgo(post.UpdatedAt),
@@ -190,12 +190,12 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 
 		data = PostPageData{
 			Site:         *cfg.GetSiteData(),
-			PageTitle:    GetPostTitle(post),
+			PageTitle:    post.Filename,
 			URL:          template.URL(cfg.PostURL(post.Username, post.Slug)),
 			RawURL:       template.URL(cfg.RawPostURL(post.Username, post.Slug)),
 			BlogURL:      template.URL(cfg.BlogURL(username)),
 			Description:  post.Description,
-			Title:        shared.FilenameToTitle(post.Filename, post.Title),
+			Title:        post.Filename,
 			PublishAt:    post.PublishAt.Format("02 Jan, 2006"),
 			PublishAtISO: post.PublishAt.Format(time.RFC3339),
 			Username:     username,
