@@ -42,6 +42,16 @@
     metrics @caddymetrics {
         disable_openmetrics
     }
+
+    @appmetrics {
+        host {$APP_DOMAIN}
+        path /_app/metrics
+    }
+
+    handle @appmetrics {
+        rewrite * /metrics
+        reverse_proxy ssh:9222
+    }
 }
 
 :443 {

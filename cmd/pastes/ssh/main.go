@@ -20,6 +20,7 @@ import (
 	"git.sr.ht/~erock/pico/wish/send/scp"
 	"git.sr.ht/~erock/pico/wish/send/sftp"
 	"git.sr.ht/~erock/pico/wish/send/utils"
+	"github.com/charmbracelet/promwish"
 	"github.com/charmbracelet/wish"
 	bm "github.com/charmbracelet/wish/bubbletea"
 	lm "github.com/charmbracelet/wish/logging"
@@ -101,20 +102,21 @@ func pasteMiddleware(writeHandler *filehandlers.ScpUploadHandler) wish.Middlewar
 	}
 }
 
-func withProxy(handler *filehandlers.ScpUploadHandler) ssh.Option {
+func withProxy(handler *filehandlers.ScpUploadHandler, otherMiddleware ...wish.Middleware) ssh.Option {
 	return func(server *ssh.Server) error {
 		err := sftp.SSHOption(handler)(server)
 		if err != nil {
 			return err
 		}
 
-		return proxy.WithProxy(createRouter(handler))(server)
+		return proxy.WithProxy(createRouter(handler), otherMiddleware...)(server)
 	}
 }
 
 func main() {
 	host := shared.GetEnv("PASTES_HOST", "0.0.0.0")
 	port := shared.GetEnv("PASTES_SSH_PORT", "2222")
+	promPort := shared.GetEnv("PASTES_PROM_PORT", "9222")
 	cfg := pastes.NewConfigSite()
 	logger := cfg.Logger
 	dbh := postgres.NewDB(&cfg.ConfigCms)
@@ -129,7 +131,10 @@ func main() {
 		wish.WithAddress(fmt.Sprintf("%s:%s", host, port)),
 		wish.WithHostKeyPath("ssh_data/term_info_ed25519"),
 		wish.WithPublicKeyAuth(sshServer.authHandler),
-		withProxy(handler),
+		withProxy(
+			handler,
+			promwish.Middleware(fmt.Sprintf("%s:%s", host, promPort), "pastes-ssh"),
+		),
 	)
 	if err != nil {
 		logger.Fatal(err)

@@ -15,7 +15,7 @@ func withMiddleware(mdw ...wish.Middleware) ssh.Handler {
 	return handler
 }
 
-func WithProxy(router Router) ssh.Option {
+func WithProxy(router Router, otherMiddleware ...wish.Middleware) ssh.Option {
 	mdw := func(sh ssh.Handler) ssh.Handler {
 		return func(s ssh.Session) {
 			mw := router(sh, s)
@@ -24,5 +24,8 @@ func WithProxy(router Router) ssh.Option {
 		}
 	}
 
-	return wish.WithMiddleware(mdw)
+	newMiddleware := []wish.Middleware{mdw}
+	newMiddleware = append(newMiddleware, otherMiddleware...)
+
+	return wish.WithMiddleware(newMiddleware...)
 }
