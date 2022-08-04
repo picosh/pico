@@ -1,63 +1,63 @@
 {
-    on_demand_tls {
-        ask http://web:3000/check
-        interval 1m
-        burst 10
-    }
+	on_demand_tls {
+		ask http://web:3000/check
+		interval 1m
+		burst 10
+	}
 }
 
 *.{$APP_DOMAIN}, {$APP_DOMAIN} {
-    reverse_proxy web:3000
-    tls {$APP_EMAIL} {
-        dns cloudflare {$CF_API_TOKEN}
-    }
-    encode zstd gzip
+	reverse_proxy web:3000
+	tls {$APP_EMAIL} {
+		dns cloudflare {$CF_API_TOKEN}
+	}
+	encode zstd gzip
 
-    header {
-        # disable FLoC tracking
-        Permissions-Policy interest-cohort=()
+	header {
+		# disable FLoC tracking
+		Permissions-Policy interest-cohort=()
 
-        # enable HSTS
-        Strict-Transport-Security max-age=31536000;
+		# enable HSTS
+		Strict-Transport-Security max-age=31536000;
 
-        # disable clients from sniffing the media type
-        X-Content-Type-Options nosniff
+		# disable clients from sniffing the media type
+		X-Content-Type-Options nosniff
 
-        # clickjacking protection
-        X-Frame-Options DENY
+		# clickjacking protection
+		X-Frame-Options DENY
 
-        # keep referrer data off of HTTP connections
-        Referrer-Policy no-referrer-when-downgrade
+		# keep referrer data off of HTTP connections
+		Referrer-Policy no-referrer-when-downgrade
 
-        Content-Security-Policy "default-src 'self'; img-src * 'unsafe-inline'; style-src * 'unsafe-inline'"
+		Content-Security-Policy "default-src 'self'; img-src * 'unsafe-inline'; style-src * 'unsafe-inline'"
 
-        X-XSS-Protection "1; mode=block"
-    }
+		X-XSS-Protection "1; mode=block"
+	}
 
-    @caddymetrics {
-        host {$APP_DOMAIN}
-        path /_caddy/metrics
-    }
+	@caddymetrics {
+		host {$APP_DOMAIN}
+		path /_caddy/metrics
+	}
 
-    metrics @caddymetrics {
-        disable_openmetrics
-    }
+	metrics @caddymetrics {
+		disable_openmetrics
+	}
 
-    @appmetrics {
-        host {$APP_DOMAIN}
-        path /_app/metrics
-    }
+	@appmetrics {
+		host {$APP_DOMAIN}
+		path /_app/metrics
+	}
 
-    handle @appmetrics {
-        rewrite * /metrics
-        reverse_proxy ssh:9222
-    }
+	handle @appmetrics {
+		rewrite * /metrics
+		reverse_proxy ssh:9222
+	}
 }
 
 :443 {
-    reverse_proxy web:3000
-    tls {$APP_EMAIL} {
-            on_demand
-    }
-    encode zstd gzip
+	reverse_proxy web:3000
+	tls {$APP_EMAIL} {
+		on_demand
+	}
+	encode zstd gzip
 }
