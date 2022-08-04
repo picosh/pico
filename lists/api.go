@@ -223,6 +223,44 @@ func GetBlogName(username string) string {
 	return fmt.Sprintf("%s's lists", username)
 }
 
+func postRawHandler(w http.ResponseWriter, r *http.Request) {
+	username := shared.GetUsernameFromRequest(r)
+	subdomain := shared.GetSubdomain(r)
+	cfg := shared.GetCfg(r)
+
+	var slug string
+	if !cfg.IsSubdomains() || subdomain == "" {
+		slug, _ = url.PathUnescape(shared.GetField(r, 1))
+	} else {
+		slug, _ = url.PathUnescape(shared.GetField(r, 0))
+	}
+
+	dbpool := shared.GetDB(r)
+	logger := shared.GetLogger(r)
+
+	user, err := dbpool.FindUserForName(username)
+	if err != nil {
+		logger.Infof("blog not found: %s", username)
+		http.Error(w, "blog not found", http.StatusNotFound)
+		return
+	}
+
+	post, err := dbpool.FindPostWithSlug(slug, user.ID, cfg.Space)
+	if err != nil {
+		logger.Infof("post not found")
+		http.Error(w, "post not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Add("Content-Type", "text/plain")
+
+	_, err = w.Write([]byte(post.Text))
+	if err != nil {
+		logger.Error(err)
+		http.Error(w, "server error", 500)
+	}
+}
+
 func postHandler(w http.ResponseWriter, r *http.Request) {
 	username := shared.GetUsernameFromRequest(r)
 	subdomain := shared.GetSubdomain(r)
@@ -634,6 +672,7 @@ func createMainRoutes(staticRoutes []shared.Route) []shared.Route {
 		shared.NewRoute("GET", "/([^/]+)", blogHandler),
 		shared.NewRoute("GET", "/([^/]+)/rss", rssBlogHandler),
 		shared.NewRoute("GET", "/([^/]+)/([^/]+)", postHandler),
+		shared.NewRoute("GET", "/raw/([^/]+)/([^/]+)", postRawHandler),
 	)
 
 	return routes
@@ -653,6 +692,7 @@ func createSubdomainRoutes(staticRoutes []shared.Route) []shared.Route {
 	routes = append(
 		routes,
 		shared.NewRoute("GET", "/([^/]+)", postHandler),
+		shared.NewRoute("GET", "/raw/([^/]+)", postRawHandler),
 	)
 
 	return routes
