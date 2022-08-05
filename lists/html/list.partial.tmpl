@@ -1,22 +1,38 @@
 {{define "list"}}
+{{$indent := 0}}
+{{$mod := 0}}
 <ul style="list-style-type: {{.ListType}};">
     {{range .Items}}
+        {{if lt $indent .Indent}}
+        <ul style="list-style-type: {{$.ListType}};">
+        {{else if gt $indent .Indent}}
+
+        {{$mod = minus $indent .Indent}}
+        {{range $y := intRange 1 $mod}}
+        </li></ul>
+        {{end}}
+
+        {{else}}
+        </li>
+        {{end}}
+        {{$indent = .Indent}}
+
         {{if .IsText}}
             {{if .Value}}
-            <li>{{.Value}}</li>
+            <li>{{.Value}}
             {{end}}
         {{end}}
 
         {{if .IsURL}}
-        <li><a href="{{.URL}}">{{.Value}}</a></li>
+        <li><a href="{{.URL}}">{{.Value}}</a>
         {{end}}
 
         {{if .IsImg}}
-        <li><img src="{{.URL}}" alt="{{.Value}}" /></li>
+        <li><img src="{{.URL}}" alt="{{.Value}}" />
         {{end}}
 
         {{if .IsBlock}}
-        <li><blockquote>{{.Value}}</blockquote></li>
+        <li><blockquote>{{.Value}}</blockquote>
         {{end}}
 
         {{if .IsHeaderOne}}
@@ -28,7 +44,7 @@
         {{end}}
 
         {{if .IsPre}}
-        <li><pre>{{.Value}}</pre></li>
+        <li><pre>{{.Value}}</pre>
         {{end}}
     {{end}}
 </ul>

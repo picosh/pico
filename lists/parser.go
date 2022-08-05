@@ -3,15 +3,18 @@ package lists
 import (
 	"fmt"
 	"html/template"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/araddon/dateparse"
 )
 
+var reIndent = regexp.MustCompile(`^[[:blank:]]+`)
+
 type ParsedText struct {
-	Items    []*ListItem
-	MetaData *MetaData
+	Items []*ListItem
+	*MetaData
 }
 
 type ListItem struct {
@@ -25,6 +28,7 @@ type ListItem struct {
 	IsHeaderTwo bool
 	IsImg       bool
 	IsPre       bool
+	Indent      int
 }
 
 type MetaData struct {
@@ -107,6 +111,63 @@ func KeyAsValue(token *SplitToken) string {
 	return token.Value
 }
 
+func parseItem(meta *MetaData, li *ListItem, prevItem *ListItem, pre bool, mod int) (bool, bool, int) {
+	skip := false
+
+	if strings.HasPrefix(li.Value, preToken) {
+		pre = !pre
+		if pre {
+			nextValue := strings.Replace(li.Value, preToken, "", 1)
+			li.IsPre = true
+			li.Value = nextValue
+		} else {
+			skip = true
+		}
+	} else if pre {
+		nextValue := strings.Replace(li.Value, preToken, "", 1)
+		prevItem.Value = fmt.Sprintf("%s\n%s", prevItem.Value, nextValue)
+		skip = true
+	} else if strings.HasPrefix(li.Value, urlToken) {
+		li.IsURL = true
+		split := TextToSplitToken(strings.Replace(li.Value, urlToken, "", 1))
+		li.URL = template.URL(split.Key)
+		li.Value = KeyAsValue(split)
+	} else if strings.HasPrefix(li.Value, blockToken) {
+		li.IsBlock = true
+		li.Value = strings.Replace(li.Value, blockToken, "", 1)
+	} else if strings.HasPrefix(li.Value, imgToken) {
+		li.IsImg = true
+		split := TextToSplitToken(strings.Replace(li.Value, imgToken, "", 1))
+		li.URL = template.URL(split.Key)
+		li.Value = KeyAsValue(split)
+	} else if strings.HasPrefix(li.Value, varToken) {
+		split := TextToSplitToken(strings.Replace(li.Value, varToken, "", 1))
+		TokenToMetaField(meta, split)
+	} else if strings.HasPrefix(li.Value, headerTwoToken) {
+		li.IsHeaderTwo = true
+		li.Value = strings.Replace(li.Value, headerTwoToken, "", 1)
+	} else if strings.HasPrefix(li.Value, headerOneToken) {
+		li.IsHeaderOne = true
+		li.Value = strings.Replace(li.Value, headerOneToken, "", 1)
+	} else if reIndent.MatchString(li.Value) {
+		trim := reIndent.ReplaceAllString(li.Value, "")
+		old := len(li.Value)
+		li.Value = trim
+
+		pre, skip, _ = parseItem(meta, li, prevItem, pre, mod)
+		if prevItem.Indent == 0 {
+			mod = old - len(trim)
+			li.Indent = 1
+		} else {
+			li.Indent = (old - len(trim)) / mod
+		}
+	} else {
+		li.IsText = true
+	}
+
+	return pre, skip, mod
+}
+
 func ParseText(text string) *ParsedText {
 	textItems := SplitByNewline(text)
 	items := []*ListItem{}
@@ -116,58 +177,19 @@ func ParseText(text string) *ParsedText {
 	}
 	pre := false
 	skip := false
+	mod := 0
 	var prevItem *ListItem
 
 	for _, t := range textItems {
-		skip = false
-
 		if len(items) > 0 {
 			prevItem = items[len(items)-1]
 		}
 
 		li := ListItem{
-			Value: strings.Trim(t, " "),
+			Value: t,
 		}
 
-		if strings.HasPrefix(li.Value, preToken) {
-			pre = !pre
-			if pre {
-				nextValue := strings.Replace(li.Value, preToken, "", 1)
-				li.IsPre = true
-				li.Value = nextValue
-			} else {
-				skip = true
-			}
-		} else if pre {
-			nextValue := strings.Replace(li.Value, preToken, "", 1)
-			prevItem.Value = fmt.Sprintf("%s\n%s", prevItem.Value, nextValue)
-			skip = true
-		} else if strings.HasPrefix(li.Value, urlToken) {
-			li.IsURL = true
-			split := TextToSplitToken(strings.Replace(li.Value, urlToken, "", 1))
-			li.URL = template.URL(split.Key)
-			li.Value = KeyAsValue(split)
-		} else if strings.HasPrefix(li.Value, blockToken) {
-			li.IsBlock = true
-			li.Value = strings.Replace(li.Value, blockToken, "", 1)
-		} else if strings.HasPrefix(li.Value, imgToken) {
-			li.IsImg = true
-			split := TextToSplitToken(strings.Replace(li.Value, imgToken, "", 1))
-			li.URL = template.URL(split.Key)
-			li.Value = KeyAsValue(split)
-		} else if strings.HasPrefix(li.Value, varToken) {
-			split := TextToSplitToken(strings.Replace(li.Value, varToken, "", 1))
-			TokenToMetaField(&meta, split)
-			continue
-		} else if strings.HasPrefix(li.Value, headerTwoToken) {
-			li.IsHeaderTwo = true
-			li.Value = strings.Replace(li.Value, headerTwoToken, "", 1)
-		} else if strings.HasPrefix(li.Value, headerOneToken) {
-			li.IsHeaderOne = true
-			li.Value = strings.Replace(li.Value, headerOneToken, "", 1)
-		} else {
-			li.IsText = true
-		}
+		pre, skip, mod = parseItem(&meta, &li, prevItem, pre, mod)
 
 		if li.IsText && li.Value == "" {
 			skip = true

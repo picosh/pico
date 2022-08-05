@@ -61,6 +61,24 @@ func ServeFile(file string, contentType string) http.HandlerFunc {
 	}
 }
 
+func minus(a, b int) int {
+	return a - b
+}
+
+func intRange(start, end int) []int {
+	n := end - start + 1
+	result := make([]int, n)
+	for i := 0; i < n; i++ {
+		result[i] = start + i
+	}
+	return result
+}
+
+var funcMap = template.FuncMap{
+	"minus":    minus,
+	"intRange": intRange,
+}
+
 func RenderTemplate(cfg *ConfigSite, templates []string) (*template.Template, error) {
 	files := make([]string, len(templates))
 	copy(files, templates)
@@ -71,7 +89,8 @@ func RenderTemplate(cfg *ConfigSite, templates []string) (*template.Template, er
 		cfg.StaticPath("html/base.layout.tmpl"),
 	)
 
-	ts, err := template.ParseFiles(files...)
+	ts, err := template.New("base").Funcs(funcMap).ParseFiles(files...)
+	// ts, err := template.ParseFiles(files...)
 	if err != nil {
 		return nil, err
 	}
