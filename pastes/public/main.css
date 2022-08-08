@@ -1,24 +1,31 @@
-*, ::before, ::after {
+*,
+::before,
+::after {
   box-sizing: border-box;
 }
 
 ::-moz-focus-inner {
-	border-style: none;
-	padding: 0;
+  border-style: none;
+  padding: 0;
 }
-:-moz-focusring { outline: 1px dotted ButtonText; }
-:-moz-ui-invalid { box-shadow: none; }
+:-moz-focusring {
+  outline: 1px dotted ButtonText;
+}
+:-moz-ui-invalid {
+  box-shadow: none;
+}
 
 @media (prefers-color-scheme: light) {
   :root {
     --white: #6a737d;
-    --code: rgba(255, 229, 100, 0.2);
+    --code: #fff8d3;
+    --code-border: #f0d547;
     --pre: #f6f8fa;
     --bg-color: #fff;
     --text-color: #24292f;
     --link-color: #005cc5;
     --visited: #6f42c1;
-    --blockquote: #785840;
+    --blockquote: #005cc5;
     --blockquote-bg: #fff;
     --hover: #d73a49;
     --grey: #ccc;
@@ -28,7 +35,8 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --white: #f2f2f2;
-    --code: #252525;
+    --code: #414558;
+    --code-border: #252525;
     --pre: #252525;
     --bg-color: #282a36;
     --text-color: #f2f2f2;
@@ -45,12 +53,13 @@ html {
   background-color: var(--bg-color);
   color: var(--text-color);
   line-height: 1.5;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell,
-    "Fira Sans", "Droid Sans", "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji",
-    "Segoe UI Emoji", "Segoe UI Symbol";
-	-webkit-text-size-adjust: 100%;
-	-moz-tab-size: 4;
-	tab-size: 4;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
+    Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", Arial,
+    sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  -webkit-text-size-adjust: 100%;
+  -moz-tab-size: 4;
+  tab-size: 4;
+  font-size: 17px;
 }
 
 body {
@@ -63,34 +72,43 @@ img {
   height: auto;
 }
 
-b, strong {
+b,
+strong {
   font-weight: bold;
 }
 
-code, kbd, samp, pre {
-	font-family: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
-	font-size: 0.8rem;
+code,
+kbd,
+samp,
+pre {
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo,
+    monospace;
+  font-size: 0.8rem;
 }
 
-code, kbd, samp {
+code,
+kbd,
+samp {
   background-color: var(--code);
+  border: 1px solid var(--code-border);
 }
 
 pre > code {
   background-color: inherit;
   padding: 0;
+  border: none;
 }
 
 code {
   border-radius: 0.3rem;
-  padding: .15rem .2rem .05rem;
+  padding: 0.15rem 0.2rem 0.05rem;
 }
 
 pre {
   border-radius: 5px;
   padding: 1rem;
+  margin: 1rem 0;
   overflow-x: auto;
-  margin: 0;
   background-color: var(--pre) !important;
 }
 
@@ -102,10 +120,12 @@ summary {
   display: list-item;
 }
 
-h1, h2, h3 {
+h1,
+h2,
+h3 {
   margin: 0;
-	padding: 0;
-	border: 0;
+  padding: 0.6rem 0 0 0;
+  border: 0;
   font-style: normal;
   font-weight: inherit;
   font-size: inherit;
@@ -126,7 +146,8 @@ a {
   color: var(--link-color);
 }
 
-a:hover, a:visited:hover {
+a:hover,
+a:visited:hover {
   color: var(--hover);
 }
 
@@ -144,7 +165,7 @@ a.link-grey:visited {
 }
 
 section {
-  margin-bottom: 2rem;
+  margin-bottom: 1.4rem;
 }
 
 section:last-child {
@@ -166,11 +187,16 @@ article {
 blockquote {
   border-left: 5px solid var(--blockquote);
   background-color: var(--blockquote-bg);
-  padding: 0.5rem;
-  margin: 0.5rem 0;
+  padding: 0.8rem;
+  margin: 1rem 0;
 }
 
-ul, ol {
+blockquote > p {
+  margin: 0;
+}
+
+ul,
+ol {
   padding: 0 0 0 2rem;
   list-style-position: outside;
 }
@@ -201,30 +227,7 @@ dd {
 }
 
 dd:not(:last-child) {
-  margin-bottom: .5rem;
-}
-
-.md h1 {
-  font-size: 1.25rem;
-  line-height: 1.15;
-  font-weight: bold;
-  padding: 0.5rem 0;
-}
-
-.md h2 {
-  font-size: 1.125rem;
-  line-height: 1.15;
-  font-weight: bold;
-  padding: 0.5rem 0;
-}
-
-.md h3 {
-  font-weight: bold;
-}
-
-.md h4 {
-  font-size: 0.875rem;
-  font-weight: bold;
+  margin-bottom: 0.5rem;
 }
 
 .post-date {
@@ -236,17 +239,17 @@ dd:not(:last-child) {
 }
 
 .text-2xl {
-  font-size: 1.5rem;
+  font-size: 1.85rem;
   line-height: 1.15;
 }
 
 .text-xl {
-  font-size: 1.25rem;
+  font-size: 1.45rem;
   line-height: 1.15;
 }
 
 .text-lg {
-  font-size: 1.125rem;
+  font-size: 1.25rem;
   line-height: 1.15;
 }
 
@@ -313,8 +316,4 @@ dd:not(:last-child) {
   header {
     margin: 0;
   }
-}
-
-#post {
-  max-width: 90%;
 }

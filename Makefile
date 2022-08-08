@@ -7,6 +7,15 @@ DOCKER_TAG?=$(shell git log --format="%H" -n 1)
 DOCKER_PLATFORM?=linux/amd64,linux/arm64
 DOCKER_BUILDX_BUILD?=docker buildx build --push --platform $(DOCKER_PLATFORM)
 
+css:
+	cp ./smol.css lists/public/main.css
+	cp ./smol.css prose/public/main.css
+	cp ./smol.css pastes/public/main.css
+
+	cp ./syntax.css pastes/public/syntax.css
+	cp ./syntax.css prose/public/syntax.css
+.PHONY: css
+
 lint:
 	docker run --rm -v $(shell pwd):/app -w /app golangci/golangci-lint:latest golangci-lint run -E goimports -E godot
 .PHONY: lint

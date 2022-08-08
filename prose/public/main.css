@@ -1,13 +1,19 @@
-*, ::before, ::after {
+*,
+::before,
+::after {
   box-sizing: border-box;
 }
 
 ::-moz-focus-inner {
-	border-style: none;
-	padding: 0;
+  border-style: none;
+  padding: 0;
 }
-:-moz-focusring { outline: 1px dotted ButtonText; }
-:-moz-ui-invalid { box-shadow: none; }
+:-moz-focusring {
+  outline: 1px dotted ButtonText;
+}
+:-moz-ui-invalid {
+  box-shadow: none;
+}
 
 @media (prefers-color-scheme: light) {
   :root {
@@ -47,12 +53,12 @@ html {
   background-color: var(--bg-color);
   color: var(--text-color);
   line-height: 1.5;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell,
-    "Fira Sans", "Droid Sans", "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji",
-    "Segoe UI Emoji", "Segoe UI Symbol";
-	-webkit-text-size-adjust: 100%;
-	-moz-tab-size: 4;
-	tab-size: 4;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
+    Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", Arial,
+    sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  -webkit-text-size-adjust: 100%;
+  -moz-tab-size: 4;
+  tab-size: 4;
   font-size: 17px;
 }
 
@@ -66,16 +72,23 @@ img {
   height: auto;
 }
 
-b, strong {
+b,
+strong {
   font-weight: bold;
 }
 
-code, kbd, samp, pre {
-	font-family: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
-	font-size: 0.8rem;
+code,
+kbd,
+samp,
+pre {
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo,
+    monospace;
+  font-size: 0.8rem;
 }
 
-code, kbd, samp {
+code,
+kbd,
+samp {
   background-color: var(--code);
   border: 1px solid var(--code-border);
 }
@@ -88,7 +101,7 @@ pre > code {
 
 code {
   border-radius: 0.3rem;
-  padding: .15rem .2rem .05rem;
+  padding: 0.15rem 0.2rem 0.05rem;
 }
 
 pre {
@@ -107,10 +120,12 @@ summary {
   display: list-item;
 }
 
-h1, h2, h3 {
+h1,
+h2,
+h3 {
   margin: 0;
-  padding: 1rem 0 0 0;
-	border: 0;
+  padding: 0.6rem 0 0 0;
+  border: 0;
   font-style: normal;
   font-weight: inherit;
   font-size: inherit;
@@ -131,7 +146,8 @@ a {
   color: var(--link-color);
 }
 
-a:hover, a:visited:hover {
+a:hover,
+a:visited:hover {
   color: var(--hover);
 }
 
@@ -149,7 +165,7 @@ a.link-grey:visited {
 }
 
 section {
-  margin-bottom: 2rem;
+  margin-bottom: 1.4rem;
 }
 
 section:last-child {
@@ -179,17 +195,8 @@ blockquote > p {
   margin: 0;
 }
 
-table {
-  display: block;
-  max-width: fit-content;
-  margin: 0 auto;
-  overflow-x: auto;
-  white-space: nowrap;
-  border-spacing: 10px;
-  border-collapse: separate;
-}
-
-ul, ol {
+ul,
+ol {
   padding: 0 0 0 2rem;
   list-style-position: outside;
 }
@@ -220,33 +227,7 @@ dd {
 }
 
 dd:not(:last-child) {
-  margin-bottom: .5rem;
-}
-
-.md h1 {
-  font-size: 1.85rem;
-  line-height: 1.15;
-  font-weight: bold;
-  padding: 1rem 0 0 0;
-}
-
-.md h2 {
-  font-size: 1.45rem;
-  line-height: 1.15;
-  font-weight: bold;
-  padding: 1rem 0 0 0;
-}
-
-.md h3 {
-  font-size: 1.25rem;
-  font-weight: bold;
-  padding: 1rem 0 0 0;
-}
-
-.md h4 {
-  font-size: 1rem;
-  font-weight: bold;
-  padding: 1rem 0 0 0;
+  margin-bottom: 0.5rem;
 }
 
 .post-date {

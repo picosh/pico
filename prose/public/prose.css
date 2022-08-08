@@ -1,0 +1,35 @@
+table {
+  display: block;
+  max-width: fit-content;
+  margin: 0 auto;
+  overflow-x: auto;
+  white-space: nowrap;
+  border-spacing: 10px;
+  border-collapse: separate;
+}
+
+.md h1 {
+  font-size: 1.85rem;
+  line-height: 1.15;
+  font-weight: bold;
+  padding: 0.6rem 0 0 0;
+}
+
+.md h2 {
+  font-size: 1.45rem;
+  line-height: 1.15;
+  font-weight: bold;
+  padding: 0.6rem 0 0 0;
+}
+
+.md h3 {
+  font-size: 1.25rem;
+  font-weight: bold;
+  padding: 0.6rem 0 0 0;
+}
+
+.md h4 {
+  font-size: 1rem;
+  font-weight: bold;
+  padding: 0.6rem 0 0 0;
+}
