@@ -12,13 +12,14 @@
 @media (prefers-color-scheme: light) {
   :root {
     --white: #6a737d;
-    --code: rgba(255, 229, 100, 0.2);
+    --code: #fff8d3;
+    --code-border: #f0d547;
     --pre: #f6f8fa;
     --bg-color: #fff;
     --text-color: #24292f;
     --link-color: #005cc5;
     --visited: #6f42c1;
-    --blockquote: #785840;
+    --blockquote: #005cc5;
     --blockquote-bg: #fff;
     --hover: #d73a49;
     --grey: #ccc;
@@ -28,7 +29,8 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --white: #f2f2f2;
-    --code: #252525;
+    --code: #414558;
+    --code-border: #252525;
     --pre: #252525;
     --bg-color: #282a36;
     --text-color: #f2f2f2;
@@ -51,6 +53,7 @@ html {
 	-webkit-text-size-adjust: 100%;
 	-moz-tab-size: 4;
 	tab-size: 4;
+  font-size: 17px;
 }
 
 body {
@@ -69,16 +72,18 @@ b, strong {
 
 code, kbd, samp, pre {
 	font-family: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
-	font-size: 1rem;
+	font-size: 0.8rem;
 }
 
 code, kbd, samp {
   background-color: var(--code);
+  border: 1px solid var(--code-border);
 }
 
 pre > code {
   background-color: inherit;
   padding: 0;
+  border: none;
 }
 
 code {
@@ -89,8 +94,8 @@ code {
 pre {
   border-radius: 5px;
   padding: 1rem;
+  margin: 1rem 0;
   overflow-x: auto;
-  margin: 0;
   background-color: var(--pre) !important;
 }
 
@@ -104,7 +109,7 @@ summary {
 
 h1, h2, h3 {
   margin: 0;
-	padding: 0;
+  padding: 1rem 0 0 0;
 	border: 0;
   font-style: normal;
   font-weight: inherit;
@@ -166,8 +171,12 @@ article {
 blockquote {
   border-left: 5px solid var(--blockquote);
   background-color: var(--blockquote-bg);
-  padding: 0.5rem;
-  margin: 0.5rem 0;
+  padding: 0.8rem;
+  margin: 1rem 0;
+}
+
+blockquote > p {
+  margin: 0;
 }
 
 table {
@@ -215,26 +224,29 @@ dd:not(:last-child) {
 }
 
 .md h1 {
-  font-size: 1.25rem;
+  font-size: 1.85rem;
   line-height: 1.15;
   font-weight: bold;
-  padding: 0.5rem 0;
+  padding: 1rem 0 0 0;
 }
 
 .md h2 {
-  font-size: 1.125rem;
+  font-size: 1.45rem;
   line-height: 1.15;
   font-weight: bold;
-  padding: 0.5rem 0;
+  padding: 1rem 0 0 0;
 }
 
 .md h3 {
+  font-size: 1.25rem;
   font-weight: bold;
+  padding: 1rem 0 0 0;
 }
 
 .md h4 {
-  font-size: 0.875rem;
+  font-size: 1rem;
   font-weight: bold;
+  padding: 1rem 0 0 0;
 }
 
 .post-date {
@@ -246,17 +258,17 @@ dd:not(:last-child) {
 }
 
 .text-2xl {
-  font-size: 1.5rem;
+  font-size: 1.85rem;
   line-height: 1.15;
 }
 
 .text-xl {
-  font-size: 1.25rem;
+  font-size: 1.45rem;
   line-height: 1.15;
 }
 
 .text-lg {
-  font-size: 1.125rem;
+  font-size: 1.25rem;
   line-height: 1.15;
 }
 
