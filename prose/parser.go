@@ -30,7 +30,13 @@ type ParsedText struct {
 	*MetaData
 }
 
-var policy = bluemonday.UGCPolicy()
+func HtmlPolicy() *bluemonday.Policy {
+	policy := bluemonday.UGCPolicy()
+	policy.AllowStyling()
+	return policy
+}
+
+var policy = HtmlPolicy()
 
 func toString(obj interface{}) string {
 	if obj == nil {
@@ -127,7 +133,6 @@ func ParseText(text string) (*ParsedText, error) {
 		return &parsed, err
 	}
 
-	policy.AllowStyling()
 	parsed.Html = policy.Sanitize(buf.String())
 	metaData := meta.Get(context)
 	parsed.MetaData.Title = toString(metaData["title"])
