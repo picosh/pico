@@ -480,7 +480,7 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ts, err := template.New("base").Funcs(shared.FuncMap).ParseFiles(
+	ts, err := template.New("rss.page.tmpl").Funcs(shared.FuncMap).ParseFiles(
 		cfg.StaticPath("html/rss.page.tmpl"),
 		cfg.StaticPath("html/list.partial.tmpl"),
 	)
@@ -530,6 +530,7 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 			Items:    parsed.Items,
 		}
 		if err := ts.Execute(&tpl, data); err != nil {
+			logger.Error(err)
 			continue
 		}
 
@@ -574,7 +575,7 @@ func rssHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ts, err := template.New("base").Funcs(shared.FuncMap).ParseFiles(
+	ts, err := template.New("rss.page.tmpl").Funcs(shared.FuncMap).ParseFiles(
 		cfg.StaticPath("html/rss.page.tmpl"),
 		cfg.StaticPath("html/list.partial.tmpl"),
 	)
@@ -601,6 +602,7 @@ func rssHandler(w http.ResponseWriter, r *http.Request) {
 			Items:    parsed.Items,
 		}
 		if err := ts.Execute(&tpl, data); err != nil {
+			logger.Error(err)
 			continue
 		}
 
