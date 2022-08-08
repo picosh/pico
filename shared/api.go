@@ -74,7 +74,7 @@ func intRange(start, end int) []int {
 	return result
 }
 
-var funcMap = template.FuncMap{
+var FuncMap = template.FuncMap{
 	"minus":    minus,
 	"intRange": intRange,
 }
@@ -89,8 +89,7 @@ func RenderTemplate(cfg *ConfigSite, templates []string) (*template.Template, er
 		cfg.StaticPath("html/base.layout.tmpl"),
 	)
 
-	ts, err := template.New("base").Funcs(funcMap).ParseFiles(files...)
-	// ts, err := template.ParseFiles(files...)
+	ts, err := template.New("base").Funcs(FuncMap).ParseFiles(files...)
 	if err != nil {
 		return nil, err
 	}
