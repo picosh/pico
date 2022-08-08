@@ -127,6 +127,7 @@ func ParseText(text string) (*ParsedText, error) {
 		return &parsed, err
 	}
 
+	policy.AllowStyling()
 	parsed.Html = policy.Sanitize(buf.String())
 	metaData := meta.Get(context)
 	parsed.MetaData.Title = toString(metaData["title"])
