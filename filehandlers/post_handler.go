@@ -154,7 +154,7 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 	} else {
 		if text == post.Text {
 			logger.Infof("(%s) found, but text is identical, skipping", filename)
-			return h.Cfg.FullPostURL(user.Name, filename, h.Cfg.IsSubdomains(), true), nil
+			return h.Cfg.FullPostURL(user.Name, metadata.Slug, h.Cfg.IsSubdomains(), true), nil
 		}
 
 		logger.Infof("(%s) found, updating record", filename)

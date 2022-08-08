@@ -50,6 +50,15 @@ const (
 		publish_at::date <= CURRENT_DATE AND
 		cur_space = $2
 	ORDER BY publish_at DESC`
+	sqlSelectAllPostsForUser = `
+	SELECT posts.id, user_id, filename, slug, title, text, description, publish_at,
+		app_users.name as username, posts.updated_at
+	FROM posts
+	LEFT OUTER JOIN app_users ON app_users.id = posts.user_id
+	WHERE
+		user_id = $1 AND
+		cur_space = $2
+	ORDER BY publish_at DESC`
 	sqlSelectPostsByTag = `
 	SELECT posts.id, user_id, filename, slug, title, text, description, publish_at,
 		app_users.name as username, posts.updated_at
@@ -540,6 +549,38 @@ func (me *PsqlDB) RemovePosts(postIDs []string) error {
 func (me *PsqlDB) FindPostsForUser(userID string, space string) ([]*db.Post, error) {
 	var posts []*db.Post
 	rs, err := me.Db.Query(sqlSelectPostsForUser, userID, space)
+	if err != nil {
+		return posts, err
+	}
+	for rs.Next() {
+		post := &db.Post{}
+		err := rs.Scan(
+			&post.ID,
+			&post.UserID,
+			&post.Filename,
+			&post.Slug,
+			&post.Title,
+			&post.Text,
+			&post.Description,
+			&post.PublishAt,
+			&post.Username,
+			&post.UpdatedAt,
+		)
+		if err != nil {
+			return posts, err
+		}
+
+		posts = append(posts, post)
+	}
+	if rs.Err() != nil {
+		return posts, rs.Err()
+	}
+	return posts, nil
+}
+
+func (me *PsqlDB) FindAllPostsForUser(userID string, space string) ([]*db.Post, error) {
+	var posts []*db.Post
+	rs, err := me.Db.Query(sqlSelectAllPostsForUser, userID, space)
 	if err != nil {
 		return posts, err
 	}

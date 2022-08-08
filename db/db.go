@@ -108,6 +108,7 @@ type DB interface {
 	FindPosts() ([]*Post, error)
 	FindPost(postID string) (*Post, error)
 	FindPostsForUser(userID string, space string) ([]*Post, error)
+	FindAllPostsForUser(userID string, space string) ([]*Post, error)
 	FindPostsBeforeDate(date *time.Time, space string) ([]*Post, error)
 	FindUpdatedPostsForUser(userID string, space string) ([]*Post, error)
 	FindPostWithFilename(filename string, userID string, space string) (*Post, error)
