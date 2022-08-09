@@ -13,6 +13,7 @@ import (
 	"git.sr.ht/~erock/pico/prose"
 	"git.sr.ht/~erock/pico/shared"
 	"git.sr.ht/~erock/pico/wish/cms"
+	"git.sr.ht/~erock/pico/wish/pipe"
 	"git.sr.ht/~erock/pico/wish/proxy"
 	"git.sr.ht/~erock/pico/wish/send/scp"
 	"git.sr.ht/~erock/pico/wish/send/sftp"
@@ -34,13 +35,14 @@ func createRouter(handler *filehandlers.ScpUploadHandler) proxy.Router {
 		cmd := s.Command()
 		mdw := []wish.Middleware{}
 
-		if len(cmd) == 0 {
+		if len(cmd) > 0 && cmd[0] == "scp" {
+			mdw = append(mdw, scp.Middleware(handler))
+		} else {
 			mdw = append(mdw,
+				pipe.Middleware(handler, ".md"),
 				bm.Middleware(cms.Middleware(&handler.Cfg.ConfigCms, handler.Cfg)),
 				lm.Middleware(),
 			)
-		} else if cmd[0] == "scp" {
-			mdw = append(mdw, scp.Middleware(handler))
 		}
 
 		return mdw
