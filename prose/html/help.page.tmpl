@@ -93,11 +93,15 @@ date: 2022-06-28
 ---</pre>
         </p>
         <p>
-            List of available variables:
+            List of available variables can be found <a href="#hugo-support">here</a>.
+        </p>
+        <p>
+            Common variables:
             <ul>
                 <li>title (custom title not dependent on filename)</li>
                 <li>description (what is the purpose of this post?  It's also added to meta tag)</li>
-                <li>date (format must be YYYY-MM-DD)</li>
+                <li>date (format must be YYYY-MM-DD, if set in future post wil be unlisted)</li>
+                <li>tags (<code>[feature, announcement]</code>)</li>
             </ul>
         </p>
     </section>
@@ -163,7 +167,6 @@ scp ./delete.md {{.Site.Domain}}:/</pre>
         <pre>---
 title: some title!
 description: this is a great description
-tags: [feature, announcement]
 nav:
     - google: https://google.com
     - site: https://some.site
@@ -179,7 +182,6 @@ This will show up on the blog landing page.
                 <li>title (name of the blog, default: "X's blog")</li>
                 <li>description (description of blog)</li>
                 <li>nav (key=value pair that corresponds to text=href in html)</li>
-                <li>tags (e.g. [feature, announcement]</li>
             </ul>
         </p>
     </section>
@@ -273,6 +275,196 @@ This will show up on the blog landing page.
         <pre>TXT _prose.subdomain.yourcustomdomain.com -> yourproseusername</pre>
         <p>Resulting in:</p>
         <pre>_prose.subdomain.yourcustomdomain.com.         300     IN      TXT     "hey"</pre>
+    </section>
+
+    <section id="hugo-support">
+        <h2 class="text-xl">
+            <a href="#hugo-support" rel="nofollow noopener">#</a>
+            Hugo support
+        </h2>
+        <p>
+            We support a subset of pre-defined hugo variables in our frontmatter.
+            <a href="https://gohugo.io/content-management/front-matter/">Complete list at Hugo</a>
+        </p>
+        <table>
+            <th>
+                <tr>
+                    <th align="left">Variable</th>
+                    <th>Supported</th>
+                    <th>Planned</th>
+                </tr>
+            </th>
+
+            <tbody>
+                <tr>
+                    <td>aliases</td>
+                    <td>no</td>
+                    <td>yes</td>
+                </tr>
+
+                <tr>
+                    <td>audio</td>
+                    <td>no</td>
+                    <td>no</td>
+                </tr>
+
+                <tr>
+                    <td>cascade</td>
+                    <td>no</td>
+                    <td>no</td>
+                </tr>
+
+                <tr>
+                    <td>date</td>
+                    <td>yes</td>
+                    <td>-</td>
+                </tr>
+
+                <tr>
+                    <td>description</td>
+                    <td>yes</td>
+                    <td>-</td>
+                </tr>
+
+                <tr>
+                    <td>draft</td>
+                    <td>no</td>
+                    <td>yes</td>
+                </tr>
+
+                <tr>
+                    <td>expiryDate</td>
+                    <td>no</td>
+                    <td>no</td>
+                </tr>
+
+                <tr>
+                    <td>headless</td>
+                    <td>no</td>
+                    <td>no</td>
+                </tr>
+
+                <tr>
+                    <td>images</td>
+                    <td>no</td>
+                    <td>no</td>
+                </tr>
+
+                <tr>
+                    <td>isCJKLanguage</td>
+                    <td>no</td>
+                    <td>no</td>
+                </tr>
+
+                <tr>
+                    <td>keywords</td>
+                    <td>no</td>
+                    <td>yes</td>
+                </tr>
+
+                <tr>
+                    <td>layout</td>
+                    <td>no</td>
+                    <td>maybe</td>
+                </tr>
+
+                <tr>
+                    <td>lastmod</td>
+                    <td>no</td>
+                    <td>maybe</td>
+                </tr>
+
+                <tr>
+                    <td>linkTitle</td>
+                    <td>no</td>
+                    <td>no</td>
+                </tr>
+
+                <tr>
+                    <td>markup</td>
+                    <td>no</td>
+                    <td>no</td>
+                </tr>
+
+                <tr>
+                    <td>outputs</td>
+                    <td>no</td>
+                    <td>no</td>
+                </tr>
+
+                <tr>
+                    <td>publishDate</td>
+                    <td>no</td>
+                    <td>no</td>
+                </tr>
+
+                <tr>
+                    <td>resources</td>
+                    <td>no</td>
+                    <td>no</td>
+                </tr>
+
+                <tr>
+                    <td>series</td>
+                    <td>no</td>
+                    <td>no</td>
+                </tr>
+
+                <tr>
+                    <td>slug</td>
+                    <td>no</td>
+                    <td>yes</td>
+                </tr>
+
+                <tr>
+                    <td>summary</td>
+                    <td>no</td>
+                    <td>yes</td>
+                </tr>
+
+                <tr>
+                    <td>tags</td>
+                    <td>yes</td>
+                    <td>-</td>
+                </tr>
+
+                <tr>
+                    <td>title</td>
+                    <td>yes</td>
+                    <td>-</td>
+                </tr>
+
+                <tr>
+                    <td>type</td>
+                    <td>no</td>
+                    <td>maybe</td>
+                </tr>
+
+                <tr>
+                    <td>url</td>
+                    <td>no</td>
+                    <td>no</td>
+                </tr>
+
+                <tr>
+                    <td>videos</td>
+                    <td>no</td>
+                    <td>no</td>
+                </tr>
+
+                <tr>
+                    <td>weight</td>
+                    <td>no</td>
+                    <td>no</td>
+                </tr>
+
+                <tr>
+                    <td>taxonomies</td>
+                    <td>no</td>
+                    <td>no</td>
+                </tr>
+            </tbody>
+        </table>
     </section>
 </main>
 {{template "marketing-footer" .}}
