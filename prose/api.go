@@ -62,6 +62,7 @@ type PostPageData struct {
 	PageTitle    string
 	URL          template.URL
 	BlogURL      template.URL
+	Slug         string
 	Title        string
 	Description  string
 	Username     string
@@ -354,6 +355,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			BlogURL:      template.URL(cfg.FullBlogURL(username, onSubdomain, withUserName)),
 			Description:  post.Description,
 			Title:        shared.FilenameToTitle(post.Filename, post.Title),
+			Slug:         post.Slug,
 			PublishAt:    post.PublishAt.Format("02 Jan, 2006"),
 			PublishAtISO: post.PublishAt.Format(time.RFC3339),
 			Username:     username,

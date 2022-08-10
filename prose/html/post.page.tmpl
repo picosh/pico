@@ -26,7 +26,7 @@
 {{if .HasCSS}}<link rel="stylesheet" href="{{.CssURL}}" />{{end}}
 {{end}}
 
-{{define "attrs"}}id="post"{{end}}
+{{define "attrs"}}id="post" class="{{.Slug}}"{{end}}
 
 {{define "body"}}
 <header>
