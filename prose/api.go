@@ -204,7 +204,25 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 			if parsedText.Title != "" {
 				headerTxt.Title = parsedText.Title
 			}
-			headerTxt.Nav = parsedText.Nav
+
+			headerTxt.Nav = []Link{}
+			for _, nav := range parsedText.Nav {
+				u, _ := url.Parse(nav.URL)
+				finURL := nav.URL
+				if !u.IsAbs() {
+					finURL = cfg.FullPostURL(
+						post.Username,
+						nav.URL,
+						onSubdomain,
+						withUserName,
+					)
+				}
+				headerTxt.Nav = append(headerTxt.Nav, Link{
+					URL:  finURL,
+					Text: nav.Text,
+				})
+			}
+
 			readmeTxt.Contents = template.HTML(parsedText.Html)
 			if len(readmeTxt.Contents) > 0 {
 				readmeTxt.HasText = true

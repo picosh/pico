@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/url"
 	"path"
+	"strings"
 
 	"git.sr.ht/~erock/pico/wish/cms/config"
 	"go.uber.org/zap"
@@ -67,7 +68,7 @@ func (c *ConfigSite) PostURL(username, slug string) string {
 }
 
 func (c *ConfigSite) FullPostURL(username, slug string, onSubdomain bool, withUserName bool) string {
-	fname := url.PathEscape(slug)
+	fname := url.PathEscape(strings.TrimLeft(slug, "/"))
 	if c.IsSubdomains() && onSubdomain {
 		return fmt.Sprintf("%s://%s.%s/%s", c.Protocol, username, c.Domain, fname)
 	}
