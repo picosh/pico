@@ -9,15 +9,15 @@ import (
 	"time"
 
 	"git.sr.ht/~erock/pico/db/postgres"
-	"git.sr.ht/~erock/pico/filehandlers"
-	"git.sr.ht/~erock/pico/prose"
+	"git.sr.ht/~erock/pico/imgs"
+	"git.sr.ht/~erock/pico/imgs/upload"
 	"git.sr.ht/~erock/pico/shared"
 	"git.sr.ht/~erock/pico/wish/cms"
 	"git.sr.ht/~erock/pico/wish/pipe"
 	"git.sr.ht/~erock/pico/wish/proxy"
-	wishrsync "git.sr.ht/~erock/pico/wish/send/rsync"
 	"git.sr.ht/~erock/pico/wish/send/scp"
 	"git.sr.ht/~erock/pico/wish/send/sftp"
+	"git.sr.ht/~erock/pico/wish/send/utils"
 	"github.com/charmbracelet/promwish"
 	"github.com/charmbracelet/wish"
 	bm "github.com/charmbracelet/wish/bubbletea"
@@ -31,19 +31,17 @@ func (me *SSHServer) authHandler(ctx ssh.Context, key ssh.PublicKey) bool {
 	return true
 }
 
-func createRouter(handler *filehandlers.ScpUploadHandler) proxy.Router {
+func createRouter(cfg *shared.ConfigSite, handler utils.CopyFromClientHandler) proxy.Router {
 	return func(sh ssh.Handler, s ssh.Session) []wish.Middleware {
 		cmd := s.Command()
 		mdw := []wish.Middleware{}
 
 		if len(cmd) > 0 && cmd[0] == "scp" {
 			mdw = append(mdw, scp.Middleware(handler))
-		} else if len(cmd) > 0 && cmd[0] == "rsync" {
-			mdw = append(mdw, wishrsync.Middleware(handler))
 		} else {
 			mdw = append(mdw,
-				pipe.Middleware(handler, ".md"),
-				bm.Middleware(cms.Middleware(&handler.Cfg.ConfigCms, handler.Cfg)),
+				pipe.Middleware(handler, ""),
+				bm.Middleware(cms.Middleware(&cfg.ConfigCms, cfg)),
 				lm.Middleware(),
 			)
 		}
@@ -52,30 +50,26 @@ func createRouter(handler *filehandlers.ScpUploadHandler) proxy.Router {
 	}
 }
 
-func withProxy(handler *filehandlers.ScpUploadHandler, otherMiddleware ...wish.Middleware) ssh.Option {
+func withProxy(cfg *shared.ConfigSite, handler utils.CopyFromClientHandler, otherMiddleware ...wish.Middleware) ssh.Option {
 	return func(server *ssh.Server) error {
 		err := sftp.SSHOption(handler)(server)
 		if err != nil {
 			return err
 		}
 
-		return proxy.WithProxy(createRouter(handler), otherMiddleware...)(server)
+		return proxy.WithProxy(createRouter(cfg, handler), otherMiddleware...)(server)
 	}
 }
 
 func main() {
-	host := shared.GetEnv("PROSE_HOST", "0.0.0.0")
-	port := shared.GetEnv("PROSE_SSH_PORT", "2222")
-	promPort := shared.GetEnv("PROSE_PROM_PORT", "9222")
-	cfg := prose.NewConfigSite()
+	host := shared.GetEnv("IMGS_HOST", "0.0.0.0")
+	port := shared.GetEnv("IMGS_SSH_PORT", "2222")
+	promPort := shared.GetEnv("IMGS_PROM_PORT", "9222")
+	cfg := imgs.NewConfigSite()
 	logger := cfg.Logger
 	dbh := postgres.NewDB(&cfg.ConfigCms)
 	defer dbh.Close()
-	hooks := &prose.MarkdownHooks{
-		Cfg: cfg,
-		Db:  dbh,
-	}
-	handler := filehandlers.NewScpPostHandler(dbh, cfg, hooks)
+	handler := upload.NewUploadImgHandler(dbh, cfg, imgs.NewStorageFS(cfg.StorageDir))
 
 	sshServer := &SSHServer{}
 	s, err := wish.NewServer(
@@ -83,8 +77,9 @@ func main() {
 		wish.WithHostKeyPath("ssh_data/term_info_ed25519"),
 		wish.WithPublicKeyAuth(sshServer.authHandler),
 		withProxy(
+			cfg,
 			handler,
-			promwish.Middleware(fmt.Sprintf("%s:%s", host, promPort), "prose-ssh"),
+			promwish.Middleware(fmt.Sprintf("%s:%s", host, promPort), "pastes-ssh"),
 		),
 	)
 	if err != nil {

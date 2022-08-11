@@ -230,6 +230,10 @@ dd:not(:last-child) {
   margin-bottom: 0.5rem;
 }
 
+figure {
+  margin: 0;
+}
+
 .post-date {
   width: 130px;
 }

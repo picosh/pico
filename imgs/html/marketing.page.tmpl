@@ -1,0 +1,91 @@
+{{template "base" .}}
+
+{{define "title"}}{{.Site.Domain}} -- premium image hosting for hackers{{end}}
+
+{{define "meta"}}
+<meta name="description" content="premium image hosting for hackers" />
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="{{.Site.Domain}}">
+<meta property="og:url" content="https://{{.Site.Domain}}">
+<meta property="og:title" content="{{.Site.Domain}}">
+<meta property="og:description" content="premium image hosting for hackers">
+
+<meta name="twitter:card" content="summary" />
+<meta property="twitter:url" content="https://{{.Site.Domain}}">
+<meta property="twitter:title" content="{{.Site.Domain}}">
+<meta property="twitter:description" content="premium image hosting for hackers">
+<meta name="twitter:image" content="https://{{.Site.Domain}}/card.png" />
+<meta name="twitter:image:src" content="https://{{.Site.Domain}}/card.png" />
+
+<meta property="og:image:width" content="300" />
+<meta property="og:image:height" content="300" />
+<meta itemprop="image" content="https://{{.Site.Domain}}/card.png" />
+<meta property="og:image" content="https://{{.Site.Domain}}/card.png" />
+{{end}}
+
+{{define "attrs"}}{{end}}
+
+{{define "body"}}
+<header class="text-center">
+    <h1 class="text-2xl font-bold">{{.Site.Domain}}</h1>
+    <p class="text-lg">premium image hosting for hackers</p>
+    <hr />
+</header>
+
+<main>
+    <section>
+        <h2 class="text-lg font-bold">Examples</h2>
+        <p>Fill this in</p>
+    </section>
+
+    <section>
+        <h2 class="text-lg font-bold">Create your account with Public-Key Cryptography</h2>
+        <p>We don't want your email address.</p>
+        <p>To get started, simply ssh into our content management system:</p>
+        <pre>ssh new@{{.Site.Domain}}</pre>
+        <div class="text-sm font-italic note">
+            note: <code>new</code> is a special username that will always send you to account
+            creation, even with multiple accounts associated with your key-pair.
+        </div>
+        <div class="text-sm font-italic note">
+            note: getting permission denied? <a href="/help#permission-denied">read this</a>
+        </div>
+        <p>
+            After that, just set a username and you're ready to start writing! When you SSH
+            again, use your username that you set in the CMS.
+        </p>
+    </section>
+
+    <section>
+        <h2 class="text-lg font-bold">Publish your images with one command</h2>
+        <p>
+            When your image is ready to be published, copy the file to our server with a familiar
+            command:
+        </p>
+        <pre>scp my-image.jpg {{.Site.Domain}}:/</pre>
+        <p>We'll either create or update the images for you.</p>
+    </section>
+
+    <section>
+        <h2 class="text-lg font-bold">Features</h2>
+        <ul>
+            <li>Fill this in</li>
+        </ul>
+    </section>
+
+    <section>
+        <h2 class="text-lg font-bold">Philosophy</h2>
+        <p>Fill this in</p>
+    </section>
+
+    <section>
+        <h2 class="text-lg font-bold">Roadmap</h2>
+        <ol>
+            <li>Fill this in</li>
+        </ol>
+    </section>
+</main>
+
+{{template "marketing-footer" .}}
+{{end}}

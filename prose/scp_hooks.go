@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"git.sr.ht/~erock/pico/db"
 	"git.sr.ht/~erock/pico/filehandlers"
 	"git.sr.ht/~erock/pico/shared"
 	"golang.org/x/exp/slices"
@@ -11,13 +12,14 @@ import (
 
 type MarkdownHooks struct {
 	Cfg *shared.ConfigSite
+	Db  db.DB
 }
 
-func (p *MarkdownHooks) FileValidate(text string, filename string) (bool, error) {
-	if !shared.IsTextFile(text) {
+func (p *MarkdownHooks) FileValidate(data *filehandlers.PostMetaData) (bool, error) {
+	if !shared.IsTextFile(data.Text) {
 		err := fmt.Errorf(
 			"WARNING: (%s) invalid file must be plain text (utf-8), skipping",
-			filename,
+			data.Filename,
 		)
 		return false, err
 	}
@@ -25,15 +27,15 @@ func (p *MarkdownHooks) FileValidate(text string, filename string) (bool, error)
 	// special styles css file we want to permit but no other css file.
 	// sometimes the directory is provided in the filename, so we want to
 	// remove that before we perform this check.
-	if strings.Replace(filename, "/", "", 1) == "_styles.css" {
+	if strings.Replace(data.Filename, "/", "", 1) == "_styles.css" {
 		return true, nil
 	}
 
-	if !shared.IsExtAllowed(filename, p.Cfg.AllowedExt) {
+	if !shared.IsExtAllowed(data.Filename, p.Cfg.AllowedExt) {
 		extStr := strings.Join(p.Cfg.AllowedExt, ",")
 		err := fmt.Errorf(
 			"WARNING: (%s) invalid file, format must be (%s), skipping",
-			filename,
+			data.Filename,
 			extStr,
 		)
 		return false, err
@@ -42,14 +44,16 @@ func (p *MarkdownHooks) FileValidate(text string, filename string) (bool, error)
 	return true, nil
 }
 
-func (p *MarkdownHooks) FileMeta(text string, data *filehandlers.PostMetaData) error {
-	parsedText, err := ParseText(text)
+func (p *MarkdownHooks) FileMeta(data *filehandlers.PostMetaData) error {
+	parsedText, err := ParseText(data.Text)
 	// we return nil here because we don't want the file upload to fail
 	if err != nil {
 		return nil
 	}
 
-	if parsedText.Title != "" {
+	if parsedText.Title == "" {
+		data.Title = shared.ToUpper(data.Slug)
+	} else {
 		data.Title = parsedText.Title
 	}
 

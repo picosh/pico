@@ -1,7 +1,9 @@
 package shared
 
 import (
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"math"
 	"os"
@@ -115,4 +117,9 @@ func TimeAgo(t *time.Time) string {
 	} else {
 		return fmt.Sprintf("%d %ss ago", amount, metric)
 	}
+}
+
+func Shasum(data []byte) string {
+	hash := sha256.Sum256(data)
+	return hex.EncodeToString(hash[:])
 }

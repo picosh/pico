@@ -1,8 +1,11 @@
 package filehandlers
 
 import (
+	"encoding/binary"
 	"fmt"
 	"io"
+	"net/http"
+	"path"
 	"strings"
 	"time"
 
@@ -14,19 +17,16 @@ import (
 )
 
 type PostMetaData struct {
-	Filename    string
-	Slug        string
-	Text        string
-	Title       string
-	Description string
-	PublishAt   *time.Time
-	Hidden      bool
-	Tags        []string
+	*db.Post
+	Cur       *db.Post
+	Tags      []string
+	User      *db.User
+	FileEntry *utils.FileEntry
 }
 
 type ScpFileHooks interface {
-	FileValidate(text string, filename string) (bool, error)
-	FileMeta(text string, data *PostMetaData) error
+	FileValidate(data *PostMetaData) (bool, error)
+	FileMeta(data *PostMetaData) error
 }
 
 type ScpUploadHandler struct {
@@ -74,35 +74,56 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		return "", fmt.Errorf("error for %s: %v", filename, err)
 	}
 
-	var text string
+	var text []byte
 	if b, err := io.ReadAll(entry.Reader); err == nil {
-		text = string(b)
-	}
-
-	valid, err := h.Hooks.FileValidate(text, entry.Filepath)
-	if !valid {
-		return "", err
-	}
-
-	post, err := h.DBPool.FindPostWithFilename(filename, userID, h.Cfg.Space)
-	if err != nil {
-		logger.Debugf("unable to load post (%s), continuing", filename)
-		logger.Debug(err)
+		text = b
 	}
 
 	now := time.Now()
 	slug := shared.SanitizeFileExt(filename)
-	metadata := PostMetaData{
+	fileSize := binary.Size(text)
+	shasum := shared.Shasum(text)
+
+	nextPost := db.Post{
 		Filename:  filename,
 		Slug:      slug,
-		Title:     shared.ToUpper(slug),
 		PublishAt: &now,
-	}
-	if post != nil {
-		metadata.PublishAt = post.PublishAt
+		Text:      string(text),
+		MimeType:  http.DetectContentType(text),
+		FileSize:  fileSize,
+		Shasum:    shasum,
 	}
 
-	err = h.Hooks.FileMeta(text, &metadata)
+	ext := path.Ext(filename)
+	// DetectContentType does not detect markdown
+	if ext == ".md" {
+		nextPost.MimeType = "text/markdown; charset=UTF-8"
+	}
+
+	metadata := PostMetaData{
+		Post:      &nextPost,
+		User:      h.User,
+		FileEntry: entry,
+	}
+
+	valid, err := h.Hooks.FileValidate(&metadata)
+	if !valid {
+		logger.Info(err)
+		return "", err
+	}
+
+	post, err := h.DBPool.FindPostWithFilename(metadata.Filename, metadata.User.ID, h.Cfg.Space)
+	if err != nil {
+		logger.Infof("unable to load post (%s), continuing", filename)
+		logger.Info(err)
+	}
+
+	if post != nil {
+		metadata.Cur = post
+		metadata.Post.PublishAt = post.PublishAt
+	}
+
+	err = h.Hooks.FileMeta(&metadata)
 	if err != nil {
 		logger.Error(err)
 		return "", err
@@ -124,17 +145,23 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		}
 	} else if post == nil {
 		logger.Infof("(%s) not found, adding record", filename)
-		post, err = h.DBPool.InsertPost(
-			userID,
-			filename,
-			metadata.Slug,
-			metadata.Title,
-			text,
-			metadata.Description,
-			metadata.PublishAt,
-			metadata.Hidden,
-			h.Cfg.Space,
-		)
+		insertPost := db.Post{
+			UserID: userID,
+			Space:  h.Cfg.Space,
+
+			Data:        metadata.Data,
+			Description: metadata.Description,
+			Filename:    metadata.Filename,
+			FileSize:    metadata.FileSize,
+			Hidden:      metadata.Hidden,
+			MimeType:    metadata.MimeType,
+			PublishAt:   metadata.PublishAt,
+			Shasum:      metadata.Shasum,
+			Slug:        metadata.Slug,
+			Text:        metadata.Text,
+			Title:       metadata.Title,
+		}
+		post, err = h.DBPool.InsertPost(&insertPost)
 		if err != nil {
 			logger.Errorf("error for %s: %v", filename, err)
 			return "", fmt.Errorf("error for %s: %v", filename, err)
@@ -152,20 +179,25 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 			}
 		}
 	} else {
-		if text == post.Text {
+		if metadata.Text == post.Text {
 			logger.Infof("(%s) found, but text is identical, skipping", filename)
 			return h.Cfg.FullPostURL(user.Name, metadata.Slug, h.Cfg.IsSubdomains(), true), nil
 		}
 
 		logger.Infof("(%s) found, updating record", filename)
-		_, err = h.DBPool.UpdatePost(
-			post.ID,
-			metadata.Slug,
-			metadata.Title,
-			text,
-			metadata.Description,
-			metadata.PublishAt,
-		)
+		updatePost := db.Post{
+			ID: post.ID,
+
+			Data:        metadata.Data,
+			FileSize:    metadata.FileSize,
+			Description: metadata.Description,
+			PublishAt:   metadata.PublishAt,
+			Slug:        metadata.Slug,
+			Shasum:      metadata.Shasum,
+			Text:        metadata.Text,
+			Title:       metadata.Title,
+		}
+		_, err = h.DBPool.UpdatePost(&updatePost)
 		if err != nil {
 			logger.Errorf("error for %s: %v", filename, err)
 			return "", fmt.Errorf("error for %s: %v", filename, err)

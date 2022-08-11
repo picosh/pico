@@ -27,6 +27,7 @@ type ConfigSite struct {
 	config.ConfigURL
 	SubdomainsEnabled    bool
 	CustomdomainsEnabled bool
+	StorageDir           string
 }
 
 func (c *ConfigSite) GetSiteData() *SitePageData {

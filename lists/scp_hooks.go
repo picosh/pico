@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"git.sr.ht/~erock/pico/db"
 	"git.sr.ht/~erock/pico/filehandlers"
 	"git.sr.ht/~erock/pico/shared"
 	"golang.org/x/exp/slices"
@@ -11,22 +12,23 @@ import (
 
 type ListHooks struct {
 	Cfg *shared.ConfigSite
+	Db  db.DB
 }
 
-func (p *ListHooks) FileValidate(text string, filename string) (bool, error) {
-	if !shared.IsTextFile(text) {
+func (p *ListHooks) FileValidate(data *filehandlers.PostMetaData) (bool, error) {
+	if !shared.IsTextFile(string(data.Text)) {
 		err := fmt.Errorf(
 			"WARNING: (%s) invalid file must be plain text (utf-8), skipping",
-			filename,
+			data.Filename,
 		)
 		return false, err
 	}
 
-	if !shared.IsExtAllowed(filename, p.Cfg.AllowedExt) {
+	if !shared.IsExtAllowed(data.Filename, p.Cfg.AllowedExt) {
 		extStr := strings.Join(p.Cfg.AllowedExt, ",")
 		err := fmt.Errorf(
 			"WARNING: (%s) invalid file, format must be (%s), skipping",
-			filename,
+			data.Filename,
 			extStr,
 		)
 		return false, err
@@ -35,10 +37,12 @@ func (p *ListHooks) FileValidate(text string, filename string) (bool, error) {
 	return true, nil
 }
 
-func (p *ListHooks) FileMeta(text string, data *filehandlers.PostMetaData) error {
-	parsedText := ParseText(text)
+func (p *ListHooks) FileMeta(data *filehandlers.PostMetaData) error {
+	parsedText := ParseText(string(data.Text))
 
-	if parsedText.MetaData.Title != "" {
+	if parsedText.MetaData.Title == "" {
+		data.Title = shared.ToUpper(data.Slug)
+	} else {
 		data.Title = parsedText.MetaData.Title
 	}
 

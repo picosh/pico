@@ -7,13 +7,12 @@ import (
 	"strings"
 	"time"
 
-	"git.sr.ht/~erock/pico/filehandlers"
 	"git.sr.ht/~erock/pico/wish/send/utils"
 	"github.com/charmbracelet/wish"
 	"github.com/gliderlabs/ssh"
 )
 
-func Middleware(writeHandler *filehandlers.ScpUploadHandler, ext string) wish.Middleware {
+func Middleware(writeHandler utils.CopyFromClientHandler, ext string) wish.Middleware {
 	return func(sshHandler ssh.Handler) ssh.Handler {
 		return func(session ssh.Session) {
 			_, _, activePty := session.Pty()
