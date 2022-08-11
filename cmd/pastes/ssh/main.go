@@ -70,6 +70,7 @@ func main() {
 	defer dbh.Close()
 	hooks := &pastes.FileHooks{
 		Cfg: cfg,
+		Db:  dbh,
 	}
 	handler := filehandlers.NewScpPostHandler(dbh, cfg, hooks)
 

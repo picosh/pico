@@ -11,6 +11,7 @@ css:
 	cp ./smol.css lists/public/main.css
 	cp ./smol.css prose/public/main.css
 	cp ./smol.css pastes/public/main.css
+	cp ./smol.css imgs/public/main.css
 
 	cp ./syntax.css pastes/public/syntax.css
 	cp ./syntax.css prose/public/syntax.css
@@ -34,7 +35,7 @@ bp-%: bp-setup
 	$(DOCKER_BUILDX_BUILD) --build-arg "APP=$*" -t "neurosnap/$*-web:$(DOCKER_TAG)" --target release-web .
 .PHONY: bp-%
 
-bp-all: bp-prose bp-lists bp-pastes
+bp-all: bp-prose bp-lists bp-pastes bp-imgs
 .PHONY: bp-all
 
 build-%:
@@ -42,7 +43,7 @@ build-%:
 	go build -o "build/$*-ssh" "./cmd/$*/ssh"
 .PHONY: build-%
 
-build: build-prose build-lists build-pastes
+build: build-prose build-lists build-pastes build-imgs
 .PHONY: build
 
 format:
@@ -68,10 +69,13 @@ migrate:
 	docker exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20220727_post_change_post_contraints.sql
 	docker exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20220730_post_change_filename_to_slug.sql
 	docker exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20220801_add_post_tags.sql
+	docker exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20220811_add_data_to_post.sql
+	docker exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20220811_add_feature.sql
 .PHONY: migrate
 
 latest:
-	docker exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20220801_add_post_tags.sql
+	docker exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20220811_add_data_to_post.sql
+	docker exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20220811_add_feature.sql
 .PHONY: latest
 
 psql:

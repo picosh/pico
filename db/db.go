@@ -1,6 +1,8 @@
 package db
 
 import (
+	"database/sql/driver"
+	"encoding/json"
 	"errors"
 	"regexp"
 	"time"
@@ -24,6 +26,27 @@ type User struct {
 	CreatedAt *time.Time `json:"created_at"`
 }
 
+type PostData struct {
+	ImgPath string `json:"img_path"`
+}
+
+// Make the Attrs struct implement the driver.Valuer interface. This method
+// simply returns the JSON-encoded representation of the struct.
+func (p PostData) Value() (driver.Value, error) {
+	return json.Marshal(p)
+}
+
+// Make the Attrs struct implement the sql.Scanner interface. This method
+// simply decodes a JSON-encoded value into the struct fields.
+func (p *PostData) Scan(value interface{}) error {
+	b, ok := value.([]byte)
+	if !ok {
+		return errors.New("type assertion to []byte failed")
+	}
+
+	return json.Unmarshal(b, &p)
+}
+
 type Post struct {
 	ID          string     `json:"id"`
 	UserID      string     `json:"user_id"`
@@ -40,6 +63,11 @@ type Post struct {
 	Views       int        `json:"views"`
 	Space       string     `json:"space"`
 	Score       string     `json:"score"`
+	Shasum      string     `json:"shasum"`
+	FileSize    int        `json:"file_size"`
+	MimeType    string     `json:"mime_type"`
+	Data        PostData   `json:"data"`
+	Tags        []string   `json:"tags"`
 }
 
 type Paginate[T any] struct {
@@ -115,16 +143,21 @@ type DB interface {
 	FindPostWithSlug(slug string, userID string, space string) (*Post, error)
 	FindAllPosts(pager *Pager, space string) (*Paginate[*Post], error)
 	FindAllUpdatedPosts(pager *Pager, space string) (*Paginate[*Post], error)
-	InsertPost(userID string, filename string, slug string, title string, text string, description string, publishAt *time.Time, hidden bool, space string) (*Post, error)
-	UpdatePost(postID string, slug string, title string, text string, description string, publishAt *time.Time) (*Post, error)
+	// FindPostsWithTagsForUser(userID, space string) ([]*Post, error)
+	InsertPost(post *Post) (*Post, error)
+	UpdatePost(post *Post) (*Post, error)
 	RemovePosts(postIDs []string) error
 
 	ReplaceTagsForPost(tags []string, postID string) error
 	FindUserPostsByTag(tag, userID, space string) ([]*Post, error)
 	FindPostsByTag(tag, space string) ([]*Post, error)
 	FindPopularTags() ([]string, error)
+	FindTagsForPost(postID string) ([]string, error)
 
 	AddViewCount(postID string) (int, error)
+
+	HasFeatureForUser(userID string, feature string) bool
+	FindTotalSizeForUser(userID string) (int, error)
 
 	Close() error
 }

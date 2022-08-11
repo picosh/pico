@@ -18,6 +18,108 @@ import (
 
 var PAGER_SIZE = 15
 
+var SelectPost = `
+	posts.id, user_id, app_users.name, filename, slug, title, text, description,
+	posts.created_at, publish_at, posts.updated_at, hidden, file_size, mime_type, shasum, data`
+
+var (
+	sqlSelectPosts = fmt.Sprintf(`
+	SELECT %s
+	FROM posts
+	LEFT OUTER JOIN app_users ON app_users.id = posts.user_id`, SelectPost)
+
+	sqlSelectPostsBeforeDate = fmt.Sprintf(`
+	SELECT %s
+	FROM posts
+	LEFT OUTER JOIN app_users ON app_users.id = posts.user_id
+	WHERE publish_at::date <= $1 AND cur_space = $2`, SelectPost)
+
+	sqlSelectPostWithFilename = fmt.Sprintf(`
+	SELECT %s, STRING_AGG(coalesce(post_tags.name, ''), ',') tags
+	FROM posts
+	LEFT OUTER JOIN app_users ON app_users.id = posts.user_id
+	LEFT OUTER JOIN post_tags ON post_tags.post_id = posts.id
+	WHERE filename = $1 AND user_id = $2 AND cur_space = $3
+	GROUP BY %s`, SelectPost, SelectPost)
+
+	sqlSelectPostWithSlug = fmt.Sprintf(`
+	SELECT %s, STRING_AGG(coalesce(post_tags.name, ''), ',') tags
+	FROM posts
+	LEFT OUTER JOIN app_users ON app_users.id = posts.user_id
+	LEFT OUTER JOIN post_tags ON post_tags.post_id = posts.id
+	WHERE slug = $1 AND user_id = $2 AND cur_space = $3
+	GROUP BY %s`, SelectPost, SelectPost)
+
+	sqlSelectPost = fmt.Sprintf(`
+	SELECT %s
+	FROM posts
+	LEFT OUTER JOIN app_users ON app_users.id = posts.user_id
+	WHERE posts.id = $1`, SelectPost)
+
+	sqlSelectUpdatedPostsForUser = fmt.Sprintf(`
+	SELECT %s
+	FROM posts
+	LEFT OUTER JOIN app_users ON app_users.id = posts.user_id
+	WHERE user_id = $1 AND publish_at::date <= CURRENT_DATE AND cur_space = $2
+	ORDER BY posts.updated_at DESC`, SelectPost)
+
+	sqlSelectPostsForUser = fmt.Sprintf(`
+	SELECT %s, STRING_AGG(coalesce(post_tags.name, ''), ',') tags
+	FROM posts
+	LEFT OUTER JOIN app_users ON app_users.id = posts.user_id
+	LEFT OUTER JOIN post_tags ON post_tags.post_id = posts.id
+	WHERE
+		user_id = $1 AND
+		publish_at::date <= CURRENT_DATE AND
+		cur_space = $2
+	GROUP BY %s
+	ORDER BY publish_at DESC, slug DESC`, SelectPost, SelectPost)
+
+	sqlSelectAllPostsForUser = fmt.Sprintf(`
+	SELECT %s
+	FROM posts
+	LEFT OUTER JOIN app_users ON app_users.id = posts.user_id
+	WHERE
+		user_id = $1 AND
+		cur_space = $2
+	ORDER BY publish_at DESC`, SelectPost)
+
+	sqlSelectPostsByTag = fmt.Sprintf(`
+	SELECT %s
+	FROM posts
+	LEFT OUTER JOIN app_users ON app_users.id = posts.user_id
+	LEFT OUTER JOIN post_tags ON post_tags.post_id = posts.id
+	WHERE
+		post_tags.name = '$1' AND
+		publish_at::date <= CURRENT_DATE AND
+		cur_space = $2
+	ORDER BY publish_at DESC`, SelectPost)
+
+	sqlSelectUserPostsByTag = fmt.Sprintf(`
+	SELECT %s
+	FROM posts
+	LEFT OUTER JOIN app_users ON app_users.id = posts.user_id
+	LEFT OUTER JOIN post_tags ON post_tags.post_id = posts.id
+	WHERE
+		user_id = $1 AND
+		(post_tags.name = $2 OR hidden = true) AND
+		publish_at::date <= CURRENT_DATE AND
+		cur_space = $3
+	ORDER BY publish_at DESC`, SelectPost)
+
+	/* sqlSelectUserPostsWithTags = fmt.Sprintf(`
+	SELECT %s, STRING_AGG(coalesce(post_tags.name, ''), ',') tags
+	FROM posts
+	LEFT OUTER JOIN app_users ON app_users.id = posts.user_id
+	LEFT OUTER JOIN post_tags ON post_tags.post_id = posts.id
+	WHERE
+		user_id = $1 AND
+		publish_at::date <= CURRENT_DATE AND
+		cur_space = $2
+	GROUP BY %s
+	ORDER BY publish_at DESC`, SelectPost, SelectPost) */
+)
+
 const (
 	sqlSelectPublicKey         = `SELECT id, user_id, public_key, created_at FROM public_keys WHERE public_key = $1`
 	sqlSelectPublicKeys        = `SELECT id, user_id, public_key, created_at FROM public_keys WHERE user_id = $1`
@@ -32,57 +134,28 @@ const (
 	sqlSelectTotalPostsAfterDate = `SELECT count(id) FROM posts WHERE created_at >= $1 AND cur_space = $2`
 	sqlSelectUsersWithPost       = `SELECT count(app_users.id) FROM app_users WHERE EXISTS (SELECT 1 FROM posts WHERE user_id = app_users.id AND cur_space = $1);`
 
-	sqlSelectPosts               = `SELECT id, user_id, filename, slug, title, text, description, created_at, publish_at, updated_at, hidden FROM posts`
-	sqlSelectPostsBeforeDate     = `SELECT posts.id, user_id, filename, slug, title, text, description, publish_at, app_users.name as username, posts.updated_at FROM posts LEFT OUTER JOIN app_users ON app_users.id = posts.user_id WHERE publish_at::date <= $1 AND cur_space = $2`
-	sqlSelectPostWithFilename    = `SELECT posts.id, user_id, filename, slug, title, text, description, publish_at, app_users.name as username, posts.updated_at FROM posts LEFT OUTER JOIN app_users ON app_users.id = posts.user_id WHERE filename = $1 AND user_id = $2 AND cur_space = $3`
-	sqlSelectPostWithSlug        = `SELECT posts.id, user_id, filename, slug, title, text, description, publish_at, app_users.name as username, posts.updated_at FROM posts LEFT OUTER JOIN app_users ON app_users.id = posts.user_id WHERE slug = $1 AND user_id = $2 AND cur_space = $3`
-	sqlSelectPost                = `SELECT posts.id, user_id, filename, slug, title, text, description, publish_at, app_users.name as username, posts.updated_at FROM posts LEFT OUTER JOIN app_users ON app_users.id = posts.user_id WHERE posts.id = $1`
-	sqlSelectUpdatedPostsForUser = `SELECT posts.id, user_id, filename, slug, title, text, description, publish_at, app_users.name as username, posts.updated_at FROM posts LEFT OUTER JOIN app_users ON app_users.id = posts.user_id WHERE user_id = $1 AND publish_at::date <= CURRENT_DATE AND cur_space = $2 ORDER BY updated_at DESC`
-	sqlSelectAllUpdatedPosts     = `SELECT posts.id, user_id, filename, slug, title, text, description, publish_at, app_users.name as username, posts.updated_at, 0 as score FROM posts LEFT OUTER JOIN app_users ON app_users.id = posts.user_id WHERE hidden = FALSE AND publish_at::date <= CURRENT_DATE AND cur_space = $3 ORDER BY updated_at DESC LIMIT $1 OFFSET $2`
-	sqlSelectPostCount           = `SELECT count(id) FROM posts WHERE hidden = FALSE AND cur_space=$1`
-	sqlSelectPostsForUser        = `
-	SELECT posts.id, user_id, filename, slug, title, text, description, publish_at,
-		app_users.name as username, posts.updated_at
-	FROM posts
-	LEFT OUTER JOIN app_users ON app_users.id = posts.user_id
-	WHERE
-		user_id = $1 AND
-		publish_at::date <= CURRENT_DATE AND
-		cur_space = $2
-	ORDER BY publish_at DESC`
-	sqlSelectAllPostsForUser = `
-	SELECT posts.id, user_id, filename, slug, title, text, description, publish_at,
-		app_users.name as username, posts.updated_at
-	FROM posts
-	LEFT OUTER JOIN app_users ON app_users.id = posts.user_id
-	WHERE
-		user_id = $1 AND
-		cur_space = $2
-	ORDER BY publish_at DESC`
-	sqlSelectPostsByTag = `
-	SELECT posts.id, user_id, filename, slug, title, text, description, publish_at,
-		app_users.name as username, posts.updated_at
-	FROM posts
-	LEFT OUTER JOIN app_users ON app_users.id = posts.user_id
-	LEFT OUTER JOIN post_tags ON post_tags.post_id = posts.id
-	WHERE
-		post_tags.name = '$1' AND
-		publish_at::date <= CURRENT_DATE AND
-		cur_space = $2
-	ORDER BY publish_at DESC`
-	sqlSelectUserPostsByTag = `
+	sqlSelectFeatureForUser = `SELECT id FROM feature_flags WHERE user_id = $1 AND name = $2`
+	sqlSelectSizeForUser    = `SELECT sum(file_size) FROM posts WHERE user_id = $1`
+
+	sqlSelectPostCount       = `SELECT count(id) FROM posts WHERE hidden = FALSE AND cur_space=$1`
+	sqlSelectAllUpdatedPosts = `
 	SELECT
-		posts.id, user_id, filename, slug, title, text, description, publish_at,
-		app_users.name as username, posts.updated_at
+		posts.id,
+		user_id,
+		filename,
+		slug,
+		title,
+		text,
+		description,
+		publish_at,
+		app_users.name as username,
+		posts.updated_at,
+		0 AS "score"
 	FROM posts
 	LEFT OUTER JOIN app_users ON app_users.id = posts.user_id
-	LEFT OUTER JOIN post_tags ON post_tags.post_id = posts.id
-	WHERE
-		user_id = $1 AND
-		(post_tags.name = $2 OR hidden = true) AND
-		publish_at::date <= CURRENT_DATE AND
-		cur_space = $3
-	ORDER BY publish_at DESC`
+	WHERE hidden = FALSE AND publish_at::date <= CURRENT_DATE AND cur_space = $3
+	ORDER BY updated_at DESC
+	LIMIT $1 OFFSET $2`
 	sqlSelectPostsByRank = `
 	SELECT
 		posts.id,
@@ -112,13 +185,23 @@ const (
 	LIMIT $1 OFFSET $2`
 
 	sqlSelectPopularTags = `SELECT name, count(post_id) as tally FROM post_tags GROUP_BY name, post_id ORDER BY tally DESC LIMIT 10`
+	sqlSelectTagsForPost = `SELECT name FROM post_tags WHERE post_id=$1`
 
 	sqlInsertPublicKey = `INSERT INTO public_keys (user_id, public_key) VALUES ($1, $2)`
-	sqlInsertPost      = `INSERT INTO posts (user_id, filename, slug, title, text, description, publish_at, hidden, cur_space) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`
-	sqlInsertUser      = `INSERT INTO app_users DEFAULT VALUES returning id`
-	sqlInsertTag       = `INSERT INTO post_tags (post_id, name) VALUES($1, $2) RETURNING id;`
+	sqlInsertPost      = `
+	INSERT INTO posts
+		(user_id, filename, slug, title, text, description, publish_at, hidden, cur_space,
+		file_size, mime_type, shasum, data)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+	RETURNING id`
+	sqlInsertUser = `INSERT INTO app_users DEFAULT VALUES returning id`
+	sqlInsertTag  = `INSERT INTO post_tags (post_id, name) VALUES($1, $2) RETURNING id;`
 
-	sqlUpdatePost     = `UPDATE posts SET slug = $1, title = $2, text = $3, description = $4, updated_at = $5, publish_at = $6 WHERE id = $7`
+	sqlUpdatePost = `
+	UPDATE posts
+	SET slug = $1, title = $2, text = $3, description = $4, updated_at = $5, publish_at = $6,
+		file_size = $7, shasum = $8, data = $9
+	WHERE id = $10`
 	sqlUpdateUserName = `UPDATE app_users SET name = $1 WHERE id = $2`
 	sqlIncrementViews = `UPDATE posts SET views = views + 1 WHERE id = $1 RETURNING views`
 
@@ -131,6 +214,74 @@ const (
 type PsqlDB struct {
 	Logger *zap.SugaredLogger
 	Db     *sql.DB
+}
+
+type RowScanner interface {
+	Scan(dest ...any) error
+}
+
+func CreatePostFromRow(r RowScanner) (*db.Post, error) {
+	post := &db.Post{}
+	err := r.Scan(
+		&post.ID,
+		&post.UserID,
+		&post.Username,
+		&post.Filename,
+		&post.Slug,
+		&post.Title,
+		&post.Text,
+		&post.Description,
+		&post.CreatedAt,
+		&post.PublishAt,
+		&post.UpdatedAt,
+		&post.Hidden,
+		&post.FileSize,
+		&post.MimeType,
+		&post.Shasum,
+		&post.Data,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return post, nil
+}
+
+func CreatePostWithTagsFromRow(r RowScanner) (*db.Post, error) {
+	post := &db.Post{}
+	tagStr := ""
+	err := r.Scan(
+		&post.ID,
+		&post.UserID,
+		&post.Username,
+		&post.Filename,
+		&post.Slug,
+		&post.Title,
+		&post.Text,
+		&post.Description,
+		&post.CreatedAt,
+		&post.PublishAt,
+		&post.UpdatedAt,
+		&post.Hidden,
+		&post.FileSize,
+		&post.MimeType,
+		&post.Shasum,
+		&post.Data,
+		&tagStr,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	tags := strings.Split(tagStr, ",")
+	for _, tag := range tags {
+		tg := strings.TrimSpace(tag)
+		if tg == "" {
+			continue
+		}
+		post.Tags = append(post.Tags, tg)
+	}
+
+	return post, nil
 }
 
 func NewDB(cfg *config.ConfigCms) *PsqlDB {
@@ -280,21 +431,9 @@ func (me *PsqlDB) FindPostsBeforeDate(date *time.Time, space string) ([]*db.Post
 		return posts, err
 	}
 	for rs.Next() {
-		post := &db.Post{}
-		err := rs.Scan(
-			&post.ID,
-			&post.UserID,
-			&post.Filename,
-			&post.Slug,
-			&post.Title,
-			&post.Text,
-			&post.Description,
-			&post.PublishAt,
-			&post.Username,
-			&post.UpdatedAt,
-		)
+		post, err := CreatePostFromRow(rs)
 		if err != nil {
-			return posts, err
+			return nil, err
 		}
 
 		posts = append(posts, post)
@@ -399,20 +538,8 @@ func (me *PsqlDB) SetUserName(userID string, name string) error {
 }
 
 func (me *PsqlDB) FindPostWithFilename(filename string, persona_id string, space string) (*db.Post, error) {
-	post := &db.Post{}
 	r := me.Db.QueryRow(sqlSelectPostWithFilename, filename, persona_id, space)
-	err := r.Scan(
-		&post.ID,
-		&post.UserID,
-		&post.Filename,
-		&post.Slug,
-		&post.Title,
-		&post.Text,
-		&post.Description,
-		&post.PublishAt,
-		&post.Username,
-		&post.UpdatedAt,
-	)
+	post, err := CreatePostWithTagsFromRow(r)
 	if err != nil {
 		return nil, err
 	}
@@ -421,20 +548,8 @@ func (me *PsqlDB) FindPostWithFilename(filename string, persona_id string, space
 }
 
 func (me *PsqlDB) FindPostWithSlug(slug string, user_id string, space string) (*db.Post, error) {
-	post := &db.Post{}
 	r := me.Db.QueryRow(sqlSelectPostWithSlug, slug, user_id, space)
-	err := r.Scan(
-		&post.ID,
-		&post.UserID,
-		&post.Filename,
-		&post.Slug,
-		&post.Title,
-		&post.Text,
-		&post.Description,
-		&post.PublishAt,
-		&post.Username,
-		&post.UpdatedAt,
-	)
+	post, err := CreatePostWithTagsFromRow(r)
 	if err != nil {
 		return nil, err
 	}
@@ -443,20 +558,8 @@ func (me *PsqlDB) FindPostWithSlug(slug string, user_id string, space string) (*
 }
 
 func (me *PsqlDB) FindPost(postID string) (*db.Post, error) {
-	post := &db.Post{}
 	r := me.Db.QueryRow(sqlSelectPost, postID)
-	err := r.Scan(
-		&post.ID,
-		&post.UserID,
-		&post.Filename,
-		&post.Slug,
-		&post.Title,
-		&post.Text,
-		&post.Description,
-		&post.PublishAt,
-		&post.Username,
-		&post.UpdatedAt,
-	)
+	post, err := CreatePostFromRow(r)
 	if err != nil {
 		return nil, err
 	}
@@ -521,9 +624,24 @@ func (me *PsqlDB) FindAllUpdatedPosts(page *db.Pager, space string) (*db.Paginat
 	return me.postPager(rs, page.Num, space)
 }
 
-func (me *PsqlDB) InsertPost(userID, filename, slug, title, text, description string, publishAt *time.Time, hidden bool, space string) (*db.Post, error) {
+func (me *PsqlDB) InsertPost(post *db.Post) (*db.Post, error) {
 	var id string
-	err := me.Db.QueryRow(sqlInsertPost, userID, filename, slug, title, text, description, publishAt, hidden, space).Scan(&id)
+	err := me.Db.QueryRow(
+		sqlInsertPost,
+		post.UserID,
+		post.Filename,
+		post.Slug,
+		post.Title,
+		post.Text,
+		post.Description,
+		post.PublishAt,
+		post.Hidden,
+		post.Space,
+		post.FileSize,
+		post.MimeType,
+		post.Shasum,
+		post.Data,
+	).Scan(&id)
 	if err != nil {
 		return nil, err
 	}
@@ -531,13 +649,25 @@ func (me *PsqlDB) InsertPost(userID, filename, slug, title, text, description st
 	return me.FindPost(id)
 }
 
-func (me *PsqlDB) UpdatePost(postID, slug, title, text, description string, publishAt *time.Time) (*db.Post, error) {
-	_, err := me.Db.Exec(sqlUpdatePost, slug, title, text, description, time.Now(), publishAt, postID)
+func (me *PsqlDB) UpdatePost(post *db.Post) (*db.Post, error) {
+	_, err := me.Db.Exec(
+		sqlUpdatePost,
+		post.Slug,
+		post.Title,
+		post.Text,
+		post.Description,
+		time.Now(),
+		post.PublishAt,
+		post.FileSize,
+		post.Shasum,
+		post.Data,
+		post.ID,
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	return me.FindPost(postID)
+	return me.FindPost(post.ID)
 }
 
 func (me *PsqlDB) RemovePosts(postIDs []string) error {
@@ -553,21 +683,9 @@ func (me *PsqlDB) FindPostsForUser(userID string, space string) ([]*db.Post, err
 		return posts, err
 	}
 	for rs.Next() {
-		post := &db.Post{}
-		err := rs.Scan(
-			&post.ID,
-			&post.UserID,
-			&post.Filename,
-			&post.Slug,
-			&post.Title,
-			&post.Text,
-			&post.Description,
-			&post.PublishAt,
-			&post.Username,
-			&post.UpdatedAt,
-		)
+		post, err := CreatePostWithTagsFromRow(rs)
 		if err != nil {
-			return posts, err
+			return nil, err
 		}
 
 		posts = append(posts, post)
@@ -585,21 +703,9 @@ func (me *PsqlDB) FindAllPostsForUser(userID string, space string) ([]*db.Post, 
 		return posts, err
 	}
 	for rs.Next() {
-		post := &db.Post{}
-		err := rs.Scan(
-			&post.ID,
-			&post.UserID,
-			&post.Filename,
-			&post.Slug,
-			&post.Title,
-			&post.Text,
-			&post.Description,
-			&post.PublishAt,
-			&post.Username,
-			&post.UpdatedAt,
-		)
+		post, err := CreatePostFromRow(rs)
 		if err != nil {
-			return posts, err
+			return nil, err
 		}
 
 		posts = append(posts, post)
@@ -617,22 +723,9 @@ func (me *PsqlDB) FindPosts() ([]*db.Post, error) {
 		return posts, err
 	}
 	for rs.Next() {
-		post := &db.Post{}
-		err := rs.Scan(
-			&post.ID,
-			&post.UserID,
-			&post.Filename,
-			&post.Slug,
-			&post.Title,
-			&post.Text,
-			&post.Description,
-			&post.CreatedAt,
-			&post.PublishAt,
-			&post.UpdatedAt,
-			&post.Hidden,
-		)
+		post, err := CreatePostFromRow(rs)
 		if err != nil {
-			return posts, err
+			return nil, err
 		}
 
 		posts = append(posts, post)
@@ -650,21 +743,9 @@ func (me *PsqlDB) FindUpdatedPostsForUser(userID string, space string) ([]*db.Po
 		return posts, err
 	}
 	for rs.Next() {
-		post := &db.Post{}
-		err := rs.Scan(
-			&post.ID,
-			&post.UserID,
-			&post.Filename,
-			&post.Slug,
-			&post.Title,
-			&post.Text,
-			&post.Description,
-			&post.PublishAt,
-			&post.Username,
-			&post.UpdatedAt,
-		)
+		post, err := CreatePostFromRow(rs)
 		if err != nil {
-			return posts, err
+			return nil, err
 		}
 
 		posts = append(posts, post)
@@ -764,21 +845,9 @@ func (me *PsqlDB) FindUserPostsByTag(tag, userID, space string) ([]*db.Post, err
 		return posts, err
 	}
 	for rs.Next() {
-		post := &db.Post{}
-		err := rs.Scan(
-			&post.ID,
-			&post.UserID,
-			&post.Filename,
-			&post.Slug,
-			&post.Title,
-			&post.Text,
-			&post.Description,
-			&post.PublishAt,
-			&post.Username,
-			&post.UpdatedAt,
-		)
+		post, err := CreatePostFromRow(rs)
 		if err != nil {
-			return posts, err
+			return nil, err
 		}
 
 		posts = append(posts, post)
@@ -796,21 +865,9 @@ func (me *PsqlDB) FindPostsByTag(tag, space string) ([]*db.Post, error) {
 		return posts, err
 	}
 	for rs.Next() {
-		post := &db.Post{}
-		err := rs.Scan(
-			&post.ID,
-			&post.UserID,
-			&post.Filename,
-			&post.Slug,
-			&post.Title,
-			&post.Text,
-			&post.Description,
-			&post.PublishAt,
-			&post.Username,
-			&post.UpdatedAt,
-		)
+		post, err := CreatePostFromRow(rs)
 		if err != nil {
-			return posts, err
+			return nil, err
 		}
 
 		posts = append(posts, post)
@@ -829,7 +886,7 @@ func (me *PsqlDB) FindPopularTags() ([]string, error) {
 	}
 	for rs.Next() {
 		name := ""
-		err := rs.Scan(name)
+		err := rs.Scan(&name)
 		if err != nil {
 			return tags, err
 		}
@@ -840,4 +897,93 @@ func (me *PsqlDB) FindPopularTags() ([]string, error) {
 		return tags, rs.Err()
 	}
 	return tags, nil
+}
+
+func (me *PsqlDB) FindTagsForPost(postID string) ([]string, error) {
+	tags := make([]string, 0)
+	rs, err := me.Db.Query(sqlSelectTagsForPost, postID)
+	if err != nil {
+		return tags, err
+	}
+
+	for rs.Next() {
+		name := ""
+		err := rs.Scan(&name)
+		if err != nil {
+			return tags, err
+		}
+
+		tags = append(tags, name)
+	}
+
+	if rs.Err() != nil {
+		return tags, rs.Err()
+	}
+
+	return tags, nil
+}
+
+/* func (me *PsqlDB) FindPostsWithTagsForUser(userID, space string) ([]*db.Post, error) {
+	var posts []*db.Post
+	rs, err := me.Db.Query(sqlSelectUserPostsWithTags, userID, space)
+	if err != nil {
+		return posts, err
+	}
+	for rs.Next() {
+		tagStr := ""
+		post := &db.Post{}
+		err := rs.Scan(
+			&post.ID,
+			&post.UserID,
+			&post.Username,
+			&post.Filename,
+			&post.Slug,
+			&post.Title,
+			&post.Text,
+			&post.Description,
+			&post.CreatedAt,
+			&post.PublishAt,
+			&post.UpdatedAt,
+			&post.Hidden,
+			&post.FileSize,
+			&post.MimeType,
+			&post.Shasum,
+			&tagStr,
+		)
+		if err != nil {
+			return nil, err
+		}
+		tags := strings.Split(tagStr, ",")
+		for _, tag := range tags {
+			tg := strings.TrimSpace(tag)
+			if tg == "" {
+				continue
+			}
+			post.Tags = append(post.Tags, tg)
+		}
+
+		posts = append(posts, post)
+	}
+	if rs.Err() != nil {
+		return posts, rs.Err()
+	}
+	return posts, nil
+} */
+
+func (me *PsqlDB) HasFeatureForUser(userID string, feature string) bool {
+	var id string
+	err := me.Db.QueryRow(sqlSelectFeatureForUser, userID, feature).Scan(&id)
+	if err != nil {
+		return false
+	}
+	return id != ""
+}
+
+func (me *PsqlDB) FindTotalSizeForUser(userID string) (int, error) {
+	var fileSize int
+	err := me.Db.QueryRow(sqlSelectSizeForUser, userID).Scan(&fileSize)
+	if err != nil {
+		return 0, err
+	}
+	return fileSize, nil
 }

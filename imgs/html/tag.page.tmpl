@@ -1,0 +1,46 @@
+{{template "base" .}}
+
+{{define "title"}}{{.PageTitle}}{{end}}
+
+{{define "meta"}}
+<meta name="description" content="{{.PageTitle}}" />
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="{{.Site.Domain}}">
+<meta property="og:url" content="{{.URL}}">
+<meta property="og:title" content="{{.PageTitle}}">
+<meta property="og:description" content="{{.Tag}}">
+<meta property="og:image:width" content="300" />
+<meta property="og:image:height" content="300" />
+<meta itemprop="image" content="https://{{.Site.Domain}}/card.png" />
+<meta property="og:image" content="https://{{.Site.Domain}}/card.png" />
+
+<meta property="twitter:card" content="summary">
+<meta property="twitter:url" content="{{.URL}}">
+<meta property="twitter:title" content="{{.PageTitle}}">
+<meta property="twitter:description" content="{{.Tag}}">
+<meta name="twitter:image" content="https://{{.Site.Domain}}/card.png" />
+<meta name="twitter:image:src" content="https://{{.Site.Domain}}/card.png" />
+{{end}}
+
+{{define "attrs"}}id="blog"{{end}}
+
+{{define "body"}}
+<header class="text-center">
+    <h1 class="text-2xl font-bold">{{.Tag}}</h1>
+    <a href="{{.BlogURL}}">&lt; {{.Username}}</a>
+    <hr />
+</header>
+<main>
+    <section class="albums">
+        {{range .Posts}}
+        <article  class="thumbnail-container">
+            <a href="{{.URL}}" class="thumbnail-link">
+                <img class="thumbnail" src="{{.ImgURL}}" alt="{{.Caption}}" />
+            </a>
+        </article>
+        {{end}}
+    </section>
+</main>
+{{template "footer" .}}
+{{end}}

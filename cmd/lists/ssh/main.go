@@ -71,6 +71,7 @@ func main() {
 
 	hooks := &lists.ListHooks{
 		Cfg: cfg,
+		Db:  dbh,
 	}
 	handler := filehandlers.NewScpPostHandler(dbh, cfg, hooks)
 

@@ -9,3 +9,5 @@ build/*
 data/*
 !data/.gitkeep
 ssh_data
+.storage
+__debug_bin
