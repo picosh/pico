@@ -155,7 +155,7 @@ func parseItem(meta *MetaData, li *ListItem, prevItem *ListItem, pre bool, mod i
 		li.Value = trim
 
 		pre, skip, _ = parseItem(meta, li, prevItem, pre, mod)
-		if prevItem.Indent == 0 {
+		if prevItem != nil && prevItem.Indent == 0 {
 			mod = old - len(trim)
 			li.Indent = 1
 		} else {
