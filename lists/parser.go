@@ -159,7 +159,12 @@ func parseItem(meta *MetaData, li *ListItem, prevItem *ListItem, pre bool, mod i
 			mod = old - len(trim)
 			li.Indent = 1
 		} else {
-			li.Indent = (old - len(trim)) / mod
+			numerator := old - len(trim)
+			if mod == 0 {
+				li.Indent = 1
+			} else {
+				li.Indent = numerator / mod
+			}
 		}
 	} else {
 		li.IsText = true
