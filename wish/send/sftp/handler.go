@@ -37,11 +37,6 @@ func (f *handler) Filecmd(r *sftp.Request) error {
 }
 
 func (f *handler) Filelist(r *sftp.Request) (sftp.ListerAt, error) {
-	err := f.writeHandler.Validate(f.session)
-	if err != nil {
-		return nil, err
-	}
-
 	switch r.Method {
 	case "List":
 		fallthrough

@@ -23,15 +23,23 @@ func SSHOption(writeHandler utils.CopyFromClientHandler) ssh.Option {
 
 func SubsystemHandler(writeHandler utils.CopyFromClientHandler) ssh.SubsystemHandler {
 	return func(session ssh.Session) {
+		err := writeHandler.Validate(session)
+		if err != nil {
+			utils.ErrorHandler(session, err)
+			return
+		}
+
 		rootFile := &tempfile{
 			name:  "/",
 			isDir: true,
 		}
+
 		handler := &handler{
 			session:      session,
 			writeHandler: writeHandler,
 			rootFile:     rootFile,
 		}
+
 		handlers := sftp.Handlers{
 			FilePut:  handler,
 			FileList: handler,
@@ -41,7 +49,7 @@ func SubsystemHandler(writeHandler utils.CopyFromClientHandler) ssh.SubsystemHan
 
 		requestServer := sftp.NewRequestServer(session, handlers)
 
-		err := requestServer.Serve()
+		err = requestServer.Serve()
 		if err != nil && !errors.Is(err, io.EOF) {
 			log.Println("Error serving sftp subsystem:", err)
 		}
