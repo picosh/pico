@@ -48,3 +48,17 @@ services:
       - prose
       - services
       - all
+  imgs-web:
+    image: neurosnap/imgs-web:latest
+    restart: always
+    profiles:
+      - imgs
+      - services
+      - all
+  imgs-ssh:
+    image: neurosnap/imgs-ssh:latest
+    restart: always
+    profiles:
+      - imgs
+      - services
+      - all
