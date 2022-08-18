@@ -28,15 +28,49 @@
 
 {{define "body"}}
 <header class="text-center">
-    <h1 class="text-2xl font-bold">{{.Site.Domain}}</h1>
+    <h1 class="text-2xl font-bold">{{.Site.Domain}} [beta]</h1>
     <p class="text-lg">premium image hosting for hackers</p>
     <hr />
 </header>
 
 <main>
     <section>
+        <h2 class="text-lg font-bold">Beta access</h2>
+        <p>
+            Want beta access?  You must to join our
+            <a href="irc://irc.libera.chat/#pico.sh">IRC channel</a> (#pico.sh on libera)
+            and ask for access.  We want all beta testers to be in IRC so you can provide us with
+            feedback.
+        </p>
+        <p>
+            Don't have an IRC client?  <a href="https://web.libera.chat/">Use libera web client</a>
+            and join <code>#pico.sh</code>.
+        </p>
+    </section>
+
+    <section>
         <h2 class="text-lg font-bold">Examples</h2>
-        <p>Fill this in</p>
+        <p><a href="https://erock.imgs.sh/t/iceland">album</a></p>
+    </section>
+
+    <section>
+        <h2 class="text-lg font-bold">Features</h2>
+        <ul>
+            <li>Delightful terminal workflow</li>
+            <li>Share public images from the terminal</li>
+            <li>Seamless integration with other pico services (e.g. <a href="https://prose.sh">prose</a>)</li>
+            <li>Images are web optimized by default</li>
+            <li>Images are device optimized by default</li>
+            <li>API to modify images on-the-fly (e.g. dimensions)</li>
+            <li>Original images are always available</li>
+            <li>Ability to add metadata to images using markdown</li>
+            <li>Organize images into albums using tags</li>
+            <li>Hotlinking encouraged!</li>
+            <li>No javascript</li>
+            <li>No ads</li>
+            <li>No file size limits</li>
+            <li>25GB max storage</li>
+        </ul>
     </section>
 
     <section>
@@ -68,23 +102,24 @@
     </section>
 
     <section>
-        <h2 class="text-lg font-bold">Features</h2>
-        <ul>
-            <li>Delightful terminal workflow</li>
-            <li>Share public images from the terminal</li>
-            <li>Seamless integration with other pico services</li>
-            <li>Images are web optimized by default</li>
-            <li>Images are device optimized by default</li>
-            <li>API to modify images on-the-fly (e.g. dimensions)</li>
-            <li>Original images are always available</li>
-            <li>Ability to add metadata to images using markdown</li>
-            <li>Organize images into albums using tags</li>
-            <li>Hotlinking encouraged!</li>
-            <li>No javascript</li>
-            <li>No ads</li>
-            <li>No file size limits</li>
-            <li>25GB max storage</li>
-        </ul>
+        <h2 class="text-lg font-bold">Add metadata to your images</h2>
+        <p>
+            We also support adding metadata to images.  Create a markdown file with the same name
+            as your image.  So if we have an image <code>my-image.jpg</code> we would create a
+            markdown file <code>my-image.md</code>:
+        </p>
+        <pre>---
+title: This is my caption
+date: 2022-08-18
+tags: [trip, mexico]
+---
+
+# Day 1
+
+This section is just normal markdown that will be rendered on the image page within imgs.
+</pre>
+        <pre>rsync my-image.md {{.Site.Domain}}:/</pre>
+        <p><a href="/help#img-meta">Read more about metadata here.</a></p>
     </section>
 
     <section>
