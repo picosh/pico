@@ -15,6 +15,7 @@ import (
 	"git.sr.ht/~erock/pico/wish/cms"
 	"git.sr.ht/~erock/pico/wish/pipe"
 	"git.sr.ht/~erock/pico/wish/proxy"
+	wishrsync "git.sr.ht/~erock/pico/wish/send/rsync"
 	"git.sr.ht/~erock/pico/wish/send/scp"
 	"git.sr.ht/~erock/pico/wish/send/sftp"
 	"git.sr.ht/~erock/pico/wish/send/utils"
@@ -38,6 +39,8 @@ func createRouter(cfg *shared.ConfigSite, handler utils.CopyFromClientHandler) p
 
 		if len(cmd) > 0 && cmd[0] == "scp" {
 			mdw = append(mdw, scp.Middleware(handler))
+		} else if len(cmd) > 0 && cmd[0] == "rsync" {
+			mdw = append(mdw, wishrsync.Middleware(handler))
 		} else {
 			mdw = append(mdw,
 				pipe.Middleware(handler, ""),
