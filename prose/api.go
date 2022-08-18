@@ -600,11 +600,13 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		item := &feeds.Item{
-			Id:      realUrl,
-			Title:   shared.FilenameToTitle(post.Filename, post.Title),
-			Link:    &feeds.Link{Href: realUrl},
-			Content: tpl.String(),
-			Created: *post.PublishAt,
+			Id:          realUrl,
+			Title:       shared.FilenameToTitle(post.Filename, post.Title),
+			Link:        &feeds.Link{Href: realUrl},
+			Content:     tpl.String(),
+			Created:     *post.PublishAt,
+			Updated:     *post.UpdatedAt,
+			Description: post.Description,
 		}
 
 		if post.Description != "" {
@@ -682,11 +684,14 @@ func rssHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		item := &feeds.Item{
-			Id:      realUrl,
-			Title:   post.Title,
-			Link:    &feeds.Link{Href: realUrl},
-			Content: tpl.String(),
-			Created: *post.PublishAt,
+			Id:          realUrl,
+			Title:       post.Title,
+			Link:        &feeds.Link{Href: realUrl},
+			Content:     tpl.String(),
+			Created:     *post.PublishAt,
+			Updated:     *post.UpdatedAt,
+			Description: post.Description,
+			Author:      &feeds.Author{Name: post.Username},
 		}
 
 		if post.Description != "" {
@@ -770,6 +775,9 @@ func createMainRoutes(staticRoutes []shared.Route) []shared.Route {
 
 		shared.NewRoute("GET", "/([^/]+)", blogHandler),
 		shared.NewRoute("GET", "/([^/]+)/rss", rssBlogHandler),
+		shared.NewRoute("GET", "/([^/]+)/rss.xml", rssBlogHandler),
+		shared.NewRoute("GET", "/([^/]+)/atom.xml", rssBlogHandler),
+		shared.NewRoute("GET", "/([^/]+)/feed.xml", rssBlogHandler),
 		shared.NewRoute("GET", "/([^/]+)/styles.css", blogStyleHandler),
 		shared.NewRoute("GET", "/([^/]+)/([^/]+)", postHandler),
 		shared.NewRoute("GET", "/raw/([^/]+)/([^/]+)", postRawHandler),
