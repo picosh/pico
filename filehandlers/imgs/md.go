@@ -29,7 +29,7 @@ func (h *UploadImgHandler) validateMd(data *PostMetaData) (bool, error) {
 }
 
 func (h *UploadImgHandler) metaMd(data *PostMetaData) error {
-	parsedText, err := shared.ParseText(data.Text)
+	parsedText, err := shared.ParseText(data.Text, "")
 	// we return nil here because we don't want the file upload to fail
 	if err != nil {
 		return nil
