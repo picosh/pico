@@ -12,7 +12,6 @@ import (
 
 	"git.sr.ht/~erock/pico/db"
 	"git.sr.ht/~erock/pico/db/postgres"
-	"git.sr.ht/~erock/pico/prose"
 	"git.sr.ht/~erock/pico/shared"
 	"github.com/gorilla/feeds"
 	"golang.org/x/exp/slices"
@@ -489,7 +488,7 @@ func tagPostHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	parsed, err := prose.ParseText(post.Text)
+	parsed, err := shared.ParseText(post.Text)
 	if err != nil {
 		logger.Error(err)
 	}
@@ -572,7 +571,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	var data PostPageData
 	post, err := dbpool.FindPostWithSlug(slug, user.ID, cfg.Space)
 	if err == nil {
-		parsed, err := prose.ParseText(post.Text)
+		parsed, err := shared.ParseText(post.Text)
 		if err != nil {
 			logger.Error(err)
 		}

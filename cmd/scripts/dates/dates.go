@@ -10,7 +10,7 @@ import (
 	"git.sr.ht/~erock/pico/db"
 	"git.sr.ht/~erock/pico/db/postgres"
 	"git.sr.ht/~erock/pico/lists"
-	"git.sr.ht/~erock/pico/prose"
+	"git.sr.ht/~erock/pico/shared"
 	"git.sr.ht/~erock/pico/wish/cms/config"
 	"go.uber.org/zap"
 )
@@ -97,7 +97,7 @@ func main() {
 	logger.Info("updating dates")
 	for _, post := range posts {
 		if post.Space == "prose" {
-			parsed, err := prose.ParseText(post.Text)
+			parsed, err := shared.ParseText(post.Text)
 			if err != nil {
 				logger.Error(err)
 				continue

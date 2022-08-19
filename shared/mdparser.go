@@ -1,4 +1,4 @@
-package prose
+package shared
 
 import (
 	"bytes"
@@ -16,6 +16,11 @@ import (
 	"github.com/yuin/goldmark/parser"
 	ghtml "github.com/yuin/goldmark/renderer/html"
 )
+
+type Link struct {
+	URL  string
+	Text string
+}
 
 type MetaData struct {
 	PublishAt   *time.Time

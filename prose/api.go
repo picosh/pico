@@ -80,15 +80,10 @@ type TransparencyPageData struct {
 	Analytics *db.Analytics
 }
 
-type Link struct {
-	URL  string
-	Text string
-}
-
 type HeaderTxt struct {
 	Title    string
 	Bio      string
-	Nav      []Link
+	Nav      []shared.Link
 	HasLinks bool
 }
 
@@ -196,7 +191,7 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 		if post.Filename == "_styles.css" && len(post.Text) > 0 {
 			hasCSS = true
 		} else if post.Filename == "_readme.md" {
-			parsedText, err := ParseText(post.Text)
+			parsedText, err := shared.ParseText(post.Text)
 			if err != nil {
 				logger.Error(err)
 			}
@@ -205,7 +200,7 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 				headerTxt.Title = parsedText.Title
 			}
 
-			headerTxt.Nav = []Link{}
+			headerTxt.Nav = []shared.Link{}
 			for _, nav := range parsedText.Nav {
 				u, _ := url.Parse(nav.URL)
 				finURL := nav.URL
@@ -217,7 +212,7 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 						withUserName,
 					)
 				}
-				headerTxt.Nav = append(headerTxt.Nav, Link{
+				headerTxt.Nav = append(headerTxt.Nav, shared.Link{
 					URL:  finURL,
 					Text: nav.Text,
 				})
@@ -333,7 +328,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	var data PostPageData
 	post, err := dbpool.FindPostWithSlug(slug, user.ID, cfg.Space)
 	if err == nil {
-		parsedText, err := ParseText(post.Text)
+		parsedText, err := shared.ParseText(post.Text)
 		if err != nil {
 			logger.Error(err)
 		}
@@ -341,7 +336,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 		// we need the blog name from the readme unfortunately
 		readme, err := dbpool.FindPostWithFilename("_readme.md", user.ID, cfg.Space)
 		if err == nil {
-			readmeParsed, err := ParseText(readme.Text)
+			readmeParsed, err := shared.ParseText(readme.Text)
 			if err != nil {
 				logger.Error(err)
 			}
@@ -547,7 +542,7 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 
 	for _, post := range posts {
 		if post.Filename == "_readme.md" {
-			parsedText, err := ParseText(post.Text)
+			parsedText, err := shared.ParseText(post.Text)
 			if err != nil {
 				logger.Error(err)
 			}
@@ -582,7 +577,7 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 		if slices.Contains(cfg.HiddenPosts, post.Filename) {
 			continue
 		}
-		parsed, err := ParseText(post.Text)
+		parsed, err := shared.ParseText(post.Text)
 		if err != nil {
 			logger.Error(err)
 		}
@@ -665,7 +660,7 @@ func rssHandler(w http.ResponseWriter, r *http.Request) {
 
 	var feedItems []*feeds.Item
 	for _, post := range pager.Data {
-		parsed, err := ParseText(post.Text)
+		parsed, err := shared.ParseText(post.Text)
 		if err != nil {
 			logger.Error(err)
 		}

@@ -7,7 +7,7 @@ import (
 
 	"git.sr.ht/~erock/pico/db"
 	"git.sr.ht/~erock/pico/db/postgres"
-	"git.sr.ht/~erock/pico/prose"
+	"git.sr.ht/~erock/pico/shared"
 	"git.sr.ht/~erock/pico/wish/cms/config"
 	"go.uber.org/zap"
 )
@@ -75,7 +75,7 @@ func main() {
 
 	logger.Info("replacing tags")
 	for _, post := range posts {
-		parsed, err := prose.ParseText(post.Text)
+		parsed, err := shared.ParseText(post.Text)
 		if err != nil {
 			continue
 		}
