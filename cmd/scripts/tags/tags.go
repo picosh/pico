@@ -75,7 +75,7 @@ func main() {
 
 	logger.Info("replacing tags")
 	for _, post := range posts {
-		parsed, err := shared.ParseText(post.Text)
+		parsed, err := shared.ParseText(post.Text, "")
 		if err != nil {
 			continue
 		}

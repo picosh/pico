@@ -13,6 +13,7 @@ import (
 
 	"git.sr.ht/~erock/pico/db"
 	"git.sr.ht/~erock/pico/db/postgres"
+	"git.sr.ht/~erock/pico/imgs"
 	"git.sr.ht/~erock/pico/shared"
 	"github.com/gorilla/feeds"
 	"golang.org/x/exp/slices"
@@ -191,7 +192,7 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 		if post.Filename == "_styles.css" && len(post.Text) > 0 {
 			hasCSS = true
 		} else if post.Filename == "_readme.md" {
-			parsedText, err := shared.ParseText(post.Text)
+			parsedText, err := shared.ParseText(post.Text, imgs.ImgBaseURL(post.Username))
 			if err != nil {
 				logger.Error(err)
 			}
@@ -328,7 +329,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	var data PostPageData
 	post, err := dbpool.FindPostWithSlug(slug, user.ID, cfg.Space)
 	if err == nil {
-		parsedText, err := shared.ParseText(post.Text)
+		parsedText, err := shared.ParseText(post.Text, imgs.ImgBaseURL(username))
 		if err != nil {
 			logger.Error(err)
 		}
@@ -336,7 +337,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 		// we need the blog name from the readme unfortunately
 		readme, err := dbpool.FindPostWithFilename("_readme.md", user.ID, cfg.Space)
 		if err == nil {
-			readmeParsed, err := shared.ParseText(readme.Text)
+			readmeParsed, err := shared.ParseText(readme.Text, imgs.ImgBaseURL(username))
 			if err != nil {
 				logger.Error(err)
 			}
@@ -540,9 +541,15 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 		Title: GetBlogName(username),
 	}
 
+	hostDomain := strings.Split(r.Host, ":")[0]
+	appDomain := strings.Split(cfg.ConfigCms.Domain, ":")[0]
+
+	onSubdomain := cfg.IsSubdomains() && strings.Contains(hostDomain, appDomain)
+	withUserName := (!onSubdomain && hostDomain == appDomain) || !cfg.IsCustomdomains()
+
 	for _, post := range posts {
 		if post.Filename == "_readme.md" {
-			parsedText, err := shared.ParseText(post.Text)
+			parsedText, err := shared.ParseText(post.Text, imgs.ImgBaseURL(post.Username))
 			if err != nil {
 				logger.Error(err)
 			}
@@ -558,12 +565,6 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	hostDomain := strings.Split(r.Host, ":")[0]
-	appDomain := strings.Split(cfg.ConfigCms.Domain, ":")[0]
-
-	onSubdomain := cfg.IsSubdomains() && strings.Contains(hostDomain, appDomain)
-	withUserName := (!onSubdomain && hostDomain == appDomain) || !cfg.IsCustomdomains()
-
 	feed := &feeds.Feed{
 		Title:       headerTxt.Title,
 		Link:        &feeds.Link{Href: cfg.FullBlogURL(username, onSubdomain, withUserName)},
@@ -577,7 +578,7 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 		if slices.Contains(cfg.HiddenPosts, post.Filename) {
 			continue
 		}
-		parsed, err := shared.ParseText(post.Text)
+		parsed, err := shared.ParseText(post.Text, imgs.ImgBaseURL(post.Username))
 		if err != nil {
 			logger.Error(err)
 		}
@@ -660,7 +661,7 @@ func rssHandler(w http.ResponseWriter, r *http.Request) {
 
 	var feedItems []*feeds.Item
 	for _, post := range pager.Data {
-		parsed, err := shared.ParseText(post.Text)
+		parsed, err := shared.ParseText(post.Text, imgs.ImgBaseURL(post.Username))
 		if err != nil {
 			logger.Error(err)
 		}

@@ -12,9 +12,12 @@ import (
 	"github.com/yuin/goldmark"
 	highlighting "github.com/yuin/goldmark-highlighting"
 	meta "github.com/yuin/goldmark-meta"
+	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
+	"github.com/yuin/goldmark/renderer"
 	ghtml "github.com/yuin/goldmark/renderer/html"
+	"github.com/yuin/goldmark/util"
 )
 
 type Link struct {
@@ -107,7 +110,65 @@ func toTags(obj interface{}) ([]string, error) {
 	return arr, nil
 }
 
-func ParseText(text string) (*ParsedText, error) {
+type ImgRender struct {
+	ghtml.Config
+	ImgURL func(url []byte) []byte
+}
+
+func NewImgsRenderer(url func([]byte) []byte) renderer.NodeRenderer {
+	return &ImgRender{
+		ImgURL: url,
+	}
+}
+
+func (r *ImgRender) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
+	reg.Register(ast.KindImage, r.renderImage)
+}
+
+func (r *ImgRender) renderImage(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
+	if !entering {
+		return ast.WalkContinue, nil
+	}
+	n := node.(*ast.Image)
+	_, _ = w.WriteString("<img src=\"")
+	if r.Unsafe || !ghtml.IsDangerousURL(n.Destination) {
+		dest := r.ImgURL(n.Destination)
+		_, _ = w.Write(util.EscapeHTML(util.URLEscape(dest, true)))
+	}
+	_, _ = w.WriteString(`" alt="`)
+	_, _ = w.Write(util.EscapeHTML(n.Text(source)))
+	_ = w.WriteByte('"')
+	if n.Title != nil {
+		_, _ = w.WriteString(` title="`)
+		r.Writer.Write(w, n.Title)
+		_ = w.WriteByte('"')
+	}
+	if n.Attributes() != nil {
+		ghtml.RenderAttributes(w, n, ghtml.ImageAttributeFilter)
+	}
+	if r.XHTML {
+		_, _ = w.WriteString(" />")
+	} else {
+		_, _ = w.WriteString(">")
+	}
+	return ast.WalkSkipChildren, nil
+}
+
+func createImgURL(absURL string) func([]byte) []byte {
+	return func(url []byte) []byte {
+		if url[0] == '/' {
+			nextURL := fmt.Sprintf("%s%s", absURL, string(url))
+			return []byte(nextURL)
+		} else if bytes.HasPrefix(url, []byte{'.', '/'}) {
+			fname := url[1:]
+			nextURL := fmt.Sprintf("%s%s", absURL, string(fname))
+			return []byte(nextURL)
+		}
+		return url
+	}
+}
+
+func ParseText(text string, absURL string) (*ParsedText, error) {
 	parsed := ParsedText{
 		MetaData: &MetaData{
 			Tags: []string{},
@@ -131,6 +192,9 @@ func ParseText(text string) (*ParsedText, error) {
 		),
 		goldmark.WithRendererOptions(
 			ghtml.WithUnsafe(),
+			renderer.WithNodeRenderers(
+				util.Prioritized(NewImgsRenderer(createImgURL(absURL)), 0),
+			),
 		),
 	)
 	context := parser.NewContext()

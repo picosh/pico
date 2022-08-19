@@ -12,6 +12,7 @@ import (
 
 	"git.sr.ht/~erock/pico/db"
 	"git.sr.ht/~erock/pico/db/postgres"
+	"git.sr.ht/~erock/pico/imgs/storage"
 	"git.sr.ht/~erock/pico/shared"
 	"github.com/gorilla/feeds"
 	"golang.org/x/exp/slices"
@@ -112,45 +113,6 @@ type MergePost struct {
 
 var allTag = "all"
 
-func ImgURL(c *shared.ConfigSite, username string, slug string, onSubdomain bool, withUserName bool) string {
-	fname := url.PathEscape(strings.TrimLeft(slug, "/"))
-	if c.IsSubdomains() && onSubdomain {
-		return fmt.Sprintf("%s://%s.%s/%s", c.Protocol, username, c.Domain, fname)
-	}
-
-	if withUserName {
-		return fmt.Sprintf("/%s/%s", username, fname)
-	}
-
-	return fmt.Sprintf("/%s", fname)
-}
-
-func TagURL(c *shared.ConfigSite, username, tag string, onSubdomain, withUserName bool) string {
-	tg := url.PathEscape(tag)
-	if c.IsSubdomains() && onSubdomain {
-		return fmt.Sprintf("%s://%s.%s/t/%s", c.Protocol, username, c.Domain, tg)
-	}
-
-	if withUserName {
-		return fmt.Sprintf("/%s/t/%s", username, tg)
-	}
-
-	return fmt.Sprintf("/t/%s", tg)
-}
-
-func TagPostURL(c *shared.ConfigSite, username, tag, slug string, onSubdomain, withUserName bool) string {
-	fname := url.PathEscape(strings.TrimLeft(slug, "/"))
-	if c.IsSubdomains() && onSubdomain {
-		return fmt.Sprintf("%s://%s.%s/%s/%s", c.Protocol, username, c.Domain, tag, fname)
-	}
-
-	if withUserName {
-		return fmt.Sprintf("/%s/%s/%s", username, tag, fname)
-	}
-
-	return fmt.Sprintf("/%s/%s", tag, fname)
-}
-
 func GetPostTitle(post *db.Post) string {
 	if post.Description == "" {
 		return post.Title
@@ -238,8 +200,8 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	for key, post := range tagMap {
 		postCollection = append(postCollection, &PostTagData{
 			Tag:       key,
-			URL:       template.URL(TagURL(cfg, post.Username, key, onSubdomain, withUserName)),
-			ImgURL:    template.URL(ImgURL(cfg, post.Username, post.Filename, onSubdomain, withUserName)),
+			URL:       template.URL(cfg.TagURL(post.Username, key, onSubdomain, withUserName)),
+			ImgURL:    template.URL(cfg.ImgURL(post.Username, post.Filename, onSubdomain, withUserName)),
 			PublishAt: post.PublishAt,
 		})
 	}
@@ -303,14 +265,14 @@ func imgHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	storage := NewStorageFS(cfg.StorageDir)
-	bucket, err := storage.GetBucket(user.ID)
+	st := storage.NewStorageFS(cfg.StorageDir)
+	bucket, err := st.GetBucket(user.ID)
 	if err != nil {
 		logger.Infof("bucket not found %s/%s", username, filename)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	contents, err := storage.GetFile(bucket, post.Filename)
+	contents, err := st.GetFile(bucket, post.Filename)
 	if err != nil {
 		logger.Infof("file not found %s/%s", username, post.Filename)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -369,8 +331,8 @@ func tagHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		mergedPosts = append(mergedPosts, TagPostData{
-			URL:     template.URL(TagPostURL(cfg, username, tag, post.Slug, onSubdomain, withUserName)),
-			ImgURL:  template.URL(ImgURL(cfg, username, post.Filename, onSubdomain, withUserName)),
+			URL:     template.URL(cfg.TagPostURL(username, tag, post.Slug, onSubdomain, withUserName)),
+			ImgURL:  template.URL(cfg.ImgURL(username, post.Filename, onSubdomain, withUserName)),
 			Caption: post.Title,
 		})
 	}
@@ -382,7 +344,7 @@ func tagHandler(w http.ResponseWriter, r *http.Request) {
 		Site:      *cfg.GetSiteData(),
 		Tag:       tag,
 		Posts:     mergedPosts,
-		URL:       template.URL(TagURL(cfg, username, tag, onSubdomain, withUserName)),
+		URL:       template.URL(cfg.TagURL(username, tag, onSubdomain, withUserName)),
 	}
 
 	ts, err := shared.RenderTemplate(cfg, []string{
@@ -459,8 +421,7 @@ func tagPostHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if i+1 < len(mergedPosts) {
-			nextPage = TagPostURL(
-				cfg,
+			nextPage = cfg.TagPostURL(
 				username,
 				tag,
 				mergedPosts[i+1].Slug,
@@ -470,8 +431,7 @@ func tagPostHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if i-1 >= 0 {
-			prevPage = TagPostURL(
-				cfg,
+			prevPage = cfg.TagPostURL(
 				username,
 				tag,
 				mergedPosts[i-1].Slug,
@@ -488,7 +448,7 @@ func tagPostHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	parsed, err := shared.ParseText(post.Text)
+	parsed, err := shared.ParseText(post.Text, cfg.ImgURL(username, "", true, false))
 	if err != nil {
 		logger.Error(err)
 	}
@@ -500,7 +460,7 @@ func tagPostHandler(w http.ResponseWriter, r *http.Request) {
 	tagLinks := make([]Link, 0, len(post.Tags))
 	for _, tag := range post.Tags {
 		tagLinks = append(tagLinks, Link{
-			URL:  template.URL(TagURL(cfg, username, tag, onSubdomain, withUserName)),
+			URL:  template.URL(cfg.TagURL(username, tag, onSubdomain, withUserName)),
 			Text: tag,
 		})
 	}
@@ -518,7 +478,7 @@ func tagPostHandler(w http.ResponseWriter, r *http.Request) {
 		Username:     username,
 		BlogName:     blogName,
 		Contents:     template.HTML(text),
-		ImgURL:       template.URL(ImgURL(cfg, username, post.Filename, onSubdomain, withUserName)),
+		ImgURL:       template.URL(cfg.ImgURL(username, post.Filename, onSubdomain, withUserName)),
 		Tags:         tagLinks,
 		PrevPage:     template.URL(prevPage),
 		NextPage:     template.URL(nextPage),
@@ -571,7 +531,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	var data PostPageData
 	post, err := dbpool.FindPostWithSlug(slug, user.ID, cfg.Space)
 	if err == nil {
-		parsed, err := shared.ParseText(post.Text)
+		parsed, err := shared.ParseText(post.Text, cfg.ImgURL(username, "", true, false))
 		if err != nil {
 			logger.Error(err)
 		}
@@ -583,7 +543,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 		tagLinks := make([]Link, 0, len(post.Tags))
 		for _, tag := range post.Tags {
 			tagLinks = append(tagLinks, Link{
-				URL:  template.URL(TagURL(cfg, username, tag, onSubdomain, withUserName)),
+				URL:  template.URL(cfg.TagURL(username, tag, onSubdomain, withUserName)),
 				Text: tag,
 			})
 		}
@@ -601,7 +561,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			Username:     username,
 			BlogName:     blogName,
 			Contents:     template.HTML(text),
-			ImgURL:       template.URL(ImgURL(cfg, username, post.Filename, onSubdomain, withUserName)),
+			ImgURL:       template.URL(cfg.ImgURL(username, post.Filename, onSubdomain, withUserName)),
 			Tags:         tagLinks,
 		}
 	} else {
@@ -721,7 +681,7 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		var tpl bytes.Buffer
 		data := &PostPageData{
-			ImgURL: template.URL(ImgURL(cfg, username, post.Filename, onSubdomain, withUserName)),
+			ImgURL: template.URL(cfg.ImgURL(username, post.Filename, onSubdomain, withUserName)),
 		}
 		if err := ts.Execute(&tpl, data); err != nil {
 			continue
@@ -800,7 +760,7 @@ func rssHandler(w http.ResponseWriter, r *http.Request) {
 	for _, post := range pager.Data {
 		var tpl bytes.Buffer
 		data := &PostPageData{
-			ImgURL: template.URL(ImgURL(cfg, post.Username, post.Filename, onSubdomain, withUserName)),
+			ImgURL: template.URL(cfg.ImgURL(post.Username, post.Filename, onSubdomain, withUserName)),
 		}
 		if err := ts.Execute(&tpl, data); err != nil {
 			continue

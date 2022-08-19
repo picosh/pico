@@ -97,7 +97,7 @@ func main() {
 	logger.Info("updating dates")
 	for _, post := range posts {
 		if post.Space == "prose" {
-			parsed, err := shared.ParseText(post.Text)
+			parsed, err := shared.ParseText(post.Text, "")
 			if err != nil {
 				logger.Error(err)
 				continue

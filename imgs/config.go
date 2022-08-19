@@ -7,6 +7,15 @@ import (
 	"git.sr.ht/~erock/pico/wish/cms/config"
 )
 
+func ImgBaseURL(username string) string {
+	cfg := NewConfigSite()
+	if cfg.IsSubdomains() {
+		return fmt.Sprintf("%s://%s.%s", cfg.Protocol, username, cfg.Domain)
+	}
+
+	return "/"
+}
+
 func NewConfigSite() *shared.ConfigSite {
 	domain := shared.GetEnv("IMGS_DOMAIN", "prose.sh")
 	email := shared.GetEnv("IMGS_EMAIL", "hello@prose.sh")

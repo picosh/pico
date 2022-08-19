@@ -1,15 +1,14 @@
-package upload
+package uploadimgs
 
 import (
 	"fmt"
 	"strings"
 
 	"git.sr.ht/~erock/pico/db"
-	"git.sr.ht/~erock/pico/filehandlers"
 	"git.sr.ht/~erock/pico/shared"
 )
 
-func (h *UploadImgHandler) validateImg(data *filehandlers.PostMetaData) (bool, error) {
+func (h *UploadImgHandler) validateImg(data *PostMetaData) (bool, error) {
 	if !h.DBPool.HasFeatureForUser(data.User.ID, "imgs") {
 		return false, fmt.Errorf("ERROR: user (%s) does not have access to this feature (imgs)", data.User.Name)
 	}
@@ -35,7 +34,7 @@ func (h *UploadImgHandler) validateImg(data *filehandlers.PostMetaData) (bool, e
 	return true, nil
 }
 
-func (h *UploadImgHandler) metaImg(data *filehandlers.PostMetaData) error {
+func (h *UploadImgHandler) metaImg(data *PostMetaData) error {
 	// create or get
 	bucket, err := h.Storage.UpsertBucket(data.User.ID)
 	if err != nil {
@@ -60,7 +59,7 @@ func (h *UploadImgHandler) metaImg(data *filehandlers.PostMetaData) error {
 	return nil
 }
 
-func (h *UploadImgHandler) writeImg(data *filehandlers.PostMetaData) error {
+func (h *UploadImgHandler) writeImg(data *PostMetaData) error {
 	valid, err := h.validateImg(data)
 	if !valid {
 		return err
@@ -72,7 +71,7 @@ func (h *UploadImgHandler) writeImg(data *filehandlers.PostMetaData) error {
 		return err
 	}
 
-	if len(data.Text) == 0 {
+	if len(data.OrigText) == 0 {
 		err = h.removePost(data)
 		if err != nil {
 			return err
@@ -107,8 +106,8 @@ func (h *UploadImgHandler) writeImg(data *filehandlers.PostMetaData) error {
 			return fmt.Errorf("error for %s: %v", data.Filename, err)
 		}
 	} else {
-		if shared.Shasum([]byte(data.Text)) == data.Cur.Shasum {
-			h.Cfg.Logger.Infof("(%s) found, but text is identical, skipping", data.Filename)
+		if shared.Shasum(data.OrigText) == data.Cur.Shasum {
+			h.Cfg.Logger.Infof("(%s) found, but image is identical, skipping", data.Filename)
 			return nil
 		}
 

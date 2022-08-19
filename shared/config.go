@@ -143,6 +143,45 @@ func (c *ConfigSite) RawPostURL(username, slug string) string {
 	return fmt.Sprintf("/raw/%s/%s", username, fname)
 }
 
+func (c *ConfigSite) ImgURL(username string, slug string, onSubdomain bool, withUserName bool) string {
+	fname := url.PathEscape(strings.TrimLeft(slug, "/"))
+	if c.IsSubdomains() && onSubdomain {
+		return fmt.Sprintf("%s://%s.%s/%s", c.Protocol, username, c.Domain, fname)
+	}
+
+	if withUserName {
+		return fmt.Sprintf("/%s/%s", username, fname)
+	}
+
+	return fmt.Sprintf("/%s", fname)
+}
+
+func (c *ConfigSite) TagURL(username, tag string, onSubdomain, withUserName bool) string {
+	tg := url.PathEscape(tag)
+	if c.IsSubdomains() && onSubdomain {
+		return fmt.Sprintf("%s://%s.%s/t/%s", c.Protocol, username, c.Domain, tg)
+	}
+
+	if withUserName {
+		return fmt.Sprintf("/%s/t/%s", username, tg)
+	}
+
+	return fmt.Sprintf("/t/%s", tg)
+}
+
+func (c *ConfigSite) TagPostURL(username, tag, slug string, onSubdomain, withUserName bool) string {
+	fname := url.PathEscape(strings.TrimLeft(slug, "/"))
+	if c.IsSubdomains() && onSubdomain {
+		return fmt.Sprintf("%s://%s.%s/%s/%s", c.Protocol, username, c.Domain, tag, fname)
+	}
+
+	if withUserName {
+		return fmt.Sprintf("/%s/%s/%s", username, tag, fname)
+	}
+
+	return fmt.Sprintf("/%s/%s", tag, fname)
+}
+
 func CreateLogger() *zap.SugaredLogger {
 	logger, err := zap.NewProduction()
 	if err != nil {
