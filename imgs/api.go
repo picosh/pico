@@ -12,6 +12,7 @@ import (
 
 	"git.sr.ht/~erock/pico/db"
 	"git.sr.ht/~erock/pico/db/postgres"
+	"git.sr.ht/~erock/pico/imgs/storage"
 	"git.sr.ht/~erock/pico/shared"
 	"github.com/gorilla/feeds"
 	"golang.org/x/exp/slices"
@@ -303,14 +304,14 @@ func imgHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	storage := NewStorageFS(cfg.StorageDir)
-	bucket, err := storage.GetBucket(user.ID)
+	st := storage.NewStorageFS(cfg.StorageDir)
+	bucket, err := st.GetBucket(user.ID)
 	if err != nil {
 		logger.Infof("bucket not found %s/%s", username, filename)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	contents, err := storage.GetFile(bucket, post.Filename)
+	contents, err := st.GetFile(bucket, post.Filename)
 	if err != nil {
 		logger.Infof("file not found %s/%s", username, post.Filename)
 		http.Error(w, err.Error(), http.StatusInternalServerError)

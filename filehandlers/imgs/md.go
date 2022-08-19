@@ -1,16 +1,14 @@
-package upload
+package uploadimgs
 
 import (
 	"fmt"
 	"strings"
 
 	"git.sr.ht/~erock/pico/db"
-	"git.sr.ht/~erock/pico/filehandlers"
-	"git.sr.ht/~erock/pico/prose"
 	"git.sr.ht/~erock/pico/shared"
 )
 
-func (h *UploadImgHandler) validateMd(data *filehandlers.PostMetaData) (bool, error) {
+func (h *UploadImgHandler) validateMd(data *PostMetaData) (bool, error) {
 	if !shared.IsTextFile(data.Text) {
 		err := fmt.Errorf(
 			"WARNING: (%s) invalid file must be plain text (utf-8), skipping",
@@ -30,11 +28,24 @@ func (h *UploadImgHandler) validateMd(data *filehandlers.PostMetaData) (bool, er
 	return true, nil
 }
 
-func (h *UploadImgHandler) metaMd(data *filehandlers.PostMetaData) error {
-	hooks := prose.MarkdownHooks{Cfg: h.Cfg}
-	err := hooks.FileMeta(data)
+func (h *UploadImgHandler) metaMd(data *PostMetaData) error {
+	parsedText, err := shared.ParseText(data.Text)
+	// we return nil here because we don't want the file upload to fail
 	if err != nil {
-		return err
+		return nil
+	}
+
+	if parsedText.Title == "" {
+		data.Title = shared.ToUpper(data.Slug)
+	} else {
+		data.Title = parsedText.Title
+	}
+
+	data.Tags = parsedText.Tags
+	data.Description = parsedText.Description
+
+	if parsedText.PublishAt != nil && !parsedText.PublishAt.IsZero() {
+		data.PublishAt = parsedText.MetaData.PublishAt
 	}
 
 	if data.Cur != nil {
@@ -53,7 +64,7 @@ func (h *UploadImgHandler) metaMd(data *filehandlers.PostMetaData) error {
 	return nil
 }
 
-func (h *UploadImgHandler) writeMd(data *filehandlers.PostMetaData) error {
+func (h *UploadImgHandler) writeMd(data *PostMetaData) error {
 	valid, err := h.validateMd(data)
 	if !valid {
 		return err

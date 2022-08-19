@@ -9,8 +9,9 @@ import (
 	"time"
 
 	"git.sr.ht/~erock/pico/db/postgres"
+	"git.sr.ht/~erock/pico/filehandlers/imgs"
 	"git.sr.ht/~erock/pico/imgs"
-	"git.sr.ht/~erock/pico/imgs/upload"
+	"git.sr.ht/~erock/pico/imgs/storage"
 	"git.sr.ht/~erock/pico/shared"
 	"git.sr.ht/~erock/pico/wish/cms"
 	"git.sr.ht/~erock/pico/wish/pipe"
@@ -72,7 +73,11 @@ func main() {
 	logger := cfg.Logger
 	dbh := postgres.NewDB(&cfg.ConfigCms)
 	defer dbh.Close()
-	handler := upload.NewUploadImgHandler(dbh, cfg, imgs.NewStorageFS(cfg.StorageDir))
+	handler := uploadimgs.NewUploadImgHandler(
+		dbh,
+		cfg,
+		storage.NewStorageFS(cfg.StorageDir),
+	)
 
 	sshServer := &SSHServer{}
 	s, err := wish.NewServer(

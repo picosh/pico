@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"git.sr.ht/~erock/pico/db"
+	"git.sr.ht/~erock/pico/imgs"
 	"git.sr.ht/~erock/pico/shared"
 	"git.sr.ht/~erock/pico/wish/cms/util"
 	"git.sr.ht/~erock/pico/wish/send/utils"
@@ -69,14 +70,26 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 	userID := h.User.ID
 	filename := entry.Name
 
-	user, err := h.DBPool.FindUser(userID)
-	if err != nil {
-		return "", fmt.Errorf("error for %s: %v", filename, err)
+	client := imgs.NewImgsAPI(h.DBPool)
+	if shared.IsExtAllowed(filename, client.Cfg.AllowedExt) {
+		if !client.HasAccess(userID) {
+			msg := "user (%s) does not have access to imgs.sh, cannot upload file (%s)"
+			return "", fmt.Errorf(msg, h.User.Name, filename)
+		}
+
+		return client.Upload(s, entry)
 	}
 
 	var text []byte
 	if b, err := io.ReadAll(entry.Reader); err == nil {
 		text = b
+	}
+
+	mimeType := http.DetectContentType(text)
+	ext := path.Ext(filename)
+	// DetectContentType does not detect markdown
+	if ext == ".md" {
+		mimeType = "text/markdown; charset=UTF-8"
 	}
 
 	now := time.Now()
@@ -89,15 +102,9 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		Slug:      slug,
 		PublishAt: &now,
 		Text:      string(text),
-		MimeType:  http.DetectContentType(text),
+		MimeType:  mimeType,
 		FileSize:  fileSize,
 		Shasum:    shasum,
-	}
-
-	ext := path.Ext(filename)
-	// DetectContentType does not detect markdown
-	if ext == ".md" {
-		nextPost.MimeType = "text/markdown; charset=UTF-8"
 	}
 
 	metadata := PostMetaData{
@@ -181,7 +188,7 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 	} else {
 		if metadata.Text == post.Text {
 			logger.Infof("(%s) found, but text is identical, skipping", filename)
-			return h.Cfg.FullPostURL(user.Name, metadata.Slug, h.Cfg.IsSubdomains(), true), nil
+			return h.Cfg.FullPostURL(h.User.Name, metadata.Slug, h.Cfg.IsSubdomains(), true), nil
 		}
 
 		logger.Infof("(%s) found, updating record", filename)
@@ -214,5 +221,5 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		}
 	}
 
-	return h.Cfg.FullPostURL(user.Name, metadata.Slug, h.Cfg.IsSubdomains(), true), nil
+	return h.Cfg.FullPostURL(h.User.Name, metadata.Slug, h.Cfg.IsSubdomains(), true), nil
 }

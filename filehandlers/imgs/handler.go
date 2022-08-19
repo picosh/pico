@@ -1,4 +1,4 @@
-package upload
+package uploadimgs
 
 import (
 	"encoding/binary"
@@ -9,8 +9,7 @@ import (
 	"time"
 
 	"git.sr.ht/~erock/pico/db"
-	"git.sr.ht/~erock/pico/filehandlers"
-	"git.sr.ht/~erock/pico/imgs"
+	"git.sr.ht/~erock/pico/imgs/storage"
 	"git.sr.ht/~erock/pico/shared"
 	"git.sr.ht/~erock/pico/wish/cms/util"
 	"git.sr.ht/~erock/pico/wish/send/utils"
@@ -21,14 +20,22 @@ var GB = 1024 * 1024 * 1024
 var maxSize = 2 * GB
 var mdMime = "text/markdown; charset=UTF-8"
 
+type PostMetaData struct {
+	*db.Post
+	Cur       *db.Post
+	Tags      []string
+	User      *db.User
+	FileEntry *utils.FileEntry
+}
+
 type UploadImgHandler struct {
 	User    *db.User
 	DBPool  db.DB
 	Cfg     *shared.ConfigSite
-	Storage *imgs.StorageFS
+	Storage *storage.StorageFS
 }
 
-func NewUploadImgHandler(dbpool db.DB, cfg *shared.ConfigSite, storage *imgs.StorageFS) *UploadImgHandler {
+func NewUploadImgHandler(dbpool db.DB, cfg *shared.ConfigSite, storage *storage.StorageFS) *UploadImgHandler {
 	return &UploadImgHandler{
 		DBPool:  dbpool,
 		Cfg:     cfg,
@@ -36,7 +43,7 @@ func NewUploadImgHandler(dbpool db.DB, cfg *shared.ConfigSite, storage *imgs.Sto
 	}
 }
 
-func (h *UploadImgHandler) removePost(data *filehandlers.PostMetaData) error {
+func (h *UploadImgHandler) removePost(data *PostMetaData) error {
 	// skip empty files from being added to db
 	if data.Post == nil {
 		h.Cfg.Logger.Infof("(%s) is empty, skipping record", data.Filename)
@@ -112,7 +119,7 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		h.Cfg.Logger.Info(err)
 	}
 
-	metadata := filehandlers.PostMetaData{
+	metadata := PostMetaData{
 		Post:      &nextPost,
 		User:      h.User,
 		FileEntry: entry,
