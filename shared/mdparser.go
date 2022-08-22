@@ -117,6 +117,7 @@ type ImgRender struct {
 
 func NewImgsRenderer(url func([]byte) []byte) renderer.NodeRenderer {
 	return &ImgRender{
+		Config: ghtml.NewConfig(),
 		ImgURL: url,
 	}
 }
