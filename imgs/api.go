@@ -6,7 +6,6 @@ import (
 	"html/template"
 	"net/http"
 	"net/url"
-	"sort"
 	"strings"
 	"time"
 
@@ -23,32 +22,12 @@ type PageData struct {
 }
 
 type PostItemData struct {
-	URL            template.URL
-	BlogURL        template.URL
-	Username       string
-	Title          string
-	Description    string
-	PublishAtISO   string
-	PublishAt      string
-	UpdatedAtISO   string
-	UpdatedTimeAgo string
-	Tags           []string
-}
-
-type TagPageData struct {
-	BlogURL   template.URL
-	PageTitle string
-	Username  string
-	URL       template.URL
-	Site      shared.SitePageData
-	Tag       string
-	Posts     []TagPostData
-}
-
-type TagPostData struct {
-	URL     template.URL
-	ImgURL  template.URL
-	Caption string
+	BlogURL      template.URL
+	URL          template.URL
+	ImgURL       template.URL
+	PublishAtISO string
+	PublishAt    string
+	Caption      string
 }
 
 type BlogPageData struct {
@@ -59,7 +38,7 @@ type BlogPageData struct {
 	Username  string
 	Readme    *ReadmeTxt
 	Header    *HeaderTxt
-	Posts     []*PostTagData
+	Posts     []*PostItemData
 	HasFilter bool
 }
 
@@ -105,14 +84,6 @@ type ReadmeTxt struct {
 	Contents template.HTML
 }
 
-type MergePost struct {
-	Db     db.DB
-	UserID string
-	Space  string
-}
-
-var allTag = "all"
-
 func GetPostTitle(post *db.Post) string {
 	if post.Description == "" {
 		return post.Title
@@ -129,13 +100,6 @@ func isRequestTrackable(r *http.Request) bool {
 	return true
 }
 
-type PostTagData struct {
-	URL       template.URL
-	ImgURL    template.URL
-	Tag       string
-	PublishAt *time.Time
-}
-
 func blogHandler(w http.ResponseWriter, r *http.Request) {
 	username := shared.GetUsernameFromRequest(r)
 	dbpool := shared.GetDB(r)
@@ -149,7 +113,13 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	posts, err := dbpool.FindPostsForUser(user.ID, cfg.Space)
+	tag := r.URL.Query().Get("tag")
+	var posts []*db.Post
+	if tag == "" {
+		posts, err = dbpool.FindPostsForUser(user.ID, cfg.Space)
+	} else {
+		posts, err = dbpool.FindUserPostsByTag(tag, user.ID, cfg.Space)
+	}
 
 	if err != nil {
 		logger.Error(err)
@@ -179,46 +149,27 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	readmeTxt := &ReadmeTxt{}
 
-	tagMap := make(map[string]*db.Post, len(posts))
+	postCollection := make([]*PostItemData, 0, len(posts))
 	for _, post := range posts {
-		if post.Hidden {
-			continue
-		}
-
-		for _, tag := range post.Tags {
-			if tagMap[tag] == nil {
-				tagMap[tag] = post
-			}
-		}
-
-		if tagMap[allTag] == nil {
-			tagMap[allTag] = post
-		}
-	}
-
-	postCollection := make([]*PostTagData, 0, len(tagMap))
-	for key, post := range tagMap {
-		postCollection = append(postCollection, &PostTagData{
-			Tag:       key,
-			URL:       template.URL(cfg.TagURL(post.Username, key, onSubdomain, withUserName)),
-			ImgURL:    template.URL(cfg.ImgURL(post.Username, post.Filename, onSubdomain, withUserName)),
-			PublishAt: post.PublishAt,
+		postCollection = append(postCollection, &PostItemData{
+			ImgURL:       template.URL(cfg.ImgURL(post.Username, post.Filename, onSubdomain, withUserName)),
+			URL:          template.URL(cfg.ImgURL(post.Username, post.Slug, onSubdomain, withUserName)),
+			Caption:      post.Title,
+			PublishAt:    post.PublishAt.Format("02 Jan, 2006"),
+			PublishAtISO: post.PublishAt.Format(time.RFC3339),
 		})
 	}
-
-	sort.Slice(postCollection, func(i, j int) bool {
-		return postCollection[i].PublishAt.After(*postCollection[j].PublishAt)
-	})
 
 	data := BlogPageData{
 		Site:      *cfg.GetSiteData(),
 		PageTitle: headerTxt.Title,
 		URL:       template.URL(cfg.FullBlogURL(username, onSubdomain, withUserName)),
-		RSSURL:    template.URL(cfg.RssBlogURL(username, onSubdomain, withUserName, "")),
+		RSSURL:    template.URL(cfg.RssBlogURL(username, onSubdomain, withUserName, tag)),
 		Readme:    readmeTxt,
 		Header:    headerTxt,
 		Username:  username,
 		Posts:     postCollection,
+		HasFilter: tag != "",
 	}
 
 	err = ts.Execute(w, data)
@@ -283,219 +234,6 @@ func imgHandler(w http.ResponseWriter, r *http.Request) {
 	_, err = w.Write(contents)
 	if err != nil {
 		logger.Error(err)
-	}
-}
-
-func tagHandler(w http.ResponseWriter, r *http.Request) {
-	username := shared.GetUsernameFromRequest(r)
-	subdomain := shared.GetSubdomain(r)
-	cfg := shared.GetCfg(r)
-
-	tag := ""
-	if !cfg.IsSubdomains() || subdomain == "" {
-		tag, _ = url.PathUnescape(shared.GetField(r, 1))
-	} else {
-		tag, _ = url.PathUnescape(shared.GetField(r, 0))
-	}
-
-	dbpool := shared.GetDB(r)
-	logger := shared.GetLogger(r)
-
-	user, err := dbpool.FindUserForName(username)
-	if err != nil {
-		logger.Infof("blog not found: %s", username)
-		http.Error(w, "blog not found", http.StatusNotFound)
-		return
-	}
-
-	hostDomain := strings.Split(r.Host, ":")[0]
-	appDomain := strings.Split(cfg.ConfigCms.Domain, ":")[0]
-
-	onSubdomain := cfg.IsSubdomains() && strings.Contains(hostDomain, appDomain)
-	withUserName := (!onSubdomain && hostDomain == appDomain) || !cfg.IsCustomdomains()
-
-	posts, err := dbpool.FindPostsForUser(user.ID, cfg.Space)
-	if err != nil {
-		logger.Infof("tag not found: %s/%s", username, tag)
-		http.Error(w, "tag not found", http.StatusNotFound)
-		return
-	}
-
-	mergedPosts := make([]TagPostData, 0)
-	for _, post := range posts {
-		if post.Hidden {
-			continue
-		}
-
-		if tag != allTag && !slices.Contains(post.Tags, tag) {
-			continue
-		}
-		mergedPosts = append(mergedPosts, TagPostData{
-			URL:     template.URL(cfg.TagPostURL(username, tag, post.Slug, onSubdomain, withUserName)),
-			ImgURL:  template.URL(cfg.ImgURL(username, post.Filename, onSubdomain, withUserName)),
-			Caption: post.Title,
-		})
-	}
-
-	data := TagPageData{
-		BlogURL:   template.URL(cfg.FullBlogURL(username, onSubdomain, withUserName)),
-		Username:  username,
-		PageTitle: fmt.Sprintf("%s -- %s", tag, username),
-		Site:      *cfg.GetSiteData(),
-		Tag:       tag,
-		Posts:     mergedPosts,
-		URL:       template.URL(cfg.TagURL(username, tag, onSubdomain, withUserName)),
-	}
-
-	ts, err := shared.RenderTemplate(cfg, []string{
-		cfg.StaticPath("html/tag.page.tmpl"),
-	})
-
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-
-	err = ts.Execute(w, data)
-	if err != nil {
-		logger.Error(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-}
-
-func tagPostHandler(w http.ResponseWriter, r *http.Request) {
-	username := shared.GetUsernameFromRequest(r)
-	subdomain := shared.GetSubdomain(r)
-	cfg := shared.GetCfg(r)
-
-	tag := ""
-	slug := ""
-	if !cfg.IsSubdomains() || subdomain == "" {
-		tag, _ = url.PathUnescape(shared.GetField(r, 1))
-		slug, _ = url.PathUnescape(shared.GetField(r, 2))
-	} else {
-		tag, _ = url.PathUnescape(shared.GetField(r, 0))
-		slug, _ = url.PathUnescape(shared.GetField(r, 1))
-	}
-
-	dbpool := shared.GetDB(r)
-	logger := shared.GetLogger(r)
-
-	user, err := dbpool.FindUserForName(username)
-	if err != nil {
-		logger.Infof("blog not found: %s", username)
-		http.Error(w, "blog not found", http.StatusNotFound)
-		return
-	}
-
-	blogName := GetBlogName(username)
-	hostDomain := strings.Split(r.Host, ":")[0]
-	appDomain := strings.Split(cfg.ConfigCms.Domain, ":")[0]
-
-	onSubdomain := cfg.IsSubdomains() && strings.Contains(hostDomain, appDomain)
-	withUserName := (!onSubdomain && hostDomain == appDomain) || !cfg.IsCustomdomains()
-
-	posts, err := dbpool.FindPostsForUser(user.ID, cfg.Space)
-	if err != nil {
-		logger.Infof("tag not found: %s/%s", username, tag)
-		http.Error(w, "tag not found", http.StatusNotFound)
-		return
-	}
-
-	mergedPosts := make([]db.Post, 0)
-	for _, post := range posts {
-		if post.Hidden {
-			continue
-		}
-
-		if !slices.Contains(post.Tags, tag) {
-			continue
-		}
-		mergedPosts = append(mergedPosts, *post)
-	}
-
-	prevPage := ""
-	nextPage := ""
-	for i, post := range mergedPosts {
-		if post.Slug != slug {
-			continue
-		}
-
-		if i+1 < len(mergedPosts) {
-			nextPage = cfg.TagPostURL(
-				username,
-				tag,
-				mergedPosts[i+1].Slug,
-				onSubdomain,
-				withUserName,
-			)
-		}
-
-		if i-1 >= 0 {
-			prevPage = cfg.TagPostURL(
-				username,
-				tag,
-				mergedPosts[i-1].Slug,
-				onSubdomain,
-				withUserName,
-			)
-		}
-	}
-
-	post, err := dbpool.FindPostWithSlug(slug, user.ID, cfg.Space)
-	if err != nil {
-		logger.Infof("post not found: %s/%s", username, slug)
-		http.Error(w, "post not found", http.StatusNotFound)
-		return
-	}
-
-	parsed, err := shared.ParseText(post.Text, cfg.ImgURL(username, "", true, false))
-	if err != nil {
-		logger.Error(err)
-	}
-	text := ""
-	if parsed != nil {
-		text = parsed.Html
-	}
-
-	tagLinks := make([]Link, 0, len(post.Tags))
-	for _, tag := range post.Tags {
-		tagLinks = append(tagLinks, Link{
-			URL:  template.URL(cfg.TagURL(username, tag, onSubdomain, withUserName)),
-			Text: tag,
-		})
-	}
-
-	data := PostPageData{
-		Site:         *cfg.GetSiteData(),
-		PageTitle:    GetPostTitle(post),
-		URL:          template.URL(cfg.FullPostURL(post.Username, post.Slug, onSubdomain, withUserName)),
-		BlogURL:      template.URL(cfg.FullBlogURL(username, onSubdomain, withUserName)),
-		Caption:      post.Description,
-		Title:        post.Title,
-		Slug:         post.Slug,
-		PublishAt:    post.PublishAt.Format("02 Jan, 2006"),
-		PublishAtISO: post.PublishAt.Format(time.RFC3339),
-		Username:     username,
-		BlogName:     blogName,
-		Contents:     template.HTML(text),
-		ImgURL:       template.URL(cfg.ImgURL(username, post.Filename, onSubdomain, withUserName)),
-		Tags:         tagLinks,
-		PrevPage:     template.URL(prevPage),
-		NextPage:     template.URL(nextPage),
-	}
-
-	ts, err := shared.RenderTemplate(cfg, []string{
-		cfg.StaticPath("html/tag_post.page.tmpl"),
-	})
-
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-
-	err = ts.Execute(w, data)
-	if err != nil {
-		logger.Error(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
@@ -864,8 +602,6 @@ func createSubdomainRoutes(staticRoutes []shared.Route) []shared.Route {
 	routes = append(
 		routes,
 		shared.NewRoute("GET", "/([^/]+\\..+)", imgHandler),
-		shared.NewRoute("GET", "/t/([^/]+)", tagHandler),
-		shared.NewRoute("GET", "/([^/]+)/([^/]+)", tagPostHandler),
 		shared.NewRoute("GET", "/([^/]+)", postHandler),
 	)
 

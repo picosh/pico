@@ -47,13 +47,14 @@
     </section>
     {{end}}
 
+    {{if .HasFilter}}
+        <a href={{.URL}}>clear filters</a>
+    {{end}}
     <section class="albums">
         {{range .Posts}}
         <article  class="thumbnail-container">
             <a href="{{.URL}}" class="thumbnail-link">
-                <div class="tag-overlay"></div>
-                <div class="tag-text text-2xl">{{.Tag}}</div>
-                <img class="thumbnail" src="{{.ImgURL}}" alt="{{.Tag}}" />
+                <img class="thumbnail" src="{{.ImgURL}}" alt="{{.Caption}}" />
             </a>
         </article>
         {{end}}

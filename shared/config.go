@@ -158,28 +158,7 @@ func (c *ConfigSite) ImgURL(username string, slug string, onSubdomain bool, with
 
 func (c *ConfigSite) TagURL(username, tag string, onSubdomain, withUserName bool) string {
 	tg := url.PathEscape(tag)
-	if c.IsSubdomains() && onSubdomain {
-		return fmt.Sprintf("%s://%s.%s/t/%s", c.Protocol, username, c.Domain, tg)
-	}
-
-	if withUserName {
-		return fmt.Sprintf("/%s/t/%s", username, tg)
-	}
-
-	return fmt.Sprintf("/t/%s", tg)
-}
-
-func (c *ConfigSite) TagPostURL(username, tag, slug string, onSubdomain, withUserName bool) string {
-	fname := url.PathEscape(strings.TrimLeft(slug, "/"))
-	if c.IsSubdomains() && onSubdomain {
-		return fmt.Sprintf("%s://%s.%s/%s/%s", c.Protocol, username, c.Domain, tag, fname)
-	}
-
-	if withUserName {
-		return fmt.Sprintf("/%s/%s/%s", username, tag, fname)
-	}
-
-	return fmt.Sprintf("/%s/%s", tag, fname)
+	return fmt.Sprintf("%s?tag=%s", c.FullBlogURL(username, onSubdomain, withUserName), tg)
 }
 
 func CreateLogger() *zap.SugaredLogger {
