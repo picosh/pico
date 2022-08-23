@@ -132,16 +132,9 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		metadata.Post.PublishAt = post.PublishAt
 	}
 
-	if metadata.MimeType == mdMime {
-		err := h.writeMd(&metadata)
-		if err != nil {
-			return "", err
-		}
-	} else {
-		err := h.writeImg(&metadata)
-		if err != nil {
-			return "", err
-		}
+	err = h.writeImg(&metadata)
+	if err != nil {
+		return "", err
 	}
 
 	url := h.Cfg.FullPostURL(

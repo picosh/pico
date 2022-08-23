@@ -49,12 +49,7 @@ func (h *UploadImgHandler) metaImg(data *PostMetaData) error {
 		ImgPath: fname,
 	}
 
-	if data.Cur != nil {
-		data.Text = data.Cur.Text
-		data.Title = data.Cur.Title
-		data.PublishAt = data.Cur.PublishAt
-		data.Description = data.Cur.Description
-	}
+	data.Text = ""
 
 	return nil
 }
@@ -91,19 +86,34 @@ func (h *UploadImgHandler) writeImg(data *PostMetaData) error {
 			UserID: h.User.ID,
 			Space:  h.Cfg.Space,
 
-			Data:      data.Data,
-			Filename:  data.Filename,
-			FileSize:  data.FileSize,
-			Hidden:    data.Hidden,
-			MimeType:  data.MimeType,
-			PublishAt: data.PublishAt,
-			Shasum:    data.Shasum,
-			Slug:      data.Slug,
+			Data:        data.Data,
+			Description: data.Description,
+			Filename:    data.Filename,
+			FileSize:    data.FileSize,
+			Hidden:      data.Hidden,
+			MimeType:    data.MimeType,
+			PublishAt:   data.PublishAt,
+			Shasum:      data.Shasum,
+			Slug:        data.Slug,
+			Text:        data.Text,
+			Title:       data.Title,
 		}
 		_, err := h.DBPool.InsertPost(&insertPost)
 		if err != nil {
 			h.Cfg.Logger.Errorf("error for %s: %v", data.Filename, err)
 			return fmt.Errorf("error for %s: %v", data.Filename, err)
+		}
+
+		if len(data.Tags) > 0 {
+			h.Cfg.Logger.Infof(
+				"Found (%s) post tags, replacing with old tags",
+				strings.Join(data.Tags, ","),
+			)
+			err = h.DBPool.ReplaceTagsForPost(data.Tags, data.Post.ID)
+			if err != nil {
+				h.Cfg.Logger.Errorf("error for %s: %v", data.Filename, err)
+				return fmt.Errorf("error for %s: %v", data.Filename, err)
+			}
 		}
 	} else {
 		if shared.Shasum(data.OrigText) == data.Cur.Shasum {

@@ -80,12 +80,12 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		return client.Upload(s, entry)
 	}
 
-	var text []byte
+	var origText []byte
 	if b, err := io.ReadAll(entry.Reader); err == nil {
-		text = b
+		origText = b
 	}
 
-	mimeType := http.DetectContentType(text)
+	mimeType := http.DetectContentType(origText)
 	ext := path.Ext(filename)
 	// DetectContentType does not detect markdown
 	if ext == ".md" {
@@ -94,14 +94,14 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 
 	now := time.Now()
 	slug := shared.SanitizeFileExt(filename)
-	fileSize := binary.Size(text)
-	shasum := shared.Shasum(text)
+	fileSize := binary.Size(origText)
+	shasum := shared.Shasum(origText)
 
 	nextPost := db.Post{
 		Filename:  filename,
 		Slug:      slug,
 		PublishAt: &now,
-		Text:      string(text),
+		Text:      string(origText),
 		MimeType:  mimeType,
 		FileSize:  fileSize,
 		Shasum:    shasum,
@@ -137,7 +137,7 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 	}
 
 	// if the file is empty we remove it from our database
-	if len(text) == 0 {
+	if len(origText) == 0 {
 		// skip empty files from being added to db
 		if post == nil {
 			logger.Infof("(%s) is empty, skipping record", filename)
