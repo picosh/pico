@@ -21,7 +21,7 @@
         {{if .NextPage}}<a href="{{.NextPage}}">next</a>{{else}}<span class="text-grey">next</span>{{end}}
     </div>
     {{range .Posts}}
-    <article>
+    <article class="my">
         <div class="flex items-center">
             <time datetime="{{.PublishAtISO}}" class="font-italic text-sm post-date">{{.PublishAt}}</time>
             <div class="flex-1">

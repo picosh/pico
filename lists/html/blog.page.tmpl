@@ -52,7 +52,7 @@
             <a href="{{.URL}}">clear filters</a>
         {{end}}
         {{range .Posts}}
-        <article>
+        <article class="my">
             <div class="flex items-center">
                 <time datetime="{{.UpdatedAtISO}}" class="font-italic text-sm post-date">{{.UpdatedTimeAgo}}</time>
                 <div class="font-bold flex-1"><a href="{{.URL}}">{{.Title}}</a></div>
