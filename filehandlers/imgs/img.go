@@ -116,7 +116,7 @@ func (h *UploadImgHandler) writeImg(data *PostMetaData) error {
 			}
 		}
 	} else {
-		if shared.Shasum(data.OrigText) == data.Cur.Shasum {
+		if data.Shasum == data.Cur.Shasum {
 			h.Cfg.Logger.Infof("(%s) found, but image is identical, skipping", data.Filename)
 			return nil
 		}

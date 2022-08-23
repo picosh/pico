@@ -18,7 +18,6 @@ import (
 
 var GB = 1024 * 1024 * 1024
 var maxSize = 2 * GB
-var mdMime = "text/markdown; charset=UTF-8"
 
 type PostMetaData struct {
 	*db.Post
@@ -110,8 +109,8 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		nextPost.MimeType = "text/markdown; charset=UTF-8"
 	}
 
-	post, err := h.DBPool.FindPostWithSlug(
-		nextPost.Slug,
+	post, err := h.DBPool.FindPostWithFilename(
+		nextPost.Filename,
 		h.User.ID,
 		h.Cfg.Space,
 	)

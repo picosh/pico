@@ -120,6 +120,8 @@ func TimeAgo(t *time.Time) string {
 }
 
 func Shasum(data []byte) string {
-	hash := sha256.Sum256(data)
-	return hex.EncodeToString(hash[:])
+	h := sha256.New()
+	h.Write(data)
+	bs := h.Sum(nil)
+	return hex.EncodeToString(bs)
 }
