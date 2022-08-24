@@ -16,8 +16,8 @@ This repo hosts the following pico services:
 
 ## development
 
-- `golang` >= 1.18
-- `direnv` to load environment vars 
+- `golang` >= 1.19
+- `direnv` to load environment vars
 
 ```bash
 cp ./.env.example .env

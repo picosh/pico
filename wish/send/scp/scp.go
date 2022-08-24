@@ -11,14 +11,20 @@ import (
 func Middleware(writeHandler utils.CopyFromClientHandler) wish.Middleware {
 	return func(sshHandler ssh.Handler) ssh.Handler {
 		return func(session ssh.Session) {
-			info := GetInfo(session.Command())
+			cmd := session.Command()
+			if len(cmd) == 0 || cmd[0] != "scp" {
+				sshHandler(session)
+				return
+			}
+
+			info := GetInfo(cmd)
 			if !info.Ok {
 				sshHandler(session)
 				return
 			}
 
 			if info.Recursive {
-				err := fmt.Errorf("recursive not supported.\n")
+				err := fmt.Errorf("recursive not supported")
 				utils.ErrorHandler(session, err)
 				return
 			}

@@ -46,6 +46,12 @@ func (h *handler) Put(fileName string, content io.Reader, fileSize int64, mTime 
 func Middleware(writeHandler utils.CopyFromClientHandler) wish.Middleware {
 	return func(sshHandler ssh.Handler) ssh.Handler {
 		return func(session ssh.Session) {
+			cmd := session.Command()
+			if len(cmd) == 0 || cmd[0] != "rsync" {
+				sshHandler(session)
+				return
+			}
+
 			err := writeHandler.Validate(session)
 			if err != nil {
 				utils.ErrorHandler(session, err)

@@ -1,6 +1,6 @@
 module git.sr.ht/~erock/pico
 
-go 1.18
+go 1.19
 
 // replace git.sr.ht/~erock/pico/wish => /home/erock/pico/wish
 // replace github.com/antoniomika/go-rsync-receiver => /home/erock/pico/go-rsync-receiver
@@ -10,7 +10,7 @@ require (
 	github.com/antoniomika/go-rsync-receiver v0.0.0-20220817204644-b0fcbb706c46
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
 	github.com/charmbracelet/bubbles v0.13.0
-	github.com/charmbracelet/bubbletea v0.22.0
+	github.com/charmbracelet/bubbletea v0.22.1
 	github.com/charmbracelet/lipgloss v0.5.0
 	github.com/charmbracelet/promwish v0.2.0
 	github.com/charmbracelet/wish v0.5.0
@@ -24,9 +24,9 @@ require (
 	github.com/yuin/goldmark v1.4.13
 	github.com/yuin/goldmark-highlighting v0.0.0-20220208100518-594be1970594
 	github.com/yuin/goldmark-meta v1.1.0
-	go.uber.org/zap v1.22.0
-	golang.org/x/crypto v0.0.0-20220817201139-bc19a97f63c8
-	golang.org/x/exp v0.0.0-20220722155223-a9213eeb770e
+	go.uber.org/zap v1.23.0
+	golang.org/x/crypto v0.0.0-20220824171710-5757bc0c5503
+	golang.org/x/exp v0.0.0-20220823124025-807a23277127
 )
 
 require (
@@ -46,6 +46,7 @@ require (
 	github.com/kr/fs v0.1.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mattn/go-isatty v0.0.16 // indirect
+	github.com/mattn/go-localereader v0.0.1 // indirect
 	github.com/mattn/go-runewidth v0.0.13 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
@@ -60,9 +61,10 @@ require (
 	github.com/rivo/uniseg v0.3.4 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
-	golang.org/x/net v0.0.0-20220812174116-3211cb980234 // indirect
-	golang.org/x/sys v0.0.0-20220817070843-5a390386f1f2 // indirect
+	golang.org/x/net v0.0.0-20220822230855-b0a4917ee28c // indirect
+	golang.org/x/sys v0.0.0-20220823224334-20c2bfdbfe24 // indirect
 	golang.org/x/term v0.0.0-20220722155259-a9ba230a4035 // indirect
+	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )

@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"git.sr.ht/~erock/pico/db/postgres"
-	"git.sr.ht/~erock/pico/filehandlers/imgs"
+	uploadimgs "git.sr.ht/~erock/pico/filehandlers/imgs"
 	"git.sr.ht/~erock/pico/imgs"
 	"git.sr.ht/~erock/pico/imgs/storage"
 	"git.sr.ht/~erock/pico/shared"
@@ -35,22 +35,13 @@ func (me *SSHServer) authHandler(ctx ssh.Context, key ssh.PublicKey) bool {
 
 func createRouter(cfg *shared.ConfigSite, handler utils.CopyFromClientHandler) proxy.Router {
 	return func(sh ssh.Handler, s ssh.Session) []wish.Middleware {
-		cmd := s.Command()
-		mdw := []wish.Middleware{}
-
-		if len(cmd) > 0 && cmd[0] == "scp" {
-			mdw = append(mdw, scp.Middleware(handler))
-		} else if len(cmd) > 0 && cmd[0] == "rsync" {
-			mdw = append(mdw, wishrsync.Middleware(handler))
-		} else {
-			mdw = append(mdw,
-				pipe.Middleware(handler, ""),
-				bm.Middleware(cms.Middleware(&cfg.ConfigCms, cfg)),
-				lm.Middleware(),
-			)
+		return []wish.Middleware{
+			pipe.Middleware(handler, ""),
+			scp.Middleware(handler),
+			wishrsync.Middleware(handler),
+			bm.Middleware(cms.Middleware(&cfg.ConfigCms, cfg)),
+			lm.Middleware(),
 		}
-
-		return mdw
 	}
 }
 

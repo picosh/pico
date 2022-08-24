@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
+	"strings"
 
 	"git.sr.ht/~erock/pico/wish/send"
 	"git.sr.ht/~erock/pico/wish/send/utils"
@@ -23,6 +25,16 @@ func (h *handler) Validate(session ssh.Session) error {
 	log.Printf("Received validate from session: %+v", session)
 
 	return nil
+}
+
+func (h *handler) Read(session ssh.Session, file *utils.FileEntry) (io.Reader, error) {
+	log.Printf("Received validate from session: %+v", session)
+
+	return strings.NewReader("lorem ipsum dolor"), nil
+}
+
+func (h *handler) List(session ssh.Session) ([]string, error) {
+	return nil, nil
 }
 
 func main() {

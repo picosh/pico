@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM golang:1.18-alpine as builder-deps
+FROM --platform=$BUILDPLATFORM golang:1.19-alpine as builder-deps
 LABEL maintainer="Pico Maintainers <hello@pico.sh>"
 
 ENV CGO_ENABLED 0

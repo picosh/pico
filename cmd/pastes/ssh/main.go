@@ -33,22 +33,13 @@ func (me *SSHServer) authHandler(ctx ssh.Context, key ssh.PublicKey) bool {
 
 func createRouter(handler *filehandlers.ScpUploadHandler) proxy.Router {
 	return func(sh ssh.Handler, s ssh.Session) []wish.Middleware {
-		cmd := s.Command()
-		mdw := []wish.Middleware{}
-
-		if len(cmd) > 0 && cmd[0] == "scp" {
-			mdw = append(mdw, scp.Middleware(handler))
-		} else if len(cmd) > 0 && cmd[0] == "rsync" {
-			mdw = append(mdw, wishrsync.Middleware(handler))
-		} else {
-			mdw = append(mdw,
-				pipe.Middleware(handler, ""),
-				bm.Middleware(cms.Middleware(&handler.Cfg.ConfigCms, handler.Cfg)),
-				lm.Middleware(),
-			)
+		return []wish.Middleware{
+			pipe.Middleware(handler, ""),
+			scp.Middleware(handler),
+			wishrsync.Middleware(handler),
+			bm.Middleware(cms.Middleware(&handler.Cfg.ConfigCms, handler.Cfg)),
+			lm.Middleware(),
 		}
-
-		return mdw
 	}
 }
 
