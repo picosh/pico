@@ -2,7 +2,7 @@ package imgs
 
 import (
 	"git.sr.ht/~erock/pico/db"
-	"git.sr.ht/~erock/pico/filehandlers/imgs"
+	uploadimgs "git.sr.ht/~erock/pico/filehandlers/imgs"
 	"git.sr.ht/~erock/pico/imgs/storage"
 	"git.sr.ht/~erock/pico/shared"
 	"git.sr.ht/~erock/pico/wish/send/utils"

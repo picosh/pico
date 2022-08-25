@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"os"
 	"strconv"
 
 	"github.com/gliderlabs/ssh"
@@ -55,12 +56,14 @@ func octalPerms(info fs.FileMode) string {
 type CopyFromClientHandler interface {
 	// Write should write the given file.
 	Write(ssh.Session, *FileEntry) (string, error)
+	Read(ssh.Session, string) (os.FileInfo, io.ReaderAt, error)
+	List(ssh.Session, string) ([]os.FileInfo, error)
 	Validate(ssh.Session) error
 }
 
 func KeyText(session ssh.Session) (string, error) {
 	if session.PublicKey() == nil {
-		return "", fmt.Errorf("Session doesn't have public key")
+		return "", fmt.Errorf("session doesn't have public key")
 	}
 	kb := base64.StdEncoding.EncodeToString(session.PublicKey().Marshal())
 	return fmt.Sprintf("%s %s", session.PublicKey().Type(), kb), nil

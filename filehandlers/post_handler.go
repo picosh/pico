@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"path"
 	"strings"
 	"time"
@@ -43,6 +44,70 @@ func NewScpPostHandler(dbpool db.DB, cfg *shared.ConfigSite, hooks ScpFileHooks)
 		Cfg:    cfg,
 		Hooks:  hooks,
 	}
+}
+
+func (h *ScpUploadHandler) Read(s ssh.Session, filename string) (os.FileInfo, io.ReaderAt, error) {
+	cleanFilename := strings.ReplaceAll(filename, "/", "")
+
+	if cleanFilename == "" || cleanFilename == "." {
+		return nil, nil, os.ErrNotExist
+	}
+
+	post, err := h.DBPool.FindPostWithFilename(cleanFilename, h.User.ID, h.Cfg.Space)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	fileInfo := &utils.VirtualFile{
+		FName:    post.Filename,
+		FIsDir:   false,
+		FSize:    int64(post.FileSize),
+		FModTime: *post.UpdatedAt,
+	}
+
+	return fileInfo, strings.NewReader(post.Text), nil
+}
+
+func (h *ScpUploadHandler) List(s ssh.Session, filename string) ([]os.FileInfo, error) {
+	var fileList []os.FileInfo
+	cleanFilename := strings.ReplaceAll(filename, "/", "")
+
+	var err error
+	var post *db.Post
+	var posts []*db.Post
+
+	if cleanFilename == "" || cleanFilename == "." {
+		name := cleanFilename
+		if name == "" {
+			name = "/"
+		}
+
+		fileList = append(fileList, &utils.VirtualFile{
+			FName:  name,
+			FIsDir: true,
+		})
+
+		posts, err = h.DBPool.FindAllPostsForUser(h.User.ID, h.Cfg.Space)
+	} else {
+		post, err = h.DBPool.FindPostWithFilename(cleanFilename, h.User.ID, h.Cfg.Space)
+
+		posts = append(posts, post)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	for _, post := range posts {
+		fileList = append(fileList, &utils.VirtualFile{
+			FName:    post.Filename,
+			FIsDir:   false,
+			FSize:    int64(post.FileSize),
+			FModTime: *post.UpdatedAt,
+		})
+	}
+
+	return fileList, nil
 }
 
 func (h *ScpUploadHandler) Validate(s ssh.Session) error {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"path"
 	"time"
 
@@ -58,6 +59,14 @@ func (h *UploadImgHandler) removePost(data *PostMetaData) error {
 	}
 
 	return nil
+}
+
+func (h *UploadImgHandler) Read(s ssh.Session, filename string) (os.FileInfo, io.ReaderAt, error) {
+	return nil, nil, nil
+}
+
+func (h *UploadImgHandler) List(s ssh.Session, filename string) ([]os.FileInfo, error) {
+	return nil, nil
 }
 
 func (h *UploadImgHandler) Validate(s ssh.Session) error {

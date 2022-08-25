@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"strings"
+	"time"
 
 	"git.sr.ht/~erock/pico/wish/send"
 	"git.sr.ht/~erock/pico/wish/send/utils"
@@ -27,13 +29,20 @@ func (h *handler) Validate(session ssh.Session) error {
 	return nil
 }
 
-func (h *handler) Read(session ssh.Session, file *utils.FileEntry) (io.Reader, error) {
+func (h *handler) Read(session ssh.Session, filename string) (os.FileInfo, io.ReaderAt, error) {
 	log.Printf("Received validate from session: %+v", session)
 
-	return strings.NewReader("lorem ipsum dolor"), nil
+	data := strings.NewReader("lorem ipsum dolor")
+
+	return &utils.VirtualFile{
+		FName:    "test",
+		FIsDir:   false,
+		FSize:    data.Size(),
+		FModTime: time.Now(),
+	}, data, nil
 }
 
-func (h *handler) List(session ssh.Session) ([]string, error) {
+func (h *handler) List(session ssh.Session, filename string) ([]os.FileInfo, error) {
 	return nil, nil
 }
 
@@ -41,7 +50,7 @@ func main() {
 	h := &handler{}
 
 	s, err := wish.NewServer(
-		wish.WithAddress(":9000"),
+		wish.WithAddress("localhost:9000"),
 		wish.WithHostKeyPath("ssh_data/term_info_ed25519"),
 		send.Middleware(h),
 	)

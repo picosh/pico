@@ -29,7 +29,6 @@ func (f listerat) ListAt(ls []os.FileInfo, offset int64) (int, error) {
 type handler struct {
 	session      ssh.Session
 	writeHandler utils.CopyFromClientHandler
-	rootFile     *tempfile
 }
 
 func (f *handler) Filecmd(r *sftp.Request) error {
@@ -41,9 +40,16 @@ func (f *handler) Filelist(r *sftp.Request) (sftp.ListerAt, error) {
 	case "List":
 		fallthrough
 	case "Stat":
-		if r.Filepath == "/" {
-			return listerat{f.rootFile}, nil
+		listData, err := f.writeHandler.List(f.session, r.Filepath)
+		if err != nil {
+			return nil, err
 		}
+
+		if r.Method == "List" {
+			listData = listData[1:]
+		}
+
+		return listerat(listData), nil
 	}
 
 	return nil, errors.New("unsupported")
@@ -70,5 +76,7 @@ func (f *handler) Fileread(r *sftp.Request) (io.ReaderAt, error) {
 		return nil, os.ErrInvalid
 	}
 
-	return nil, errors.New("unsupported")
+	_, reader, err := f.writeHandler.Read(f.session, r.Filepath)
+
+	return reader, err
 }

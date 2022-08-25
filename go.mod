@@ -3,11 +3,11 @@ module git.sr.ht/~erock/pico
 go 1.19
 
 // replace git.sr.ht/~erock/pico/wish => /home/erock/pico/wish
-// replace github.com/antoniomika/go-rsync-receiver => /home/erock/pico/go-rsync-receiver
+// replace github.com/antoniomika/go-rsync-receiver => /Users/.../go-rsync-receiver
 
 require (
 	github.com/alecthomas/chroma v0.10.0
-	github.com/antoniomika/go-rsync-receiver v0.0.0-20220817204644-b0fcbb706c46
+	github.com/antoniomika/go-rsync-receiver v0.0.0-20220825041817-0387edc9afb7
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
 	github.com/charmbracelet/bubbles v0.13.0
 	github.com/charmbracelet/bubbletea v0.22.1

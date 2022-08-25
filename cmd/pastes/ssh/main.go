@@ -13,6 +13,7 @@ import (
 	"git.sr.ht/~erock/pico/pastes"
 	"git.sr.ht/~erock/pico/shared"
 	"git.sr.ht/~erock/pico/wish/cms"
+	"git.sr.ht/~erock/pico/wish/list"
 	"git.sr.ht/~erock/pico/wish/pipe"
 	"git.sr.ht/~erock/pico/wish/proxy"
 	wishrsync "git.sr.ht/~erock/pico/wish/send/rsync"
@@ -35,6 +36,7 @@ func createRouter(handler *filehandlers.ScpUploadHandler) proxy.Router {
 	return func(sh ssh.Handler, s ssh.Session) []wish.Middleware {
 		return []wish.Middleware{
 			pipe.Middleware(handler, ""),
+			list.Middleware(handler),
 			scp.Middleware(handler),
 			wishrsync.Middleware(handler),
 			bm.Middleware(cms.Middleware(&handler.Cfg.ConfigCms, handler.Cfg)),

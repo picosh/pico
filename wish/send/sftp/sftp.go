@@ -29,15 +29,9 @@ func SubsystemHandler(writeHandler utils.CopyFromClientHandler) ssh.SubsystemHan
 			return
 		}
 
-		rootFile := &tempfile{
-			name:  "/",
-			isDir: true,
-		}
-
 		handler := &handler{
 			session:      session,
 			writeHandler: writeHandler,
-			rootFile:     rootFile,
 		}
 
 		handlers := sftp.Handlers{

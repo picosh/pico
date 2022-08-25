@@ -5,10 +5,13 @@ import (
 	"io"
 	"io/fs"
 	"log"
+	"os"
 	"path"
 
 	"git.sr.ht/~erock/pico/wish/send/utils"
 	"github.com/antoniomika/go-rsync-receiver/rsyncreceiver"
+	"github.com/antoniomika/go-rsync-receiver/rsyncsender"
+	rsyncutils "github.com/antoniomika/go-rsync-receiver/utils"
 	"github.com/charmbracelet/wish"
 	"github.com/gliderlabs/ssh"
 )
@@ -18,7 +21,29 @@ type handler struct {
 	writeHandler utils.CopyFromClientHandler
 }
 
-func (h *handler) Put(fileName string, content io.Reader, fileSize int64, mTime int64, aTime int64) (written int64, err error) {
+func (h *handler) Skip(file *rsyncutils.ReceiverFile) bool {
+	return false
+}
+
+func (h *handler) List(path string) ([]os.FileInfo, error) {
+	list, err := h.writeHandler.List(h.session, path)
+	if err != nil {
+		return nil, err
+	}
+
+	newList := list
+	if list[0].IsDir() {
+		newList = list[1:]
+	}
+
+	return newList, nil
+}
+
+func (h *handler) Read(path string) (os.FileInfo, io.ReaderAt, error) {
+	return h.writeHandler.Read(h.session, path)
+}
+
+func (h *handler) Put(fileName string, content io.Reader, fileSize int64, mTime int64, aTime int64) (int64, error) {
 	cleanName := path.Base(fileName)
 	fileEntry := &utils.FileEntry{
 		Name:     cleanName,
@@ -61,6 +86,15 @@ func Middleware(writeHandler utils.CopyFromClientHandler) wish.Middleware {
 			fileHandler := &handler{
 				session:      session,
 				writeHandler: writeHandler,
+			}
+
+			for _, arg := range cmd {
+				if arg == "--sender" {
+					if err := rsyncsender.ClientRun(nil, session, fileHandler, cmd[len(cmd)-1], true); err != nil {
+						log.Println("error running rsync:", err)
+					}
+					return
+				}
 			}
 
 			if _, err := rsyncreceiver.ClientRun(nil, session, fileHandler, true); err != nil {

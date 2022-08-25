@@ -37,7 +37,11 @@ func Middleware(writeHandler utils.CopyFromClientHandler) wish.Middleware {
 
 			switch info.Op {
 			case OpCopyToClient:
-				err = fmt.Errorf("copying from server to client not supported")
+				if writeHandler == nil {
+					err = fmt.Errorf("no handler provided for scp -t")
+					break
+				}
+				err = copyToClient(session, info, writeHandler)
 			case OpCopyFromClient:
 				if writeHandler == nil {
 					err = fmt.Errorf("no handler provided for scp -t")
@@ -47,10 +51,7 @@ func Middleware(writeHandler utils.CopyFromClientHandler) wish.Middleware {
 			}
 			if err != nil {
 				utils.ErrorHandler(session, err)
-				return
 			}
-
-			sshHandler(session)
 		}
 	}
 }
