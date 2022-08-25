@@ -13,7 +13,7 @@ func Middleware(writeHandler utils.CopyFromClientHandler) wish.Middleware {
 	return func(sshHandler ssh.Handler) ssh.Handler {
 		return func(session ssh.Session) {
 			cmd := session.Command()
-			if len(cmd) == 0 || (len(cmd) > 1 && cmd[1] != "ls") {
+			if !(len(cmd) > 1 && cmd[0] == "command" && cmd[1] == "ls") {
 				sshHandler(session)
 				return
 			}
