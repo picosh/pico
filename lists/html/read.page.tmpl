@@ -13,10 +13,21 @@
     <hr />
 </header>
 <main>
-    <div class="my">
+    <div class="flex items-center">
+        <div class="font-italic text-sm post-date">popular tags</div>
+        <div class="flex-1">
+        {{range .Tags}}
+        <a href="/read?tag={{.}}">#{{.}}</a>
+        {{end}}
+        </div>
+    </div>
+    {{if .HasFilter}}<a href="/read">clear filter</a>{{end}}
+
+    <div class="mb">
         {{if .PrevPage}}<a href="{{.PrevPage}}">prev</a>{{else}}<span class="text-grey">prev</span>{{end}}
         {{if .NextPage}}<a href="{{.NextPage}}">next</a>{{else}}<span class="text-grey">next</span>{{end}}
     </div>
+
     {{range .Posts}}
     <article class="my">
         <div class="flex items-center">

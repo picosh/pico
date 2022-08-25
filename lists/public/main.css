@@ -289,6 +289,10 @@ figure {
   margin: 0;
 }
 
+.mb {
+  margin-bottom: 0.5rem;
+}
+
 .my {
   margin-top: 0.5rem;
   margin-bottom: 0.5rem;

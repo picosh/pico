@@ -84,16 +84,28 @@ var (
 		cur_space = $2
 	ORDER BY publish_at DESC`, SelectPost)
 
-	sqlSelectPostsByTag = fmt.Sprintf(`
-	SELECT %s
+	sqlSelectPostsByTag = `
+	SELECT
+		posts.id,
+		user_id,
+		filename,
+		slug,
+		title,
+		text,
+		description,
+		publish_at,
+		app_users.name as username,
+		posts.updated_at,
+		0 AS "score"
 	FROM posts
 	LEFT OUTER JOIN app_users ON app_users.id = posts.user_id
 	LEFT OUTER JOIN post_tags ON post_tags.post_id = posts.id
 	WHERE
-		post_tags.name = '$1' AND
+		post_tags.name = $3 AND
 		publish_at::date <= CURRENT_DATE AND
-		cur_space = $2
-	ORDER BY publish_at DESC`, SelectPost)
+		cur_space = $4
+	ORDER BY publish_at DESC
+	LIMIT $1 OFFSET $2`
 
 	sqlSelectUserPostsByTag = fmt.Sprintf(`
 	SELECT %s
@@ -137,6 +149,11 @@ const (
 	sqlSelectFeatureForUser = `SELECT id FROM feature_flags WHERE user_id = $1 AND name = $2`
 	sqlSelectSizeForUser    = `SELECT sum(file_size) FROM posts WHERE user_id = $1`
 
+	sqlSelectTagPostCount = `
+	SELECT count(posts.id)
+	FROM posts
+	LEFT OUTER JOIN post_tags ON post_tags.post_id = posts.id
+	WHERE hidden = FALSE AND cur_space=$1 and post_tags.name = $2`
 	sqlSelectPostCount       = `SELECT count(id) FROM posts WHERE hidden = FALSE AND cur_space=$1`
 	sqlSelectAllUpdatedPosts = `
 	SELECT
@@ -184,7 +201,14 @@ const (
 	ORDER BY score DESC
 	LIMIT $1 OFFSET $2`
 
-	sqlSelectPopularTags = `SELECT name, count(post_id) as tally FROM post_tags GROUP_BY name, post_id ORDER BY tally DESC LIMIT 10`
+	sqlSelectPopularTags = `
+	SELECT name, count(post_id) as "tally"
+	FROM post_tags
+	LEFT OUTER JOIN posts ON posts.id = post_id
+	WHERE posts.cur_space = $1
+	GROUP BY name
+	ORDER BY tally DESC
+	LIMIT 5`
 	sqlSelectTagsForPost = `SELECT name FROM post_tags WHERE post_id=$1`
 
 	sqlInsertPublicKey = `INSERT INTO public_keys (user_id, public_key) VALUES ($1, $2)`
@@ -567,7 +591,7 @@ func (me *PsqlDB) FindPost(postID string) (*db.Post, error) {
 	return post, nil
 }
 
-func (me *PsqlDB) postPager(rs *sql.Rows, pageNum int, space string) (*db.Paginate[*db.Post], error) {
+func (me *PsqlDB) postPager(rs *sql.Rows, pageNum int, space string, tag string) (*db.Paginate[*db.Post], error) {
 	var posts []*db.Post
 	for rs.Next() {
 		post := &db.Post{}
@@ -595,7 +619,12 @@ func (me *PsqlDB) postPager(rs *sql.Rows, pageNum int, space string) (*db.Pagina
 	}
 
 	var count int
-	err := me.Db.QueryRow(sqlSelectPostCount, space).Scan(&count)
+	var err error
+	if tag == "" {
+		err = me.Db.QueryRow(sqlSelectPostCount, space).Scan(&count)
+	} else {
+		err = me.Db.QueryRow(sqlSelectTagPostCount, space, tag).Scan(&count)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -613,7 +642,7 @@ func (me *PsqlDB) FindAllPosts(page *db.Pager, space string) (*db.Paginate[*db.P
 	if err != nil {
 		return nil, err
 	}
-	return me.postPager(rs, page.Num, space)
+	return me.postPager(rs, page.Num, space, "")
 }
 
 func (me *PsqlDB) FindAllUpdatedPosts(page *db.Pager, space string) (*db.Paginate[*db.Post], error) {
@@ -621,7 +650,7 @@ func (me *PsqlDB) FindAllUpdatedPosts(page *db.Pager, space string) (*db.Paginat
 	if err != nil {
 		return nil, err
 	}
-	return me.postPager(rs, page.Num, space)
+	return me.postPager(rs, page.Num, space, "")
 }
 
 func (me *PsqlDB) InsertPost(post *db.Post) (*db.Post, error) {
@@ -858,35 +887,31 @@ func (me *PsqlDB) FindUserPostsByTag(tag, userID, space string) ([]*db.Post, err
 	return posts, nil
 }
 
-func (me *PsqlDB) FindPostsByTag(tag, space string) ([]*db.Post, error) {
-	var posts []*db.Post
-	rs, err := me.Db.Query(sqlSelectPostsByTag, tag, space)
+func (me *PsqlDB) FindPostsByTag(pager *db.Pager, tag, space string) (*db.Paginate[*db.Post], error) {
+	rs, err := me.Db.Query(
+		sqlSelectPostsByTag,
+		pager.Num,
+		pager.Num*pager.Page,
+		tag,
+		space,
+	)
 	if err != nil {
-		return posts, err
+		return nil, err
 	}
-	for rs.Next() {
-		post, err := CreatePostFromRow(rs)
-		if err != nil {
-			return nil, err
-		}
 
-		posts = append(posts, post)
-	}
-	if rs.Err() != nil {
-		return posts, rs.Err()
-	}
-	return posts, nil
+	return me.postPager(rs, pager.Num, space, tag)
 }
 
-func (me *PsqlDB) FindPopularTags() ([]string, error) {
+func (me *PsqlDB) FindPopularTags(space string) ([]string, error) {
 	tags := make([]string, 0)
-	rs, err := me.Db.Query(sqlSelectPopularTags)
+	rs, err := me.Db.Query(sqlSelectPopularTags, space)
 	if err != nil {
 		return tags, err
 	}
 	for rs.Next() {
 		name := ""
-		err := rs.Scan(&name)
+		tally := 0
+		err := rs.Scan(&name, &tally)
 		if err != nil {
 			return tags, err
 		}

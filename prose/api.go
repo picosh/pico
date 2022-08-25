@@ -52,10 +52,12 @@ type BlogPageData struct {
 }
 
 type ReadPageData struct {
-	Site     shared.SitePageData
-	NextPage string
-	PrevPage string
-	Posts    []PostItemData
+	Site      shared.SitePageData
+	NextPage  string
+	PrevPage  string
+	Posts     []PostItemData
+	Tags      []string
+	HasFilter bool
 }
 
 type PostPageData struct {
@@ -450,7 +452,15 @@ func readHandler(w http.ResponseWriter, r *http.Request) {
 	cfg := shared.GetCfg(r)
 
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-	pager, err := dbpool.FindAllPosts(&db.Pager{Num: 30, Page: page}, cfg.Space)
+	tag := r.URL.Query().Get("tag")
+	var pager *db.Paginate[*db.Post]
+	var err error
+	if tag == "" {
+		pager, err = dbpool.FindAllPosts(&db.Pager{Num: 30, Page: page}, cfg.Space)
+	} else {
+		pager, err = dbpool.FindPostsByTag(&db.Pager{Num: 30, Page: page}, tag, cfg.Space)
+	}
+
 	if err != nil {
 		logger.Error(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -468,17 +478,30 @@ func readHandler(w http.ResponseWriter, r *http.Request) {
 	nextPage := ""
 	if page < pager.Total-1 {
 		nextPage = fmt.Sprintf("/read?page=%d", page+1)
+		if tag != "" {
+			nextPage = fmt.Sprintf("%s&tag=%s", nextPage, tag)
+		}
 	}
 
 	prevPage := ""
 	if page > 0 {
 		prevPage = fmt.Sprintf("/read?page=%d", page-1)
+		if tag != "" {
+			prevPage = fmt.Sprintf("%s&tag=%s", prevPage, tag)
+		}
+	}
+
+	tags, err := dbpool.FindPopularTags(cfg.Space)
+	if err != nil {
+		logger.Error(err)
 	}
 
 	data := ReadPageData{
-		Site:     *cfg.GetSiteData(),
-		NextPage: nextPage,
-		PrevPage: prevPage,
+		Site:      *cfg.GetSiteData(),
+		NextPage:  nextPage,
+		PrevPage:  prevPage,
+		Tags:      tags,
+		HasFilter: tag != "",
 	}
 	for _, post := range pager.Data {
 		item := PostItemData{

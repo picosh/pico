@@ -150,8 +150,8 @@ type DB interface {
 
 	ReplaceTagsForPost(tags []string, postID string) error
 	FindUserPostsByTag(tag, userID, space string) ([]*Post, error)
-	FindPostsByTag(tag, space string) ([]*Post, error)
-	FindPopularTags() ([]string, error)
+	FindPostsByTag(pager *Pager, tag, space string) (*Paginate[*Post], error)
+	FindPopularTags(space string) ([]string, error)
 	FindTagsForPost(postID string) ([]string, error)
 
 	AddViewCount(postID string) (int, error)
