@@ -12,6 +12,7 @@ import (
 
 	"git.sr.ht/~erock/pico/db"
 	"git.sr.ht/~erock/pico/imgs"
+	"git.sr.ht/~erock/pico/imgs/storage"
 	"git.sr.ht/~erock/pico/shared"
 	"git.sr.ht/~erock/pico/wish/cms/util"
 	"git.sr.ht/~erock/pico/wish/send/utils"
@@ -32,17 +33,21 @@ type ScpFileHooks interface {
 }
 
 type ScpUploadHandler struct {
-	User   *db.User
-	DBPool db.DB
-	Cfg    *shared.ConfigSite
-	Hooks  ScpFileHooks
+	User      *db.User
+	DBPool    db.DB
+	Cfg       *shared.ConfigSite
+	Hooks     ScpFileHooks
+	ImgClient *imgs.ImgsAPI
 }
 
-func NewScpPostHandler(dbpool db.DB, cfg *shared.ConfigSite, hooks ScpFileHooks) *ScpUploadHandler {
+func NewScpPostHandler(dbpool db.DB, cfg *shared.ConfigSite, hooks ScpFileHooks, st storage.ObjectStorage) *ScpUploadHandler {
+	client := imgs.NewImgsAPI(dbpool, st)
+
 	return &ScpUploadHandler{
-		DBPool: dbpool,
-		Cfg:    cfg,
-		Hooks:  hooks,
+		DBPool:    dbpool,
+		Cfg:       cfg,
+		Hooks:     hooks,
+		ImgClient: client,
 	}
 }
 
@@ -135,14 +140,13 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 	userID := h.User.ID
 	filename := entry.Name
 
-	client := imgs.NewImgsAPI(h.DBPool)
-	if shared.IsExtAllowed(filename, client.Cfg.AllowedExt) {
-		if !client.HasAccess(userID) {
+	if shared.IsExtAllowed(filename, h.ImgClient.Cfg.AllowedExt) {
+		if !h.ImgClient.HasAccess(userID) {
 			msg := "user (%s) does not have access to imgs.sh, cannot upload file (%s)"
 			return "", fmt.Errorf(msg, h.User.Name, filename)
 		}
 
-		return client.Upload(s, entry)
+		return h.ImgClient.Upload(s, entry)
 	}
 
 	var origText []byte

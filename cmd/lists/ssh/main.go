@@ -10,6 +10,7 @@ import (
 
 	"git.sr.ht/~erock/pico/db/postgres"
 	"git.sr.ht/~erock/pico/filehandlers"
+	"git.sr.ht/~erock/pico/imgs/storage"
 	"git.sr.ht/~erock/pico/lists"
 	"git.sr.ht/~erock/pico/shared"
 	"git.sr.ht/~erock/pico/wish/cms"
@@ -69,7 +70,20 @@ func main() {
 		Cfg: cfg,
 		Db:  dbh,
 	}
-	handler := filehandlers.NewScpPostHandler(dbh, cfg, hooks)
+
+	var st storage.ObjectStorage
+	var err error
+	if cfg.MinioURL == "" {
+		st, err = storage.NewStorageFS(cfg.StorageDir)
+	} else {
+		st, err = storage.NewStorageMinio(cfg.MinioURL, cfg.MinioUser, cfg.MinioPass)
+	}
+
+	if err != nil {
+		logger.Fatal(err)
+	}
+
+	handler := filehandlers.NewScpPostHandler(dbh, cfg, hooks, st)
 
 	sshServer := &SSHServer{}
 	s, err := wish.NewServer(

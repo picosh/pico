@@ -20,11 +20,12 @@ type ImgsAPI struct {
 	St  storage.ObjectStorage
 }
 
-func NewImgsAPI(dbpool db.DB) *ImgsAPI {
+func NewImgsAPI(dbpool db.DB, st storage.ObjectStorage) *ImgsAPI {
 	cfg := NewConfigSite()
 	return &ImgsAPI{
 		Cfg: cfg,
 		Db:  dbpool,
+		St:  st,
 	}
 }
 
