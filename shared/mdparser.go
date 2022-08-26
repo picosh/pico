@@ -185,6 +185,7 @@ func ParseText(text string, absURL string) (*ParsedText, error) {
 	md := goldmark.New(
 		goldmark.WithExtensions(
 			extension.GFM,
+			extension.Footnote,
 			meta.Meta,
 			hili,
 		),

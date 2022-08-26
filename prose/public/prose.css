@@ -9,21 +9,21 @@ table {
 }
 
 .md h1 {
-  font-size: 1.85rem;
+  font-size: 1.55rem;
   line-height: 1.15;
   font-weight: bold;
   padding: 0.6rem 0 0 0;
 }
 
 .md h2 {
-  font-size: 1.45rem;
+  font-size: 1.35rem;
   line-height: 1.15;
   font-weight: bold;
   padding: 0.6rem 0 0 0;
 }
 
 .md h3 {
-  font-size: 1.25rem;
+  font-size: 1.10rem;
   font-weight: bold;
   padding: 0.6rem 0 0 0;
 }
