@@ -5,6 +5,12 @@ services:
       - .env.example
     ports:
       - "5432:5432"
+  minio:
+    env_file:
+      - .env.example
+    ports:
+      - "9000:9000"
+      - "9001:9001"
   lists-web:
     build:
       args:

@@ -6,6 +6,13 @@ services:
     profiles:
       - db
       - all
+  minio:
+    image: quay.io/minio/minio
+    command: server /data --console-address ":9001"
+    restart: always
+    profiles:
+      - db
+      - all
   lists-web:
     image: neurosnap/lists-web:latest
     restart: always

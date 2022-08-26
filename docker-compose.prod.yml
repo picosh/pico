@@ -7,6 +7,14 @@ services:
       - ./data/postgres-data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+  minio:
+    env_file:
+      - .env.prod
+    volumes:
+      - ./data/minio-data:/data
+    ports:
+      - "9000:9000"
+      - "9100:9100"
   lists-caddy:
     image: neurosnap/pico-caddy:latest
     restart: always
