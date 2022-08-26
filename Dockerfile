@@ -5,7 +5,7 @@ ENV CGO_ENABLED 0
 
 WORKDIR /app
 
-RUN apk add --no-cache git
+RUN apk add --no-cache git ca-certificates
 
 COPY go.* ./
 
@@ -30,6 +30,7 @@ WORKDIR /app
 
 ARG APP=lists
 
+COPY --from=build-image /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /go/bin/${APP}-ssh ./ssh
 
 ENTRYPOINT ["/app/ssh"]
@@ -40,6 +41,7 @@ WORKDIR /app
 
 ARG APP=lists
 
+COPY --from=build-image /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /go/bin/${APP}-web ./web
 COPY --from=builder /app/${APP}/html ./${APP}/html
 COPY --from=builder /app/${APP}/public ./${APP}/public
