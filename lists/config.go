@@ -15,6 +15,10 @@ func NewConfigSite() *shared.ConfigSite {
 	port := shared.GetEnv("LISTS_WEB_PORT", "3000")
 	protocol := shared.GetEnv("LISTS_PROTOCOL", "https")
 	allowRegister := shared.GetEnv("LISTS_ALLOW_REGISTER", "1")
+	storageDir := shared.GetEnv("IMGS_STORAGE_DIR", ".storage")
+	minioURL := shared.GetEnv("MINIO_URL", "")
+	minioUser := shared.GetEnv("MINIO_ROOT_USER", "")
+	minioPass := shared.GetEnv("MINIO_ROOT_PASSWORD", "")
 	dbURL := shared.GetEnv("DATABASE_URL", "")
 	subdomainsEnabled := false
 	if subdomains == "1" {
@@ -41,6 +45,10 @@ func NewConfigSite() *shared.ConfigSite {
 			Port:          port,
 			Protocol:      protocol,
 			DbURL:         dbURL,
+			StorageDir:    storageDir,
+			MinioURL:      minioURL,
+			MinioUser:     minioUser,
+			MinioPass:     minioPass,
 			Description:   "A microblog for your lists.",
 			IntroText:     intro,
 			Space:         "lists",

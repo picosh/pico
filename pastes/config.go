@@ -16,6 +16,10 @@ func NewConfigSite() *shared.ConfigSite {
 	dbURL := shared.GetEnv("DATABASE_URL", "")
 	protocol := shared.GetEnv("PASTES_PROTOCOL", "https")
 	allowRegister := shared.GetEnv("PASTES_ALLOW_REGISTER", "1")
+	storageDir := shared.GetEnv("IMGS_STORAGE_DIR", ".storage")
+	minioURL := shared.GetEnv("MINIO_URL", "")
+	minioUser := shared.GetEnv("MINIO_ROOT_USER", "")
+	minioPass := shared.GetEnv("MINIO_ROOT_PASSWORD", "")
 	subdomainsEnabled := false
 	if subdomains == "1" {
 		subdomainsEnabled = true
@@ -41,6 +45,10 @@ func NewConfigSite() *shared.ConfigSite {
 			Protocol:      protocol,
 			Email:         email,
 			DbURL:         dbURL,
+			StorageDir:    storageDir,
+			MinioURL:      minioURL,
+			MinioUser:     minioUser,
+			MinioPass:     minioPass,
 			Description:   "a pastebin for hackers.",
 			IntroText:     intro,
 			Space:         "pastes",

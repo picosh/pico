@@ -331,10 +331,21 @@ func (m Model) fetchPosts(userID string) tea.Cmd {
 
 func removePost(m Model) tea.Cmd {
 	return func() tea.Msg {
-		err := m.dbpool.RemovePosts([]string{m.posts[m.getSelectedIndex()].ID})
+		bucket, err := m.st.UpsertBucket(m.user.ID)
 		if err != nil {
 			return errMsg{err}
 		}
+
+		err = m.st.DeleteFile(bucket, m.posts[m.getSelectedIndex()].Filename)
+		if err != nil {
+			return errMsg{err}
+		}
+
+		err = m.dbpool.RemovePosts([]string{m.posts[m.getSelectedIndex()].ID})
+		if err != nil {
+			return errMsg{err}
+		}
+
 		return removePostMsg(m.index)
 	}
 }

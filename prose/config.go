@@ -15,6 +15,10 @@ func NewConfigSite() *shared.ConfigSite {
 	port := shared.GetEnv("PROSE_WEB_PORT", "3000")
 	protocol := shared.GetEnv("PROSE_PROTOCOL", "https")
 	allowRegister := shared.GetEnv("PROSE_ALLOW_REGISTER", "1")
+	storageDir := shared.GetEnv("IMGS_STORAGE_DIR", ".storage")
+	minioURL := shared.GetEnv("MINIO_URL", "")
+	minioUser := shared.GetEnv("MINIO_ROOT_USER", "")
+	minioPass := shared.GetEnv("MINIO_ROOT_PASSWORD", "")
 	dbURL := shared.GetEnv("DATABASE_URL", "")
 	subdomainsEnabled := false
 	if subdomains == "1" {
@@ -41,6 +45,10 @@ func NewConfigSite() *shared.ConfigSite {
 			Port:          port,
 			Protocol:      protocol,
 			DbURL:         dbURL,
+			StorageDir:    storageDir,
+			MinioURL:      minioURL,
+			MinioUser:     minioUser,
+			MinioPass:     minioPass,
 			Description:   "a blog platform for hackers.",
 			IntroText:     intro,
 			Space:         "prose",
