@@ -39,7 +39,7 @@
 		host console.{$APP_DOMAIN}
 	}
 
-	handle @appmetrics {
+	handle @console {
 		reverse_proxy minio:9001
 	}
 }

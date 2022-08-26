@@ -32,7 +32,7 @@ services:
       - ./data/minio-data:/data
     ports:
       - "9000:9000"
-      - "9100:9100"
+      - "9001:9001"
   lists-caddy:
     image: neurosnap/pico-caddy:latest
     restart: always
