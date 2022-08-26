@@ -15,6 +15,10 @@ type ConfigCms struct {
 	Email         string
 	Protocol      string
 	DbURL         string
+	StorageDir    string
+	MinioURL      string
+	MinioUser     string
+	MinioPass     string
 	Description   string
 	IntroText     string
 	Space         string

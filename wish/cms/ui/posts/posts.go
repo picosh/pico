@@ -8,6 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"git.sr.ht/~erock/pico/db"
+	"git.sr.ht/~erock/pico/imgs/storage"
 	"git.sr.ht/~erock/pico/wish/cms/config"
 	"git.sr.ht/~erock/pico/wish/cms/ui/common"
 
@@ -50,6 +51,7 @@ type Model struct {
 	cfg     *config.ConfigCms
 	urls    config.ConfigURL
 	dbpool  db.DB
+	st      storage.ObjectStorage
 	user    *db.User
 	posts   []*db.Post
 	styles  common.Styles
@@ -82,7 +84,7 @@ func (m *Model) UpdatePaging(msg tea.Msg) {
 }
 
 // NewModel creates a new model with defaults.
-func NewModel(cfg *config.ConfigCms, urls config.ConfigURL, dbpool db.DB, user *db.User) Model {
+func NewModel(cfg *config.ConfigCms, urls config.ConfigURL, dbpool db.DB, user *db.User, stor storage.ObjectStorage) Model {
 	logger := cfg.Logger
 	st := common.DefaultStyles()
 
@@ -94,6 +96,7 @@ func NewModel(cfg *config.ConfigCms, urls config.ConfigURL, dbpool db.DB, user *
 	return Model{
 		cfg:     cfg,
 		dbpool:  dbpool,
+		st:      stor,
 		user:    user,
 		styles:  st,
 		pager:   p,

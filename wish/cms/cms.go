@@ -6,6 +6,7 @@ import (
 
 	"git.sr.ht/~erock/pico/db"
 	"git.sr.ht/~erock/pico/db/postgres"
+	"git.sr.ht/~erock/pico/imgs/storage"
 	"git.sr.ht/~erock/pico/wish/cms/config"
 	"git.sr.ht/~erock/pico/wish/cms/ui/account"
 	"git.sr.ht/~erock/pico/wish/cms/ui/common"
@@ -100,11 +101,23 @@ func Middleware(cfg *config.ConfigCms, urls config.ConfigURL) bm.Handler {
 
 		dbpool := postgres.NewDB(cfg)
 
+		var st storage.ObjectStorage
+		if cfg.MinioURL == "" {
+			st, err = storage.NewStorageFS(cfg.StorageDir)
+		} else {
+			st, err = storage.NewStorageMinio(cfg.MinioURL, cfg.MinioUser, cfg.MinioPass)
+		}
+
+		if err != nil {
+			logger.Fatal(err)
+		}
+
 		m := model{
 			cfg:        cfg,
 			urls:       urls,
 			publicKey:  key,
 			dbpool:     dbpool,
+			st:         st,
 			sshUser:    sshUser,
 			status:     statusInit,
 			menuChoice: unsetChoice,
@@ -129,6 +142,7 @@ type model struct {
 	urls          config.ConfigURL
 	publicKey     string
 	dbpool        db.DB
+	st            storage.ObjectStorage
 	user          *db.User
 	err           error
 	sshUser       string
@@ -226,7 +240,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.user = msg
 		m.username = username.NewModel(m.dbpool, m.user, m.sshUser)
 		m.info = info.NewModel(m.cfg, m.urls, m.user)
-		m.posts = posts.NewModel(m.cfg, m.urls, m.dbpool, m.user)
+		m.posts = posts.NewModel(m.cfg, m.urls, m.dbpool, m.user, m.st)
 		m.keys = keys.NewModel(m.cfg, m.dbpool, m.user)
 		m.createAccount = account.NewCreateModel(m.cfg, m.dbpool, m.publicKey)
 	}
@@ -235,7 +249,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case statusInit:
 		m.username = username.NewModel(m.dbpool, m.user, m.sshUser)
 		m.info = info.NewModel(m.cfg, m.urls, m.user)
-		m.posts = posts.NewModel(m.cfg, m.urls, m.dbpool, m.user)
+		m.posts = posts.NewModel(m.cfg, m.urls, m.dbpool, m.user, m.st)
 		m.keys = keys.NewModel(m.cfg, m.dbpool, m.user)
 		m.createAccount = account.NewCreateModel(m.cfg, m.dbpool, m.publicKey)
 		if m.user == nil {
@@ -267,7 +281,7 @@ func updateChildren(msg tea.Msg, m model) (model, tea.Cmd) {
 		cmd = newCmd
 
 		if m.posts.Exit {
-			m.posts = posts.NewModel(m.cfg, m.urls, m.dbpool, m.user)
+			m.posts = posts.NewModel(m.cfg, m.urls, m.dbpool, m.user, m.st)
 			m.status = statusReady
 		} else if m.posts.Quit {
 			m.status = statusQuitting
