@@ -30,7 +30,7 @@ WORKDIR /app
 
 ARG APP=lists
 
-COPY --from=build-image /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /go/bin/${APP}-ssh ./ssh
 
 ENTRYPOINT ["/app/ssh"]
@@ -41,7 +41,7 @@ WORKDIR /app
 
 ARG APP=lists
 
-COPY --from=build-image /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /go/bin/${APP}-web ./web
 COPY --from=builder /app/${APP}/html ./${APP}/html
 COPY --from=builder /app/${APP}/public ./${APP}/public
