@@ -25,6 +25,9 @@ func NewConfigSite() *shared.ConfigSite {
 	protocol := shared.GetEnv("IMGS_PROTOCOL", "https")
 	allowRegister := shared.GetEnv("IMGS_ALLOW_REGISTER", "1")
 	storageDir := shared.GetEnv("IMGS_STORAGE_DIR", ".storage")
+	minioURL := shared.GetEnv("MINIO_URL", "")
+	minioUser := shared.GetEnv("MINIO_ROOT_USER", "")
+	minioPass := shared.GetEnv("MINIO_ROOT_PASSWORD", "")
 	dbURL := shared.GetEnv("DATABASE_URL", "")
 	subdomainsEnabled := false
 	if subdomains == "1" {
@@ -45,6 +48,9 @@ func NewConfigSite() *shared.ConfigSite {
 		SubdomainsEnabled:    subdomainsEnabled,
 		CustomdomainsEnabled: customdomainsEnabled,
 		StorageDir:           storageDir,
+		MinioURL:             minioURL,
+		MinioUser:            minioUser,
+		MinioPass:            minioPass,
 		ConfigCms: config.ConfigCms{
 			Domain:        domain,
 			Email:         email,

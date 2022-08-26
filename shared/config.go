@@ -28,6 +28,9 @@ type ConfigSite struct {
 	SubdomainsEnabled    bool
 	CustomdomainsEnabled bool
 	StorageDir           string
+	MinioURL             string
+	MinioUser            string
+	MinioPass            string
 }
 
 func (c *ConfigSite) GetSiteData() *SitePageData {

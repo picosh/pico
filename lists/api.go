@@ -13,6 +13,7 @@ import (
 
 	"git.sr.ht/~erock/pico/db"
 	"git.sr.ht/~erock/pico/db/postgres"
+	"git.sr.ht/~erock/pico/imgs/storage"
 	"git.sr.ht/~erock/pico/shared"
 	"github.com/gorilla/feeds"
 	"golang.org/x/exp/slices"
@@ -737,11 +738,22 @@ func StartApiServer() {
 	defer db.Close()
 	logger := cfg.Logger
 
+	var st storage.ObjectStorage
+	var err error
+	if cfg.MinioURL == "" {
+		st, err = storage.NewStorageFS(cfg.StorageDir)
+	} else {
+		st, err = storage.NewStorageMinio(cfg.MinioURL, cfg.MinioUser, cfg.MinioPass)
+	}
+	if err != nil {
+		logger.Fatal(err)
+	}
+
 	staticRoutes := createStaticRoutes()
 	mainRoutes := createMainRoutes(staticRoutes)
 	subdomainRoutes := createSubdomainRoutes(staticRoutes)
 
-	handler := shared.CreateServe(mainRoutes, subdomainRoutes, cfg, db, logger)
+	handler := shared.CreateServe(mainRoutes, subdomainRoutes, cfg, db, st, logger)
 	router := http.HandlerFunc(handler)
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)

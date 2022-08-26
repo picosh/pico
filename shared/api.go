@@ -3,8 +3,8 @@ package shared
 import (
 	"fmt"
 	"html/template"
-	"io/ioutil"
 	"net/http"
+	"os"
 	"strings"
 )
 
@@ -46,7 +46,7 @@ func ServeFile(file string, contentType string) http.HandlerFunc {
 		logger := GetLogger(r)
 		cfg := GetCfg(r)
 
-		contents, err := ioutil.ReadFile(cfg.StaticPath(fmt.Sprintf("public/%s", file)))
+		contents, err := os.ReadFile(cfg.StaticPath(fmt.Sprintf("public/%s", file)))
 		if err != nil {
 			logger.Error(err)
 			http.Error(w, "file not found", 404)

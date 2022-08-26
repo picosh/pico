@@ -66,10 +66,23 @@ func main() {
 	logger := cfg.Logger
 	dbh := postgres.NewDB(&cfg.ConfigCms)
 	defer dbh.Close()
+
+	var st storage.ObjectStorage
+	var err error
+	if cfg.MinioURL == "" {
+		st, err = storage.NewStorageFS(cfg.StorageDir)
+	} else {
+		st, err = storage.NewStorageMinio(cfg.MinioURL, cfg.MinioUser, cfg.MinioPass)
+	}
+
+	if err != nil {
+		logger.Fatal(err)
+	}
+
 	handler := uploadimgs.NewUploadImgHandler(
 		dbh,
 		cfg,
-		storage.NewStorageFS(cfg.StorageDir),
+		st,
 	)
 
 	sshServer := &SSHServer{}

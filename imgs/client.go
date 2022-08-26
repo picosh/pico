@@ -17,6 +17,7 @@ type IImgsAPI interface {
 type ImgsAPI struct {
 	Cfg *shared.ConfigSite
 	Db  db.DB
+	St  storage.ObjectStorage
 }
 
 func NewImgsAPI(dbpool db.DB) *ImgsAPI {
@@ -32,7 +33,7 @@ func (img *ImgsAPI) HasAccess(userID string) bool {
 }
 
 func (img *ImgsAPI) Upload(s ssh.Session, file *utils.FileEntry) (string, error) {
-	handler := uploadimgs.NewUploadImgHandler(img.Db, img.Cfg, storage.NewStorageFS(img.Cfg.StorageDir))
+	handler := uploadimgs.NewUploadImgHandler(img.Db, img.Cfg, img.St)
 	err := handler.Validate(s)
 	if err != nil {
 		return "", err

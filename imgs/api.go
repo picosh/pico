@@ -192,6 +192,7 @@ func imgHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	dbpool := shared.GetDB(r)
+	st := shared.GetStorage(r)
 	logger := shared.GetLogger(r)
 
 	user, err := dbpool.FindUserForName(username)
@@ -216,7 +217,6 @@ func imgHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	st := storage.NewStorageFS(cfg.StorageDir)
 	bucket, err := st.GetBucket(user.ID)
 	if err != nil {
 		logger.Infof("bucket not found %s/%s", username, filename)
@@ -610,15 +610,28 @@ func createSubdomainRoutes(staticRoutes []shared.Route) []shared.Route {
 
 func StartApiServer() {
 	cfg := NewConfigSite()
+	logger := cfg.Logger
+
 	db := postgres.NewDB(&cfg.ConfigCms)
 	defer db.Close()
-	logger := cfg.Logger
+
+	var st storage.ObjectStorage
+	var err error
+	if cfg.MinioURL == "" {
+		st, err = storage.NewStorageFS(cfg.StorageDir)
+	} else {
+		st, err = storage.NewStorageMinio(cfg.MinioURL, cfg.MinioUser, cfg.MinioPass)
+	}
+
+	if err != nil {
+		logger.Fatal(err)
+	}
 
 	staticRoutes := createStaticRoutes()
 	mainRoutes := createMainRoutes(staticRoutes)
 	subdomainRoutes := createSubdomainRoutes(staticRoutes)
 
-	handler := shared.CreateServe(mainRoutes, subdomainRoutes, cfg, db, logger)
+	handler := shared.CreateServe(mainRoutes, subdomainRoutes, cfg, db, st, logger)
 	router := http.HandlerFunc(handler)
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"git.sr.ht/~erock/pico/db"
+	"git.sr.ht/~erock/pico/imgs/storage"
 	"go.uber.org/zap"
 )
 
@@ -28,7 +29,7 @@ func NewRoute(method, pattern string, handler http.HandlerFunc) Route {
 
 type ServeFn func(http.ResponseWriter, *http.Request)
 
-func CreateServe(routes []Route, subdomainRoutes []Route, cfg *ConfigSite, dbpool db.DB, logger *zap.SugaredLogger) ServeFn {
+func CreateServe(routes []Route, subdomainRoutes []Route, cfg *ConfigSite, dbpool db.DB, st storage.ObjectStorage, logger *zap.SugaredLogger) ServeFn {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var allow []string
 		var subdomain string
@@ -63,7 +64,8 @@ func CreateServe(routes []Route, subdomainRoutes []Route, cfg *ConfigSite, dbpoo
 				loggerCtx := context.WithValue(r.Context(), ctxLoggerKey{}, logger)
 				subdomainCtx := context.WithValue(loggerCtx, ctxSubdomainKey{}, subdomain)
 				dbCtx := context.WithValue(subdomainCtx, ctxDBKey{}, dbpool)
-				cfgCtx := context.WithValue(dbCtx, ctxCfg{}, cfg)
+				storageCtx := context.WithValue(dbCtx, ctxStorageKey{}, st)
+				cfgCtx := context.WithValue(storageCtx, ctxCfg{}, cfg)
 				ctx := context.WithValue(cfgCtx, ctxKey{}, matches[1:])
 				route.handler(w, r.WithContext(ctx))
 				return
@@ -79,6 +81,7 @@ func CreateServe(routes []Route, subdomainRoutes []Route, cfg *ConfigSite, dbpoo
 }
 
 type ctxDBKey struct{}
+type ctxStorageKey struct{}
 type ctxKey struct{}
 type ctxLoggerKey struct{}
 type ctxSubdomainKey struct{}
@@ -94,6 +97,10 @@ func GetLogger(r *http.Request) *zap.SugaredLogger {
 
 func GetDB(r *http.Request) db.DB {
 	return r.Context().Value(ctxDBKey{}).(db.DB)
+}
+
+func GetStorage(r *http.Request) storage.ObjectStorage {
+	return r.Context().Value(ctxStorageKey{}).(storage.ObjectStorage)
 }
 
 func GetField(r *http.Request, index int) string {

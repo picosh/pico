@@ -33,10 +33,10 @@ type UploadImgHandler struct {
 	User    *db.User
 	DBPool  db.DB
 	Cfg     *shared.ConfigSite
-	Storage *storage.StorageFS
+	Storage storage.ObjectStorage
 }
 
-func NewUploadImgHandler(dbpool db.DB, cfg *shared.ConfigSite, storage *storage.StorageFS) *UploadImgHandler {
+func NewUploadImgHandler(dbpool db.DB, cfg *shared.ConfigSite, storage storage.ObjectStorage) *UploadImgHandler {
 	return &UploadImgHandler{
 		DBPool:  dbpool,
 		Cfg:     cfg,

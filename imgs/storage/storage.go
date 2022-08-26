@@ -24,8 +24,8 @@ type StorageFS struct {
 	Dir string
 }
 
-func NewStorageFS(dir string) *StorageFS {
-	return &StorageFS{Dir: dir}
+func NewStorageFS(dir string) (*StorageFS, error) {
+	return &StorageFS{Dir: dir}, nil
 }
 
 // GetBucket - A bucket for the filesystem is just a directory.
@@ -38,16 +38,16 @@ func (s *StorageFS) GetBucket(name string) (Bucket, error) {
 
 	info, err := os.Stat(dirPath)
 	if os.IsNotExist(err) {
-		return bucket, fmt.Errorf("directory does not exist: %v %w\n", dirPath, err)
+		return bucket, fmt.Errorf("directory does not exist: %v %w", dirPath, err)
 	}
 
 	if err != nil {
-		return bucket, fmt.Errorf("directory error: %v %w\n", dirPath, err)
+		return bucket, fmt.Errorf("directory error: %v %w", dirPath, err)
 
 	}
 
 	if !info.IsDir() {
-		return bucket, fmt.Errorf("directory is a file, not a directory: %#v\n", dirPath)
+		return bucket, fmt.Errorf("directory is a file, not a directory: %#v", dirPath)
 	}
 
 	return bucket, nil

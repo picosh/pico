@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"html/template"
-	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -14,6 +14,7 @@ import (
 	"git.sr.ht/~erock/pico/db"
 	"git.sr.ht/~erock/pico/db/postgres"
 	"git.sr.ht/~erock/pico/imgs"
+	"git.sr.ht/~erock/pico/imgs/storage"
 	"git.sr.ht/~erock/pico/shared"
 	"github.com/gorilla/feeds"
 	"golang.org/x/exp/slices"
@@ -739,7 +740,7 @@ func serveFile(file string, contentType string) http.HandlerFunc {
 		logger := shared.GetLogger(r)
 		cfg := shared.GetCfg(r)
 
-		contents, err := ioutil.ReadFile(cfg.StaticPath(fmt.Sprintf("public/%s", file)))
+		contents, err := os.ReadFile(cfg.StaticPath(fmt.Sprintf("public/%s", file)))
 		if err != nil {
 			logger.Error(err)
 			http.Error(w, "file not found", 404)
@@ -832,11 +833,23 @@ func StartApiServer() {
 	defer db.Close()
 	logger := cfg.Logger
 
+	var st storage.ObjectStorage
+	var err error
+	if cfg.MinioURL == "" {
+		st, err = storage.NewStorageFS(cfg.StorageDir)
+	} else {
+		st, err = storage.NewStorageMinio(cfg.MinioURL, cfg.MinioUser, cfg.MinioPass)
+	}
+
+	if err != nil {
+		logger.Fatal(err)
+	}
+
 	staticRoutes := createStaticRoutes()
 	mainRoutes := createMainRoutes(staticRoutes)
 	subdomainRoutes := createSubdomainRoutes(staticRoutes)
 
-	handler := shared.CreateServe(mainRoutes, subdomainRoutes, cfg, db, logger)
+	handler := shared.CreateServe(mainRoutes, subdomainRoutes, cfg, db, st, logger)
 	router := http.HandlerFunc(handler)
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)
