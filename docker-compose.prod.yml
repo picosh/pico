@@ -7,6 +7,24 @@ services:
       - ./data/postgres-data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+  minio-caddy:
+    image: neurosnap/pico-caddy:latest
+    restart: always
+    env_file:
+      - .env.prod
+    environment:
+      APP_DOMAIN: ${MINIO_DOMAIN:-minio.pico.sh}
+      APP_EMAIL: ${MINIO_EMAIL:-hello@pico.sh}
+    volumes:
+      - ./caddy/Caddyfile.minio:/etc/caddy/Caddyfile
+      - ./data/minio-caddy/data:/data
+      - ./data/minio-caddy/config:/config
+    ports:
+      - "80:80"
+      - "443:443"
+    profiles:
+      - db
+      - all
   minio:
     env_file:
       - .env.prod
