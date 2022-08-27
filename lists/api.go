@@ -87,13 +87,13 @@ type ReadmeTxt struct {
 	Items    []*ListItem
 }
 
-func getPostsForUser(r *http.Request, user *db.User, tag string) ([]*db.Post, error) {
+func getPostsForUser(r *http.Request, user *db.User, tag string, num int) ([]*db.Post, error) {
 	dbpool := shared.GetDB(r)
 	cfg := shared.GetCfg(r)
 	var err error
 
 	posts := make([]*db.Post, 0)
-	pager := &db.Pager{Num: 1000, Page: 0}
+	pager := &db.Pager{Num: num, Page: 0}
 	var p *db.Paginate[*db.Post]
 	if tag == "" {
 		p, err = dbpool.FindPostsForUser(pager, user.ID, cfg.Space)
@@ -131,7 +131,7 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tag := r.URL.Query().Get("tag")
-	posts, err := getPostsForUser(r, user, tag)
+	posts, err := getPostsForUser(r, user, tag, 1000)
 	if err != nil {
 		logger.Error(err)
 		http.Error(w, "could not fetch posts for blog", http.StatusInternalServerError)
@@ -503,7 +503,7 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tag := r.URL.Query().Get("tag")
-	posts, err := getPostsForUser(r, user, tag)
+	posts, err := getPostsForUser(r, user, tag, 10)
 	if err != nil {
 		logger.Error(err)
 		http.Error(w, "could not fetch posts for blog", http.StatusInternalServerError)

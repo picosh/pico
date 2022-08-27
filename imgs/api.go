@@ -382,8 +382,16 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pager, err := dbpool.FindPostsForUser(&db.Pager{Num: 10, Page: 0}, user.ID, cfg.Space)
-	posts := pager.Data
+	tag := r.URL.Query().Get("tag")
+	var posts []*db.Post
+	var p *db.Paginate[*db.Post]
+	pager := &db.Pager{Num: 10, Page: 0}
+	if tag == "" {
+		p, err = dbpool.FindPostsForUser(pager, user.ID, cfg.Space)
+	} else {
+		p, err = dbpool.FindUserPostsByTag(pager, tag, user.ID, cfg.Space)
+	}
+	posts = p.Data
 
 	if err != nil {
 		logger.Error(err)
