@@ -135,7 +135,7 @@ type DB interface {
 
 	FindPosts() ([]*Post, error)
 	FindPost(postID string) (*Post, error)
-	FindPostsForUser(userID string, space string) ([]*Post, error)
+	FindPostsForUser(pager *Pager, userID string, space string) (*Paginate[*Post], error)
 	FindAllPostsForUser(userID string, space string) ([]*Post, error)
 	FindPostsBeforeDate(date *time.Time, space string) ([]*Post, error)
 	FindUpdatedPostsForUser(userID string, space string) ([]*Post, error)
@@ -149,7 +149,7 @@ type DB interface {
 	RemovePosts(postIDs []string) error
 
 	ReplaceTagsForPost(tags []string, postID string) error
-	FindUserPostsByTag(tag, userID, space string) ([]*Post, error)
+	FindUserPostsByTag(pager *Pager, tag, userID, space string) (*Paginate[*Post], error)
 	FindPostsByTag(pager *Pager, tag, space string) (*Paginate[*Post], error)
 	FindPopularTags(space string) ([]string, error)
 	FindTagsForPost(postID string) ([]string, error)

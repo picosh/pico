@@ -154,12 +154,15 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tag := r.URL.Query().Get("tag")
+	pager := &db.Pager{Num: 1000, Page: 0}
 	var posts []*db.Post
+	var p *db.Paginate[*db.Post]
 	if tag == "" {
-		posts, err = dbpool.FindPostsForUser(user.ID, cfg.Space)
+		p, err = dbpool.FindPostsForUser(pager, user.ID, cfg.Space)
 	} else {
-		posts, err = dbpool.FindUserPostsByTag(tag, user.ID, cfg.Space)
+		p, err = dbpool.FindUserPostsByTag(pager, tag, user.ID, cfg.Space)
 	}
+	posts = p.Data
 
 	if err != nil {
 		logger.Error(err)
@@ -167,15 +170,15 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ts, err := shared.RenderTemplate(cfg, []string{
+		cfg.StaticPath("html/blog.page.tmpl"),
+	})
+
 	hostDomain := strings.Split(r.Host, ":")[0]
 	appDomain := strings.Split(cfg.ConfigCms.Domain, ":")[0]
 
 	onSubdomain := cfg.IsSubdomains() && strings.Contains(hostDomain, appDomain)
 	withUserName := (!onSubdomain && hostDomain == appDomain) || !cfg.IsCustomdomains()
-
-	ts, err := shared.RenderTemplate(cfg, []string{
-		cfg.StaticPath("html/blog.page.tmpl"),
-	})
 
 	if err != nil {
 		logger.Error(err)
@@ -189,55 +192,59 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	readmeTxt := &ReadmeTxt{}
 
+	readme, err := dbpool.FindPostWithFilename("_readme.md", user.ID, cfg.Space)
+	if err == nil {
+		parsedText, err := shared.ParseText(readme.Text, imgs.ImgBaseURL(readme.Username))
+		if err != nil {
+			logger.Error(err)
+		}
+		headerTxt.Bio = parsedText.Description
+		if parsedText.Title != "" {
+			headerTxt.Title = parsedText.Title
+		}
+
+		headerTxt.Nav = []shared.Link{}
+		for _, nav := range parsedText.Nav {
+			u, _ := url.Parse(nav.URL)
+			finURL := nav.URL
+			if !u.IsAbs() {
+				finURL = cfg.FullPostURL(
+					readme.Username,
+					nav.URL,
+					onSubdomain,
+					withUserName,
+				)
+			}
+			headerTxt.Nav = append(headerTxt.Nav, shared.Link{
+				URL:  finURL,
+				Text: nav.Text,
+			})
+		}
+
+		readmeTxt.Contents = template.HTML(parsedText.Html)
+		if len(readmeTxt.Contents) > 0 {
+			readmeTxt.HasText = true
+		}
+	}
+
 	hasCSS := false
+	_, err = dbpool.FindPostWithFilename("_styles.css", user.ID, cfg.Space)
+	if err == nil {
+		hasCSS = true
+	}
+
 	postCollection := make([]PostItemData, 0, len(posts))
 	for _, post := range posts {
-		if post.Filename == "_styles.css" && len(post.Text) > 0 {
-			hasCSS = true
-		} else if post.Filename == "_readme.md" {
-			parsedText, err := shared.ParseText(post.Text, imgs.ImgBaseURL(post.Username))
-			if err != nil {
-				logger.Error(err)
-			}
-			headerTxt.Bio = parsedText.Description
-			if parsedText.Title != "" {
-				headerTxt.Title = parsedText.Title
-			}
-
-			headerTxt.Nav = []shared.Link{}
-			for _, nav := range parsedText.Nav {
-				u, _ := url.Parse(nav.URL)
-				finURL := nav.URL
-				if !u.IsAbs() {
-					finURL = cfg.FullPostURL(
-						post.Username,
-						nav.URL,
-						onSubdomain,
-						withUserName,
-					)
-				}
-				headerTxt.Nav = append(headerTxt.Nav, shared.Link{
-					URL:  finURL,
-					Text: nav.Text,
-				})
-			}
-
-			readmeTxt.Contents = template.HTML(parsedText.Html)
-			if len(readmeTxt.Contents) > 0 {
-				readmeTxt.HasText = true
-			}
-		} else {
-			p := PostItemData{
-				URL:            template.URL(cfg.FullPostURL(post.Username, post.Slug, onSubdomain, withUserName)),
-				BlogURL:        template.URL(cfg.FullBlogURL(post.Username, onSubdomain, withUserName)),
-				Title:          shared.FilenameToTitle(post.Filename, post.Title),
-				PublishAt:      post.PublishAt.Format("02 Jan, 2006"),
-				PublishAtISO:   post.PublishAt.Format(time.RFC3339),
-				UpdatedTimeAgo: shared.TimeAgo(post.UpdatedAt),
-				UpdatedAtISO:   post.UpdatedAt.Format(time.RFC3339),
-			}
-			postCollection = append(postCollection, p)
+		p := PostItemData{
+			URL:            template.URL(cfg.FullPostURL(post.Username, post.Slug, onSubdomain, withUserName)),
+			BlogURL:        template.URL(cfg.FullBlogURL(post.Username, onSubdomain, withUserName)),
+			Title:          shared.FilenameToTitle(post.Filename, post.Title),
+			PublishAt:      post.PublishAt.Format("02 Jan, 2006"),
+			PublishAtISO:   post.PublishAt.Format(time.RFC3339),
+			UpdatedTimeAgo: shared.TimeAgo(post.UpdatedAt),
+			UpdatedAtISO:   post.UpdatedAt.Format(time.RFC3339),
 		}
+		postCollection = append(postCollection, p)
 	}
 
 	data := BlogPageData{
@@ -541,12 +548,15 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tag := r.URL.Query().Get("tag")
+	pager := &db.Pager{Num: 10, Page: 0}
 	var posts []*db.Post
+	var p *db.Paginate[*db.Post]
 	if tag == "" {
-		posts, err = dbpool.FindPostsForUser(user.ID, cfg.Space)
+		p, err = dbpool.FindPostsForUser(pager, user.ID, cfg.Space)
 	} else {
-		posts, err = dbpool.FindUserPostsByTag(tag, user.ID, cfg.Space)
+		p, err = dbpool.FindUserPostsByTag(pager, tag, user.ID, cfg.Space)
 	}
+	posts = p.Data
 
 	if err != nil {
 		logger.Error(err)
@@ -565,29 +575,26 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 		Title: GetBlogName(username),
 	}
 
+	readme, err := dbpool.FindPostWithFilename("_readme.md", user.ID, cfg.Space)
+	if err == nil {
+		parsedText, err := shared.ParseText(readme.Text, imgs.ImgBaseURL(readme.Username))
+		if err != nil {
+			logger.Error(err)
+		}
+		if parsedText.Title != "" {
+			headerTxt.Title = parsedText.Title
+		}
+
+		if parsedText.Description != "" {
+			headerTxt.Bio = parsedText.Description
+		}
+	}
+
 	hostDomain := strings.Split(r.Host, ":")[0]
 	appDomain := strings.Split(cfg.ConfigCms.Domain, ":")[0]
 
 	onSubdomain := cfg.IsSubdomains() && strings.Contains(hostDomain, appDomain)
 	withUserName := (!onSubdomain && hostDomain == appDomain) || !cfg.IsCustomdomains()
-
-	for _, post := range posts {
-		if post.Filename == "_readme.md" {
-			parsedText, err := shared.ParseText(post.Text, imgs.ImgBaseURL(post.Username))
-			if err != nil {
-				logger.Error(err)
-			}
-			if parsedText.Title != "" {
-				headerTxt.Title = parsedText.Title
-			}
-
-			if parsedText.Description != "" {
-				headerTxt.Bio = parsedText.Description
-			}
-
-			break
-		}
-	}
 
 	feed := &feeds.Feed{
 		Title:       headerTxt.Title,

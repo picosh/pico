@@ -69,11 +69,13 @@ var (
 	LEFT OUTER JOIN app_users ON app_users.id = posts.user_id
 	LEFT OUTER JOIN post_tags ON post_tags.post_id = posts.id
 	WHERE
+		hidden = FALSE AND
 		user_id = $1 AND
 		publish_at::date <= CURRENT_DATE AND
 		cur_space = $2
 	GROUP BY %s
-	ORDER BY publish_at DESC, slug DESC`, SelectPost, SelectPost)
+	ORDER BY publish_at DESC, slug DESC
+	LIMIT $3 OFFSET $4`, SelectPost, SelectPost)
 
 	sqlSelectAllPostsForUser = fmt.Sprintf(`
 	SELECT %s
@@ -113,11 +115,13 @@ var (
 	LEFT OUTER JOIN app_users ON app_users.id = posts.user_id
 	LEFT OUTER JOIN post_tags ON post_tags.post_id = posts.id
 	WHERE
+		hidden = FALSE AND
 		user_id = $1 AND
 		(post_tags.name = $2 OR hidden = true) AND
 		publish_at::date <= CURRENT_DATE AND
 		cur_space = $3
-	ORDER BY publish_at DESC`, SelectPost)
+	ORDER BY publish_at DESC
+	LIMIT $4 OFFSET $5`, SelectPost)
 
 	/* sqlSelectUserPostsWithTags = fmt.Sprintf(`
 	SELECT %s, STRING_AGG(coalesce(post_tags.name, ''), ',') tags
@@ -705,11 +709,17 @@ func (me *PsqlDB) RemovePosts(postIDs []string) error {
 	return err
 }
 
-func (me *PsqlDB) FindPostsForUser(userID string, space string) ([]*db.Post, error) {
+func (me *PsqlDB) FindPostsForUser(page *db.Pager, userID string, space string) (*db.Paginate[*db.Post], error) {
 	var posts []*db.Post
-	rs, err := me.Db.Query(sqlSelectPostsForUser, userID, space)
+	rs, err := me.Db.Query(
+		sqlSelectPostsForUser,
+		userID,
+		space,
+		page.Num,
+		page.Num*page.Page,
+	)
 	if err != nil {
-		return posts, err
+		return nil, err
 	}
 	for rs.Next() {
 		post, err := CreatePostWithTagsFromRow(rs)
@@ -719,10 +729,22 @@ func (me *PsqlDB) FindPostsForUser(userID string, space string) ([]*db.Post, err
 
 		posts = append(posts, post)
 	}
+
 	if rs.Err() != nil {
-		return posts, rs.Err()
+		return nil, rs.Err()
 	}
-	return posts, nil
+
+	var count int
+	err = me.Db.QueryRow(sqlSelectPostCount, space).Scan(&count)
+	if err != nil {
+		return nil, err
+	}
+
+	pager := &db.Paginate[*db.Post]{
+		Data:  posts,
+		Total: int(math.Ceil(float64(count) / float64(page.Num))),
+	}
+	return pager, nil
 }
 
 func (me *PsqlDB) FindAllPostsForUser(userID string, space string) ([]*db.Post, error) {
@@ -867,11 +889,18 @@ func (me *PsqlDB) ReplaceTagsForPost(tags []string, postID string) error {
 	return err
 }
 
-func (me *PsqlDB) FindUserPostsByTag(tag, userID, space string) ([]*db.Post, error) {
+func (me *PsqlDB) FindUserPostsByTag(page *db.Pager, tag, userID, space string) (*db.Paginate[*db.Post], error) {
 	var posts []*db.Post
-	rs, err := me.Db.Query(sqlSelectUserPostsByTag, userID, tag, space)
+	rs, err := me.Db.Query(
+		sqlSelectUserPostsByTag,
+		userID,
+		tag,
+		space,
+		page.Num,
+		page.Num*page.Page,
+	)
 	if err != nil {
-		return posts, err
+		return nil, err
 	}
 	for rs.Next() {
 		post, err := CreatePostFromRow(rs)
@@ -881,10 +910,22 @@ func (me *PsqlDB) FindUserPostsByTag(tag, userID, space string) ([]*db.Post, err
 
 		posts = append(posts, post)
 	}
+
 	if rs.Err() != nil {
-		return posts, rs.Err()
+		return nil, rs.Err()
 	}
-	return posts, nil
+
+	var count int
+	err = me.Db.QueryRow(sqlSelectPostCount, space).Scan(&count)
+	if err != nil {
+		return nil, err
+	}
+
+	pager := &db.Paginate[*db.Post]{
+		Data:  posts,
+		Total: int(math.Ceil(float64(count) / float64(page.Num))),
+	}
+	return pager, nil
 }
 
 func (me *PsqlDB) FindPostsByTag(pager *db.Pager, tag, space string) (*db.Paginate[*db.Post], error) {

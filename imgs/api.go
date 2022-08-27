@@ -115,11 +115,14 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 
 	tag := r.URL.Query().Get("tag")
 	var posts []*db.Post
+	var p *db.Paginate[*db.Post]
+	pager := &db.Pager{Num: 1000, Page: 0}
 	if tag == "" {
-		posts, err = dbpool.FindPostsForUser(user.ID, cfg.Space)
+		p, err = dbpool.FindPostsForUser(pager, user.ID, cfg.Space)
 	} else {
-		posts, err = dbpool.FindUserPostsByTag(tag, user.ID, cfg.Space)
+		p, err = dbpool.FindUserPostsByTag(pager, tag, user.ID, cfg.Space)
 	}
+	posts = p.Data
 
 	if err != nil {
 		logger.Error(err)
@@ -379,7 +382,8 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	posts, err := dbpool.FindPostsForUser(user.ID, cfg.Space)
+	pager, err := dbpool.FindPostsForUser(&db.Pager{Num: 10, Page: 0}, user.ID, cfg.Space)
+	posts := pager.Data
 
 	if err != nil {
 		logger.Error(err)

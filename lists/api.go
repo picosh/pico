@@ -93,11 +93,14 @@ func getPostsForUser(r *http.Request, user *db.User, tag string) ([]*db.Post, er
 	var err error
 
 	posts := make([]*db.Post, 0)
+	pager := &db.Pager{Num: 1000, Page: 0}
+	var p *db.Paginate[*db.Post]
 	if tag == "" {
-		posts, err = dbpool.FindPostsForUser(user.ID, cfg.Space)
+		p, err = dbpool.FindPostsForUser(pager, user.ID, cfg.Space)
 	} else {
-		posts, err = dbpool.FindUserPostsByTag(tag, user.ID, cfg.Space)
+		p, err = dbpool.FindUserPostsByTag(pager, tag, user.ID, cfg.Space)
 	}
+	posts = p.Data
 
 	if err != nil {
 		return posts, err
@@ -156,43 +159,46 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 		Title: GetBlogName(username),
 		Bio:   "",
 	}
+	header, err := dbpool.FindPostWithFilename("_header.txt", user.ID, cfg.Space)
+	if err == nil {
+		parsedText := ParseText(header.Text)
+		if parsedText.MetaData.Title != "" {
+			headerTxt.Title = parsedText.MetaData.Title
+		}
+
+		if parsedText.MetaData.Description != "" {
+			headerTxt.Bio = parsedText.MetaData.Description
+		}
+
+		headerTxt.Nav = parsedText.Items
+		if len(headerTxt.Nav) > 0 {
+			headerTxt.HasItems = true
+		}
+	}
+
 	readmeTxt := &ReadmeTxt{}
+	readme, err := dbpool.FindPostWithFilename("_header.txt", user.ID, cfg.Space)
+	if err == nil {
+		parsedText := ParseText(readme.Text)
+		readmeTxt.Items = parsedText.Items
+		readmeTxt.ListType = parsedText.MetaData.ListType
+		if len(readmeTxt.Items) > 0 {
+			readmeTxt.HasItems = true
+		}
+	}
 
 	postCollection := make([]PostItemData, 0, len(posts))
 	for _, post := range posts {
-		if post.Filename == "_header.txt" {
-			parsedText := ParseText(post.Text)
-			if parsedText.MetaData.Title != "" {
-				headerTxt.Title = parsedText.MetaData.Title
-			}
-
-			if parsedText.MetaData.Description != "" {
-				headerTxt.Bio = parsedText.MetaData.Description
-			}
-
-			headerTxt.Nav = parsedText.Items
-			if len(headerTxt.Nav) > 0 {
-				headerTxt.HasItems = true
-			}
-		} else if post.Filename == "_readme.txt" {
-			parsedText := ParseText(post.Text)
-			readmeTxt.Items = parsedText.Items
-			readmeTxt.ListType = parsedText.MetaData.ListType
-			if len(readmeTxt.Items) > 0 {
-				readmeTxt.HasItems = true
-			}
-		} else {
-			p := PostItemData{
-				URL:            template.URL(cfg.FullPostURL(post.Username, post.Slug, onSubdomain, withUserName)),
-				BlogURL:        template.URL(cfg.FullBlogURL(post.Username, onSubdomain, withUserName)),
-				Title:          shared.FilenameToTitle(post.Filename, post.Title),
-				PublishAt:      post.PublishAt.Format("02 Jan, 2006"),
-				PublishAtISO:   post.PublishAt.Format(time.RFC3339),
-				UpdatedTimeAgo: shared.TimeAgo(post.UpdatedAt),
-				UpdatedAtISO:   post.UpdatedAt.Format(time.RFC3339),
-			}
-			postCollection = append(postCollection, p)
+		p := PostItemData{
+			URL:            template.URL(cfg.FullPostURL(post.Username, post.Slug, onSubdomain, withUserName)),
+			BlogURL:        template.URL(cfg.FullBlogURL(post.Username, onSubdomain, withUserName)),
+			Title:          shared.FilenameToTitle(post.Filename, post.Title),
+			PublishAt:      post.PublishAt.Format("02 Jan, 2006"),
+			PublishAtISO:   post.PublishAt.Format(time.RFC3339),
+			UpdatedTimeAgo: shared.TimeAgo(post.UpdatedAt),
+			UpdatedAtISO:   post.UpdatedAt.Format(time.RFC3339),
 		}
+		postCollection = append(postCollection, p)
 	}
 
 	data := BlogPageData{
@@ -517,19 +523,15 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 	headerTxt := &HeaderTxt{
 		Title: GetBlogName(username),
 	}
+	header, err := dbpool.FindPostWithFilename("_header.txt", user.ID, cfg.Space)
+	if err == nil {
+		parsedText := ParseText(header.Text)
+		if parsedText.MetaData.Title != "" {
+			headerTxt.Title = parsedText.MetaData.Title
+		}
 
-	for _, post := range posts {
-		if post.Filename == "_header.txt" {
-			parsedText := ParseText(post.Text)
-			if parsedText.MetaData.Title != "" {
-				headerTxt.Title = parsedText.MetaData.Title
-			}
-
-			if parsedText.MetaData.Description != "" {
-				headerTxt.Bio = parsedText.MetaData.Description
-			}
-
-			break
+		if parsedText.MetaData.Description != "" {
+			headerTxt.Bio = parsedText.MetaData.Description
 		}
 	}
 
