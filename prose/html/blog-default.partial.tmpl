@@ -1,0 +1,37 @@
+{{define "blog-default"}}
+<header class="text-center">
+    <h1 class="text-2xl font-bold">{{.Header.Title}}</h1>
+    {{if .Header.Bio}}<p class="text-lg">{{.Header.Bio}}</p>{{end}}
+    <nav>
+        {{range .Header.Nav}}
+        <a href="{{.URL}}" class="text-lg">{{.Text}}</a> |
+        {{end}}
+        <a href="{{.RSSURL}}" class="text-lg">rss</a>
+    </nav>
+    <hr />
+</header>
+<main>
+    {{if .Readme.HasText}}
+    <section>
+        <article class="md">
+            {{.Readme.Contents}}
+        </article>
+        <hr />
+    </section>
+    {{end}}
+
+    <section class="posts">
+        {{if .HasFilter}}
+            <a href={{.URL}}>clear filters</a>
+        {{end}}
+        {{range .Posts}}
+        <article class="my">
+            <div class="flex items-center">
+                <time datetime="{{.PublishAtISO}}" class="font-italic text-sm post-date">{{.PublishAt}}</time>
+                <div class="font-bold flex-1"><a href="{{.URL}}">{{.Title}}</a></div>
+            </div>
+        </article>
+        {{end}}
+    </section>
+</main>
+{{end}}

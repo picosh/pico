@@ -293,6 +293,14 @@ figure {
   margin-bottom: 0.5rem;
 }
 
+.mr {
+  margin-right: 0.5rem;
+}
+
+.ml {
+  margin-left: 0.5rem;
+}
+
 .my {
   margin-top: 0.5rem;
   margin-bottom: 0.5rem;

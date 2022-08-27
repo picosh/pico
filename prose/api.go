@@ -89,6 +89,7 @@ type HeaderTxt struct {
 	Bio      string
 	Nav      []shared.Link
 	HasLinks bool
+	Layout   string
 }
 
 type ReadmeTxt struct {
@@ -171,6 +172,8 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ts, err := shared.RenderTemplate(cfg, []string{
+		cfg.StaticPath("html/blog-default.partial.tmpl"),
+		cfg.StaticPath("html/blog-aside.partial.tmpl"),
 		cfg.StaticPath("html/blog.page.tmpl"),
 	})
 
@@ -187,8 +190,9 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	headerTxt := &HeaderTxt{
-		Title: GetBlogName(username),
-		Bio:   "",
+		Title:  GetBlogName(username),
+		Bio:    "",
+		Layout: "default",
 	}
 	readmeTxt := &ReadmeTxt{}
 
@@ -201,6 +205,9 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 		headerTxt.Bio = parsedText.Description
 		if parsedText.Title != "" {
 			headerTxt.Title = parsedText.Title
+		}
+		if parsedText.Layout != "" {
+			headerTxt.Layout = parsedText.Layout
 		}
 
 		headerTxt.Nav = []shared.Link{}
@@ -434,6 +441,7 @@ func transparencyHandler(w http.ResponseWriter, r *http.Request) {
 
 	ts, err := template.ParseFiles(
 		cfg.StaticPath("html/transparency.page.tmpl"),
+		cfg.StaticPath("html/base.layout.tmpl"),
 		cfg.StaticPath("html/footer.partial.tmpl"),
 		cfg.StaticPath("html/marketing-footer.partial.tmpl"),
 		cfg.StaticPath("html/base.layout.tmpl"),

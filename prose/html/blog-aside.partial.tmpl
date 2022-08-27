@@ -1,0 +1,54 @@
+{{define "blog-aside"}}
+<main class="flex">
+    <section class="flex-1 mr">
+        <div>
+            <h1 class="text-2xl font-bold">{{.Header.Title}}</h1>
+            {{if .Header.Bio}}<span>{{.Header.Bio}}</span>{{end}}
+        </div>
+
+        <div id="readme">
+            {{if .Readme.HasText}}
+            <section class="md">
+                {{.Readme.Contents}}
+            </section>
+            {{end}}
+            <div>
+                {{range .Header.Nav}}
+                <a href="{{.URL}}" class="text-lg">{{.Text}}</a> ·
+                {{end}}
+                <a href="{{.RSSURL}}" class="text-lg">rss</a>
+            </div>
+            <hr />
+        </div>
+
+        {{if .HasFilter}}
+            <a href={{.URL}}>clear filters</a>
+        {{end}}
+
+        <div class="posts">
+        {{range .Posts}}
+            <article class="my">
+                <div class="flex items-center">
+                    <time datetime="{{.PublishAtISO}}" class="font-italic text-sm post-date">{{.PublishAt}}</time>
+                    <div class="font-bold flex-1"><a href="{{.URL}}">{{.Title}}</a></div>
+                </div>
+            </article>
+        {{end}}
+        </div>
+    </section>
+
+    <aside>
+        {{if .Readme.HasText}}
+        <section class="md">
+            {{.Readme.Contents}}
+        </section>
+        {{end}}
+        <nav>
+            {{range .Header.Nav}}
+            <a href="{{.URL}}" class="text-lg">{{.Text}}</a> ·
+            {{end}}
+            <a href="{{.RSSURL}}" class="text-lg">rss</a>
+        </nav>
+    </aside>
+</main>
+{{end}}

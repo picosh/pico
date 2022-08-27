@@ -33,3 +33,33 @@ table {
   font-weight: bold;
   padding: 0.6rem 0 0 0;
 }
+
+.layout-aside {
+  max-width: 50rem;
+}
+
+.layout-aside aside {
+  width: 200px;
+}
+
+.layout-aside img {
+  border-radius: 5px;
+}
+
+#readme {
+  display: none;
+}
+
+@media only screen and (max-width: 600px) {
+  .layout-aside main {
+    flex-direction: column;
+  }
+
+  #readme {
+    display: block;
+  }
+
+  aside {
+    display: none;
+  }
+}

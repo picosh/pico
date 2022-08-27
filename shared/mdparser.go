@@ -31,6 +31,7 @@ type MetaData struct {
 	Description string
 	Nav         []Link
 	Tags        []string
+	Layout      string
 }
 
 type ParsedText struct {
@@ -208,6 +209,7 @@ func ParseText(text string, absURL string) (*ParsedText, error) {
 	metaData := meta.Get(context)
 	parsed.MetaData.Title = toString(metaData["title"])
 	parsed.MetaData.Description = toString(metaData["description"])
+	parsed.MetaData.Layout = toString(metaData["layout"])
 
 	var publishAt *time.Time = nil
 	var err error
