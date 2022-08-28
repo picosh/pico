@@ -267,14 +267,22 @@ This will show up on the blog landing page.
             2 DNS records need to be created:
         </p>
 
-        <p>CNAME for the domain to prose (subdomains or DNS hosting with CNAME flattening) or A record</p>
+        <p><code>CNAME</code> for the domain to prose (subdomains or DNS hosting with <code>CNAME</code> flattening) or <code>A</code> record</p>
         <pre>CNAME subdomain.yourcustomdomain.com -> prose.sh</pre>
         <p>Resulting in:</p>
+
         <pre>subdomain.yourcustomdomain.com.         300     IN      CNAME   prose.sh.</pre>
-        <p>And a TXT record to tell Prose what blog is hosted on that domain at the subdomain entry _prose</p>
+
+        <p>And a <code>TXT</code> record to tell Prose what blog is hosted on that domain at the subdomain entry <code>_prose</code></p>
         <pre>TXT _prose.subdomain.yourcustomdomain.com -> yourproseusername</pre>
         <p>Resulting in:</p>
         <pre>_prose.subdomain.yourcustomdomain.com.         300     IN      TXT     "hey"</pre>
+
+        <p>
+            Depending on your DNS, this could take some time to fully switch over.  We have an endpoint
+            to check whether or not custom domains are setup:
+            <pre>curl -vvvv https://prose.sh/check?domain=<DOMAIN></pre>
+        </p>
     </section>
 
     <section id="hugo-support">
