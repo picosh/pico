@@ -42,8 +42,8 @@ func createRouter(handler *filehandlers.ScpUploadHandler) proxy.Router {
 			scp.Middleware(handler),
 			wishrsync.Middleware(handler),
 			bm.Middleware(cms.Middleware(&handler.Cfg.ConfigCms, handler.Cfg)),
-			lm.Middleware(),
 			auth.Middleware(handler),
+			lm.Middleware(),
 		}
 	}
 }
