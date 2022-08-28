@@ -10,17 +10,29 @@
 <meta property="og:url" content="{{.URL}}">
 <meta property="og:title" content="{{.Header.Title}}">
 {{if .Header.Bio}}<meta property="og:description" content="{{.Header.Bio}}">{{end}}
+
+{{if .Header.Image}}
+<meta itemprop="image" content="{{.Header.Image}}" />
+<meta property="og:image" content="{{.Header.Image}}" />
+
+<meta name="twitter:image" content="{{.Header.Image}}" />
+{{else}}
 <meta property="og:image:width" content="300" />
 <meta property="og:image:height" content="300" />
 <meta itemprop="image" content="https://{{.Site.Domain}}/card.png" />
 <meta property="og:image" content="https://{{.Site.Domain}}/card.png" />
 
+<meta name="twitter:image" content="https://{{.Site.Domain}}/card.png" />
+{{end}}
+
+{{if .Header.ImageCard}}
+<meta property="twitter:card" content="{{.Header.ImageCard}}">
+{{else}}
 <meta property="twitter:card" content="summary">
+{{end}}
 <meta property="twitter:url" content="{{.URL}}">
 <meta property="twitter:title" content="{{.Header.Title}}">
 {{if .Header.Bio}}<meta property="twitter:description" content="{{.Header.Bio}}">{{end}}
-<meta name="twitter:image" content="https://{{.Site.Domain}}/card.png" />
-<meta name="twitter:image:src" content="https://{{.Site.Domain}}/card.png" />
 
 <link rel="stylesheet" href="/syntax.css" />
 {{if .HasCSS}}<link rel="stylesheet" href="{{.CssURL}}" />{{end}}

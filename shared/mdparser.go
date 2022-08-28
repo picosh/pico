@@ -32,6 +32,8 @@ type MetaData struct {
 	Nav         []Link
 	Tags        []string
 	Layout      string
+	Image       string
+	ImageCard   string
 }
 
 type ParsedText struct {
@@ -210,6 +212,13 @@ func ParseText(text string, absURL string) (*ParsedText, error) {
 	parsed.MetaData.Title = toString(metaData["title"])
 	parsed.MetaData.Description = toString(metaData["description"])
 	parsed.MetaData.Layout = toString(metaData["layout"])
+	parsed.MetaData.Image = toString(metaData["image"])
+	if strings.HasPrefix(parsed.Image, "/") {
+		parsed.MetaData.Image = fmt.Sprintf("%s%s", absURL, parsed.Image)
+	} else if strings.HasPrefix(parsed.Image, "./") {
+		parsed.MetaData.Image = fmt.Sprintf("%s%s", absURL, parsed.Image[1:])
+	}
+	parsed.MetaData.ImageCard = toString(metaData["card"])
 
 	var publishAt *time.Time = nil
 	var err error

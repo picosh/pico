@@ -66,17 +66,19 @@ type PostPageData struct {
 	PageTitle    string
 	URL          template.URL
 	BlogURL      template.URL
+	BlogName     string
 	Slug         string
 	Title        string
 	Description  string
 	Username     string
-	BlogName     string
 	Contents     template.HTML
 	PublishAtISO string
 	PublishAt    string
 	HasCSS       bool
 	CssURL       template.URL
 	Tags         []string
+	Image        template.URL
+	ImageCard    string
 }
 
 type TransparencyPageData struct {
@@ -85,11 +87,13 @@ type TransparencyPageData struct {
 }
 
 type HeaderTxt struct {
-	Title    string
-	Bio      string
-	Nav      []shared.Link
-	HasLinks bool
-	Layout   string
+	Title     string
+	Bio       string
+	Nav       []shared.Link
+	HasLinks  bool
+	Layout    string
+	Image     template.URL
+	ImageCard string
 }
 
 type ReadmeTxt struct {
@@ -190,9 +194,10 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	headerTxt := &HeaderTxt{
-		Title:  GetBlogName(username),
-		Bio:    "",
-		Layout: "default",
+		Title:     GetBlogName(username),
+		Bio:       "",
+		Layout:    "default",
+		ImageCard: "summary",
 	}
 	readmeTxt := &ReadmeTxt{}
 
@@ -203,11 +208,11 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 			logger.Error(err)
 		}
 		headerTxt.Bio = parsedText.Description
+		headerTxt.Layout = parsedText.Layout
+		headerTxt.Image = template.URL(parsedText.Image)
+		headerTxt.ImageCard = parsedText.ImageCard
 		if parsedText.Title != "" {
 			headerTxt.Title = parsedText.Title
-		}
-		if parsedText.Layout != "" {
-			headerTxt.Layout = parsedText.Layout
 		}
 
 		headerTxt.Nav = []shared.Link{}
@@ -342,6 +347,8 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	onSubdomain := cfg.IsSubdomains() && strings.Contains(hostDomain, appDomain)
 	withUserName := (!onSubdomain && hostDomain == appDomain) || !cfg.IsCustomdomains()
 
+	ogImage := ""
+	ogImageCard := ""
 	hasCSS := false
 	var data PostPageData
 	post, err := dbpool.FindPostWithSlug(slug, user.ID, cfg.Space)
@@ -361,6 +368,16 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			if readmeParsed.MetaData.Title != "" {
 				blogName = readmeParsed.MetaData.Title
 			}
+			ogImage = readmeParsed.Image
+			ogImageCard = readmeParsed.ImageCard
+		}
+
+		if parsedText.Image != "" {
+			ogImage = parsedText.Image
+		}
+
+		if parsedText.ImageCard != "" {
+			ogImageCard = parsedText.ImageCard
 		}
 
 		// we need the blog name from the readme unfortunately
@@ -395,6 +412,8 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			HasCSS:       hasCSS,
 			CssURL:       template.URL(cfg.CssURL(username)),
 			Tags:         parsedText.Tags,
+			Image:        template.URL(ogImage),
+			ImageCard:    ogImageCard,
 		}
 	} else {
 		data = PostPageData{
