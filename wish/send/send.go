@@ -2,6 +2,7 @@ package send
 
 import (
 	"git.sr.ht/~erock/pico/wish/pipe"
+	"git.sr.ht/~erock/pico/wish/send/auth"
 	"git.sr.ht/~erock/pico/wish/send/rsync"
 	"git.sr.ht/~erock/pico/wish/send/scp"
 	"git.sr.ht/~erock/pico/wish/send/sftp"
@@ -12,7 +13,7 @@ import (
 
 func Middleware(writeHandler utils.CopyFromClientHandler) ssh.Option {
 	return func(server *ssh.Server) error {
-		err := wish.WithMiddleware(pipe.Middleware(writeHandler, ""), scp.Middleware(writeHandler), rsync.Middleware(writeHandler))(server)
+		err := wish.WithMiddleware(pipe.Middleware(writeHandler, ""), scp.Middleware(writeHandler), rsync.Middleware(writeHandler), auth.Middleware(writeHandler))(server)
 		if err != nil {
 			return err
 		}

@@ -77,12 +77,6 @@ func Middleware(writeHandler utils.CopyFromClientHandler) wish.Middleware {
 				return
 			}
 
-			err := writeHandler.Validate(session)
-			if err != nil {
-				utils.ErrorHandler(session, err)
-				return
-			}
-
 			fileHandler := &handler{
 				session:      session,
 				writeHandler: writeHandler,

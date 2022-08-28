@@ -22,12 +22,6 @@ func Middleware(writeHandler utils.CopyFromClientHandler, ext string) wish.Middl
 				return
 			}
 
-			err := writeHandler.Validate(session)
-			if err != nil {
-				utils.ErrorHandler(session, err)
-				return
-			}
-
 			name := strings.TrimSpace(strings.Join(session.Command(), " "))
 			postTime := time.Now()
 

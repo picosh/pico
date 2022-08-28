@@ -1,7 +1,6 @@
 package sftp
 
 import (
-	"bytes"
 	"errors"
 	"io"
 	"os"
@@ -65,7 +64,7 @@ func (f *handler) Filewrite(r *sftp.Request) (io.WriterAt, error) {
 		Atime:    int64(r.Attributes().Atime),
 	}
 
-	buf := bytes.NewBuffer([]byte{})
+	buf := &buffer{}
 	fileEntry.Reader = buf
 
 	return fakeWrite{fileEntry: fileEntry, buf: buf, handler: f}, nil

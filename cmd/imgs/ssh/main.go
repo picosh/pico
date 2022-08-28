@@ -17,6 +17,7 @@ import (
 	"git.sr.ht/~erock/pico/wish/list"
 	"git.sr.ht/~erock/pico/wish/pipe"
 	"git.sr.ht/~erock/pico/wish/proxy"
+	"git.sr.ht/~erock/pico/wish/send/auth"
 	wishrsync "git.sr.ht/~erock/pico/wish/send/rsync"
 	"git.sr.ht/~erock/pico/wish/send/scp"
 	"git.sr.ht/~erock/pico/wish/send/sftp"
@@ -43,6 +44,7 @@ func createRouter(cfg *shared.ConfigSite, handler utils.CopyFromClientHandler) p
 			wishrsync.Middleware(handler),
 			bm.Middleware(cms.Middleware(&cfg.ConfigCms, cfg)),
 			lm.Middleware(),
+			auth.Middleware(handler),
 		}
 	}
 }

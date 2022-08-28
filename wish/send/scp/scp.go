@@ -29,11 +29,7 @@ func Middleware(writeHandler utils.CopyFromClientHandler) wish.Middleware {
 				return
 			}
 
-			err := writeHandler.Validate(session)
-			if err != nil {
-				utils.ErrorHandler(session, err)
-				return
-			}
+			var err error
 
 			switch info.Op {
 			case OpCopyToClient:
