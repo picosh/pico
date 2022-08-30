@@ -42,8 +42,8 @@ func createRouter(cfg *shared.ConfigSite, handler utils.CopyFromClientHandler) p
 			list.Middleware(handler),
 			scp.Middleware(handler),
 			wishrsync.Middleware(handler),
-			bm.Middleware(cms.Middleware(&cfg.ConfigCms, cfg)),
 			auth.Middleware(handler),
+			bm.Middleware(cms.Middleware(&cfg.ConfigCms, cfg)),
 			lm.Middleware(),
 		}
 	}
