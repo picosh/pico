@@ -7,13 +7,25 @@ import (
 	"git.sr.ht/~erock/pico/wish/cms/config"
 )
 
-func ImgBaseURL(username string) string {
-	cfg := NewConfigSite()
-	if cfg.IsSubdomains() {
-		return fmt.Sprintf("%s://%s.%s", cfg.Protocol, username, cfg.Domain)
-	}
+type ImgsLinkify struct {
+	Cfg          *shared.ConfigSite
+	Username     string
+	OnSubdomain  bool
+	WithUsername bool
+}
 
-	return "/"
+func NewImgsLinkify(username string, onSubdomain, withUsername bool) *ImgsLinkify {
+	cfg := NewConfigSite()
+	return &ImgsLinkify{
+		Cfg:          cfg,
+		Username:     username,
+		OnSubdomain:  onSubdomain,
+		WithUsername: withUsername,
+	}
+}
+
+func (i *ImgsLinkify) Create(fname string) string {
+	return i.Cfg.ImgURL(i.Username, fname, i.OnSubdomain, i.WithUsername)
 }
 
 func NewConfigSite() *shared.ConfigSite {

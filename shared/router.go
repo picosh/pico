@@ -105,6 +105,9 @@ func GetStorage(r *http.Request) storage.ObjectStorage {
 
 func GetField(r *http.Request, index int) string {
 	fields := r.Context().Value(ctxKey{}).([]string)
+	if index >= len(fields) {
+		return ""
+	}
 	return fields[index]
 }
 

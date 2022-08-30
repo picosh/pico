@@ -203,7 +203,8 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 
 	readme, err := dbpool.FindPostWithFilename("_readme.md", user.ID, cfg.Space)
 	if err == nil {
-		parsedText, err := shared.ParseText(readme.Text, imgs.ImgBaseURL(readme.Username))
+		linkify := imgs.NewImgsLinkify(readme.Username, onSubdomain, withUserName)
+		parsedText, err := shared.ParseText(readme.Text, linkify)
 		if err != nil {
 			logger.Error(err)
 		}
@@ -352,8 +353,9 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	hasCSS := false
 	var data PostPageData
 	post, err := dbpool.FindPostWithSlug(slug, user.ID, cfg.Space)
+	linkify := imgs.NewImgsLinkify(username, onSubdomain, withUserName)
 	if err == nil {
-		parsedText, err := shared.ParseText(post.Text, imgs.ImgBaseURL(username))
+		parsedText, err := shared.ParseText(post.Text, linkify)
 		if err != nil {
 			logger.Error(err)
 		}
@@ -361,7 +363,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 		// we need the blog name from the readme unfortunately
 		readme, err := dbpool.FindPostWithFilename("_readme.md", user.ID, cfg.Space)
 		if err == nil {
-			readmeParsed, err := shared.ParseText(readme.Text, imgs.ImgBaseURL(username))
+			readmeParsed, err := shared.ParseText(readme.Text, linkify)
 			if err != nil {
 				logger.Error(err)
 			}
@@ -604,7 +606,8 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 
 	readme, err := dbpool.FindPostWithFilename("_readme.md", user.ID, cfg.Space)
 	if err == nil {
-		parsedText, err := shared.ParseText(readme.Text, imgs.ImgBaseURL(readme.Username))
+		linkify := imgs.NewImgsLinkify(readme.Username, true, false)
+		parsedText, err := shared.ParseText(readme.Text, linkify)
 		if err != nil {
 			logger.Error(err)
 		}
@@ -636,7 +639,8 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 		if slices.Contains(cfg.HiddenPosts, post.Filename) {
 			continue
 		}
-		parsed, err := shared.ParseText(post.Text, imgs.ImgBaseURL(post.Username))
+		linkify := imgs.NewImgsLinkify(post.Username, true, false)
+		parsed, err := shared.ParseText(post.Text, linkify)
 		if err != nil {
 			logger.Error(err)
 		}
@@ -719,7 +723,8 @@ func rssHandler(w http.ResponseWriter, r *http.Request) {
 
 	var feedItems []*feeds.Item
 	for _, post := range pager.Data {
-		parsed, err := shared.ParseText(post.Text, imgs.ImgBaseURL(post.Username))
+		linkify := imgs.NewImgsLinkify(post.Username, onSubdomain, withUserName)
+		parsed, err := shared.ParseText(post.Text, linkify)
 		if err != nil {
 			logger.Error(err)
 		}

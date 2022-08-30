@@ -155,6 +155,32 @@ func (c *ConfigSite) ImgURL(username string, slug string, onSubdomain bool, with
 	return fmt.Sprintf("/%s", fname)
 }
 
+func (c *ConfigSite) ImgPostURL(username string, slug string, onSubdomain bool, withUserName bool) string {
+	fname := url.PathEscape(strings.TrimLeft(slug, "/"))
+	if c.IsSubdomains() && onSubdomain {
+		return fmt.Sprintf("%s://%s.%s/p/%s", c.Protocol, username, c.Domain, fname)
+	}
+
+	if withUserName {
+		return fmt.Sprintf("/%s/p/%s", username, fname)
+	}
+
+	return fmt.Sprintf("/p/%s", fname)
+}
+
+func (c *ConfigSite) ImgOrigURL(username string, slug string, onSubdomain bool, withUserName bool) string {
+	fname := url.PathEscape(strings.TrimLeft(slug, "/"))
+	if c.IsSubdomains() && onSubdomain {
+		return fmt.Sprintf("%s://%s.%s/o/%s", c.Protocol, username, c.Domain, fname)
+	}
+
+	if withUserName {
+		return fmt.Sprintf("/%s/o/%s", username, fname)
+	}
+
+	return fmt.Sprintf("/o/%s", fname)
+}
+
 func (c *ConfigSite) TagURL(username, tag string, onSubdomain, withUserName bool) string {
 	tg := url.PathEscape(tag)
 	return fmt.Sprintf("%s?tag=%s", c.FullBlogURL(username, onSubdomain, withUserName), tg)

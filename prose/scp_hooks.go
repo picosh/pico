@@ -6,6 +6,7 @@ import (
 
 	"git.sr.ht/~erock/pico/db"
 	"git.sr.ht/~erock/pico/filehandlers"
+	"git.sr.ht/~erock/pico/imgs"
 	"git.sr.ht/~erock/pico/shared"
 	"golang.org/x/exp/slices"
 )
@@ -45,7 +46,8 @@ func (p *MarkdownHooks) FileValidate(data *filehandlers.PostMetaData) (bool, err
 }
 
 func (p *MarkdownHooks) FileMeta(data *filehandlers.PostMetaData) error {
-	parsedText, err := shared.ParseText(data.Text, "")
+	linkify := imgs.NewImgsLinkify("", true, false)
+	parsedText, err := shared.ParseText(data.Text, linkify)
 	// we return nil here because we don't want the file upload to fail
 	if err != nil {
 		return nil

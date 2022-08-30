@@ -9,6 +9,7 @@ import (
 
 	"git.sr.ht/~erock/pico/db"
 	"git.sr.ht/~erock/pico/db/postgres"
+	"git.sr.ht/~erock/pico/imgs"
 	"git.sr.ht/~erock/pico/lists"
 	"git.sr.ht/~erock/pico/shared"
 	"git.sr.ht/~erock/pico/wish/cms/config"
@@ -97,7 +98,8 @@ func main() {
 	logger.Info("updating dates")
 	for _, post := range posts {
 		if post.Space == "prose" {
-			parsed, err := shared.ParseText(post.Text, "")
+			linkify := imgs.NewImgsLinkify(post.Username, true, false)
+			parsed, err := shared.ParseText(post.Text, linkify)
 			if err != nil {
 				logger.Error(err)
 				continue

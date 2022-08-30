@@ -158,21 +158,28 @@ func (r *ImgRender) renderImage(w util.BufWriter, source []byte, node ast.Node, 
 	return ast.WalkSkipChildren, nil
 }
 
-func createImgURL(absURL string) func([]byte) []byte {
+type Linkify interface {
+	Create(fname string) string
+}
+
+func createImgURL(linkify Linkify) func([]byte) []byte {
 	return func(url []byte) []byte {
 		if url[0] == '/' {
-			nextURL := fmt.Sprintf("%s%s", absURL, string(url))
+			name := SanitizeFileExt(string(url))
+			//  fmt.Sprintf("%s%s", absURL, name)
+			nextURL := linkify.Create(name)
 			return []byte(nextURL)
 		} else if bytes.HasPrefix(url, []byte{'.', '/'}) {
-			fname := url[1:]
-			nextURL := fmt.Sprintf("%s%s", absURL, string(fname))
+			name := SanitizeFileExt(string(url[1:]))
+			// nextURL := fmt.Sprintf("%s%s", absURL, name)
+			nextURL := linkify.Create(name)
 			return []byte(nextURL)
 		}
 		return url
 	}
 }
 
-func ParseText(text string, absURL string) (*ParsedText, error) {
+func ParseText(text string, linkify Linkify) (*ParsedText, error) {
 	parsed := ParsedText{
 		MetaData: &MetaData{
 			Tags: []string{},
@@ -198,7 +205,7 @@ func ParseText(text string, absURL string) (*ParsedText, error) {
 		goldmark.WithRendererOptions(
 			ghtml.WithUnsafe(),
 			renderer.WithNodeRenderers(
-				util.Prioritized(NewImgsRenderer(createImgURL(absURL)), 0),
+				util.Prioritized(NewImgsRenderer(createImgURL(linkify)), 0),
 			),
 		),
 	)
@@ -214,9 +221,11 @@ func ParseText(text string, absURL string) (*ParsedText, error) {
 	parsed.MetaData.Layout = toString(metaData["layout"])
 	parsed.MetaData.Image = toString(metaData["image"])
 	if strings.HasPrefix(parsed.Image, "/") {
-		parsed.MetaData.Image = fmt.Sprintf("%s%s", absURL, parsed.Image)
+		parsed.Image = linkify.Create(parsed.Image)
+		// parsed.MetaData.Image = fmt.Sprintf("%s%s", absURL, parsed.Image)
 	} else if strings.HasPrefix(parsed.Image, "./") {
-		parsed.MetaData.Image = fmt.Sprintf("%s%s", absURL, parsed.Image[1:])
+		parsed.Image = linkify.Create(parsed.Image[1:])
+		// parsed.MetaData.Image = fmt.Sprintf("%s%s", absURL, parsed.Image[1:])
 	}
 	parsed.MetaData.ImageCard = toString(metaData["card"])
 

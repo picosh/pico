@@ -1,11 +1,17 @@
 package imgs
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"html/template"
+	"image"
+	gif "image/gif"
+	jpeg "image/jpeg"
+	png "image/png"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,6 +20,9 @@ import (
 	"git.sr.ht/~erock/pico/imgs/storage"
 	"git.sr.ht/~erock/pico/shared"
 	"github.com/gorilla/feeds"
+	"github.com/nfnt/resize"
+	"github.com/nickalie/go-webpbin"
+	"go.uber.org/zap"
 	"golang.org/x/exp/slices"
 )
 
@@ -96,10 +105,6 @@ func GetBlogName(username string) string {
 	return username
 }
 
-func isRequestTrackable(r *http.Request) bool {
-	return true
-}
-
 func blogHandler(w http.ResponseWriter, r *http.Request) {
 	username := shared.GetUsernameFromRequest(r)
 	dbpool := shared.GetDB(r)
@@ -154,9 +159,13 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 
 	postCollection := make([]*PostItemData, 0, len(posts))
 	for _, post := range posts {
+		url := fmt.Sprintf(
+			"%s/300x",
+			cfg.ImgURL(post.Username, post.Slug, onSubdomain, withUserName),
+		)
 		postCollection = append(postCollection, &PostItemData{
-			ImgURL:       template.URL(cfg.ImgURL(post.Username, post.Filename, onSubdomain, withUserName)),
-			URL:          template.URL(cfg.ImgURL(post.Username, post.Slug, onSubdomain, withUserName)),
+			ImgURL:       template.URL(url),
+			URL:          template.URL(cfg.ImgPostURL(post.Username, post.Slug, onSubdomain, withUserName)),
 			Caption:      post.Title,
 			PublishAt:    post.PublishAt.Format("02 Jan, 2006"),
 			PublishAtISO: post.PublishAt.Format(time.RFC3339),
@@ -182,62 +191,255 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func imgHandler(w http.ResponseWriter, r *http.Request) {
+type deviceType int
+
+const (
+	desktopDevice deviceType = iota
+)
+
+type ImgOptimizer struct {
+	// Specify the compression factor for RGB channels between 0 and 100. The default is 75.
+	// A small factor produces a smaller file with lower quality.
+	// Best quality is achieved by using a value of 100.
+	Quality    uint
+	Optimized  bool
+	Width      uint
+	Height     uint
+	DeviceType deviceType
+	Output     []byte
+	Dimes      string
+}
+
+func (h *ImgOptimizer) GetImage(contents []byte, mimeType string) (image.Image, error) {
+	r := bytes.NewReader(contents)
+	switch mimeType {
+	case "image/png":
+		return png.Decode(r)
+	case "image/jpeg":
+		return jpeg.Decode(r)
+	case "image/jpg":
+		return jpeg.Decode(r)
+	case "image/gif":
+		return gif.Decode(r)
+	}
+
+	return nil, fmt.Errorf("(%s) not supported optimization", mimeType)
+}
+
+func (h *ImgOptimizer) GetRatio() error {
+	// dimes = x250 -- width is auto scaled and height is 250
+	if strings.HasPrefix(h.Dimes, "x") {
+		height, err := strconv.ParseUint(h.Dimes[1:], 10, 64)
+		if err != nil {
+			return err
+		}
+		h.Height = uint(height)
+	}
+
+	// dimes = 250x -- width is 250 and height is auto scaled
+	if strings.HasSuffix(h.Dimes, "x") {
+		width, err := strconv.ParseUint(h.Dimes[:len(h.Dimes)-1], 10, 64)
+		if err != nil {
+			return err
+		}
+		h.Width = uint(width)
+	}
+
+	res := strings.Split(h.Dimes, "x")
+	if len(res) != 2 {
+		return fmt.Errorf("(%s) must be in format (x200, 200x, or 200x200)", h.Dimes)
+	}
+
+	width, err := strconv.ParseUint(res[0], 10, 64)
+	if err != nil {
+		return err
+	}
+	h.Width = uint(width)
+
+	height, err := strconv.ParseUint(res[1], 10, 64)
+	if err != nil {
+		return err
+	}
+	h.Height = uint(height)
+
+	return nil
+}
+
+type SubImager interface {
+	SubImage(r image.Rectangle) image.Image
+}
+
+func (h *ImgOptimizer) Process(contents []byte, mimeType string) ([]byte, error) {
+	if !h.Optimized {
+		return contents, nil
+	}
+
+	img, err := h.GetImage(contents, mimeType)
+	if err != nil {
+		return []byte{}, err
+	}
+
+	nextImg := img
+	if h.Height > 0 || h.Width > 0 {
+		nextImg = resize.Resize(h.Width, h.Height, img, resize.NearestNeighbor)
+	}
+
+	encoder := webpbin.Encoder{
+		Quality: h.Quality,
+	}
+
+	var output bytes.Buffer
+	w := bufio.NewWriter(&output)
+
+	err = encoder.Encode(w, nextImg)
+	if err != nil {
+		return []byte{}, err
+	}
+
+	return output.Bytes(), nil
+}
+
+func NewImgOptimizer(logger *zap.SugaredLogger, optimized bool, dimes string) *ImgOptimizer {
+	opt := &ImgOptimizer{
+		Optimized:  optimized,
+		DeviceType: desktopDevice,
+		Quality:    75,
+		Dimes:      dimes,
+	}
+
+	err := opt.GetRatio()
+	if err != nil {
+		logger.Error(err)
+	}
+	return opt
+}
+
+type ImgHandler struct {
+	Username  string
+	Subdomain string
+	Slug      string
+	Cfg       *shared.ConfigSite
+	Dbpool    db.DB
+	Storage   storage.ObjectStorage
+	Logger    *zap.SugaredLogger
+	Img       *ImgOptimizer
+}
+
+func imgHandler(w http.ResponseWriter, h *ImgHandler) {
+	user, err := h.Dbpool.FindUserForName(h.Username)
+	if err != nil {
+		h.Logger.Infof("blog not found: %s", h.Username)
+		http.Error(w, "blog not found", http.StatusNotFound)
+		return
+	}
+
+	post, err := h.Dbpool.FindPostWithSlug(h.Slug, user.ID, h.Cfg.Space)
+	if err != nil {
+		h.Logger.Infof("image not found %s/%s", h.Username, h.Slug)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	_, err = h.Dbpool.AddViewCount(post.ID)
+	if err != nil {
+		h.Logger.Error(err)
+	}
+
+	bucket, err := h.Storage.GetBucket(user.ID)
+	if err != nil {
+		h.Logger.Infof("bucket not found %s/%s", h.Username, post.Filename)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	contents, err := h.Storage.GetFile(bucket, post.Filename)
+	if err != nil {
+		h.Logger.Infof("file not found %s/%s", h.Username, post.Filename)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if h.Img.Optimized {
+		w.Header().Add("Content-Type", "image/webp")
+	} else {
+		w.Header().Add("Content-Type", post.MimeType)
+	}
+
+	contentsProc, err := h.Img.Process(contents, strings.TrimSpace(post.MimeType))
+	if err != nil {
+		h.Logger.Error(err)
+	}
+
+	_, err = w.Write(contentsProc)
+	if err != nil {
+		h.Logger.Error(err)
+	}
+}
+
+func imgRequestOriginal(w http.ResponseWriter, r *http.Request) {
 	username := shared.GetUsernameFromRequest(r)
 	subdomain := shared.GetSubdomain(r)
 	cfg := shared.GetCfg(r)
 
-	var filename string
+	var slug string
 	if !cfg.IsSubdomains() || subdomain == "" {
-		filename, _ = url.PathUnescape(shared.GetField(r, 1))
+		slug, _ = url.PathUnescape(shared.GetField(r, 1))
 	} else {
-		filename, _ = url.PathUnescape(shared.GetField(r, 0))
+		slug, _ = url.PathUnescape(shared.GetField(r, 0))
 	}
+
+	// users might add the file extension when requesting an image
+	// but we want to remove that
+	slug = shared.SanitizeFileExt(slug)
 
 	dbpool := shared.GetDB(r)
 	st := shared.GetStorage(r)
 	logger := shared.GetLogger(r)
 
-	user, err := dbpool.FindUserForName(username)
-	if err != nil {
-		logger.Infof("blog not found: %s", username)
-		http.Error(w, "blog not found", http.StatusNotFound)
-		return
+	imgHandler(w, &ImgHandler{
+		Username:  username,
+		Subdomain: subdomain,
+		Slug:      slug,
+		Cfg:       cfg,
+		Dbpool:    dbpool,
+		Storage:   st,
+		Logger:    logger,
+		Img:       NewImgOptimizer(logger, false, ""),
+	})
+}
+
+func imgRequest(w http.ResponseWriter, r *http.Request) {
+	username := shared.GetUsernameFromRequest(r)
+	subdomain := shared.GetSubdomain(r)
+	cfg := shared.GetCfg(r)
+
+	var dimes string
+	var slug string
+	if !cfg.IsSubdomains() || subdomain == "" {
+		slug, _ = url.PathUnescape(shared.GetField(r, 1))
+		dimes, _ = url.PathUnescape(shared.GetField(r, 2))
+	} else {
+		slug, _ = url.PathUnescape(shared.GetField(r, 0))
+		dimes, _ = url.PathUnescape(shared.GetField(r, 1))
 	}
 
-	post, err := dbpool.FindPostWithFilename(filename, user.ID, cfg.Space)
-	if err != nil {
-		logger.Infof("image not found %s/%s", username, filename)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	// users might add the file extension when requesting an image
+	// but we want to remove that
+	slug = shared.SanitizeFileExt(slug)
 
-	// validate and fire off analytic event
-	if isRequestTrackable(r) {
-		_, err := dbpool.AddViewCount(post.ID)
-		if err != nil {
-			logger.Error(err)
-		}
-	}
+	dbpool := shared.GetDB(r)
+	st := shared.GetStorage(r)
+	logger := shared.GetLogger(r)
 
-	bucket, err := st.GetBucket(user.ID)
-	if err != nil {
-		logger.Infof("bucket not found %s/%s", username, filename)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	contents, err := st.GetFile(bucket, post.Filename)
-	if err != nil {
-		logger.Infof("file not found %s/%s", username, post.Filename)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Add("Content-Type", "image/png")
-	_, err = w.Write(contents)
-	if err != nil {
-		logger.Error(err)
-	}
+	imgHandler(w, &ImgHandler{
+		Username:  username,
+		Subdomain: subdomain,
+		Slug:      slug,
+		Cfg:       cfg,
+		Dbpool:    dbpool,
+		Storage:   st,
+		Logger:    logger,
+		Img:       NewImgOptimizer(logger, true, dimes),
+	})
 }
 
 func postHandler(w http.ResponseWriter, r *http.Request) {
@@ -272,7 +474,8 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	var data PostPageData
 	post, err := dbpool.FindPostWithSlug(slug, user.ID, cfg.Space)
 	if err == nil {
-		parsed, err := shared.ParseText(post.Text, cfg.ImgURL(username, "", true, false))
+		linkify := NewImgsLinkify(username, onSubdomain, withUserName)
+		parsed, err := shared.ParseText(post.Text, linkify)
 		if err != nil {
 			logger.Error(err)
 		}
@@ -302,7 +505,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			Username:     username,
 			BlogName:     blogName,
 			Contents:     template.HTML(text),
-			ImgURL:       template.URL(cfg.ImgURL(username, post.Filename, onSubdomain, withUserName)),
+			ImgURL:       template.URL(cfg.ImgURL(username, post.Slug, onSubdomain, withUserName)),
 			Tags:         tagLinks,
 		}
 	} else {
@@ -431,7 +634,7 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		var tpl bytes.Buffer
 		data := &PostPageData{
-			ImgURL: template.URL(cfg.ImgURL(username, post.Filename, onSubdomain, withUserName)),
+			ImgURL: template.URL(cfg.ImgURL(username, post.Slug, onSubdomain, withUserName)),
 		}
 		if err := ts.Execute(&tpl, data); err != nil {
 			continue
@@ -510,7 +713,7 @@ func rssHandler(w http.ResponseWriter, r *http.Request) {
 	for _, post := range pager.Data {
 		var tpl bytes.Buffer
 		data := &PostPageData{
-			ImgURL: template.URL(cfg.ImgURL(post.Username, post.Filename, onSubdomain, withUserName)),
+			ImgURL: template.URL(cfg.ImgURL(post.Username, post.Slug, onSubdomain, withUserName)),
 		}
 		if err := ts.Execute(&tpl, data); err != nil {
 			continue
@@ -593,8 +796,9 @@ func createMainRoutes(staticRoutes []shared.Route) []shared.Route {
 		shared.NewRoute("GET", "/([^/]+)/rss.xml", rssBlogHandler),
 		shared.NewRoute("GET", "/([^/]+)/atom.xml", rssBlogHandler),
 		shared.NewRoute("GET", "/([^/]+)/feed.xml", rssBlogHandler),
-		shared.NewRoute("GET", "/([^/]+)/([^/]+\\..+)", imgHandler),
-		shared.NewRoute("GET", "/([^/]+)/([^/]+)", postHandler),
+		shared.NewRoute("GET", "/([^/]+)/([^/]+)", imgRequest),
+		shared.NewRoute("GET", "/([^/]+)/o/([^/]+)", imgRequestOriginal),
+		shared.NewRoute("GET", "/([^/]+)/p/([^/]+)", postHandler),
 	)
 
 	return routes
@@ -613,8 +817,10 @@ func createSubdomainRoutes(staticRoutes []shared.Route) []shared.Route {
 
 	routes = append(
 		routes,
-		shared.NewRoute("GET", "/([^/]+\\..+)", imgHandler),
-		shared.NewRoute("GET", "/([^/]+)", postHandler),
+		shared.NewRoute("GET", "/([^/]+)", imgRequest),
+		shared.NewRoute("GET", "/([^/]+)/([a-z0-9]+)", imgRequest),
+		shared.NewRoute("GET", "/o/([^/]+)", imgRequestOriginal),
+		shared.NewRoute("GET", "/p/([^/]+)", postHandler),
 	)
 
 	return routes
