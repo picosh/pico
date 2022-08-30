@@ -15,6 +15,8 @@ import (
 	"git.sr.ht/~erock/pico/wish/cms/util"
 	"git.sr.ht/~erock/pico/wish/send/utils"
 	"github.com/gliderlabs/ssh"
+	"github.com/scottleedavis/go-exif-remove"
+	"golang.org/x/exp/slices"
 )
 
 var GB = 1024 * 1024 * 1024
@@ -96,6 +98,17 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 	if b, err := io.ReadAll(entry.Reader); err == nil {
 		text = b
 	}
+	mimeType := http.DetectContentType(text)
+	// strip exif data
+	if slices.Contains([]string{"image/png", "image/jpg", "image/jpeg"}, mimeType) {
+		noExifBytes, err := exifremove.Remove(text)
+		if err == nil {
+			text = noExifBytes
+			h.Cfg.Logger.Infof("(%s) stripped exif data", filename)
+		} else {
+			h.Cfg.Logger.Error(err)
+		}
+	}
 
 	now := time.Now()
 	slug := shared.SanitizeFileExt(filename)
@@ -107,7 +120,7 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		Slug:      slug,
 		PublishAt: &now,
 		Text:      string(text),
-		MimeType:  http.DetectContentType(text),
+		MimeType:  mimeType,
 		FileSize:  fileSize,
 		Shasum:    shasum,
 	}

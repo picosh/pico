@@ -24,6 +24,7 @@ require (
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/nickalie/go-webpbin v0.0.0-20220110095747-f10016bf2dc1
 	github.com/pkg/sftp v1.13.5
+	github.com/scottleedavis/go-exif-remove v0.0.0-20190908021517-58bdbaac8636
 	github.com/yuin/goldmark v1.4.13
 	github.com/yuin/goldmark-highlighting v0.0.0-20220208100518-594be1970594
 	github.com/yuin/goldmark-meta v1.1.0
@@ -44,8 +45,14 @@ require (
 	github.com/containerd/console v1.0.3 // indirect
 	github.com/dlclark/regexp2 v1.7.0 // indirect
 	github.com/dsnet/compress v0.0.1 // indirect
+	github.com/dsoprea/go-exif v0.0.0-20190901173045-3ce78807c90f // indirect
+	github.com/dsoprea/go-jpeg-image-structure v0.0.0-20190422055009-d6f9ba25cf48 // indirect
+	github.com/dsoprea/go-logging v0.0.0-20190624164917-c4f10aab7696 // indirect
+	github.com/dsoprea/go-png-image-structure v0.0.0-20190624104353-c9b28dcdc5c8 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/frankban/quicktest v1.14.3 // indirect
+	github.com/go-errors/errors v1.0.1 // indirect
+	github.com/golang/geo v0.0.0-20190812012225-f41920e961ce // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
