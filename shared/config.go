@@ -25,6 +25,7 @@ type PageData struct {
 type ConfigSite struct {
 	config.ConfigCms
 	config.ConfigURL
+	Debug                bool
 	SubdomainsEnabled    bool
 	CustomdomainsEnabled bool
 }

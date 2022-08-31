@@ -407,6 +407,11 @@ func StartApiServer() {
 	go CronDeleteExpiredPosts(cfg, db)
 
 	staticRoutes := createStaticRoutes()
+
+	if cfg.Debug {
+		staticRoutes = shared.CreatePProfRoutes(staticRoutes)
+	}
+
 	mainRoutes := createMainRoutes(staticRoutes)
 	subdomainRoutes := createSubdomainRoutes(staticRoutes)
 

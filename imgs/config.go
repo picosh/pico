@@ -29,6 +29,7 @@ func (i *ImgsLinkify) Create(fname string) string {
 }
 
 func NewConfigSite() *shared.ConfigSite {
+	debug := shared.GetEnv("IMGS_DEBUG", "0")
 	domain := shared.GetEnv("IMGS_DOMAIN", "prose.sh")
 	email := shared.GetEnv("IMGS_EMAIL", "hello@prose.sh")
 	subdomains := shared.GetEnv("IMGS_SUBDOMAINS", "0")
@@ -41,15 +42,6 @@ func NewConfigSite() *shared.ConfigSite {
 	minioUser := shared.GetEnv("MINIO_ROOT_USER", "")
 	minioPass := shared.GetEnv("MINIO_ROOT_PASSWORD", "")
 	dbURL := shared.GetEnv("DATABASE_URL", "")
-	subdomainsEnabled := false
-	if subdomains == "1" {
-		subdomainsEnabled = true
-	}
-
-	customdomainsEnabled := false
-	if customdomains == "1" {
-		customdomainsEnabled = true
-	}
 
 	intro := "To get started, enter a username.\n"
 	intro += "Then create a folder locally (e.g. ~/imgs).\n"
@@ -57,8 +49,9 @@ func NewConfigSite() *shared.ConfigSite {
 	intro += fmt.Sprintf("scp ~/imgs/*.jpg %s:/", domain)
 
 	cfg := shared.ConfigSite{
-		SubdomainsEnabled:    subdomainsEnabled,
-		CustomdomainsEnabled: customdomainsEnabled,
+		Debug:                debug == "1",
+		SubdomainsEnabled:    subdomains == "1",
+		CustomdomainsEnabled: customdomains == "1",
 		ConfigCms: config.ConfigCms{
 			Domain:        domain,
 			Email:         email,

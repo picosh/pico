@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/http/pprof"
 	"regexp"
 	"strings"
 
@@ -25,6 +26,21 @@ func NewRoute(method, pattern string, handler http.HandlerFunc) Route {
 		regexp.MustCompile("^" + pattern + "$"),
 		handler,
 	}
+}
+
+func CreatePProfRoutes(routes []Route) []Route {
+	return append(routes,
+		NewRoute("GET", "/debug/pprof/cmdline", pprof.Cmdline),
+		NewRoute("GET", "/debug/pprof/profile", pprof.Profile),
+		NewRoute("GET", "/debug/pprof/symbol", pprof.Symbol),
+		NewRoute("GET", "/debug/pprof/trace", pprof.Trace),
+		NewRoute("GET", "/debug/pprof/(.*)", pprof.Index),
+		NewRoute("POST", "/debug/pprof/cmdline", pprof.Cmdline),
+		NewRoute("POST", "/debug/pprof/profile", pprof.Profile),
+		NewRoute("POST", "/debug/pprof/symbol", pprof.Symbol),
+		NewRoute("POST", "/debug/pprof/trace", pprof.Trace),
+		NewRoute("POST", "/debug/pprof/(.*)", pprof.Index),
+	)
 }
 
 type ServeFn func(http.ResponseWriter, *http.Request)

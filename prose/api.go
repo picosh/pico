@@ -907,6 +907,11 @@ func StartApiServer() {
 	}
 
 	staticRoutes := createStaticRoutes()
+
+	if cfg.Debug {
+		staticRoutes = shared.CreatePProfRoutes(staticRoutes)
+	}
+
 	mainRoutes := createMainRoutes(staticRoutes)
 	subdomainRoutes := createSubdomainRoutes(staticRoutes)
 

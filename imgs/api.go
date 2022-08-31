@@ -15,7 +15,6 @@ import (
 	"strings"
 	"time"
 
-	"net/http/pprof"
 	_ "net/http/pprof"
 
 	"git.sr.ht/~erock/pico/db"
@@ -780,16 +779,6 @@ func createMainRoutes(staticRoutes []shared.Route) []shared.Route {
 		shared.NewRoute("GET", "/help", shared.CreatePageHandler("html/help.page.tmpl")),
 		shared.NewRoute("GET", "/transparency", transparencyHandler),
 		shared.NewRoute("GET", "/check", shared.CheckHandler),
-		shared.NewRoute("GET", "/debug/pprof/(.*)", pprof.Index),
-		shared.NewRoute("GET", "/debug/pprof/cmdline", pprof.Cmdline),
-		shared.NewRoute("GET", "/debug/pprof/profile", pprof.Profile),
-		shared.NewRoute("GET", "/debug/pprof/symbol", pprof.Symbol),
-		shared.NewRoute("GET", "/debug/pprof/trace", pprof.Trace),
-		shared.NewRoute("POST", "/debug/pprof/(.*)", pprof.Index),
-		shared.NewRoute("POST", "/debug/pprof/cmdline", pprof.Cmdline),
-		shared.NewRoute("POST", "/debug/pprof/profile", pprof.Profile),
-		shared.NewRoute("POST", "/debug/pprof/symbol", pprof.Symbol),
-		shared.NewRoute("POST", "/debug/pprof/trace", pprof.Trace),
 	}
 
 	routes = append(
@@ -859,6 +848,11 @@ func StartApiServer() {
 	}
 
 	staticRoutes := createStaticRoutes()
+
+	if cfg.Debug {
+		staticRoutes = shared.CreatePProfRoutes(staticRoutes)
+	}
+
 	mainRoutes := createMainRoutes(staticRoutes)
 	subdomainRoutes := createSubdomainRoutes(staticRoutes)
 

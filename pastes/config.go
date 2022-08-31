@@ -8,6 +8,7 @@ import (
 )
 
 func NewConfigSite() *shared.ConfigSite {
+	debug := shared.GetEnv("PASTES_DEBUG", "0")
 	domain := shared.GetEnv("PASTES_DOMAIN", "pastes.sh")
 	email := shared.GetEnv("PASTES_EMAIL", "hello@pastes.sh")
 	subdomains := shared.GetEnv("PASTES_SUBDOMAINS", "0")
@@ -20,15 +21,6 @@ func NewConfigSite() *shared.ConfigSite {
 	minioURL := shared.GetEnv("MINIO_URL", "")
 	minioUser := shared.GetEnv("MINIO_ROOT_USER", "")
 	minioPass := shared.GetEnv("MINIO_ROOT_PASSWORD", "")
-	subdomainsEnabled := false
-	if subdomains == "1" {
-		subdomainsEnabled = true
-	}
-
-	customdomainsEnabled := false
-	if customdomains == "1" {
-		customdomainsEnabled = true
-	}
 
 	intro := "To get started, enter a username.\n"
 	intro += "Then create a folder locally (e.g. ~/pastes).\n"
@@ -37,8 +29,9 @@ func NewConfigSite() *shared.ConfigSite {
 	intro += fmt.Sprintf("scp ~/pastes/* %s:/", domain)
 
 	return &shared.ConfigSite{
-		SubdomainsEnabled:    subdomainsEnabled,
-		CustomdomainsEnabled: customdomainsEnabled,
+		Debug:                debug == "1",
+		SubdomainsEnabled:    subdomains == "1",
+		CustomdomainsEnabled: customdomains == "1",
 		ConfigCms: config.ConfigCms{
 			Domain:        domain,
 			Port:          port,
