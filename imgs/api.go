@@ -1,7 +1,6 @@
 package imgs
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
 	"html/template"
@@ -20,8 +19,9 @@ import (
 	"git.sr.ht/~erock/pico/imgs/storage"
 	"git.sr.ht/~erock/pico/shared"
 	"github.com/gorilla/feeds"
+	"github.com/kolesa-team/go-webp/encoder"
+	"github.com/kolesa-team/go-webp/webp"
 	"github.com/nfnt/resize"
-	"github.com/nickalie/go-webpbin"
 	"go.uber.org/zap"
 	"golang.org/x/exp/slices"
 )
@@ -201,7 +201,7 @@ type ImgOptimizer struct {
 	// Specify the compression factor for RGB channels between 0 and 100. The default is 75.
 	// A small factor produces a smaller file with lower quality.
 	// Best quality is achieved by using a value of 100.
-	Quality    uint
+	Quality    float32
 	Optimized  bool
 	Width      uint
 	Height     uint
@@ -227,6 +227,10 @@ func (h *ImgOptimizer) GetImage(contents []byte, mimeType string) (image.Image, 
 }
 
 func (h *ImgOptimizer) GetRatio() error {
+	if h.Dimes == "" {
+		return nil
+	}
+
 	// dimes = x250 -- width is auto scaled and height is 250
 	if strings.HasPrefix(h.Dimes, "x") {
 		height, err := strconv.ParseUint(h.Dimes[1:], 10, 64)
@@ -234,6 +238,7 @@ func (h *ImgOptimizer) GetRatio() error {
 			return err
 		}
 		h.Height = uint(height)
+		return nil
 	}
 
 	// dimes = 250x -- width is 250 and height is auto scaled
@@ -243,6 +248,7 @@ func (h *ImgOptimizer) GetRatio() error {
 			return err
 		}
 		h.Width = uint(width)
+		return nil
 	}
 
 	res := strings.Split(h.Dimes, "x")
@@ -281,21 +287,26 @@ func (h *ImgOptimizer) Process(contents []byte, mimeType string) ([]byte, error)
 
 	nextImg := img
 	if h.Height > 0 || h.Width > 0 {
-		nextImg = resize.Resize(h.Width, h.Height, img, resize.NearestNeighbor)
+		nextImg = resize.Resize(h.Width, h.Height, img, resize.Bicubic)
 	}
 
-	encoder := webpbin.Encoder{
-		Quality: h.Quality,
-	}
-
-	var output bytes.Buffer
-	w := bufio.NewWriter(&output)
-
-	err = encoder.Encode(w, nextImg)
+	options, err := encoder.NewLossyEncoderOptions(
+		encoder.PresetDefault,
+		h.Quality,
+	)
 	if err != nil {
 		return []byte{}, err
 	}
 
+	output := &bytes.Buffer{}
+	err = webp.Encode(output, nextImg, options)
+	if err != nil {
+		return []byte{}, err
+	}
+
+	if mimeType == "image/png" {
+		fmt.Println(output)
+	}
 	return output.Bytes(), nil
 }
 
@@ -796,9 +807,9 @@ func createMainRoutes(staticRoutes []shared.Route) []shared.Route {
 		shared.NewRoute("GET", "/([^/]+)/rss.xml", rssBlogHandler),
 		shared.NewRoute("GET", "/([^/]+)/atom.xml", rssBlogHandler),
 		shared.NewRoute("GET", "/([^/]+)/feed.xml", rssBlogHandler),
-		shared.NewRoute("GET", "/([^/]+)/([^/]+)", imgRequest),
 		shared.NewRoute("GET", "/([^/]+)/o/([^/]+)", imgRequestOriginal),
 		shared.NewRoute("GET", "/([^/]+)/p/([^/]+)", postHandler),
+		shared.NewRoute("GET", "/([^/]+)/([^/]+)", imgRequest),
 	)
 
 	return routes
@@ -817,10 +828,10 @@ func createSubdomainRoutes(staticRoutes []shared.Route) []shared.Route {
 
 	routes = append(
 		routes,
-		shared.NewRoute("GET", "/([^/]+)", imgRequest),
-		shared.NewRoute("GET", "/([^/]+)/([a-z0-9]+)", imgRequest),
 		shared.NewRoute("GET", "/o/([^/]+)", imgRequestOriginal),
 		shared.NewRoute("GET", "/p/([^/]+)", postHandler),
+		shared.NewRoute("GET", "/([^/]+)", imgRequest),
+		shared.NewRoute("GET", "/([^/]+)/([a-z0-9]+)", imgRequest),
 	)
 
 	return routes

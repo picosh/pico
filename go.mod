@@ -16,13 +16,13 @@ require (
 	github.com/charmbracelet/wish v0.5.0
 	github.com/gliderlabs/ssh v0.3.4
 	github.com/gorilla/feeds v1.1.1
+	github.com/kolesa-team/go-webp v1.0.1
 	github.com/lib/pq v1.10.6
 	github.com/matryer/is v1.4.0
 	github.com/microcosm-cc/bluemonday v1.0.19
 	github.com/minio/minio-go/v7 v7.0.34
 	github.com/muesli/reflow v0.3.0
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
-	github.com/nickalie/go-webpbin v0.0.0-20220110095747-f10016bf2dc1
 	github.com/pkg/sftp v1.13.5
 	github.com/scottleedavis/go-exif-remove v0.0.0-20190908021517-58bdbaac8636
 	github.com/yuin/goldmark v1.4.13
@@ -44,17 +44,14 @@ require (
 	github.com/charmbracelet/keygen v0.3.0 // indirect
 	github.com/containerd/console v1.0.3 // indirect
 	github.com/dlclark/regexp2 v1.7.0 // indirect
-	github.com/dsnet/compress v0.0.1 // indirect
 	github.com/dsoprea/go-exif v0.0.0-20190901173045-3ce78807c90f // indirect
 	github.com/dsoprea/go-jpeg-image-structure v0.0.0-20190422055009-d6f9ba25cf48 // indirect
 	github.com/dsoprea/go-logging v0.0.0-20190624164917-c4f10aab7696 // indirect
 	github.com/dsoprea/go-png-image-structure v0.0.0-20190624104353-c9b28dcdc5c8 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
-	github.com/frankban/quicktest v1.14.3 // indirect
 	github.com/go-errors/errors v1.0.1 // indirect
 	github.com/golang/geo v0.0.0-20190812012225-f41920e961ce // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
-	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/gorilla/css v1.0.0 // indirect
@@ -68,7 +65,6 @@ require (
 	github.com/mattn/go-localereader v0.0.1 // indirect
 	github.com/mattn/go-runewidth v0.0.13 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
-	github.com/mholt/archiver v3.1.1+incompatible // indirect
 	github.com/minio/md5-simd v1.1.2 // indirect
 	github.com/minio/sha256-simd v1.0.0 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
@@ -78,9 +74,6 @@ require (
 	github.com/muesli/ansi v0.0.0-20211031195517-c9f0611b6c70 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/muesli/termenv v0.12.0 // indirect
-	github.com/nickalie/go-binwrapper v0.0.0-20190114141239-525121d43c84 // indirect
-	github.com/nwaples/rardecode v1.1.0 // indirect
-	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
 	github.com/prometheus/client_golang v1.13.0 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/common v0.37.0 // indirect
@@ -88,8 +81,6 @@ require (
 	github.com/rivo/uniseg v0.3.4 // indirect
 	github.com/rs/xid v1.4.0 // indirect
 	github.com/sirupsen/logrus v1.9.0 // indirect
-	github.com/ulikunitz/xz v0.5.10 // indirect
-	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
 	golang.org/x/net v0.0.0-20220822230855-b0a4917ee28c // indirect
