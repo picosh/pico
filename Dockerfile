@@ -28,8 +28,8 @@ ENV CC=/app/scripts/gccwrap.sh
 
 ENV GOOS=${TARGETOS} GOARCH=${TARGETARCH}
 
-RUN go build -ldflags "$LDFLAGS" -tags netgo -o /go/bin/${APP}-ssh ./cmd/${APP}/ssh
-RUN go build -ldflags "$LDFLAGS" -tags netgo -o /go/bin/${APP}-web ./cmd/${APP}/web
+RUN go build -ldflags "$LDFLAGS" -tags "netgo osusergo" -o /go/bin/${APP}-ssh ./cmd/${APP}/ssh
+RUN go build -ldflags "$LDFLAGS" -tags "netgo osusergo" -o /go/bin/${APP}-web ./cmd/${APP}/web
 
 FROM scratch as release-ssh
 
