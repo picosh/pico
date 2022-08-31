@@ -91,37 +91,6 @@ scp ./delete.md {{.Site.Domain}}:/</pre>
         </p>
     </section>
 
-    <section id="img-meta">
-        <h2 class="text-xl">
-            <a href="#img-meta" rel="nofollow noopener">#</a>
-            How do I add metadata (like tags) to an image?
-        </h2>
-        <p>
-           We want to make sure you are always in control of the data you upload to imgs.  Adding
-           metadata is as easy as uploading a markdown file with the same name of the image to
-           imgs.sh.
-        </p>
-
-        <p>
-            If my image is named <code>trip_mexico_01.jpg</code> then you would also have a markdown
-            file named <code>trip_mexico_01.md</code>.
-        </p>
-
-        <pre>---
-title: This is the caption
-date: 2022-08-18
-tags: [trip, mexico]
----
-
-This was the first shot I took when arriving at mexico city.  It was a warm sunny day and I was excited
-to land and find some tacos!
-</pre>
-
-        <p>
-            Then you can upload both files <code>rsync trip_mexico_01.* <user>@imgs.sh</code>
-        </p>
-    </section>
-
     <section id="custom-domain">
         <h2 class="text-xl">
             <a href="#custom-domain" rel="nofollow noopener">#</a>

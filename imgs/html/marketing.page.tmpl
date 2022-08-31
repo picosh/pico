@@ -64,7 +64,6 @@
             <li>API to modify images on-the-fly (e.g. dimensions)</li>
             <li>Original images are always available</li>
             <li>Ability to add metadata to images using markdown</li>
-            <li>Organize images into albums using tags</li>
             <li>Hotlinking encouraged!</li>
             <li>No javascript</li>
             <li>No ads</li>
@@ -102,27 +101,6 @@
     </section>
 
     <section>
-        <h2 class="text-lg font-bold">Add metadata to your images</h2>
-        <p>
-            We also support adding metadata to images.  Create a markdown file with the same name
-            as your image.  So if we have an image <code>my-image.jpg</code> we would create a
-            markdown file <code>my-image.md</code>:
-        </p>
-        <pre>---
-title: This is my caption
-date: 2022-08-18
-tags: [trip, mexico]
----
-
-# Day 1
-
-This section is just normal markdown that will be rendered on the image page within imgs.
-</pre>
-        <pre>rsync my-image.md {{.Site.Domain}}:/</pre>
-        <p><a href="/help#img-meta">Read more about metadata here.</a></p>
-    </section>
-
-    <section>
         <h2 class="text-lg font-bold">Philosophy</h2>
         <p>
             Sharing photos is such an important part of the web.  From writing a blog to creating
@@ -138,10 +116,8 @@ This section is just normal markdown that will be rendered on the image page wit
     <section>
         <h2 class="text-lg font-bold">Roadmap</h2>
         <ol>
-            <li>Integration with prose/lists</li>
-            <li>Web optimized images</li>
+            <li>Add metadata (caption, tags, etc.) to an image</li>
             <li>Device optimized images</li>
-            <li>Ability to order images in an album</li>
         </ol>
     </section>
 </main>
