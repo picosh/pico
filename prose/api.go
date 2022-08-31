@@ -79,6 +79,7 @@ type PostPageData struct {
 	Tags         []string
 	Image        template.URL
 	ImageCard    string
+	Footer       template.HTML
 }
 
 type TransparencyPageData struct {
@@ -382,12 +383,21 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			ogImageCard = parsedText.ImageCard
 		}
 
-		// we need the blog name from the readme unfortunately
 		css, err := dbpool.FindPostWithFilename("_styles.css", user.ID, cfg.Space)
 		if err == nil {
 			if len(css.Text) > 0 {
 				hasCSS = true
 			}
+		}
+
+		footer, err := dbpool.FindPostWithFilename("_footer.md", user.ID, cfg.Space)
+		var footerHTML template.HTML
+		if err == nil {
+			footerParsed, err := shared.ParseText(footer.Text, linkify)
+			if err != nil {
+				logger.Error(err)
+			}
+			footerHTML = template.HTML(footerParsed.Html)
 		}
 
 		// validate and fire off analytic event
@@ -416,6 +426,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			Tags:         parsedText.Tags,
 			Image:        template.URL(ogImage),
 			ImageCard:    ogImageCard,
+			Footer:       footerHTML,
 		}
 	} else {
 		data = PostPageData{
@@ -644,9 +655,20 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			logger.Error(err)
 		}
+
+		footer, err := dbpool.FindPostWithFilename("_footer.md", user.ID, cfg.Space)
+		var footerHTML string
+		if err == nil {
+			footerParsed, err := shared.ParseText(footer.Text, linkify)
+			if err != nil {
+				logger.Error(err)
+			}
+			footerHTML = footerParsed.Html
+		}
+
 		var tpl bytes.Buffer
 		data := &PostPageData{
-			Contents: template.HTML(parsed.Html),
+			Contents: template.HTML(parsed.Html + footerHTML),
 		}
 		if err := ts.Execute(&tpl, data); err != nil {
 			continue
