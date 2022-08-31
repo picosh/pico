@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -67,22 +66,17 @@ func (s *StorageMinio) UpsertBucket(name string) (Bucket, error) {
 	return bucket, nil
 }
 
-func (s *StorageMinio) GetFile(bucket Bucket, fname string) ([]byte, error) {
+func (s *StorageMinio) GetFile(bucket Bucket, fname string) (io.ReadCloser, error) {
 	obj, err := s.Client.GetObject(context.TODO(), bucket.Name, fname, minio.GetObjectOptions{})
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 
-	dat, err := io.ReadAll(obj)
-	if err != nil {
-		return []byte{}, err
-	}
-
-	return dat, nil
+	return obj, nil
 }
 
-func (s *StorageMinio) PutFile(bucket Bucket, fname string, contents []byte) (string, error) {
-	info, err := s.Client.PutObject(context.TODO(), bucket.Name, fname, bytes.NewReader(contents), int64(len(contents)), minio.PutObjectOptions{})
+func (s *StorageMinio) PutFile(bucket Bucket, fname string, contents io.ReadCloser) (string, error) {
+	info, err := s.Client.PutObject(context.TODO(), bucket.Name, fname, contents, -1, minio.PutObjectOptions{})
 	if err != nil {
 		return "", err
 	}

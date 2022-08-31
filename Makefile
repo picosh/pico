@@ -18,7 +18,7 @@ css:
 .PHONY: css
 
 lint:
-	docker run --rm -v $(shell pwd):/app -w /app golangci/golangci-lint:latest golangci-lint run -E goimports -E godot
+	docker run --rm -v $(shell pwd):/app -w /app golangci/golangci-lint:latest bash -c 'apt-get update > /dev/null 2>&1 && apt-get install -y libwebp-dev > /dev/null 2>&1; golangci-lint run -E goimports -E godot'
 .PHONY: lint
 
 bp-setup:

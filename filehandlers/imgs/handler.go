@@ -15,7 +15,7 @@ import (
 	"git.sr.ht/~erock/pico/wish/cms/util"
 	"git.sr.ht/~erock/pico/wish/send/utils"
 	"github.com/gliderlabs/ssh"
-	"github.com/scottleedavis/go-exif-remove"
+	exifremove "github.com/scottleedavis/go-exif-remove"
 	"golang.org/x/exp/slices"
 )
 

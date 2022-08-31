@@ -2,6 +2,7 @@ package storage
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path"
 )
@@ -15,8 +16,8 @@ type ObjectStorage interface {
 	GetBucket(name string) (Bucket, error)
 	UpsertBucket(name string) (Bucket, error)
 
-	GetFile(bucket Bucket, fname string) ([]byte, error)
-	PutFile(bucket Bucket, fname string, contents []byte) (string, error)
+	GetFile(bucket Bucket, fname string) (io.ReadCloser, error)
+	PutFile(bucket Bucket, fname string, contents io.ReadCloser) (string, error)
 	DeleteFile(bucket Bucket, fname string) error
 }
 
@@ -67,18 +68,24 @@ func (s *StorageFS) UpsertBucket(name string) (Bucket, error) {
 	return bucket, nil
 }
 
-func (s *StorageFS) GetFile(bucket Bucket, fname string) ([]byte, error) {
-	dat, err := os.ReadFile(path.Join(bucket.Path, fname))
+func (s *StorageFS) GetFile(bucket Bucket, fname string) (io.ReadCloser, error) {
+	dat, err := os.Open(path.Join(bucket.Path, fname))
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 
 	return dat, nil
 }
 
-func (s *StorageFS) PutFile(bucket Bucket, fname string, contents []byte) (string, error) {
+func (s *StorageFS) PutFile(bucket Bucket, fname string, contents io.ReadCloser) (string, error) {
 	loc := path.Join(bucket.Path, fname)
-	err := os.WriteFile(loc, contents, 0644)
+	f, err := os.OpenFile(loc, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	_, err = io.Copy(f, contents)
 	if err != nil {
 		return "", err
 	}

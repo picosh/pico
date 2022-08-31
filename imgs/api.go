@@ -8,11 +8,15 @@ import (
 	gif "image/gif"
 	jpeg "image/jpeg"
 	png "image/png"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
+
+	"net/http/pprof"
+	_ "net/http/pprof"
 
 	"git.sr.ht/~erock/pico/db"
 	"git.sr.ht/~erock/pico/db/postgres"
@@ -210,8 +214,7 @@ type ImgOptimizer struct {
 	Dimes      string
 }
 
-func (h *ImgOptimizer) GetImage(contents []byte, mimeType string) (image.Image, error) {
-	r := bytes.NewReader(contents)
+func (h *ImgOptimizer) GetImage(r io.Reader, mimeType string) (image.Image, error) {
 	switch mimeType {
 	case "image/png":
 		return png.Decode(r)
@@ -275,14 +278,15 @@ type SubImager interface {
 	SubImage(r image.Rectangle) image.Image
 }
 
-func (h *ImgOptimizer) Process(contents []byte, mimeType string) ([]byte, error) {
+func (h *ImgOptimizer) Process(contents io.Reader, writer io.Writer, mimeType string) error {
 	if !h.Optimized {
-		return contents, nil
+		_, err := io.Copy(writer, contents)
+		return err
 	}
 
 	img, err := h.GetImage(contents, mimeType)
 	if err != nil {
-		return []byte{}, err
+		return err
 	}
 
 	nextImg := img
@@ -295,19 +299,10 @@ func (h *ImgOptimizer) Process(contents []byte, mimeType string) ([]byte, error)
 		h.Quality,
 	)
 	if err != nil {
-		return []byte{}, err
+		return err
 	}
 
-	output := &bytes.Buffer{}
-	err = webp.Encode(output, nextImg, options)
-	if err != nil {
-		return []byte{}, err
-	}
-
-	if mimeType == "image/png" {
-		fmt.Println(output)
-	}
-	return output.Bytes(), nil
+	return webp.Encode(writer, nextImg, options)
 }
 
 func NewImgOptimizer(logger *zap.SugaredLogger, optimized bool, dimes string) *ImgOptimizer {
@@ -362,12 +357,14 @@ func imgHandler(w http.ResponseWriter, h *ImgHandler) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
 	contents, err := h.Storage.GetFile(bucket, post.Filename)
 	if err != nil {
 		h.Logger.Infof("file not found %s/%s", h.Username, post.Filename)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	defer contents.Close()
 
 	if h.Img.Optimized {
 		w.Header().Add("Content-Type", "image/webp")
@@ -375,12 +372,7 @@ func imgHandler(w http.ResponseWriter, h *ImgHandler) {
 		w.Header().Add("Content-Type", post.MimeType)
 	}
 
-	contentsProc, err := h.Img.Process(contents, strings.TrimSpace(post.MimeType))
-	if err != nil {
-		h.Logger.Error(err)
-	}
-
-	_, err = w.Write(contentsProc)
+	err = h.Img.Process(contents, w, strings.TrimSpace(post.MimeType))
 	if err != nil {
 		h.Logger.Error(err)
 	}
@@ -788,6 +780,16 @@ func createMainRoutes(staticRoutes []shared.Route) []shared.Route {
 		shared.NewRoute("GET", "/help", shared.CreatePageHandler("html/help.page.tmpl")),
 		shared.NewRoute("GET", "/transparency", transparencyHandler),
 		shared.NewRoute("GET", "/check", shared.CheckHandler),
+		shared.NewRoute("GET", "/debug/pprof/(.*)", pprof.Index),
+		shared.NewRoute("GET", "/debug/pprof/cmdline", pprof.Cmdline),
+		shared.NewRoute("GET", "/debug/pprof/profile", pprof.Profile),
+		shared.NewRoute("GET", "/debug/pprof/symbol", pprof.Symbol),
+		shared.NewRoute("GET", "/debug/pprof/trace", pprof.Trace),
+		shared.NewRoute("POST", "/debug/pprof/(.*)", pprof.Index),
+		shared.NewRoute("POST", "/debug/pprof/cmdline", pprof.Cmdline),
+		shared.NewRoute("POST", "/debug/pprof/profile", pprof.Profile),
+		shared.NewRoute("POST", "/debug/pprof/symbol", pprof.Symbol),
+		shared.NewRoute("POST", "/debug/pprof/trace", pprof.Trace),
 	}
 
 	routes = append(

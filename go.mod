@@ -7,7 +7,7 @@ go 1.19
 
 require (
 	github.com/alecthomas/chroma v0.10.0
-	github.com/antoniomika/go-rsync-receiver v0.0.0-20220825041817-0387edc9afb7
+	github.com/antoniomika/go-rsync-receiver v0.0.0-20220825051444-e2df2a87b439
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
 	github.com/charmbracelet/bubbles v0.13.0
 	github.com/charmbracelet/bubbletea v0.22.1
@@ -20,7 +20,7 @@ require (
 	github.com/lib/pq v1.10.6
 	github.com/matryer/is v1.4.0
 	github.com/microcosm-cc/bluemonday v1.0.19
-	github.com/minio/minio-go/v7 v7.0.34
+	github.com/minio/minio-go/v7 v7.0.35
 	github.com/muesli/reflow v0.3.0
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/pkg/sftp v1.13.5
@@ -29,8 +29,8 @@ require (
 	github.com/yuin/goldmark-highlighting v0.0.0-20220208100518-594be1970594
 	github.com/yuin/goldmark-meta v1.1.0
 	go.uber.org/zap v1.23.0
-	golang.org/x/crypto v0.0.0-20220824171710-5757bc0c5503
-	golang.org/x/exp v0.0.0-20220823124025-807a23277127
+	golang.org/x/crypto v0.0.0-20220829220503-c86fa9a7ed90
+	golang.org/x/exp v0.0.0-20220827204233-334a2380cb91
 )
 
 require (
@@ -44,20 +44,25 @@ require (
 	github.com/charmbracelet/keygen v0.3.0 // indirect
 	github.com/containerd/console v1.0.3 // indirect
 	github.com/dlclark/regexp2 v1.7.0 // indirect
-	github.com/dsoprea/go-exif v0.0.0-20190901173045-3ce78807c90f // indirect
-	github.com/dsoprea/go-jpeg-image-structure v0.0.0-20190422055009-d6f9ba25cf48 // indirect
-	github.com/dsoprea/go-logging v0.0.0-20190624164917-c4f10aab7696 // indirect
-	github.com/dsoprea/go-png-image-structure v0.0.0-20190624104353-c9b28dcdc5c8 // indirect
+	github.com/dsoprea/go-exif v0.0.0-20210625224831-a6301f85c82b // indirect
+	github.com/dsoprea/go-exif/v2 v2.0.0-20210625224831-a6301f85c82b // indirect
+	github.com/dsoprea/go-iptc v0.0.0-20200610044640-bc9ca208b413 // indirect
+	github.com/dsoprea/go-jpeg-image-structure v0.0.0-20210512043942-b434301c6836 // indirect
+	github.com/dsoprea/go-logging v0.0.0-20200710184922-b02d349568dd // indirect
+	github.com/dsoprea/go-photoshop-info-format v0.0.0-20200610045659-121dd752914d // indirect
+	github.com/dsoprea/go-png-image-structure v0.0.0-20210512210324-29b889a6093d // indirect
+	github.com/dsoprea/go-utility v0.0.0-20200717064901-2fccff4aa15e // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
-	github.com/go-errors/errors v1.0.1 // indirect
-	github.com/golang/geo v0.0.0-20190812012225-f41920e961ce // indirect
+	github.com/go-errors/errors v1.4.2 // indirect
+	github.com/go-xmlfmt/xmlfmt v1.1.2 // indirect
+	github.com/golang/geo v0.0.0-20210211234256-740aa86cb551 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/gorilla/css v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.15.9 // indirect
-	github.com/klauspost/cpuid/v2 v2.1.0 // indirect
+	github.com/klauspost/cpuid/v2 v2.1.1 // indirect
 	github.com/kr/fs v0.1.0 // indirect
 	github.com/kr/pretty v0.3.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
@@ -83,11 +88,11 @@ require (
 	github.com/sirupsen/logrus v1.9.0 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
-	golang.org/x/net v0.0.0-20220822230855-b0a4917ee28c // indirect
-	golang.org/x/sys v0.0.0-20220823224334-20c2bfdbfe24 // indirect
+	golang.org/x/net v0.0.0-20220826154423-83b083e8dc8b // indirect
+	golang.org/x/sys v0.0.0-20220829200755-d48e67d00261 // indirect
 	golang.org/x/term v0.0.0-20220722155259-a9ba230a4035 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
-	gopkg.in/ini.v1 v1.66.6 // indirect
+	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
