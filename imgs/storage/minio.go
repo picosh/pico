@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"net/url"
 
 	"github.com/minio/minio-go/v7"
@@ -66,8 +65,13 @@ func (s *StorageMinio) UpsertBucket(name string) (Bucket, error) {
 	return bucket, nil
 }
 
-func (s *StorageMinio) GetFile(bucket Bucket, fname string) (io.ReadCloser, error) {
+func (s *StorageMinio) GetFile(bucket Bucket, fname string) (ReaderAtCloser, error) {
 	obj, err := s.Client.GetObject(context.TODO(), bucket.Name, fname, minio.GetObjectOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = obj.Stat()
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +79,7 @@ func (s *StorageMinio) GetFile(bucket Bucket, fname string) (io.ReadCloser, erro
 	return obj, nil
 }
 
-func (s *StorageMinio) PutFile(bucket Bucket, fname string, contents io.ReadCloser) (string, error) {
+func (s *StorageMinio) PutFile(bucket Bucket, fname string, contents ReaderAtCloser) (string, error) {
 	info, err := s.Client.PutObject(context.TODO(), bucket.Name, fname, contents, -1, minio.PutObjectOptions{})
 	if err != nil {
 		return "", err

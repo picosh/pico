@@ -12,12 +12,32 @@ type Bucket struct {
 	Path string
 }
 
+type ReadAndReaderAt interface {
+	io.ReaderAt
+	io.Reader
+}
+
+type ReaderAtCloser interface {
+	io.ReaderAt
+	io.ReadCloser
+}
+
+func NopReaderAtCloser(r ReadAndReaderAt) ReaderAtCloser {
+	return nopReaderAtCloser{r}
+}
+
+type nopReaderAtCloser struct {
+	ReadAndReaderAt
+}
+
+func (nopReaderAtCloser) Close() error { return nil }
+
 type ObjectStorage interface {
 	GetBucket(name string) (Bucket, error)
 	UpsertBucket(name string) (Bucket, error)
 
-	GetFile(bucket Bucket, fname string) (io.ReadCloser, error)
-	PutFile(bucket Bucket, fname string, contents io.ReadCloser) (string, error)
+	GetFile(bucket Bucket, fname string) (ReaderAtCloser, error)
+	PutFile(bucket Bucket, fname string, contents ReaderAtCloser) (string, error)
 	DeleteFile(bucket Bucket, fname string) error
 }
 
@@ -68,7 +88,7 @@ func (s *StorageFS) UpsertBucket(name string) (Bucket, error) {
 	return bucket, nil
 }
 
-func (s *StorageFS) GetFile(bucket Bucket, fname string) (io.ReadCloser, error) {
+func (s *StorageFS) GetFile(bucket Bucket, fname string) (ReaderAtCloser, error) {
 	dat, err := os.Open(path.Join(bucket.Path, fname))
 	if err != nil {
 		return nil, err
@@ -77,7 +97,7 @@ func (s *StorageFS) GetFile(bucket Bucket, fname string) (io.ReadCloser, error) 
 	return dat, nil
 }
 
-func (s *StorageFS) PutFile(bucket Bucket, fname string, contents io.ReadCloser) (string, error) {
+func (s *StorageFS) PutFile(bucket Bucket, fname string, contents ReaderAtCloser) (string, error) {
 	loc := path.Join(bucket.Path, fname)
 	f, err := os.OpenFile(loc, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {

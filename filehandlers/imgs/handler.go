@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"strings"
 	"time"
 
 	"git.sr.ht/~erock/pico/db"
@@ -64,11 +65,77 @@ func (h *UploadImgHandler) removePost(data *PostMetaData) error {
 }
 
 func (h *UploadImgHandler) Read(s ssh.Session, filename string) (os.FileInfo, io.ReaderAt, error) {
-	return nil, nil, nil
+	cleanFilename := strings.ReplaceAll(filename, "/", "")
+
+	if cleanFilename == "" || cleanFilename == "." {
+		return nil, nil, os.ErrNotExist
+	}
+
+	post, err := h.DBPool.FindPostWithFilename(cleanFilename, h.User.ID, h.Cfg.Space)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	fileInfo := &utils.VirtualFile{
+		FName:    post.Filename,
+		FIsDir:   false,
+		FSize:    int64(post.FileSize),
+		FModTime: *post.UpdatedAt,
+	}
+
+	bucket, err := h.Storage.GetBucket(h.User.ID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	contents, err := h.Storage.GetFile(bucket, post.Filename)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return fileInfo, contents, nil
 }
 
 func (h *UploadImgHandler) List(s ssh.Session, filename string) ([]os.FileInfo, error) {
-	return nil, nil
+	var fileList []os.FileInfo
+	cleanFilename := strings.ReplaceAll(filename, "/", "")
+
+	var err error
+	var post *db.Post
+	var posts []*db.Post
+
+	if cleanFilename == "" || cleanFilename == "." {
+		name := cleanFilename
+		if name == "" {
+			name = "/"
+		}
+
+		fileList = append(fileList, &utils.VirtualFile{
+			FName:  name,
+			FIsDir: true,
+		})
+
+		posts, err = h.DBPool.FindAllPostsForUser(h.User.ID, h.Cfg.Space)
+	} else {
+		post, err = h.DBPool.FindPostWithFilename(cleanFilename, h.User.ID, h.Cfg.Space)
+
+		posts = append(posts, post)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	for _, post := range posts {
+		fileList = append(fileList, &utils.VirtualFile{
+			FName:    post.Filename,
+			FIsDir:   false,
+			FSize:    int64(post.FileSize),
+			FModTime: *post.UpdatedAt,
+		})
+	}
+
+	return fileList, nil
 }
 
 func (h *UploadImgHandler) Validate(s ssh.Session) error {

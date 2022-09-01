@@ -7,13 +7,14 @@ go 1.19
 
 require (
 	github.com/alecthomas/chroma v0.10.0
-	github.com/antoniomika/go-rsync-receiver v0.0.0-20220825051444-e2df2a87b439
+	github.com/antoniomika/go-rsync-receiver v0.0.0-20220901010427-e6494124f0c8
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
 	github.com/charmbracelet/bubbles v0.13.0
 	github.com/charmbracelet/bubbletea v0.22.1
 	github.com/charmbracelet/lipgloss v0.5.0
 	github.com/charmbracelet/promwish v0.2.0
 	github.com/charmbracelet/wish v0.5.0
+	github.com/disintegration/imaging v1.6.2
 	github.com/gliderlabs/ssh v0.3.4
 	github.com/gorilla/feeds v1.1.1
 	github.com/kolesa-team/go-webp v1.0.1
@@ -22,7 +23,6 @@ require (
 	github.com/microcosm-cc/bluemonday v1.0.19
 	github.com/minio/minio-go/v7 v7.0.35
 	github.com/muesli/reflow v0.3.0
-	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/pkg/sftp v1.13.5
 	github.com/scottleedavis/go-exif-remove v0.0.0-20190908021517-58bdbaac8636
 	github.com/yuin/goldmark v1.4.13
@@ -88,6 +88,7 @@ require (
 	github.com/sirupsen/logrus v1.9.0 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
+	golang.org/x/image v0.0.0-20220722155232-062f8c9fd539 // indirect
 	golang.org/x/net v0.0.0-20220826154423-83b083e8dc8b // indirect
 	golang.org/x/sys v0.0.0-20220829200755-d48e67d00261 // indirect
 	golang.org/x/term v0.0.0-20220722155259-a9ba230a4035 // indirect

@@ -3,10 +3,10 @@ package uploadimgs
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"strings"
 
 	"git.sr.ht/~erock/pico/db"
+	"git.sr.ht/~erock/pico/imgs/storage"
 	"git.sr.ht/~erock/pico/shared"
 )
 
@@ -42,7 +42,7 @@ func (h *UploadImgHandler) metaImg(data *PostMetaData) error {
 	if err != nil {
 		return err
 	}
-	fname, err := h.Storage.PutFile(bucket, data.Filename, io.NopCloser(bytes.NewReader([]byte(data.Text))))
+	fname, err := h.Storage.PutFile(bucket, data.Filename, storage.NopReaderAtCloser(bytes.NewReader([]byte(data.Text))))
 	if err != nil {
 		return err
 	}

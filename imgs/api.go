@@ -21,10 +21,10 @@ import (
 	"git.sr.ht/~erock/pico/db/postgres"
 	"git.sr.ht/~erock/pico/imgs/storage"
 	"git.sr.ht/~erock/pico/shared"
+	"github.com/disintegration/imaging"
 	"github.com/gorilla/feeds"
 	"github.com/kolesa-team/go-webp/encoder"
 	"github.com/kolesa-team/go-webp/webp"
-	"github.com/nfnt/resize"
 	"go.uber.org/zap"
 	"golang.org/x/exp/slices"
 )
@@ -290,7 +290,7 @@ func (h *ImgOptimizer) Process(contents io.Reader, writer io.Writer, mimeType st
 
 	nextImg := img
 	if h.Height > 0 || h.Width > 0 {
-		nextImg = resize.Resize(h.Width, h.Height, img, resize.Bicubic)
+		nextImg = imaging.Resize(img, int(h.Width), int(h.Height), imaging.MitchellNetravali)
 	}
 
 	options, err := encoder.NewLossyEncoderOptions(
