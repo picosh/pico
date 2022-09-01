@@ -141,13 +141,17 @@ func NewImgOptimizer(logger *zap.SugaredLogger, optimized bool, dimes string) *I
 		Optimized:  optimized,
 		DeviceType: desktopDevice,
 		Quality:    75,
+		Ratio:      &Ratio{Width: 0, Height: 0},
 	}
 
 	ratio, err := GetRatio(dimes)
-	if err == nil {
+	if ratio != nil {
 		opt.Ratio = ratio
-	} else {
+	}
+
+	if err != nil {
 		logger.Error(err)
 	}
+
 	return opt
 }

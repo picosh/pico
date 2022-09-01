@@ -170,8 +170,12 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 	if slices.Contains([]string{"image/png", "image/jpg", "image/jpeg"}, mimeType) {
 		noExifBytes, err := exifremove.Remove(text)
 		if err == nil {
-			text = noExifBytes
-			h.Cfg.Logger.Infof("(%s) stripped exif data", filename)
+			if len(noExifBytes) == 0 {
+				h.Cfg.Logger.Infof("(%s) silently failed to strip exif data", filename)
+			} else {
+				text = noExifBytes
+				h.Cfg.Logger.Infof("(%s) stripped exif data", filename)
+			}
 		} else {
 			h.Cfg.Logger.Error(err)
 		}
