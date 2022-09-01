@@ -177,7 +177,7 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	readmeTxt := &ReadmeTxt{}
-	readme, err := dbpool.FindPostWithFilename("_header.txt", user.ID, cfg.Space)
+	readme, err := dbpool.FindPostWithFilename("_readme.txt", user.ID, cfg.Space)
 	if err == nil {
 		parsedText := ParseText(readme.Text)
 		readmeTxt.Items = parsedText.Items
