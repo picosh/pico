@@ -4,14 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"html/template"
-	"image"
-	gif "image/gif"
-	jpeg "image/jpeg"
-	png "image/png"
-	"io"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
 
@@ -21,10 +15,7 @@ import (
 	"git.sr.ht/~erock/pico/db/postgres"
 	"git.sr.ht/~erock/pico/imgs/storage"
 	"git.sr.ht/~erock/pico/shared"
-	"github.com/disintegration/imaging"
 	"github.com/gorilla/feeds"
-	"github.com/kolesa-team/go-webp/encoder"
-	"github.com/kolesa-team/go-webp/webp"
 	"go.uber.org/zap"
 	"golang.org/x/exp/slices"
 )
@@ -194,131 +185,6 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-type deviceType int
-
-const (
-	desktopDevice deviceType = iota
-)
-
-type ImgOptimizer struct {
-	// Specify the compression factor for RGB channels between 0 and 100. The default is 75.
-	// A small factor produces a smaller file with lower quality.
-	// Best quality is achieved by using a value of 100.
-	Quality    float32
-	Optimized  bool
-	Width      uint
-	Height     uint
-	DeviceType deviceType
-	Output     []byte
-	Dimes      string
-}
-
-func (h *ImgOptimizer) GetImage(r io.Reader, mimeType string) (image.Image, error) {
-	switch mimeType {
-	case "image/png":
-		return png.Decode(r)
-	case "image/jpeg":
-		return jpeg.Decode(r)
-	case "image/jpg":
-		return jpeg.Decode(r)
-	case "image/gif":
-		return gif.Decode(r)
-	}
-
-	return nil, fmt.Errorf("(%s) not supported optimization", mimeType)
-}
-
-func (h *ImgOptimizer) GetRatio() error {
-	if h.Dimes == "" {
-		return nil
-	}
-
-	// dimes = x250 -- width is auto scaled and height is 250
-	if strings.HasPrefix(h.Dimes, "x") {
-		height, err := strconv.ParseUint(h.Dimes[1:], 10, 64)
-		if err != nil {
-			return err
-		}
-		h.Height = uint(height)
-		return nil
-	}
-
-	// dimes = 250x -- width is 250 and height is auto scaled
-	if strings.HasSuffix(h.Dimes, "x") {
-		width, err := strconv.ParseUint(h.Dimes[:len(h.Dimes)-1], 10, 64)
-		if err != nil {
-			return err
-		}
-		h.Width = uint(width)
-		return nil
-	}
-
-	res := strings.Split(h.Dimes, "x")
-	if len(res) != 2 {
-		return fmt.Errorf("(%s) must be in format (x200, 200x, or 200x200)", h.Dimes)
-	}
-
-	width, err := strconv.ParseUint(res[0], 10, 64)
-	if err != nil {
-		return err
-	}
-	h.Width = uint(width)
-
-	height, err := strconv.ParseUint(res[1], 10, 64)
-	if err != nil {
-		return err
-	}
-	h.Height = uint(height)
-
-	return nil
-}
-
-type SubImager interface {
-	SubImage(r image.Rectangle) image.Image
-}
-
-func (h *ImgOptimizer) Process(contents io.Reader, writer io.Writer, mimeType string) error {
-	if !h.Optimized {
-		_, err := io.Copy(writer, contents)
-		return err
-	}
-
-	img, err := h.GetImage(contents, mimeType)
-	if err != nil {
-		return err
-	}
-
-	nextImg := img
-	if h.Height > 0 || h.Width > 0 {
-		nextImg = imaging.Resize(img, int(h.Width), int(h.Height), imaging.MitchellNetravali)
-	}
-
-	options, err := encoder.NewLossyEncoderOptions(
-		encoder.PresetDefault,
-		h.Quality,
-	)
-	if err != nil {
-		return err
-	}
-
-	return webp.Encode(writer, nextImg, options)
-}
-
-func NewImgOptimizer(logger *zap.SugaredLogger, optimized bool, dimes string) *ImgOptimizer {
-	opt := &ImgOptimizer{
-		Optimized:  optimized,
-		DeviceType: desktopDevice,
-		Quality:    75,
-		Dimes:      dimes,
-	}
-
-	err := opt.GetRatio()
-	if err != nil {
-		logger.Error(err)
-	}
-	return opt
-}
-
 type ImgHandler struct {
 	Username  string
 	Subdomain string
@@ -327,7 +193,7 @@ type ImgHandler struct {
 	Dbpool    db.DB
 	Storage   storage.ObjectStorage
 	Logger    *zap.SugaredLogger
-	Img       *ImgOptimizer
+	Img       *shared.ImgOptimizer
 }
 
 func imgHandler(w http.ResponseWriter, h *ImgHandler) {
@@ -405,7 +271,7 @@ func imgRequestOriginal(w http.ResponseWriter, r *http.Request) {
 		Dbpool:    dbpool,
 		Storage:   st,
 		Logger:    logger,
-		Img:       NewImgOptimizer(logger, false, ""),
+		Img:       shared.NewImgOptimizer(logger, false, ""),
 	})
 }
 
@@ -440,7 +306,7 @@ func imgRequest(w http.ResponseWriter, r *http.Request) {
 		Dbpool:    dbpool,
 		Storage:   st,
 		Logger:    logger,
-		Img:       NewImgOptimizer(logger, true, dimes),
+		Img:       shared.NewImgOptimizer(logger, true, dimes),
 	})
 }
 
