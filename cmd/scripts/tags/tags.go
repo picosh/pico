@@ -76,7 +76,7 @@ func main() {
 
 	logger.Info("replacing tags")
 	for _, post := range posts {
-		linkify := imgs.NewImgsLinkify(post.Username, true, false)
+		linkify := imgs.NewImgsLinkify(post.Username)
 		parsed, err := shared.ParseText(post.Text, linkify)
 		if err != nil {
 			continue

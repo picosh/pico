@@ -166,12 +166,10 @@ func createImgURL(linkify Linkify) func([]byte) []byte {
 	return func(url []byte) []byte {
 		if url[0] == '/' {
 			name := SanitizeFileExt(string(url))
-			//  fmt.Sprintf("%s%s", absURL, name)
 			nextURL := linkify.Create(name)
 			return []byte(nextURL)
 		} else if bytes.HasPrefix(url, []byte{'.', '/'}) {
 			name := SanitizeFileExt(string(url[1:]))
-			// nextURL := fmt.Sprintf("%s%s", absURL, name)
 			nextURL := linkify.Create(name)
 			return []byte(nextURL)
 		}
@@ -222,10 +220,8 @@ func ParseText(text string, linkify Linkify) (*ParsedText, error) {
 	parsed.MetaData.Image = toString(metaData["image"])
 	if strings.HasPrefix(parsed.Image, "/") {
 		parsed.Image = linkify.Create(parsed.Image)
-		// parsed.MetaData.Image = fmt.Sprintf("%s%s", absURL, parsed.Image)
 	} else if strings.HasPrefix(parsed.Image, "./") {
 		parsed.Image = linkify.Create(parsed.Image[1:])
-		// parsed.MetaData.Image = fmt.Sprintf("%s%s", absURL, parsed.Image[1:])
 	}
 	parsed.MetaData.ImageCard = toString(metaData["card"])
 

@@ -143,6 +143,11 @@ func (c *ConfigSite) RawPostURL(username, slug string) string {
 	return fmt.Sprintf("/raw/%s/%s", username, fname)
 }
 
+func (c *ConfigSite) ImgFullURL(username, slug string) string {
+	fname := url.PathEscape(strings.TrimLeft(slug, "/"))
+	return fmt.Sprintf("%s://%s.%s/%s", c.Protocol, username, c.Domain, fname)
+}
+
 func (c *ConfigSite) ImgURL(username string, slug string, onSubdomain bool, withUserName bool) string {
 	fname := url.PathEscape(strings.TrimLeft(slug, "/"))
 	if c.IsSubdomains() && onSubdomain {

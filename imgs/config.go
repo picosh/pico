@@ -14,18 +14,16 @@ type ImgsLinkify struct {
 	WithUsername bool
 }
 
-func NewImgsLinkify(username string, onSubdomain, withUsername bool) *ImgsLinkify {
+func NewImgsLinkify(username string) *ImgsLinkify {
 	cfg := NewConfigSite()
 	return &ImgsLinkify{
-		Cfg:          cfg,
-		Username:     username,
-		OnSubdomain:  onSubdomain,
-		WithUsername: withUsername,
+		Cfg:      cfg,
+		Username: username,
 	}
 }
 
 func (i *ImgsLinkify) Create(fname string) string {
-	return i.Cfg.ImgURL(i.Username, fname, i.OnSubdomain, i.WithUsername)
+	return i.Cfg.ImgFullURL(i.Username, fname)
 }
 
 func NewConfigSite() *shared.ConfigSite {

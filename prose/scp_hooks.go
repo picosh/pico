@@ -46,7 +46,7 @@ func (p *MarkdownHooks) FileValidate(data *filehandlers.PostMetaData) (bool, err
 }
 
 func (p *MarkdownHooks) FileMeta(data *filehandlers.PostMetaData) error {
-	linkify := imgs.NewImgsLinkify("", true, false)
+	linkify := imgs.NewImgsLinkify("")
 	parsedText, err := shared.ParseText(data.Text, linkify)
 	// we return nil here because we don't want the file upload to fail
 	if err != nil {

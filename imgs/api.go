@@ -476,7 +476,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	var data PostPageData
 	post, err := dbpool.FindPostWithSlug(slug, user.ID, cfg.Space)
 	if err == nil {
-		linkify := NewImgsLinkify(username, onSubdomain, withUserName)
+		linkify := NewImgsLinkify(username)
 		parsed, err := shared.ParseText(post.Text, linkify)
 		if err != nil {
 			logger.Error(err)
