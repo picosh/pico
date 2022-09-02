@@ -718,6 +718,9 @@ func createSubdomainRoutes(staticRoutes []shared.Route) []shared.Route {
 	routes := []shared.Route{
 		shared.NewRoute("GET", "/", blogHandler),
 		shared.NewRoute("GET", "/rss", rssBlogHandler),
+		shared.NewRoute("GET", "/rss.xml", rssBlogHandler),
+		shared.NewRoute("GET", "/atom.xml", rssBlogHandler),
+		shared.NewRoute("GET", "/feed.xml", rssBlogHandler),
 	}
 
 	routes = append(
