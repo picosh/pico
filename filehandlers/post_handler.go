@@ -257,7 +257,8 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 	} else {
 		if metadata.Text == post.Text {
 			logger.Infof("(%s) found, but text is identical, skipping", filename)
-			return h.Cfg.FullPostURL(h.User.Name, metadata.Slug, h.Cfg.IsSubdomains(), true), nil
+			curl := shared.NewCreateURL(h.Cfg)
+			return h.Cfg.FullPostURL(curl, h.User.Name, metadata.Slug), nil
 		}
 
 		logger.Infof("(%s) found, updating record", filename)
@@ -290,5 +291,6 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		}
 	}
 
-	return h.Cfg.FullPostURL(h.User.Name, metadata.Slug, h.Cfg.IsSubdomains(), true), nil
+	curl := shared.NewCreateURL(h.Cfg)
+	return h.Cfg.FullPostURL(curl, h.User.Name, metadata.Slug), nil
 }

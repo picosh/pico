@@ -229,11 +229,11 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		return "", err
 	}
 
+	curl := shared.NewCreateURL(h.Cfg)
 	url := h.Cfg.FullPostURL(
+		curl,
 		h.User.Name,
 		metadata.Slug,
-		h.Cfg.IsSubdomains(),
-		true,
 	)
 	return url, nil
 }

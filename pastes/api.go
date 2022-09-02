@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"strings"
 	"time"
 
 	"git.sr.ht/~erock/pico/db"
@@ -95,12 +94,6 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	hostDomain := strings.Split(r.Host, ":")[0]
-	appDomain := strings.Split(cfg.ConfigCms.Domain, ":")[0]
-
-	onSubdomain := cfg.IsSubdomains() && strings.Contains(hostDomain, appDomain)
-	withUserName := (!onSubdomain && hostDomain == appDomain) || !cfg.IsCustomdomains()
-
 	ts, err := shared.RenderTemplate(cfg, []string{
 		cfg.StaticPath("html/blog.page.tmpl"),
 	})
@@ -116,11 +109,12 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 		Bio:   "",
 	}
 
+	curl := shared.CreateURLFromRequest(cfg, r)
 	postCollection := make([]PostItemData, 0, len(posts))
 	for _, post := range posts {
 		p := PostItemData{
-			URL:            template.URL(cfg.FullPostURL(post.Username, post.Slug, onSubdomain, withUserName)),
-			BlogURL:        template.URL(cfg.FullBlogURL(post.Username, onSubdomain, withUserName)),
+			URL:            template.URL(cfg.FullPostURL(curl, post.Username, post.Slug)),
+			BlogURL:        template.URL(cfg.FullBlogURL(curl, post.Username)),
 			Title:          post.Filename,
 			PublishAt:      post.PublishAt.Format("02 Jan, 2006"),
 			PublishAtISO:   post.PublishAt.Format(time.RFC3339),
@@ -133,8 +127,8 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	data := BlogPageData{
 		Site:      *cfg.GetSiteData(),
 		PageTitle: headerTxt.Title,
-		URL:       template.URL(cfg.FullBlogURL(username, onSubdomain, withUserName)),
-		RSSURL:    template.URL(cfg.RssBlogURL(username, onSubdomain, withUserName, "")),
+		URL:       template.URL(cfg.FullBlogURL(curl, username)),
+		RSSURL:    template.URL(cfg.RssBlogURL(curl, username, "")),
 		Header:    headerTxt,
 		Username:  username,
 		Posts:     postCollection,

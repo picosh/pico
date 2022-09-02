@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
 	"git.sr.ht/~erock/pico/db"
@@ -182,11 +181,7 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 		cfg.StaticPath("html/blog.page.tmpl"),
 	})
 
-	hostDomain := strings.Split(r.Host, ":")[0]
-	appDomain := strings.Split(cfg.ConfigCms.Domain, ":")[0]
-
-	onSubdomain := cfg.IsSubdomains() && strings.Contains(hostDomain, appDomain)
-	withUserName := (!onSubdomain && hostDomain == appDomain) || !cfg.IsCustomdomains()
+	curl := shared.CreateURLFromRequest(cfg, r)
 
 	if err != nil {
 		logger.Error(err)
@@ -223,10 +218,9 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 			finURL := nav.URL
 			if !u.IsAbs() {
 				finURL = cfg.FullPostURL(
+					curl,
 					readme.Username,
 					nav.URL,
-					onSubdomain,
-					withUserName,
 				)
 			}
 			headerTxt.Nav = append(headerTxt.Nav, shared.Link{
@@ -250,8 +244,8 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	postCollection := make([]PostItemData, 0, len(posts))
 	for _, post := range posts {
 		p := PostItemData{
-			URL:            template.URL(cfg.FullPostURL(post.Username, post.Slug, onSubdomain, withUserName)),
-			BlogURL:        template.URL(cfg.FullBlogURL(post.Username, onSubdomain, withUserName)),
+			URL:            template.URL(cfg.FullPostURL(curl, post.Username, post.Slug)),
+			BlogURL:        template.URL(cfg.FullBlogURL(curl, post.Username)),
 			Title:          shared.FilenameToTitle(post.Filename, post.Title),
 			PublishAt:      post.PublishAt.Format("02 Jan, 2006"),
 			PublishAtISO:   post.PublishAt.Format(time.RFC3339),
@@ -264,8 +258,8 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	data := BlogPageData{
 		Site:      *cfg.GetSiteData(),
 		PageTitle: headerTxt.Title,
-		URL:       template.URL(cfg.FullBlogURL(username, onSubdomain, withUserName)),
-		RSSURL:    template.URL(cfg.RssBlogURL(username, onSubdomain, withUserName, tag)),
+		URL:       template.URL(cfg.FullBlogURL(curl, username)),
+		RSSURL:    template.URL(cfg.RssBlogURL(curl, username, tag)),
 		Readme:    readmeTxt,
 		Header:    headerTxt,
 		Username:  username,
@@ -343,11 +337,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	blogName := GetBlogName(username)
-	hostDomain := strings.Split(r.Host, ":")[0]
-	appDomain := strings.Split(cfg.ConfigCms.Domain, ":")[0]
-
-	onSubdomain := cfg.IsSubdomains() && strings.Contains(hostDomain, appDomain)
-	withUserName := (!onSubdomain && hostDomain == appDomain) || !cfg.IsCustomdomains()
+	curl := shared.CreateURLFromRequest(cfg, r)
 
 	ogImage := ""
 	ogImageCard := ""
@@ -411,8 +401,8 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 		data = PostPageData{
 			Site:         *cfg.GetSiteData(),
 			PageTitle:    GetPostTitle(post),
-			URL:          template.URL(cfg.FullPostURL(post.Username, post.Slug, onSubdomain, withUserName)),
-			BlogURL:      template.URL(cfg.FullBlogURL(username, onSubdomain, withUserName)),
+			URL:          template.URL(cfg.FullPostURL(curl, post.Username, post.Slug)),
+			BlogURL:      template.URL(cfg.FullBlogURL(curl, username)),
 			Description:  post.Description,
 			Title:        shared.FilenameToTitle(post.Filename, post.Title),
 			Slug:         post.Slug,
@@ -431,7 +421,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		data = PostPageData{
 			Site:         *cfg.GetSiteData(),
-			BlogURL:      template.URL(cfg.FullBlogURL(username, onSubdomain, withUserName)),
+			BlogURL:      template.URL(cfg.FullBlogURL(curl, username)),
 			PageTitle:    "Post not found",
 			Description:  "Post not found",
 			Title:        "Post not found",
@@ -551,10 +541,12 @@ func readHandler(w http.ResponseWriter, r *http.Request) {
 		Tags:      tags,
 		HasFilter: tag != "",
 	}
+
+	curl := shared.NewCreateURL(cfg)
 	for _, post := range pager.Data {
 		item := PostItemData{
-			URL:            template.URL(cfg.FullPostURL(post.Username, post.Slug, true, true)),
-			BlogURL:        template.URL(cfg.FullBlogURL(post.Username, true, true)),
+			URL:            template.URL(cfg.FullPostURL(curl, post.Username, post.Slug)),
+			BlogURL:        template.URL(cfg.FullBlogURL(curl, post.Username)),
 			Title:          shared.FilenameToTitle(post.Filename, post.Title),
 			Description:    post.Description,
 			Username:       post.Username,
@@ -631,15 +623,11 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	hostDomain := strings.Split(r.Host, ":")[0]
-	appDomain := strings.Split(cfg.ConfigCms.Domain, ":")[0]
-
-	onSubdomain := cfg.IsSubdomains() && strings.Contains(hostDomain, appDomain)
-	withUserName := (!onSubdomain && hostDomain == appDomain) || !cfg.IsCustomdomains()
+	curl := shared.CreateURLFromRequest(cfg, r)
 
 	feed := &feeds.Feed{
 		Title:       headerTxt.Title,
-		Link:        &feeds.Link{Href: cfg.FullBlogURL(username, onSubdomain, withUserName)},
+		Link:        &feeds.Link{Href: cfg.FullBlogURL(curl, username)},
 		Description: headerTxt.Bio,
 		Author:      &feeds.Author{Name: username},
 		Created:     time.Now(),
@@ -674,8 +662,8 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		realUrl := cfg.FullPostURL(post.Username, post.Slug, onSubdomain, withUserName)
-		if !onSubdomain && !withUserName {
+		realUrl := cfg.FullPostURL(curl, post.Username, post.Slug)
+		if !curl.Subdomain && !curl.UsernameInRoute {
 			realUrl = fmt.Sprintf("%s://%s%s", cfg.Protocol, r.Host, realUrl)
 		}
 
@@ -737,11 +725,7 @@ func rssHandler(w http.ResponseWriter, r *http.Request) {
 		Created:     time.Now(),
 	}
 
-	hostDomain := strings.Split(r.Host, ":")[0]
-	appDomain := strings.Split(cfg.ConfigCms.Domain, ":")[0]
-
-	onSubdomain := cfg.IsSubdomains() && strings.Contains(hostDomain, appDomain)
-	withUserName := (!onSubdomain && hostDomain == appDomain) || !cfg.IsCustomdomains()
+	curl := shared.CreateURLFromRequest(cfg, r)
 
 	var feedItems []*feeds.Item
 	for _, post := range pager.Data {
@@ -759,8 +743,8 @@ func rssHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		realUrl := cfg.FullPostURL(post.Username, post.Slug, onSubdomain, withUserName)
-		if !onSubdomain && !withUserName {
+		realUrl := cfg.FullPostURL(curl, post.Username, post.Slug)
+		if !curl.Subdomain && !curl.UsernameInRoute {
 			realUrl = fmt.Sprintf("%s://%s%s", cfg.Protocol, r.Host, realUrl)
 		}
 
