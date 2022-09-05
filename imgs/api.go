@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"html/template"
+	"io"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 
 	_ "net/http/pprof"
@@ -189,6 +189,7 @@ type ImgHandler struct {
 	Storage   storage.ObjectStorage
 	Logger    *zap.SugaredLogger
 	Img       *shared.ImgOptimizer
+	Optimized bool
 }
 
 func imgHandler(w http.ResponseWriter, h *ImgHandler) {
@@ -218,7 +219,12 @@ func imgHandler(w http.ResponseWriter, h *ImgHandler) {
 		return
 	}
 
-	contents, err := h.Storage.GetFile(bucket, post.Filename)
+	fname := post.Filename
+	if h.Optimized {
+		fname = fmt.Sprintf("%s.webp", shared.SanitizeFileExt(post.Filename))
+	}
+
+	contents, err := h.Storage.GetFile(bucket, fname)
 	if err != nil {
 		h.Logger.Infof("file not found %s/%s", h.Username, post.Filename)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -226,15 +232,25 @@ func imgHandler(w http.ResponseWriter, h *ImgHandler) {
 	}
 	defer contents.Close()
 
-	if h.Img.Optimized {
+	if h.Optimized {
 		w.Header().Add("Content-Type", "image/webp")
+		if h.Img.Width != 0 || h.Img.Height != 0 {
+			err := h.Img.Process(w, contents)
+			if err != nil {
+				h.Logger.Error(err)
+			}
+		} else {
+			_, err := io.Copy(w, contents)
+			if err != nil {
+				h.Logger.Error(err)
+			}
+		}
 	} else {
 		w.Header().Add("Content-Type", post.MimeType)
-	}
-
-	err = h.Img.Process(contents, w, strings.TrimSpace(post.MimeType))
-	if err != nil {
-		h.Logger.Error(err)
+		_, err := io.Copy(w, contents)
+		if err != nil {
+			h.Logger.Error(err)
+		}
 	}
 }
 
@@ -266,7 +282,8 @@ func imgRequestOriginal(w http.ResponseWriter, r *http.Request) {
 		Dbpool:    dbpool,
 		Storage:   st,
 		Logger:    logger,
-		Img:       shared.NewImgOptimizer(logger, false, ""),
+		Img:       shared.NewImgOptimizer(logger, ""),
+		Optimized: false,
 	})
 }
 
@@ -301,7 +318,8 @@ func imgRequest(w http.ResponseWriter, r *http.Request) {
 		Dbpool:    dbpool,
 		Storage:   st,
 		Logger:    logger,
-		Img:       shared.NewImgOptimizer(logger, true, dimes),
+		Img:       shared.NewImgOptimizer(logger, dimes),
+		Optimized: true,
 	})
 }
 
@@ -650,6 +668,7 @@ func createMainRoutes(staticRoutes []shared.Route) []shared.Route {
 		shared.NewRoute("GET", "/([^/]+)/o/([^/]+)", imgRequestOriginal),
 		shared.NewRoute("GET", "/([^/]+)/p/([^/]+)", postHandler),
 		shared.NewRoute("GET", "/([^/]+)/([^/]+)", imgRequest),
+		shared.NewRoute("GET", "/([^/]+)/([^/]+)/([a-z0-9]+)", imgRequest),
 	)
 
 	return routes

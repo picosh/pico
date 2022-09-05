@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/disintegration/imaging"
+	"github.com/kolesa-team/go-webp/decoder"
 	"github.com/kolesa-team/go-webp/encoder"
 	"github.com/kolesa-team/go-webp/webp"
 	"go.uber.org/zap"
@@ -26,25 +27,9 @@ type ImgOptimizer struct {
 	// Specify the compression factor for RGB channels between 0 and 100. The default is 75.
 	// A small factor produces a smaller file with lower quality.
 	// Best quality is achieved by using a value of 100.
-	Quality   float32
-	Optimized bool
+	Quality float32
 	*Ratio
 	DeviceType deviceType
-}
-
-func (h *ImgOptimizer) GetImage(r io.Reader, mimeType string) (image.Image, error) {
-	switch mimeType {
-	case "image/png":
-		return png.Decode(r)
-	case "image/jpeg":
-		return jpeg.Decode(r)
-	case "image/jpg":
-		return jpeg.Decode(r)
-	case "image/gif":
-		return gif.Decode(r)
-	}
-
-	return nil, fmt.Errorf("(%s) not supported optimization", mimeType)
 }
 
 type Ratio struct {
@@ -75,6 +60,7 @@ func GetRatio(dimes string) (*Ratio, error) {
 		return &Ratio{Width: width, Height: 0}, nil
 	}
 
+	// dimes = 250x250
 	res := strings.Split(dimes, "x")
 	if len(res) != 2 {
 		return nil, fmt.Errorf("(%s) must be in format (x200, 200x, or 200x200)", dimes)
@@ -96,35 +82,41 @@ func GetRatio(dimes string) (*Ratio, error) {
 	return ratio, nil
 }
 
-type SubImager interface {
-	SubImage(r image.Rectangle) image.Image
-}
-
-func (h *ImgOptimizer) Resize(img image.Image) *image.NRGBA {
-	return imaging.Resize(
-		img,
-		h.Width,
-		h.Height,
-		imaging.MitchellNetravali,
-	)
-}
-
-func (h *ImgOptimizer) Process(contents io.Reader, writer io.Writer, mimeType string) error {
-	if !h.Optimized {
-		_, err := io.Copy(writer, contents)
-		return err
+func (h *ImgOptimizer) GetImage(r io.Reader, mimeType string) (image.Image, error) {
+	switch mimeType {
+	case "image/png":
+		return png.Decode(r)
+	case "image/jpeg":
+		return jpeg.Decode(r)
+	case "image/jpg":
+		return jpeg.Decode(r)
+	case "image/gif":
+		return gif.Decode(r)
 	}
 
-	img, err := h.GetImage(contents, mimeType)
+	return nil, fmt.Errorf("(%s) not supported for optimization", mimeType)
+}
+
+func (h *ImgOptimizer) DecodeWebp(r io.Reader) (image.Image, error) {
+	opt := decoder.Options{}
+	img, err := webp.Decode(r, &opt)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	nextImg := img
-	if h.Height > 0 || h.Width > 0 {
-		nextImg = h.Resize(img)
+	if h.Width != 0 || h.Height != 0 {
+		return imaging.Resize(
+			img,
+			h.Width,
+			h.Height,
+			imaging.MitchellNetravali,
+		), nil
 	}
 
+	return img, nil
+}
+
+func (h *ImgOptimizer) EncodeWebp(writer io.Writer, img image.Image) error {
 	options, err := encoder.NewLossyEncoderOptions(
 		encoder.PresetDefault,
 		h.Quality,
@@ -133,14 +125,22 @@ func (h *ImgOptimizer) Process(contents io.Reader, writer io.Writer, mimeType st
 		return err
 	}
 
-	return webp.Encode(writer, nextImg, options)
+	return webp.Encode(writer, img, options)
 }
 
-func NewImgOptimizer(logger *zap.SugaredLogger, optimized bool, dimes string) *ImgOptimizer {
+func (h *ImgOptimizer) Process(writer io.Writer, contents io.Reader) error {
+	img, err := h.DecodeWebp(contents)
+	if err != nil {
+		return err
+	}
+
+	return h.EncodeWebp(writer, img)
+}
+
+func NewImgOptimizer(logger *zap.SugaredLogger, dimes string) *ImgOptimizer {
 	opt := &ImgOptimizer{
-		Optimized:  optimized,
 		DeviceType: desktopDevice,
-		Quality:    75,
+		Quality:    80,
 		Ratio:      &Ratio{Width: 0, Height: 0},
 	}
 

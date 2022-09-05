@@ -42,7 +42,38 @@ func (h *UploadImgHandler) metaImg(data *PostMetaData) error {
 	if err != nil {
 		return err
 	}
-	fname, err := h.Storage.PutFile(bucket, data.Filename, storage.NopReaderAtCloser(bytes.NewReader([]byte(data.Text))))
+
+	reader := bytes.NewReader([]byte(data.Text))
+	tee := bytes.NewReader([]byte(data.Text))
+	// var buf bytes.Buffer
+	// tee := io.TeeReader(reader, &buf)
+
+	fname, err := h.Storage.PutFile(
+		bucket,
+		data.Filename,
+		storage.NopReaderAtCloser(reader),
+	)
+	if err != nil {
+		return err
+	}
+
+	opt := shared.NewImgOptimizer(h.Cfg.Logger, "")
+	// opt.Quality = 100
+	contents := &bytes.Buffer{}
+	img, err := opt.GetImage(tee, data.MimeType)
+	if err != nil {
+		return err
+	}
+	err = opt.EncodeWebp(contents, img)
+	if err != nil {
+		return err
+	}
+	webpReader := bytes.NewReader(contents.Bytes())
+	_, err = h.Storage.PutFile(
+		bucket,
+		fmt.Sprintf("%s.webp", shared.SanitizeFileExt(data.Filename)),
+		storage.NopReaderAtCloser(webpReader),
+	)
 	if err != nil {
 		return err
 	}
@@ -79,6 +110,11 @@ func (h *UploadImgHandler) writeImg(data *PostMetaData) error {
 			return err
 		}
 		err = h.Storage.DeleteFile(bucket, data.Filename)
+		if err != nil {
+			return err
+		}
+		webp := fmt.Sprintf("%s.webp", shared.SanitizeFileExt(data.Filename))
+		err = h.Storage.DeleteFile(bucket, webp)
 		if err != nil {
 			return err
 		}

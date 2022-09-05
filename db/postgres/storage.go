@@ -98,6 +98,7 @@ var (
 		publish_at,
 		app_users.name as username,
 		posts.updated_at,
+		posts.mime_type,
 		0 AS "score"
 	FROM posts
 	LEFT OUTER JOIN app_users ON app_users.id = posts.user_id
@@ -171,6 +172,7 @@ const (
 		publish_at,
 		app_users.name as username,
 		posts.updated_at,
+		posts.mime_type,
 		0 AS "score"
 	FROM posts
 	LEFT OUTER JOIN app_users ON app_users.id = posts.user_id
@@ -189,6 +191,7 @@ const (
 		publish_at,
 		app_users.name as username,
 		posts.updated_at,
+		posts.mime_type,
 		(
 			LOG(2.0, COALESCE(NULLIF(posts.views, 0), 1)) / (
 				EXTRACT(
@@ -610,6 +613,7 @@ func (me *PsqlDB) postPager(rs *sql.Rows, pageNum int, space string, tag string)
 			&post.PublishAt,
 			&post.Username,
 			&post.UpdatedAt,
+			&post.MimeType,
 			&post.Score,
 		)
 		if err != nil {
