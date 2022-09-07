@@ -77,12 +77,12 @@
         <p>
             However, if a user wants to delete a img they can delete the contents of the file and
             then upload it to our server.  If the file contains 0 bytes, we will remove the img.
-            For example, if you want to delete <code>delete.md</code> you could:
+            For example, if you want to delete <code>delete.jpg</code> you could:
         </p>
 
         <pre>
-cp /dev/null delete.md
-scp ./delete.md {{.Site.Domain}}:/</pre>
+cp /dev/null delete.jpg
+scp ./delete.jpg {{.Site.Domain}}:/</pre>
 
         <p>
             Alternatively, you can go to <code>ssh {{.Site.Domain}}</code> and select "Manage img."

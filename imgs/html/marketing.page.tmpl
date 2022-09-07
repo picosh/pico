@@ -1,20 +1,20 @@
 {{template "base" .}}
 
-{{define "title"}}{{.Site.Domain}} -- premium image hosting for hackers{{end}}
+{{define "title"}}{{.Site.Domain}} -- image hosting for hackers{{end}}
 
 {{define "meta"}}
-<meta name="description" content="premium image hosting for hackers" />
+<meta name="description" content="image hosting for hackers" />
 
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="{{.Site.Domain}}">
 <meta property="og:url" content="https://{{.Site.Domain}}">
 <meta property="og:title" content="{{.Site.Domain}}">
-<meta property="og:description" content="premium image hosting for hackers">
+<meta property="og:description" content="image hosting for hackers">
 
 <meta name="twitter:card" content="summary" />
 <meta property="twitter:url" content="https://{{.Site.Domain}}">
 <meta property="twitter:title" content="{{.Site.Domain}}">
-<meta property="twitter:description" content="premium image hosting for hackers">
+<meta property="twitter:description" content="image hosting for hackers">
 <meta name="twitter:image" content="https://{{.Site.Domain}}/card.png" />
 <meta name="twitter:image:src" content="https://{{.Site.Domain}}/card.png" />
 
@@ -29,7 +29,7 @@
 {{define "body"}}
 <header class="text-center">
     <h1 class="text-2xl font-bold">{{.Site.Domain}} [beta]</h1>
-    <p class="text-lg">premium image hosting for hackers</p>
+    <p class="text-lg">image hosting for hackers</p>
     <hr />
 </header>
 
@@ -60,15 +60,12 @@
             <li>Share public images from the terminal</li>
             <li>Seamless integration with other pico services (e.g. <a href="https://prose.sh">prose</a>)</li>
             <li>Images are web optimized by default</li>
-            <li>Images are device optimized by default</li>
             <li>API to modify images on-the-fly (e.g. dimensions)</li>
-            <li>Original images are always available</li>
-            <li>Ability to add metadata to images using markdown</li>
             <li>Hotlinking encouraged!</li>
             <li>No javascript</li>
             <li>No ads</li>
             <li>No file size limits</li>
-            <li>25GB max storage</li>
+            <li>2GB max storage</li>
         </ul>
     </section>
 
@@ -116,7 +113,7 @@
     <section>
         <h2 class="text-lg font-bold">Roadmap</h2>
         <ol>
-            <li>Add metadata (caption, tags, etc.) to an image</li>
+            <li>Ability to create albums</li>
             <li>Device optimized images</li>
         </ol>
     </section>
