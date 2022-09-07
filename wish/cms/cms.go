@@ -89,7 +89,7 @@ func Middleware(cfg *config.ConfigCms, urls config.ConfigURL) bm.Handler {
 
 		_, _, active := s.Pty()
 		if !active {
-			logger.Error("no active terminal, skipping")
+			logger.Info("no active terminal, skipping")
 			return nil, nil
 		}
 		key, err := util.KeyText(s)
