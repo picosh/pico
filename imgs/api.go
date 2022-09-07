@@ -219,8 +219,10 @@ func imgHandler(w http.ResponseWriter, h *ImgHandler) {
 		return
 	}
 
+	contentType := post.MimeType
 	fname := post.Filename
 	if h.Optimized {
+		contentType = "image/webp"
 		fname = fmt.Sprintf("%s.webp", shared.SanitizeFileExt(post.Filename))
 	}
 
@@ -232,25 +234,18 @@ func imgHandler(w http.ResponseWriter, h *ImgHandler) {
 	}
 	defer contents.Close()
 
-	if h.Optimized {
-		w.Header().Add("Content-Type", "image/webp")
-		if h.Img.Width != 0 || h.Img.Height != 0 {
-			err := h.Img.Process(w, contents)
-			if err != nil {
-				h.Logger.Error(err)
-			}
-		} else {
-			_, err := io.Copy(w, contents)
-			if err != nil {
-				h.Logger.Error(err)
-			}
-		}
+	w.Header().Add("Content-Type", contentType)
+
+	resizeImg := h.Img.Width != 0 || h.Img.Height != 0
+
+	if h.Optimized && resizeImg {
+		err = h.Img.Process(w, contents)
 	} else {
-		w.Header().Add("Content-Type", post.MimeType)
-		_, err := io.Copy(w, contents)
-		if err != nil {
-			h.Logger.Error(err)
-		}
+		_, err = io.Copy(w, contents)
+	}
+
+	if err != nil {
+		h.Logger.Error(err)
 	}
 }
 
