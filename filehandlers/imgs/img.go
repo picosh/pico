@@ -19,7 +19,7 @@ func (h *UploadImgHandler) validateImg(data *PostMetaData) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if fileSize+int(data.FileSize) > maxSize {
+	if fileSize+data.FileSize > maxSize {
 		return false, fmt.Errorf("ERROR: user (%s) has exceeded (%d) max (%d)", data.User.Name, fileSize, maxSize)
 	}
 
@@ -37,7 +37,6 @@ func (h *UploadImgHandler) validateImg(data *PostMetaData) (bool, error) {
 }
 
 func (h *UploadImgHandler) metaImg(data *PostMetaData) error {
-	// create or get
 	bucket, err := h.Storage.UpsertBucket(data.User.ID)
 	if err != nil {
 		return err
@@ -45,8 +44,6 @@ func (h *UploadImgHandler) metaImg(data *PostMetaData) error {
 
 	reader := bytes.NewReader([]byte(data.Text))
 	tee := bytes.NewReader([]byte(data.Text))
-	// var buf bytes.Buffer
-	// tee := io.TeeReader(reader, &buf)
 
 	fname, err := h.Storage.PutFile(
 		bucket,
@@ -58,16 +55,21 @@ func (h *UploadImgHandler) metaImg(data *PostMetaData) error {
 	}
 
 	opt := shared.NewImgOptimizer(h.Cfg.Logger, "")
-	// opt.Quality = 100
+	if data.FileSize < 3*MB {
+		opt.Quality = 100
+	}
+
 	contents := &bytes.Buffer{}
 	img, err := opt.GetImage(tee, data.MimeType)
 	if err != nil {
 		return err
 	}
+
 	err = opt.EncodeWebp(contents, img)
 	if err != nil {
 		return err
 	}
+
 	webpReader := bytes.NewReader(contents.Bytes())
 	_, err = h.Storage.PutFile(
 		bucket,

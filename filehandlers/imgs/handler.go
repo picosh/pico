@@ -20,7 +20,9 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-var GB = 1024 * 1024 * 1024
+var KB = 1024
+var MB = KB * 1024
+var GB = MB * 1024
 var maxSize = 2 * GB
 
 type PostMetaData struct {
