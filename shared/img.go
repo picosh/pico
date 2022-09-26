@@ -109,7 +109,7 @@ func (h *ImgOptimizer) DecodeWebp(r io.Reader) (image.Image, error) {
 			img,
 			h.Width,
 			h.Height,
-			imaging.MitchellNetravali,
+			imaging.NearestNeighbor,
 		), nil
 	}
 
