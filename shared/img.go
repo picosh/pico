@@ -123,7 +123,7 @@ func (h *ImgOptimizer) EncodeWebp(writer io.Writer, img image.Image) error {
 	if h.Lossless {
 		options, err = encoder.NewLosslessEncoderOptions(
 			encoder.PresetDefault,
-			int(h.Quality),
+			1, // only value that I could get to work
 		)
 	} else {
 		options, err = encoder.NewLossyEncoderOptions(
