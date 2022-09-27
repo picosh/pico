@@ -242,6 +242,7 @@ func imgHandler(w http.ResponseWriter, h *ImgHandler) {
 		// when resizing an image we don't want to mess with quality
 		// since that was already applied when converting to webp
 		h.Img.Quality = 100
+		h.Img.Lossless = false
 		err = h.Img.Process(w, contents)
 	} else {
 		_, err = io.Copy(w, contents)

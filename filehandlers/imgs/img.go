@@ -59,8 +59,10 @@ func (h *UploadImgHandler) metaImg(data *PostMetaData) error {
 	// since it can have a dramatic effect
 	if data.FileSize < 3*MB {
 		opt.Quality = 100
+		opt.Lossless = true
 	} else {
 		opt.Quality = 80
+		opt.Lossless = false
 	}
 
 	contents := &bytes.Buffer{}

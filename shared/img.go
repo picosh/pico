@@ -30,6 +30,7 @@ type ImgOptimizer struct {
 	Quality float32
 	*Ratio
 	DeviceType deviceType
+	Lossless   bool
 }
 
 type Ratio struct {
@@ -117,10 +118,19 @@ func (h *ImgOptimizer) DecodeWebp(r io.Reader) (image.Image, error) {
 }
 
 func (h *ImgOptimizer) EncodeWebp(writer io.Writer, img image.Image) error {
-	options, err := encoder.NewLossyEncoderOptions(
-		encoder.PresetDefault,
-		h.Quality,
-	)
+	var options *encoder.Options
+	var err error
+	if h.Lossless {
+		options, err = encoder.NewLosslessEncoderOptions(
+			encoder.PresetDefault,
+			int(h.Quality),
+		)
+	} else {
+		options, err = encoder.NewLossyEncoderOptions(
+			encoder.PresetDefault,
+			h.Quality,
+		)
+	}
 	if err != nil {
 		return err
 	}
