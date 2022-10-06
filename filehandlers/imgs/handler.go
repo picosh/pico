@@ -23,7 +23,7 @@ import (
 var KB = 1024
 var MB = KB * 1024
 var GB = MB * 1024
-var maxSize = 2 * GB
+var maxSize = 1 * GB
 
 type PostMetaData struct {
 	*db.Post

@@ -11,10 +11,6 @@ import (
 )
 
 func (h *UploadImgHandler) validateImg(data *PostMetaData) (bool, error) {
-	if !h.DBPool.HasFeatureForUser(data.User.ID, "imgs") {
-		return false, fmt.Errorf("ERROR: user (%s) does not have access to this feature (imgs)", data.User.Name)
-	}
-
 	fileSize, err := h.DBPool.FindTotalSizeForUser(data.User.ID)
 	if err != nil {
 		return false, err
