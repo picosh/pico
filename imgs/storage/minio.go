@@ -34,7 +34,6 @@ func NewStorageMinio(address, user, pass string) (*StorageMinio, error) {
 	}, err
 }
 
-// GetBucket - A bucket for the filesystem is just a directory.
 func (s *StorageMinio) GetBucket(name string) (Bucket, error) {
 	bucket := Bucket{
 		Name: name,

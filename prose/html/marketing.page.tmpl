@@ -81,6 +81,21 @@ Cya!
     </section>
 
     <section>
+        <h2 class="text-lg font-bold">Upload images for your blog</h2>
+        <p>
+            We also support image uploading (jpg, png, gif, webp, svg).  Simply upload your
+            images alongside your markdown files and then reference them from root `/`:
+        </p>
+        <pre>---
+title: hello world!
+---
+
+        ![profile pic](/profile.jpg)</pre>
+        <pre>scp ~/blog/hello-world.md ~/blog/profile.jpg {{.Site.Domain}}:/</pre>
+        <p>Read more about image uploading at [imgs.sh](https://imgs.sh) and our [help page](/help)</p>
+    </section>
+
+    <section>
         <h2 class="text-lg font-bold">Publish your posts with one command</h2>
         <p>
             When your post is ready to be published, copy the file to our server with a familiar
@@ -137,8 +152,6 @@ Cya!
     <section>
         <h2 class="text-lg font-bold">Roadmap</h2>
         <ol>
-            <li>Ability to upload images</li>
-            <li>View posts by tag</li>
             <li>Writing competitions</li>
             <li><a href="/help#hugo-support">Limited compatibility</a> with <a href="https://gohugo.io">hugo</a></li>
         </ol>

@@ -41,7 +41,9 @@
 <main>
     <article>
         <figure class="img">
-            <img src="{{.ImgURL}}" alt="" />
+            <a href="{{.ImgURL}}">
+                <img src="{{.ImgURL}}" alt="" />
+            </a>
             {{if .Caption}}<figcaption class="my font-italic">{{.Caption}}</figcaption>{{end}}
         </figure>
 
