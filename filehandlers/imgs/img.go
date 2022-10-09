@@ -11,12 +11,17 @@ import (
 )
 
 func (h *UploadImgHandler) validateImg(data *PostMetaData) (bool, error) {
-	fileSize, err := h.DBPool.FindTotalSizeForUser(data.User.ID)
+	totalFileSize, err := h.DBPool.FindTotalSizeForUser(data.User.ID)
 	if err != nil {
 		return false, err
 	}
-	if fileSize+data.FileSize > maxSize {
-		return false, fmt.Errorf("ERROR: user (%s) has exceeded (%d) max (%d)", data.User.Name, fileSize, maxSize)
+
+	if data.FileSize > maxImgSize {
+		return false, fmt.Errorf("ERROR: file (%s) has exceeded maximum file size (%d bytes)", data.Filename, maxImgSize)
+	}
+
+	if totalFileSize+data.FileSize > maxSize {
+		return false, fmt.Errorf("ERROR: user (%s) has exceeded (%d bytes) max (%d bytes)", data.User.Name, totalFileSize, maxSize)
 	}
 
 	if !shared.IsExtAllowed(data.Filename, h.Cfg.AllowedExt) {

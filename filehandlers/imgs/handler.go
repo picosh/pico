@@ -24,6 +24,7 @@ var KB = 1024
 var MB = KB * 1024
 var GB = MB * 1024
 var maxSize = 1 * GB
+var maxImgSize = 10 * MB
 
 type PostMetaData struct {
 	*db.Post
