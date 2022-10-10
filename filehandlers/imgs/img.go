@@ -8,6 +8,7 @@ import (
 	"git.sr.ht/~erock/pico/db"
 	"git.sr.ht/~erock/pico/imgs/storage"
 	"git.sr.ht/~erock/pico/shared"
+	"github.com/gliderlabs/ssh"
 )
 
 func (h *UploadImgHandler) validateImg(data *PostMetaData) (bool, error) {
@@ -96,9 +97,13 @@ func (h *UploadImgHandler) metaImg(data *PostMetaData) error {
 	return nil
 }
 
-func (h *UploadImgHandler) writeImg(data *PostMetaData) error {
+func (h *UploadImgHandler) writeImg(s ssh.Session, data *PostMetaData) error {
 	valid, err := h.validateImg(data)
 	if !valid {
+		return err
+	}
+	user, err := getUser(s)
+	if err != nil {
 		return err
 	}
 
@@ -130,7 +135,7 @@ func (h *UploadImgHandler) writeImg(data *PostMetaData) error {
 	} else if data.Cur == nil {
 		h.Cfg.Logger.Infof("(%s) not found, adding record", data.Filename)
 		insertPost := db.Post{
-			UserID: h.User.ID,
+			UserID: user.ID,
 			Space:  h.Cfg.Space,
 
 			Data:        data.Data,

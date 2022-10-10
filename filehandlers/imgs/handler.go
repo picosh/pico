@@ -26,6 +26,16 @@ var GB = MB * 1024
 var maxSize = 1 * GB
 var maxImgSize = 10 * MB
 
+type ctxUserKey struct{}
+
+func getUser(s ssh.Session) (*db.User, error) {
+	user := s.Context().Value(ctxUserKey{}).(*db.User)
+	if user == nil {
+		return user, fmt.Errorf("user not set on `ssh.Context()` for connection")
+	}
+	return user, nil
+}
+
 type PostMetaData struct {
 	*db.Post
 	OrigText  []byte
@@ -36,7 +46,6 @@ type PostMetaData struct {
 }
 
 type UploadImgHandler struct {
-	User    *db.User
 	DBPool  db.DB
 	Cfg     *shared.ConfigSite
 	Storage storage.ObjectStorage
@@ -68,13 +77,18 @@ func (h *UploadImgHandler) removePost(data *PostMetaData) error {
 }
 
 func (h *UploadImgHandler) Read(s ssh.Session, filename string) (os.FileInfo, io.ReaderAt, error) {
+	user, err := getUser(s)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	cleanFilename := strings.ReplaceAll(filename, "/", "")
 
 	if cleanFilename == "" || cleanFilename == "." {
 		return nil, nil, os.ErrNotExist
 	}
 
-	post, err := h.DBPool.FindPostWithFilename(cleanFilename, h.User.ID, h.Cfg.Space)
+	post, err := h.DBPool.FindPostWithFilename(cleanFilename, user.ID, h.Cfg.Space)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -86,7 +100,7 @@ func (h *UploadImgHandler) Read(s ssh.Session, filename string) (os.FileInfo, io
 		FModTime: *post.UpdatedAt,
 	}
 
-	bucket, err := h.Storage.GetBucket(h.User.ID)
+	bucket, err := h.Storage.GetBucket(user.ID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -101,9 +115,12 @@ func (h *UploadImgHandler) Read(s ssh.Session, filename string) (os.FileInfo, io
 
 func (h *UploadImgHandler) List(s ssh.Session, filename string) ([]os.FileInfo, error) {
 	var fileList []os.FileInfo
+	user, err := getUser(s)
+	if err != nil {
+		return fileList, err
+	}
 	cleanFilename := strings.ReplaceAll(filename, "/", "")
 
-	var err error
 	var post *db.Post
 	var posts []*db.Post
 
@@ -118,9 +135,9 @@ func (h *UploadImgHandler) List(s ssh.Session, filename string) ([]os.FileInfo, 
 			FIsDir: true,
 		})
 
-		posts, err = h.DBPool.FindAllPostsForUser(h.User.ID, h.Cfg.Space)
+		posts, err = h.DBPool.FindAllPostsForUser(user.ID, h.Cfg.Space)
 	} else {
-		post, err = h.DBPool.FindPostWithFilename(cleanFilename, h.User.ID, h.Cfg.Space)
+		post, err = h.DBPool.FindPostWithFilename(cleanFilename, user.ID, h.Cfg.Space)
 
 		posts = append(posts, post)
 	}
@@ -157,11 +174,17 @@ func (h *UploadImgHandler) Validate(s ssh.Session) error {
 		return fmt.Errorf("must have username set")
 	}
 
-	h.User = user
+	s.Context().SetValue(ctxUserKey{}, user)
+	h.Cfg.Logger.Infof("(%s) attempting to upload files to (%s)", user.Name, h.Cfg.Space)
 	return nil
 }
 
 func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string, error) {
+	user, err := getUser(s)
+	if err != nil {
+		return "", err
+	}
+
 	filename := entry.Name
 
 	var text []byte
@@ -207,7 +230,7 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 
 	post, err := h.DBPool.FindPostWithFilename(
 		nextPost.Filename,
-		h.User.ID,
+		user.ID,
 		h.Cfg.Space,
 	)
 	if err != nil {
@@ -218,7 +241,7 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 	metadata := PostMetaData{
 		OrigText:  text,
 		Post:      &nextPost,
-		User:      h.User,
+		User:      user,
 		FileEntry: entry,
 		Cur:       post,
 	}
@@ -227,7 +250,7 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		metadata.Post.PublishAt = post.PublishAt
 	}
 
-	err = h.writeImg(&metadata)
+	err = h.writeImg(s, &metadata)
 	if err != nil {
 		return "", err
 	}
@@ -235,7 +258,7 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 	curl := shared.NewCreateURL(h.Cfg)
 	url := h.Cfg.FullPostURL(
 		curl,
-		h.User.Name,
+		user.Name,
 		metadata.Slug,
 	)
 	return url, nil

@@ -19,6 +19,16 @@ import (
 	"github.com/gliderlabs/ssh"
 )
 
+type ctxUserKey struct{}
+
+func getUser(s ssh.Session) (*db.User, error) {
+	user := s.Context().Value(ctxUserKey{}).(*db.User)
+	if user == nil {
+		return user, fmt.Errorf("user not set on `ssh.Context()` for connection")
+	}
+	return user, nil
+}
+
 type PostMetaData struct {
 	*db.Post
 	Cur       *db.Post
@@ -33,7 +43,6 @@ type ScpFileHooks interface {
 }
 
 type ScpUploadHandler struct {
-	User      *db.User
 	DBPool    db.DB
 	Cfg       *shared.ConfigSite
 	Hooks     ScpFileHooks
@@ -52,13 +61,17 @@ func NewScpPostHandler(dbpool db.DB, cfg *shared.ConfigSite, hooks ScpFileHooks,
 }
 
 func (h *ScpUploadHandler) Read(s ssh.Session, filename string) (os.FileInfo, io.ReaderAt, error) {
+	user, err := getUser(s)
+	if err != nil {
+		return nil, nil, err
+	}
 	cleanFilename := strings.ReplaceAll(filename, "/", "")
 
 	if cleanFilename == "" || cleanFilename == "." {
 		return nil, nil, os.ErrNotExist
 	}
 
-	post, err := h.DBPool.FindPostWithFilename(cleanFilename, h.User.ID, h.Cfg.Space)
+	post, err := h.DBPool.FindPostWithFilename(cleanFilename, user.ID, h.Cfg.Space)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -75,9 +88,13 @@ func (h *ScpUploadHandler) Read(s ssh.Session, filename string) (os.FileInfo, io
 
 func (h *ScpUploadHandler) List(s ssh.Session, filename string) ([]os.FileInfo, error) {
 	var fileList []os.FileInfo
+	user, err := getUser(s)
+	if err != nil {
+		return fileList, err
+	}
+
 	cleanFilename := strings.ReplaceAll(filename, "/", "")
 
-	var err error
 	var post *db.Post
 	var posts []*db.Post
 
@@ -92,9 +109,9 @@ func (h *ScpUploadHandler) List(s ssh.Session, filename string) ([]os.FileInfo, 
 			FIsDir: true,
 		})
 
-		posts, err = h.DBPool.FindAllPostsForUser(h.User.ID, h.Cfg.Space)
+		posts, err = h.DBPool.FindAllPostsForUser(user.ID, h.Cfg.Space)
 	} else {
-		post, err = h.DBPool.FindPostWithFilename(cleanFilename, h.User.ID, h.Cfg.Space)
+		post, err = h.DBPool.FindPostWithFilename(cleanFilename, user.ID, h.Cfg.Space)
 
 		posts = append(posts, post)
 	}
@@ -131,19 +148,25 @@ func (h *ScpUploadHandler) Validate(s ssh.Session) error {
 		return fmt.Errorf("must have username set")
 	}
 
-	h.User = user
+	s.Context().SetValue(ctxUserKey{}, user)
+	h.Cfg.Logger.Infof("(%s) attempting to upload files to (%s)", user.Name, h.Cfg.Space)
 	return nil
 }
 
 func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string, error) {
 	logger := h.Cfg.Logger
-	userID := h.User.ID
+	user, err := getUser(s)
+	if err != nil {
+		return "", err
+	}
+
+	userID := user.ID
 	filename := entry.Name
 
 	if shared.IsExtAllowed(filename, h.ImgClient.Cfg.AllowedExt) {
 		if !h.ImgClient.HasAccess(userID) {
 			msg := "user (%s) does not have access to imgs.sh, cannot upload file (%s)"
-			return "", fmt.Errorf(msg, h.User.Name, filename)
+			return "", fmt.Errorf(msg, user.Name, filename)
 		}
 
 		return h.ImgClient.Upload(s, entry)
@@ -178,7 +201,7 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 
 	metadata := PostMetaData{
 		Post:      &nextPost,
-		User:      h.User,
+		User:      user,
 		FileEntry: entry,
 	}
 
@@ -258,7 +281,7 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		if metadata.Text == post.Text {
 			logger.Infof("(%s) found, but text is identical, skipping", filename)
 			curl := shared.NewCreateURL(h.Cfg)
-			return h.Cfg.FullPostURL(curl, h.User.Name, metadata.Slug), nil
+			return h.Cfg.FullPostURL(curl, user.Name, metadata.Slug), nil
 		}
 
 		logger.Infof("(%s) found, updating record", filename)
@@ -292,5 +315,5 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 	}
 
 	curl := shared.NewCreateURL(h.Cfg)
-	return h.Cfg.FullPostURL(curl, h.User.Name, metadata.Slug), nil
+	return h.Cfg.FullPostURL(curl, user.Name, metadata.Slug), nil
 }
