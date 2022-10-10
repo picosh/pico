@@ -16,7 +16,7 @@ import (
 	"git.sr.ht/~erock/pico/wish/cms/util"
 	"git.sr.ht/~erock/pico/wish/send/utils"
 	"github.com/gliderlabs/ssh"
-	exifremove "github.com/scottleedavis/go-exif-remove"
+	exifremove "github.com/neurosnap/go-exif-remove"
 	"golang.org/x/exp/slices"
 )
 
@@ -234,8 +234,7 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		h.Cfg.Space,
 	)
 	if err != nil {
-		h.Cfg.Logger.Infof("unable to load post (%s), continuing", nextPost.Filename)
-		h.Cfg.Logger.Info(err)
+		h.Cfg.Logger.Infof("(%s) unable to find post (%s), continuing", nextPost.Filename, err)
 	}
 
 	metadata := PostMetaData{
