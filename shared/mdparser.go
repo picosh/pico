@@ -34,6 +34,7 @@ type MetaData struct {
 	Layout      string
 	Image       string
 	ImageCard   string
+	Hidden      bool
 }
 
 type ParsedText struct {
@@ -54,6 +55,10 @@ func toString(obj interface{}) string {
 		return ""
 	}
 	return obj.(string)
+}
+
+func toBool(obj interface{}) bool {
+	return strings.EqualFold(toString(obj), "true")
 }
 
 func toLinks(obj interface{}) ([]Link, error) {
@@ -224,6 +229,7 @@ func ParseText(text string, linkify Linkify) (*ParsedText, error) {
 		parsed.Image = linkify.Create(parsed.Image[1:])
 	}
 	parsed.MetaData.ImageCard = toString(metaData["card"])
+	parsed.MetaData.Hidden = toBool(metaData["draft"])
 
 	var publishAt *time.Time = nil
 	var err error

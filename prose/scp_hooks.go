@@ -66,7 +66,8 @@ func (p *MarkdownHooks) FileMeta(data *filehandlers.PostMetaData) error {
 		data.PublishAt = parsedText.MetaData.PublishAt
 	}
 
-	data.Hidden = slices.Contains(p.Cfg.HiddenPosts, data.Filename)
+	isHiddenFilename := slices.Contains(p.Cfg.HiddenPosts, data.Filename)
+	data.Hidden = parsedText.MetaData.Hidden || isHiddenFilename
 
 	return nil
 }
