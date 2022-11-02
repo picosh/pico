@@ -58,7 +58,10 @@ func toString(obj interface{}) string {
 }
 
 func toBool(obj interface{}) bool {
-	return strings.EqualFold(toString(obj), "true")
+	if obj == nil {
+		return false
+	}
+	return obj.(bool)
 }
 
 func toLinks(obj interface{}) ([]Link, error) {
