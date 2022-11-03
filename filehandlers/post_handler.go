@@ -164,11 +164,6 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 	filename := entry.Name
 
 	if shared.IsExtAllowed(filename, h.ImgClient.Cfg.AllowedExt) {
-		if !h.ImgClient.HasAccess(userID) {
-			msg := "user (%s) does not have access to imgs.sh, cannot upload file (%s)"
-			return "", fmt.Errorf(msg, user.Name, filename)
-		}
-
 		return h.ImgClient.Upload(s, entry)
 	}
 
