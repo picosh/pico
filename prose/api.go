@@ -463,7 +463,6 @@ func transparencyHandler(w http.ResponseWriter, r *http.Request) {
 
 	ts, err := template.ParseFiles(
 		cfg.StaticPath("html/transparency.page.tmpl"),
-		cfg.StaticPath("html/base.layout.tmpl"),
 		cfg.StaticPath("html/footer.partial.tmpl"),
 		cfg.StaticPath("html/marketing-footer.partial.tmpl"),
 		cfg.StaticPath("html/base.layout.tmpl"),

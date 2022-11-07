@@ -77,6 +77,7 @@ type HeaderTxt struct {
 	Title    string
 	Bio      string
 	Nav      []*ListItem
+	Layout   string
 	HasItems bool
 }
 
@@ -140,6 +141,8 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	curl := shared.CreateURLFromRequest(cfg, r)
 
 	ts, err := shared.RenderTemplate(cfg, []string{
+		cfg.StaticPath("html/blog-default.partial.tmpl"),
+		cfg.StaticPath("html/blog-aside.partial.tmpl"),
 		cfg.StaticPath("html/blog.page.tmpl"),
 		cfg.StaticPath("html/list.partial.tmpl"),
 	})
@@ -163,6 +166,10 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 
 		if parsedText.MetaData.Description != "" {
 			headerTxt.Bio = parsedText.MetaData.Description
+		}
+
+		if parsedText.MetaData.Layout != "" {
+			headerTxt.Layout = parsedText.MetaData.Layout
 		}
 
 		headerTxt.Nav = parsedText.Items
@@ -388,6 +395,8 @@ func transparencyHandler(w http.ResponseWriter, r *http.Request) {
 		cfg.StaticPath("html/footer.partial.tmpl"),
 		cfg.StaticPath("html/marketing-footer.partial.tmpl"),
 		cfg.StaticPath("html/base.layout.tmpl"),
+		cfg.StaticPath("html/base-aside.layout.tmpl"),
+		cfg.StaticPath("html/base-default.layout.tmpl"),
 	)
 
 	if err != nil {

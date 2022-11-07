@@ -324,6 +324,22 @@ figure {
   flex: 1;
 }
 
+.layout-aside {
+  max-width: 50rem;
+}
+
+.layout-aside aside {
+  width: 200px;
+}
+
+.layout-aside img {
+  border-radius: 5px;
+}
+
+#readme {
+  display: none;
+}
+
 @media only screen and (max-width: 600px) {
   body {
     padding: 1rem;
@@ -331,5 +347,17 @@ figure {
 
   header {
     margin: 0;
+  }
+
+  .layout-aside main {
+    flex-direction: column;
+  }
+
+  aside {
+    display: none;
+  }
+
+  #readme {
+    display: block;
   }
 }

@@ -35,6 +35,7 @@ type MetaData struct {
 	PublishAt   *time.Time
 	Title       string
 	Description string
+	Layout      string
 	Tags        []string
 	ListType    string // https://developer.mozilla.org/en-US/docs/Web/CSS/list-style-type
 }
@@ -101,6 +102,8 @@ func TokenToMetaField(meta *MetaData, token *SplitToken) {
 		for _, tag := range tags {
 			meta.Tags = append(meta.Tags, strings.TrimSpace(tag))
 		}
+	} else if token.Key == "layout" {
+		meta.Layout = token.Value
 	}
 }
 
@@ -179,6 +182,7 @@ func ParseText(text string) *ParsedText {
 	meta := MetaData{
 		ListType: "disc",
 		Tags:     []string{},
+		Layout:   "default",
 	}
 	pre := false
 	skip := false
