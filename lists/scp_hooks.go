@@ -6,6 +6,7 @@ import (
 
 	"git.sr.ht/~erock/pico/db"
 	"git.sr.ht/~erock/pico/filehandlers"
+	"git.sr.ht/~erock/pico/imgs"
 	"git.sr.ht/~erock/pico/shared"
 	"golang.org/x/exp/slices"
 )
@@ -38,7 +39,8 @@ func (p *ListHooks) FileValidate(data *filehandlers.PostMetaData) (bool, error) 
 }
 
 func (p *ListHooks) FileMeta(data *filehandlers.PostMetaData) error {
-	parsedText := ParseText(string(data.Text))
+	linkify := imgs.NewImgsLinkify(data.Username)
+	parsedText := ParseText(string(data.Text), linkify)
 
 	if parsedText.MetaData.Title == "" {
 		data.Title = shared.ToUpper(data.Slug)

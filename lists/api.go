@@ -12,6 +12,7 @@ import (
 
 	"git.sr.ht/~erock/pico/db"
 	"git.sr.ht/~erock/pico/db/postgres"
+	"git.sr.ht/~erock/pico/imgs"
 	"git.sr.ht/~erock/pico/imgs/storage"
 	"git.sr.ht/~erock/pico/shared"
 	"github.com/gorilla/feeds"
@@ -159,7 +160,8 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	header, err := dbpool.FindPostWithFilename("_header.txt", user.ID, cfg.Space)
 	if err == nil {
-		parsedText := ParseText(header.Text)
+		linkify := imgs.NewImgsLinkify(username)
+		parsedText := ParseText(header.Text, linkify)
 		if parsedText.MetaData.Title != "" {
 			headerTxt.Title = parsedText.MetaData.Title
 		}
@@ -181,7 +183,8 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	readmeTxt := &ReadmeTxt{}
 	readme, err := dbpool.FindPostWithFilename("_readme.txt", user.ID, cfg.Space)
 	if err == nil {
-		parsedText := ParseText(readme.Text)
+		linkify := imgs.NewImgsLinkify(username)
+		parsedText := ParseText(readme.Text, linkify)
 		readmeTxt.Items = parsedText.Items
 		readmeTxt.ListType = parsedText.MetaData.ListType
 		if len(readmeTxt.Items) > 0 {
@@ -296,8 +299,9 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 
 	header, _ := dbpool.FindPostWithFilename("_header.txt", user.ID, cfg.Space)
 	blogName := GetBlogName(username)
+	linkify := imgs.NewImgsLinkify(username)
 	if header != nil {
-		headerParsed := ParseText(header.Text)
+		headerParsed := ParseText(header.Text, linkify)
 		if headerParsed.MetaData.Title != "" {
 			blogName = headerParsed.MetaData.Title
 		}
@@ -306,12 +310,12 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	var data PostPageData
 	post, err := dbpool.FindPostWithSlug(slug, user.ID, cfg.Space)
 	if err == nil {
-		parsedText := ParseText(post.Text)
+		parsedText := ParseText(post.Text, linkify)
 
 		// we need the blog name from the readme unfortunately
 		readme, err := dbpool.FindPostWithFilename("_readme.txt", user.ID, cfg.Space)
 		if err == nil {
-			readmeParsed := ParseText(readme.Text)
+			readmeParsed := ParseText(readme.Text, linkify)
 			if readmeParsed.MetaData.Title != "" {
 				blogName = readmeParsed.MetaData.Title
 			}
@@ -529,7 +533,8 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	header, err := dbpool.FindPostWithFilename("_header.txt", user.ID, cfg.Space)
 	if err == nil {
-		parsedText := ParseText(header.Text)
+		linkify := imgs.NewImgsLinkify(username)
+		parsedText := ParseText(header.Text, linkify)
 		if parsedText.MetaData.Title != "" {
 			headerTxt.Title = parsedText.MetaData.Title
 		}
@@ -552,8 +557,8 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 		if slices.Contains(cfg.HiddenPosts, post.Filename) {
 			continue
 		}
-
-		parsed := ParseText(post.Text)
+		linkify := imgs.NewImgsLinkify(username)
+		parsed := ParseText(post.Text, linkify)
 		var tpl bytes.Buffer
 		data := &PostPageData{
 			ListType: parsed.MetaData.ListType,
@@ -627,7 +632,8 @@ func rssHandler(w http.ResponseWriter, r *http.Request) {
 
 	var feedItems []*feeds.Item
 	for _, post := range pager.Data {
-		parsed := ParseText(post.Text)
+		linkify := imgs.NewImgsLinkify(post.Username)
+		parsed := ParseText(post.Text, linkify)
 		var tpl bytes.Buffer
 		data := &PostPageData{
 			ListType: parsed.MetaData.ListType,

@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"bytes"
 	"fmt"
 	"image"
 	gif "image/gif"
@@ -36,6 +37,25 @@ type ImgOptimizer struct {
 type Ratio struct {
 	Width  int
 	Height int
+}
+
+type Linkify interface {
+	Create(fname string) string
+}
+
+func CreateImgURL(linkify Linkify) func([]byte) []byte {
+	return func(url []byte) []byte {
+		if url[0] == '/' {
+			name := SanitizeFileExt(string(url))
+			nextURL := linkify.Create(name)
+			return []byte(nextURL)
+		} else if bytes.HasPrefix(url, []byte{'.', '/'}) {
+			name := SanitizeFileExt(string(url[1:]))
+			nextURL := linkify.Create(name)
+			return []byte(nextURL)
+		}
+		return url
+	}
 }
 
 func GetRatio(dimes string) (*Ratio, error) {

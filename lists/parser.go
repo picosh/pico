@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"git.sr.ht/~erock/pico/shared"
 	"github.com/araddon/dateparse"
 )
 
@@ -114,7 +115,7 @@ func KeyAsValue(token *SplitToken) string {
 	return token.Value
 }
 
-func parseItem(meta *MetaData, li *ListItem, prevItem *ListItem, pre bool, mod int) (bool, bool, int) {
+func parseItem(meta *MetaData, li *ListItem, prevItem *ListItem, pre bool, mod int, linkify shared.Linkify) (bool, bool, int) {
 	skip := false
 
 	if strings.HasPrefix(li.Value, preToken) {
@@ -141,7 +142,15 @@ func parseItem(meta *MetaData, li *ListItem, prevItem *ListItem, pre bool, mod i
 	} else if strings.HasPrefix(li.Value, imgToken) {
 		li.IsImg = true
 		split := TextToSplitToken(strings.Replace(li.Value, imgToken, "", 1))
-		li.URL = template.URL(split.Key)
+		key := split.Key
+		if strings.HasPrefix(key, "/") {
+			frag := shared.SanitizeFileExt(key)
+			key = linkify.Create(frag)
+		} else if strings.HasPrefix(key, "./") {
+			name := shared.SanitizeFileExt(key[1:])
+			key = linkify.Create(name)
+		}
+		li.URL = template.URL(key)
 		li.Value = KeyAsValue(split)
 	} else if strings.HasPrefix(li.Value, varToken) {
 		split := TextToSplitToken(strings.Replace(li.Value, varToken, "", 1))
@@ -157,7 +166,7 @@ func parseItem(meta *MetaData, li *ListItem, prevItem *ListItem, pre bool, mod i
 		old := len(li.Value)
 		li.Value = trim
 
-		pre, skip, _ = parseItem(meta, li, prevItem, pre, mod)
+		pre, skip, _ = parseItem(meta, li, prevItem, pre, mod, linkify)
 		if prevItem != nil && prevItem.Indent == 0 {
 			mod = old - len(trim)
 			li.Indent = 1
@@ -176,7 +185,7 @@ func parseItem(meta *MetaData, li *ListItem, prevItem *ListItem, pre bool, mod i
 	return pre, skip, mod
 }
 
-func ParseText(text string) *ParsedText {
+func ParseText(text string, linkify shared.Linkify) *ParsedText {
 	textItems := SplitByNewline(text)
 	items := []*ListItem{}
 	meta := MetaData{
@@ -198,7 +207,7 @@ func ParseText(text string) *ParsedText {
 			Value: t,
 		}
 
-		pre, skip, mod = parseItem(&meta, &li, prevItem, pre, mod)
+		pre, skip, mod = parseItem(&meta, &li, prevItem, pre, mod, linkify)
 
 		if li.IsText && li.Value == "" {
 			skip = true
