@@ -399,8 +399,6 @@ func transparencyHandler(w http.ResponseWriter, r *http.Request) {
 		cfg.StaticPath("html/footer.partial.tmpl"),
 		cfg.StaticPath("html/marketing-footer.partial.tmpl"),
 		cfg.StaticPath("html/base.layout.tmpl"),
-		cfg.StaticPath("html/base-aside.layout.tmpl"),
-		cfg.StaticPath("html/base-default.layout.tmpl"),
 	)
 
 	if err != nil {
