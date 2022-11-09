@@ -45,6 +45,7 @@ type ParsedText struct {
 func HtmlPolicy() *bluemonday.Policy {
 	policy := bluemonday.UGCPolicy()
 	policy.AllowStyling()
+	policy.AllowAttrs("rel").OnElements("a")
 	return policy
 }
 
