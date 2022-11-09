@@ -805,7 +805,6 @@ func (me *PsqlDB) FindPosts() ([]*db.Post, error) {
 
 func (me *PsqlDB) FindExpiredPosts(space string) ([]*db.Post, error) {
 	var posts []*db.Post
-	fmt.Println(sqlSelectExpiredPosts)
 	rs, err := me.Db.Query(sqlSelectExpiredPosts, space)
 	if err != nil {
 		return posts, err
