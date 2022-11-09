@@ -9,10 +9,7 @@ import (
 
 func deleteExpiredPosts(cfg *shared.ConfigSite, dbpool db.DB) error {
 	cfg.Logger.Infof("checking for expired posts")
-	now := time.Now()
-	// delete posts that are older than three days
-	expired := now.AddDate(0, 0, -3)
-	posts, err := dbpool.FindPostsBeforeDate(&expired, cfg.Space)
+	posts, err := dbpool.FindExpiredPosts(cfg.Space)
 	if err != nil {
 		return err
 	}
@@ -22,7 +19,7 @@ func deleteExpiredPosts(cfg *shared.ConfigSite, dbpool db.DB) error {
 		postIds = append(postIds, post.ID)
 	}
 
-	cfg.Logger.Infof("deleteing (%d) expired posts", len(postIds))
+	cfg.Logger.Infof("deleting (%d) expired posts", len(postIds))
 	err = dbpool.RemovePosts(postIds)
 	if err != nil {
 		return err

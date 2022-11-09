@@ -59,6 +59,7 @@ type Post struct {
 	PublishAt   *time.Time `json:"publish_at"`
 	Username    string     `json:"username"`
 	UpdatedAt   *time.Time `json:"updated_at"`
+	ExpiresAt   *time.Time `json:"expires_at"`
 	Hidden      bool       `json:"hidden"`
 	Views       int        `json:"views"`
 	Space       string     `json:"space"`
@@ -138,6 +139,7 @@ type DB interface {
 	FindPostsForUser(pager *Pager, userID string, space string) (*Paginate[*Post], error)
 	FindAllPostsForUser(userID string, space string) ([]*Post, error)
 	FindPostsBeforeDate(date *time.Time, space string) ([]*Post, error)
+	FindExpiredPosts(space string) ([]*Post, error)
 	FindUpdatedPostsForUser(userID string, space string) ([]*Post, error)
 	FindPostWithFilename(filename string, userID string, space string) (*Post, error)
 	FindPostWithSlug(slug string, userID string, space string) (*Post, error)

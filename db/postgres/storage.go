@@ -20,7 +20,7 @@ var PAGER_SIZE = 15
 
 var SelectPost = `
 	posts.id, user_id, app_users.name, filename, slug, title, text, description,
-	posts.created_at, publish_at, posts.updated_at, hidden, file_size, mime_type, shasum, data`
+	posts.created_at, publish_at, posts.updated_at, hidden, file_size, mime_type, shasum, data, expires_at`
 
 var (
 	sqlSelectPosts = fmt.Sprintf(`
@@ -62,6 +62,15 @@ var (
 	LEFT OUTER JOIN app_users ON app_users.id = posts.user_id
 	WHERE user_id = $1 AND publish_at::date <= CURRENT_DATE AND cur_space = $2
 	ORDER BY posts.updated_at DESC`, SelectPost)
+
+	sqlSelectExpiredPosts = fmt.Sprintf(`
+		SELECT %s
+		FROM posts
+		LEFT OUTER JOIN app_users ON app_users.id = posts.user_id
+		WHERE
+			cur_space = $1 AND
+			expires_at <= now();
+	`, SelectPost)
 
 	sqlSelectPostsForUser = fmt.Sprintf(`
 	SELECT %s, STRING_AGG(coalesce(post_tags.name, ''), ',') tags
@@ -222,8 +231,8 @@ const (
 	sqlInsertPost      = `
 	INSERT INTO posts
 		(user_id, filename, slug, title, text, description, publish_at, hidden, cur_space,
-		file_size, mime_type, shasum, data)
-	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+		file_size, mime_type, shasum, data, expires_at)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 	RETURNING id`
 	sqlInsertUser = `INSERT INTO app_users DEFAULT VALUES returning id`
 	sqlInsertTag  = `INSERT INTO post_tags (post_id, name) VALUES($1, $2) RETURNING id;`
@@ -270,6 +279,7 @@ func CreatePostFromRow(r RowScanner) (*db.Post, error) {
 		&post.MimeType,
 		&post.Shasum,
 		&post.Data,
+		&post.ExpiresAt,
 	)
 	if err != nil {
 		return nil, err
@@ -297,6 +307,7 @@ func CreatePostWithTagsFromRow(r RowScanner) (*db.Post, error) {
 		&post.MimeType,
 		&post.Shasum,
 		&post.Data,
+		&post.ExpiresAt,
 		&tagStr,
 	)
 	if err != nil {
@@ -678,6 +689,7 @@ func (me *PsqlDB) InsertPost(post *db.Post) (*db.Post, error) {
 		post.MimeType,
 		post.Shasum,
 		post.Data,
+		post.ExpiresAt,
 	).Scan(&id)
 	if err != nil {
 		return nil, err
@@ -774,6 +786,27 @@ func (me *PsqlDB) FindAllPostsForUser(userID string, space string) ([]*db.Post, 
 func (me *PsqlDB) FindPosts() ([]*db.Post, error) {
 	var posts []*db.Post
 	rs, err := me.Db.Query(sqlSelectPosts)
+	if err != nil {
+		return posts, err
+	}
+	for rs.Next() {
+		post, err := CreatePostFromRow(rs)
+		if err != nil {
+			return nil, err
+		}
+
+		posts = append(posts, post)
+	}
+	if rs.Err() != nil {
+		return posts, rs.Err()
+	}
+	return posts, nil
+}
+
+func (me *PsqlDB) FindExpiredPosts(space string) ([]*db.Post, error) {
+	var posts []*db.Post
+	fmt.Println(sqlSelectExpiredPosts)
+	rs, err := me.Db.Query(sqlSelectExpiredPosts, space)
 	if err != nil {
 		return posts, err
 	}

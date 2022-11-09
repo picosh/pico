@@ -2,6 +2,7 @@ package pastes
 
 import (
 	"fmt"
+	"time"
 
 	"git.sr.ht/~erock/pico/db"
 	"git.sr.ht/~erock/pico/filehandlers"
@@ -29,5 +30,10 @@ func (p *FileHooks) FileMeta(data *filehandlers.PostMetaData) error {
 	data.Title = shared.ToUpper(data.Slug)
 	// we want the slug to be the filename for pastes
 	data.Slug = data.Filename
+	if data.Post.ExpiresAt == nil || data.Post.ExpiresAt.IsZero() {
+		// mark posts for deletion a week after creation
+		expiresAt := time.Now().AddDate(0, 0, 7)
+		data.ExpiresAt = &expiresAt
+	}
 	return nil
 }
