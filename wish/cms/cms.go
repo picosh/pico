@@ -10,6 +10,7 @@ import (
 	"git.sr.ht/~erock/pico/wish/cms/config"
 	"git.sr.ht/~erock/pico/wish/cms/ui/account"
 	"git.sr.ht/~erock/pico/wish/cms/ui/common"
+	"git.sr.ht/~erock/pico/wish/cms/ui/email"
 	"git.sr.ht/~erock/pico/wish/cms/ui/info"
 	"git.sr.ht/~erock/pico/wish/cms/ui/keys"
 	"git.sr.ht/~erock/pico/wish/cms/ui/posts"
@@ -34,6 +35,7 @@ const (
 	statusBrowsingPosts
 	statusBrowsingKeys
 	statusSettingUsername
+	statusSettingEmail
 	statusQuitting
 )
 
@@ -42,6 +44,7 @@ func (s status) String() string {
 		"initializing",
 		"ready",
 		"setting username",
+		"setting email",
 		"browsing posts",
 		"browsing keys",
 		"quitting",
@@ -55,6 +58,7 @@ type menuChoice int
 // menu choices.
 const (
 	setUserChoice menuChoice = iota
+	setEmailChoice
 	postsChoice
 	keysChoice
 	exitChoice
@@ -63,10 +67,11 @@ const (
 
 // menu text corresponding to menu choices. these are presented to the user.
 var menuChoices = map[menuChoice]string{
-	setUserChoice: "Set username",
-	keysChoice:    "Manage keys",
-	postsChoice:   "Manage posts",
-	exitChoice:    "Exit",
+	setUserChoice:  "Set username",
+	setEmailChoice: "Set email",
+	keysChoice:     "Manage keys",
+	postsChoice:    "Manage posts",
+	exitChoice:     "Exit",
 }
 
 var (
@@ -154,6 +159,7 @@ type model struct {
 	info          info.Model
 	spinner       spinner.Model
 	username      username.Model
+	email         email.Model
 	posts         posts.Model
 	keys          keys.Model
 	createAccount account.CreateModel
@@ -234,11 +240,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.info.User.Name = string(msg)
 		m.user = m.info.User
 		m.username = username.NewModel(m.dbpool, m.user, m.sshUser) // reset the state
+	case email.NameSetMsg:
+		m.status = statusReady
+		m.info.User.Email = string(msg)
+		m.user = m.info.User
+		m.email = email.NewModel(m.dbpool, m.user) // reset the state
 	case account.CreateAccountMsg:
 		m.status = statusReady
 		m.info.User = msg
 		m.user = msg
 		m.username = username.NewModel(m.dbpool, m.user, m.sshUser)
+		m.email = email.NewModel(m.dbpool, m.user)
 		m.info = info.NewModel(m.cfg, m.urls, m.user)
 		m.posts = posts.NewModel(m.cfg, m.urls, m.dbpool, m.user, m.st)
 		m.keys = keys.NewModel(m.cfg, m.dbpool, m.user)
@@ -248,6 +260,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch m.status {
 	case statusInit:
 		m.username = username.NewModel(m.dbpool, m.user, m.sshUser)
+		m.email = email.NewModel(m.dbpool, m.user)
 		m.info = info.NewModel(m.cfg, m.urls, m.user)
 		m.posts = posts.NewModel(m.cfg, m.urls, m.dbpool, m.user, m.st)
 		m.keys = keys.NewModel(m.cfg, m.dbpool, m.user)
@@ -312,6 +325,15 @@ func updateChildren(msg tea.Msg, m model) (model, tea.Cmd) {
 			m.status = statusQuitting
 			return m, tea.Quit
 		}
+	case statusSettingEmail:
+		m.email, cmd = email.Update(msg, m.email)
+		if m.email.Done {
+			m.email = email.NewModel(m.dbpool, m.user) // reset the state
+			m.status = statusReady
+		} else if m.email.Quit {
+			m.status = statusQuitting
+			return m, tea.Quit
+		}
 	case statusNoAccount:
 		m.createAccount, cmd = account.Update(msg, m.createAccount)
 		if m.createAccount.Done {
@@ -329,6 +351,10 @@ func updateChildren(msg tea.Msg, m model) (model, tea.Cmd) {
 		m.status = statusSettingUsername
 		m.menuChoice = unsetChoice
 		cmd = username.InitialCmd()
+	case setEmailChoice:
+		m.status = statusSettingEmail
+		m.menuChoice = unsetChoice
+		cmd = email.InitialCmd()
 	case postsChoice:
 		m.status = statusBrowsingPosts
 		m.menuChoice = unsetChoice
@@ -392,6 +418,8 @@ func (m model) View() string {
 		s += footerView(m)
 	case statusSettingUsername:
 		s += username.View(m.username)
+	case statusSettingEmail:
+		s += email.View(m.email)
 	case statusBrowsingPosts:
 		s += m.posts.View()
 	case statusBrowsingKeys:

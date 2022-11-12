@@ -20,10 +20,13 @@ type PublicKey struct {
 }
 
 type User struct {
-	ID        string     `json:"id"`
-	Name      string     `json:"name"`
-	PublicKey *PublicKey `json:"public_key,omitempty"`
-	CreatedAt *time.Time `json:"created_at"`
+	ID           string     `json:"id"`
+	Name         string     `json:"name"`
+	Email        string     `json:"email"`
+	PublicKey    *PublicKey `json:"public_key,omitempty"`
+	DigestAt     *time.Time `json:"digest_at"`
+	LastDigestAt *time.Time `json:"last_digest_at"`
+	CreatedAt    *time.Time `json:"created_at"`
 }
 
 type PostData struct {
@@ -133,6 +136,9 @@ type DB interface {
 	FindUser(userID string) (*User, error)
 	ValidateName(name string) (bool, error)
 	SetUserName(userID string, name string) error
+	ValidateEmail(email string) (bool, error)
+	SetEmail(userID string, email string) error
+	SetLastDigest(userID string) error
 
 	FindPosts() ([]*Post, error)
 	FindPost(postID string) (*Post, error)

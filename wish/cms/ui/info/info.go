@@ -75,8 +75,16 @@ func (m Model) bioView() string {
 	} else {
 		username = m.styles.Subtle.Render("(none set)")
 	}
+
+	var email string
+	if m.User.Email != "" {
+		email = m.User.Email
+	} else {
+		email = m.styles.Subtle.Render("(none set)")
+	}
 	return common.KeyValueView(
 		"Username", username,
+		"Email", email,
 		"Blog URL", m.urls.BlogURL(username),
 		"Public key", m.User.PublicKey.Key,
 		"Joined", m.User.CreatedAt.Format("02 Jan 2006"),

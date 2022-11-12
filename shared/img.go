@@ -39,10 +39,6 @@ type Ratio struct {
 	Height int
 }
 
-type Linkify interface {
-	Create(fname string) string
-}
-
 func CreateImgURL(linkify Linkify) func([]byte) []byte {
 	return func(url []byte) []byte {
 		if url[0] == '/' {

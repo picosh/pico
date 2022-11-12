@@ -149,10 +149,10 @@ var (
 const (
 	sqlSelectPublicKey         = `SELECT id, user_id, public_key, created_at FROM public_keys WHERE public_key = $1`
 	sqlSelectPublicKeys        = `SELECT id, user_id, public_key, created_at FROM public_keys WHERE user_id = $1`
-	sqlSelectUser              = `SELECT id, name, created_at FROM app_users WHERE id = $1`
-	sqlSelectUserForName       = `SELECT id, name, created_at FROM app_users WHERE name = $1`
-	sqlSelectUserForNameAndKey = `SELECT app_users.id, app_users.name, app_users.created_at, public_keys.id as pk_id, public_keys.public_key, public_keys.created_at as pk_created_at FROM app_users LEFT OUTER JOIN public_keys ON public_keys.user_id = app_users.id WHERE app_users.name = $1 AND public_keys.public_key = $2`
-	sqlSelectUsers             = `SELECT id, name, created_at FROM app_users ORDER BY name ASC`
+	sqlSelectUser              = `SELECT id, name, created_at, email, digest_at, last_digest_at FROM app_users WHERE id = $1`
+	sqlSelectUserForName       = `SELECT id, name, created_at, email, digest_at, last_digest_at FROM app_users WHERE name = $1`
+	sqlSelectUserForNameAndKey = `SELECT app_users.id, app_users.name, app_users.created_at, app_users.email, app_users.digest_at, app_users.last_digest_at, public_keys.id as pk_id, public_keys.public_key, public_keys.created_at as pk_created_at FROM app_users LEFT OUTER JOIN public_keys ON public_keys.user_id = app_users.id WHERE app_users.name = $1 AND public_keys.public_key = $2`
+	sqlSelectUsers             = `SELECT id, name, created_at, email, digest_at, last_digest_at FROM app_users ORDER BY name ASC`
 
 	sqlSelectTotalUsers          = `SELECT count(id) FROM app_users`
 	sqlSelectUsersAfterDate      = `SELECT count(id) FROM app_users WHERE created_at >= $1`
@@ -242,8 +242,10 @@ const (
 	SET slug = $1, title = $2, text = $3, description = $4, updated_at = $5, publish_at = $6,
 		file_size = $7, shasum = $8, data = $9
 	WHERE id = $10`
-	sqlUpdateUserName = `UPDATE app_users SET name = $1 WHERE id = $2`
-	sqlIncrementViews = `UPDATE posts SET views = views + 1 WHERE id = $1 RETURNING views`
+	sqlUpdateUserName   = `UPDATE app_users SET name = $1 WHERE id = $2`
+	sqlUpdateEmail      = `UPDATE app_users SET email = $1 WHERE id = $2`
+	sqlUpdateLastDigest = `UPDATE app_users SET last_digest_at = $1 WHERE id = $2`
+	sqlIncrementViews   = `UPDATE posts SET views = views + 1 WHERE id = $1 RETURNING views`
 
 	sqlRemoveTagsByPost = `DELETE FROM post_tags WHERE post_id = $1`
 	sqlRemovePosts      = `DELETE FROM posts WHERE id = ANY($1::uuid[])`
@@ -518,7 +520,7 @@ func (me *PsqlDB) FindUser(userID string) (*db.User, error) {
 	user := &db.User{}
 	var un sql.NullString
 	r := me.Db.QueryRow(sqlSelectUser, userID)
-	err := r.Scan(&user.ID, &un, &user.CreatedAt)
+	err := r.Scan(&user.ID, &un, &user.CreatedAt, &user.Email, &user.DigestAt, &user.LastDigestAt)
 	if err != nil {
 		return nil, err
 	}
@@ -547,7 +549,7 @@ func (me *PsqlDB) ValidateName(name string) (bool, error) {
 func (me *PsqlDB) FindUserForName(name string) (*db.User, error) {
 	user := &db.User{}
 	r := me.Db.QueryRow(sqlSelectUserForName, strings.ToLower(name))
-	err := r.Scan(&user.ID, &user.Name, &user.CreatedAt)
+	err := r.Scan(&user.ID, &user.Name, &user.CreatedAt, &user.Email, &user.DigestAt, &user.LastDigestAt)
 	if err != nil {
 		return nil, err
 	}
@@ -559,13 +561,33 @@ func (me *PsqlDB) FindUserForNameAndKey(name string, key string) (*db.User, erro
 	pk := &db.PublicKey{}
 
 	r := me.Db.QueryRow(sqlSelectUserForNameAndKey, strings.ToLower(name), key)
-	err := r.Scan(&user.ID, &user.Name, &user.CreatedAt, &pk.ID, &pk.Key, &pk.CreatedAt)
+	err := r.Scan(&user.ID, &user.Name, &user.CreatedAt, &user.Email, &user.DigestAt, &user.LastDigestAt, &pk.ID, &pk.Key, &pk.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
 
 	user.PublicKey = pk
 	return user, nil
+}
+
+func (me *PsqlDB) ValidateEmail(email string) (bool, error) {
+	return true, nil
+}
+
+func (me *PsqlDB) SetEmail(userID string, name string) error {
+	lowerName := strings.ToLower(name)
+	valid, err := me.ValidateEmail(lowerName)
+	if !valid {
+		return err
+	}
+
+	_, err = me.Db.Exec(sqlUpdateEmail, lowerName, userID)
+	return err
+}
+
+func (me *PsqlDB) SetLastDigest(userID string) error {
+	_, err := me.Db.Exec(sqlUpdateLastDigest, userID, time.Now())
+	return err
 }
 
 func (me *PsqlDB) SetUserName(userID string, name string) error {
@@ -869,6 +891,9 @@ func (me *PsqlDB) FindUsers() ([]*db.User, error) {
 			&user.ID,
 			&user.Name,
 			&user.CreatedAt,
+			&user.Email,
+			&user.DigestAt,
+			&user.LastDigestAt,
 		)
 		if err != nil {
 			return users, err

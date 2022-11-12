@@ -1,4 +1,4 @@
-package lists
+package shared
 
 import (
 	"fmt"
@@ -7,15 +7,14 @@ import (
 	"strings"
 	"time"
 
-	"git.sr.ht/~erock/pico/shared"
 	"github.com/araddon/dateparse"
 )
 
 var reIndent = regexp.MustCompile(`^[[:blank:]]+`)
 
-type ParsedText struct {
+type ListParsedText struct {
 	Items []*ListItem
-	*MetaData
+	*ListMetaData
 }
 
 type ListItem struct {
@@ -32,7 +31,7 @@ type ListItem struct {
 	Indent      int
 }
 
-type MetaData struct {
+type ListMetaData struct {
 	PublishAt   *time.Time
 	Title       string
 	Description string
@@ -85,7 +84,7 @@ func PublishAtDate(date string) (*time.Time, error) {
 	return &t, err
 }
 
-func TokenToMetaField(meta *MetaData, token *SplitToken) {
+func TokenToMetaField(meta *ListMetaData, token *SplitToken) {
 	if token.Key == "publish_at" {
 		publishAt, err := PublishAtDate(token.Value)
 		if err == nil {
@@ -115,7 +114,7 @@ func KeyAsValue(token *SplitToken) string {
 	return token.Value
 }
 
-func parseItem(meta *MetaData, li *ListItem, prevItem *ListItem, pre bool, mod int, linkify shared.Linkify) (bool, bool, int) {
+func parseItem(meta *ListMetaData, li *ListItem, prevItem *ListItem, pre bool, mod int, linkify Linkify) (bool, bool, int) {
 	skip := false
 
 	if strings.HasPrefix(li.Value, preToken) {
@@ -144,10 +143,10 @@ func parseItem(meta *MetaData, li *ListItem, prevItem *ListItem, pre bool, mod i
 		split := TextToSplitToken(strings.Replace(li.Value, imgToken, "", 1))
 		key := split.Key
 		if strings.HasPrefix(key, "/") {
-			frag := shared.SanitizeFileExt(key)
+			frag := SanitizeFileExt(key)
 			key = linkify.Create(frag)
 		} else if strings.HasPrefix(key, "./") {
-			name := shared.SanitizeFileExt(key[1:])
+			name := SanitizeFileExt(key[1:])
 			key = linkify.Create(name)
 		}
 		li.URL = template.URL(key)
@@ -185,10 +184,10 @@ func parseItem(meta *MetaData, li *ListItem, prevItem *ListItem, pre bool, mod i
 	return pre, skip, mod
 }
 
-func ParseText(text string, linkify shared.Linkify) *ParsedText {
+func ListParseText(text string, linkify Linkify) *ListParsedText {
 	textItems := SplitByNewline(text)
 	items := []*ListItem{}
-	meta := MetaData{
+	meta := ListMetaData{
 		ListType: "disc",
 		Tags:     []string{},
 		Layout:   "default",
@@ -218,8 +217,8 @@ func ParseText(text string, linkify shared.Linkify) *ParsedText {
 		}
 	}
 
-	return &ParsedText{
+	return &ListParsedText{
 		Items:    items,
-		MetaData: &meta,
+		ListMetaData: &meta,
 	}
 }
