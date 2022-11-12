@@ -63,7 +63,7 @@ type PostPageData struct {
 	Username     string
 	BlogName     string
 	ListType     string
-	Items        []*ListItem
+	Items        []*shared.ListItem
 	PublishAtISO string
 	PublishAt    string
 	Tags         []string
@@ -77,7 +77,7 @@ type TransparencyPageData struct {
 type HeaderTxt struct {
 	Title    string
 	Bio      string
-	Nav      []*ListItem
+	Nav      []*shared.ListItem
 	Layout   string
 	HasItems bool
 }
@@ -85,7 +85,7 @@ type HeaderTxt struct {
 type ReadmeTxt struct {
 	HasItems bool
 	ListType string
-	Items    []*ListItem
+	Items    []*shared.ListItem
 }
 
 func getPostsForUser(r *http.Request, user *db.User, tag string, num int) ([]*db.Post, error) {
@@ -161,17 +161,17 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	header, err := dbpool.FindPostWithFilename("_header.txt", user.ID, cfg.Space)
 	if err == nil {
 		linkify := imgs.NewImgsLinkify(username)
-		parsedText := ParseText(header.Text, linkify)
-		if parsedText.MetaData.Title != "" {
-			headerTxt.Title = parsedText.MetaData.Title
+		parsedText := shared.ListParseText(header.Text, linkify)
+		if parsedText.Title != "" {
+			headerTxt.Title = parsedText.Title
 		}
 
-		if parsedText.MetaData.Description != "" {
-			headerTxt.Bio = parsedText.MetaData.Description
+		if parsedText.Description != "" {
+			headerTxt.Bio = parsedText.Description
 		}
 
-		if parsedText.MetaData.Layout != "" {
-			headerTxt.Layout = parsedText.MetaData.Layout
+		if parsedText.Layout != "" {
+			headerTxt.Layout = parsedText.Layout
 		}
 
 		headerTxt.Nav = parsedText.Items
@@ -184,9 +184,9 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	readme, err := dbpool.FindPostWithFilename("_readme.txt", user.ID, cfg.Space)
 	if err == nil {
 		linkify := imgs.NewImgsLinkify(username)
-		parsedText := ParseText(readme.Text, linkify)
+		parsedText := shared.ListParseText(readme.Text, linkify)
 		readmeTxt.Items = parsedText.Items
-		readmeTxt.ListType = parsedText.MetaData.ListType
+		readmeTxt.ListType = parsedText.ListType
 		if len(readmeTxt.Items) > 0 {
 			readmeTxt.HasItems = true
 		}
@@ -301,23 +301,23 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	blogName := GetBlogName(username)
 	linkify := imgs.NewImgsLinkify(username)
 	if header != nil {
-		headerParsed := ParseText(header.Text, linkify)
-		if headerParsed.MetaData.Title != "" {
-			blogName = headerParsed.MetaData.Title
+		headerParsed := shared.ListParseText(header.Text, linkify)
+		if headerParsed.Title != "" {
+			blogName = headerParsed.Title
 		}
 	}
 
 	var data PostPageData
 	post, err := dbpool.FindPostWithSlug(slug, user.ID, cfg.Space)
 	if err == nil {
-		parsedText := ParseText(post.Text, linkify)
+		parsedText := shared.ListParseText(post.Text, linkify)
 
 		// we need the blog name from the readme unfortunately
 		readme, err := dbpool.FindPostWithFilename("_readme.txt", user.ID, cfg.Space)
 		if err == nil {
-			readmeParsed := ParseText(readme.Text, linkify)
-			if readmeParsed.MetaData.Title != "" {
-				blogName = readmeParsed.MetaData.Title
+			readmeParsed := shared.ListParseText(readme.Text, linkify)
+			if readmeParsed.Title != "" {
+				blogName = readmeParsed.Title
 			}
 		}
 
@@ -335,14 +335,14 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			URL:          template.URL(cfg.PostURL(post.Username, post.Slug)),
 			BlogURL:      template.URL(cfg.BlogURL(username)),
 			Description:  post.Description,
-			ListType:     parsedText.MetaData.ListType,
+			ListType:     parsedText.ListType,
 			Title:        shared.FilenameToTitle(post.Filename, post.Title),
 			PublishAt:    post.PublishAt.Format("02 Jan, 2006"),
 			PublishAtISO: post.PublishAt.Format(time.RFC3339),
 			Username:     username,
 			BlogName:     blogName,
 			Items:        parsedText.Items,
-			Tags:         parsedText.MetaData.Tags,
+			Tags:         parsedText.Tags,
 		}
 	} else {
 		logger.Infof("post not found %s/%s", username, slug)
@@ -357,7 +357,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			PublishAtISO: time.Now().Format(time.RFC3339),
 			Username:     username,
 			BlogName:     blogName,
-			Items: []*ListItem{
+			Items: []*shared.ListItem{
 				{
 					Value:  "oops!  we can't seem to find this post.",
 					IsText: true,
@@ -532,13 +532,13 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 	header, err := dbpool.FindPostWithFilename("_header.txt", user.ID, cfg.Space)
 	if err == nil {
 		linkify := imgs.NewImgsLinkify(username)
-		parsedText := ParseText(header.Text, linkify)
-		if parsedText.MetaData.Title != "" {
-			headerTxt.Title = parsedText.MetaData.Title
+		parsedText := shared.ListParseText(header.Text, linkify)
+		if parsedText.Title != "" {
+			headerTxt.Title = parsedText.Title
 		}
 
-		if parsedText.MetaData.Description != "" {
-			headerTxt.Bio = parsedText.MetaData.Description
+		if parsedText.Description != "" {
+			headerTxt.Bio = parsedText.Description
 		}
 	}
 
@@ -556,10 +556,10 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		linkify := imgs.NewImgsLinkify(username)
-		parsed := ParseText(post.Text, linkify)
+		parsed := shared.ListParseText(post.Text, linkify)
 		var tpl bytes.Buffer
 		data := &PostPageData{
-			ListType: parsed.MetaData.ListType,
+			ListType: parsed.ListType,
 			Items:    parsed.Items,
 		}
 		if err := ts.Execute(&tpl, data); err != nil {
@@ -631,10 +631,10 @@ func rssHandler(w http.ResponseWriter, r *http.Request) {
 	var feedItems []*feeds.Item
 	for _, post := range pager.Data {
 		linkify := imgs.NewImgsLinkify(post.Username)
-		parsed := ParseText(post.Text, linkify)
+		parsed := shared.ListParseText(post.Text, linkify)
 		var tpl bytes.Buffer
 		data := &PostPageData{
-			ListType: parsed.MetaData.ListType,
+			ListType: parsed.ListType,
 			Items:    parsed.Items,
 		}
 		if err := ts.Execute(&tpl, data); err != nil {

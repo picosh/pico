@@ -75,6 +75,7 @@ func (m Model) bioView() string {
 	} else {
 		username = m.styles.Subtle.Render("(none set)")
 	}
+
 	return common.KeyValueView(
 		"Username", username,
 		"Blog URL", m.urls.BlogURL(username),

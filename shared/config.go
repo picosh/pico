@@ -29,6 +29,7 @@ type ConfigSite struct {
 	Debug                bool
 	SubdomainsEnabled    bool
 	CustomdomainsEnabled bool
+	SendgridKey          string
 }
 
 type CreateURL struct {

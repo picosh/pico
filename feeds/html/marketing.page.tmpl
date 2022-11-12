@@ -1,0 +1,99 @@
+{{template "base" .}}
+
+{{define "title"}}{{.Site.Domain}} -- an rss email notification service{{end}}
+
+{{define "meta"}}
+<meta name="description" content="an rss email notification service" />
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="{{.Site.Domain}}">
+<meta property="og:url" content="https://{{.Site.Domain}}">
+<meta property="og:title" content="{{.Site.Domain}}">
+<meta property="og:description" content="an rss email notification service">
+
+<meta name="twitter:card" content="summary" />
+<meta property="twitter:url" content="https://{{.Site.Domain}}">
+<meta property="twitter:title" content="{{.Site.Domain}}">
+<meta property="twitter:description" content="an rss email notification service">
+<meta name="twitter:image" content="https://{{.Site.Domain}}/card.png" />
+<meta name="twitter:image:src" content="https://{{.Site.Domain}}/card.png" />
+
+<meta property="og:image:width" content="300" />
+<meta property="og:image:height" content="300" />
+<meta itemprop="image" content="https://{{.Site.Domain}}/card.png" />
+<meta property="og:image" content="https://{{.Site.Domain}}/card.png" />
+{{end}}
+
+{{define "attrs"}}{{end}}
+
+{{define "body"}}
+<header class="text-center">
+    <h1 class="text-2xl font-bold">{{.Site.Domain}} [beta]</h1>
+    <p class="text-lg">An rss email notification service</p>
+    <hr />
+</header>
+
+<main>
+    <section>
+        <h2 class="text-lg font-bold">Create your account with Public-Key Cryptography</h2>
+        <p>We don't want your email address.</p>
+        <p>To get started, simply ssh into our content management system:</p>
+        <pre>ssh new@{{.Site.Domain}}</pre>
+        <div class="text-sm font-italic note">
+            note: <code>new</code> is a special username that will always send you to account
+            creation.
+        </div>
+        <div class="text-sm font-italic note">
+            note: getting permission denied? <a href="/help#permission-denied">read this</a>
+        </div>
+        <p>
+            After that, set a username and email and then you're ready!
+        </p>
+    </section>
+
+    <section>
+        <h2 class="text-lg font-bold">Subscribe to feeds</h2>
+        <p>
+            Use <a href="https://lists.sh/spec">lists.sh/spec</a> to create a txt file
+            named <code>daily.txt</code> (as an example).
+        </p>
+        <p>
+            Then add your email, the digest interval, and the rss feeds for which you
+            want to receive email notifications.
+        </p>
+        <pre>=: email rss@myemail.com
+=: digest_interval 1day
+=> https://hey.prose.sh/rss
+=> https://hey.lists.sh/rss
+=> https://erock.prose.sh/rss
+</pre>
+        <p>
+            Then copy the file to our server
+        </p>
+        <pre>scp daily.txt {{.Site.Domain}}:/</pre>
+        <p>Using this example, we will send a daily digest of new posts to the email specified.</p>
+    </section>
+
+    <section>
+        <h2 class="text-lg font-bold">Plain text format</h2>
+        <p>A simple specification that is flexible and with no frills.</p>
+        <p><a href="https://lists.sh/spec">specification</a></p>
+    </section>
+
+    <section>
+        <h2 class="text-lg font-bold">Features</h2>
+        <ul>
+            <li>Receive daily email digests</li>
+        </ul>
+    </section>
+
+    <section>
+        <h2 class="text-lg font-bold">Roadmap</h2>
+        <ol>
+            <li>Web rss reader</li>
+        </ol>
+    </section>
+</main>
+
+{{template "marketing-footer" .}}
+{{end}}

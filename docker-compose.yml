@@ -69,3 +69,17 @@ services:
       - imgs
       - services
       - all
+  feeds-web:
+    image: neurosnap/feeds-web:latest
+    restart: always
+    profiles:
+      - feeds
+      - services
+      - all
+  feeds-ssh:
+    image: neurosnap/feeds-ssh:latest
+    restart: always
+    profiles:
+      - feeds
+      - services
+      - all

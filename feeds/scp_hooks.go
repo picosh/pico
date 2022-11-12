@@ -1,8 +1,9 @@
-package lists
+package feeds
 
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/filehandlers"
@@ -11,12 +12,12 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-type ListHooks struct {
+type FeedHooks struct {
 	Cfg *shared.ConfigSite
 	Db  db.DB
 }
 
-func (p *ListHooks) FileValidate(data *filehandlers.PostMetaData) (bool, error) {
+func (p *FeedHooks) FileValidate(data *filehandlers.PostMetaData) (bool, error) {
 	if !shared.IsTextFile(string(data.Text)) {
 		err := fmt.Errorf(
 			"WARNING: (%s) invalid file must be plain text (utf-8), skipping",
@@ -38,7 +39,7 @@ func (p *ListHooks) FileValidate(data *filehandlers.PostMetaData) (bool, error) 
 	return true, nil
 }
 
-func (p *ListHooks) FileMeta(data *filehandlers.PostMetaData) error {
+func (p *FeedHooks) FileMeta(data *filehandlers.PostMetaData) error {
 	linkify := imgs.NewImgsLinkify(data.Username)
 	parsedText := shared.ListParseText(string(data.Text), linkify)
 
@@ -51,11 +52,12 @@ func (p *ListHooks) FileMeta(data *filehandlers.PostMetaData) error {
 	data.Description = parsedText.Description
 	data.Tags = parsedText.Tags
 
-	if parsedText.PublishAt != nil && !parsedText.PublishAt.IsZero() {
-		data.PublishAt = parsedText.PublishAt
-	}
-
 	data.Hidden = slices.Contains(p.Cfg.HiddenPosts, data.Filename)
+
+	if data.Data.LastDigest == nil {
+		now := time.Now()
+		data.Data.LastDigest = &now
+	}
 
 	return nil
 }
