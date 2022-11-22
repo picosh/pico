@@ -5,7 +5,7 @@ import (
 	"io"
 	"sync"
 
-	"git.sr.ht/~erock/pico/wish/send/utils"
+	"github.com/picosh/pico/wish/send/utils"
 )
 
 type buffer struct {

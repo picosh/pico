@@ -1,6 +1,6 @@
 package main
 
-import "git.sr.ht/~erock/pico/lists"
+import "github.com/picosh/pico/lists"
 
 func main() {
 	lists.StartApiServer()

@@ -1,6 +1,6 @@
 package main
 
-import "git.sr.ht/~erock/pico/imgs"
+import "github.com/picosh/pico/imgs"
 
 func main() {
 	imgs.StartApiServer()

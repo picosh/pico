@@ -9,8 +9,8 @@ import (
 	"regexp"
 	"strings"
 
-	"git.sr.ht/~erock/pico/db"
-	"git.sr.ht/~erock/pico/imgs/storage"
+	"github.com/picosh/pico/db"
+	"github.com/picosh/pico/imgs/storage"
 	"go.uber.org/zap"
 )
 

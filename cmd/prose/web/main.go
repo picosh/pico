@@ -1,6 +1,6 @@
 package main
 
-import "git.sr.ht/~erock/pico/prose"
+import "github.com/picosh/pico/prose"
 
 func main() {
 	prose.StartApiServer()

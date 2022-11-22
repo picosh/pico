@@ -1,9 +1,6 @@
-module git.sr.ht/~erock/pico
+module github.com/picosh/pico
 
 go 1.19
-
-// replace git.sr.ht/~erock/pico/wish => /home/erock/pico/wish
-// replace github.com/antoniomika/go-rsync-receiver => /Users/.../go-rsync-receiver
 
 require (
 	github.com/alecthomas/chroma v0.10.0

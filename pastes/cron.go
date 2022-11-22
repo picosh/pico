@@ -3,8 +3,8 @@ package pastes
 import (
 	"time"
 
-	"git.sr.ht/~erock/pico/db"
-	"git.sr.ht/~erock/pico/shared"
+	"github.com/picosh/pico/db"
+	"github.com/picosh/pico/shared"
 )
 
 func deleteExpiredPosts(cfg *shared.ConfigSite, dbpool db.DB) error {

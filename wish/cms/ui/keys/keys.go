@@ -3,10 +3,10 @@ package keys
 import (
 	"fmt"
 
-	"git.sr.ht/~erock/pico/db"
-	"git.sr.ht/~erock/pico/wish/cms/config"
-	"git.sr.ht/~erock/pico/wish/cms/ui/common"
-	"git.sr.ht/~erock/pico/wish/cms/ui/createkey"
+	"github.com/picosh/pico/db"
+	"github.com/picosh/pico/wish/cms/config"
+	"github.com/picosh/pico/wish/cms/ui/common"
+	"github.com/picosh/pico/wish/cms/ui/createkey"
 	pager "github.com/charmbracelet/bubbles/paginator"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"

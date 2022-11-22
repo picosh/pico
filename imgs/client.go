@@ -1,11 +1,11 @@
 package imgs
 
 import (
-	"git.sr.ht/~erock/pico/db"
-	uploadimgs "git.sr.ht/~erock/pico/filehandlers/imgs"
-	"git.sr.ht/~erock/pico/imgs/storage"
-	"git.sr.ht/~erock/pico/shared"
-	"git.sr.ht/~erock/pico/wish/send/utils"
+	"github.com/picosh/pico/db"
+	uploadimgs "github.com/picosh/pico/filehandlers/imgs"
+	"github.com/picosh/pico/imgs/storage"
+	"github.com/picosh/pico/shared"
+	"github.com/picosh/pico/wish/send/utils"
 	"github.com/gliderlabs/ssh"
 )
 

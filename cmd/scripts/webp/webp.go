@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"fmt"
 
-	"git.sr.ht/~erock/pico/db"
-	"git.sr.ht/~erock/pico/db/postgres"
-	"git.sr.ht/~erock/pico/imgs"
-	"git.sr.ht/~erock/pico/imgs/storage"
-	"git.sr.ht/~erock/pico/shared"
+	"github.com/picosh/pico/db"
+	"github.com/picosh/pico/db/postgres"
+	"github.com/picosh/pico/imgs"
+	"github.com/picosh/pico/imgs/storage"
+	"github.com/picosh/pico/shared"
 )
 
 func main() {

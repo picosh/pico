@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"strings"
 
-	"git.sr.ht/~erock/pico/db"
-	"git.sr.ht/~erock/pico/filehandlers"
-	"git.sr.ht/~erock/pico/imgs"
-	"git.sr.ht/~erock/pico/shared"
+	"github.com/picosh/pico/db"
+	"github.com/picosh/pico/filehandlers"
+	"github.com/picosh/pico/imgs"
+	"github.com/picosh/pico/shared"
 	"golang.org/x/exp/slices"
 )
 

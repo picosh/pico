@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"git.sr.ht/~erock/pico/db"
-	"git.sr.ht/~erock/pico/wish/cms/ui/common"
+	"github.com/picosh/pico/db"
+	"github.com/picosh/pico/wish/cms/ui/common"
 	"golang.org/x/crypto/ssh"
 )
 

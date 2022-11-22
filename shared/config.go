@@ -9,7 +9,7 @@ import (
 	"path"
 	"strings"
 
-	"git.sr.ht/~erock/pico/wish/cms/config"
+	"github.com/picosh/pico/wish/cms/config"
 	"go.uber.org/zap"
 )
 

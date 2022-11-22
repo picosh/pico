@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"git.sr.ht/~erock/pico/shared"
+	"github.com/picosh/pico/shared"
 	"github.com/araddon/dateparse"
 )
 

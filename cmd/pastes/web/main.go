@@ -1,6 +1,6 @@
 package main
 
-import "git.sr.ht/~erock/pico/pastes"
+import "github.com/picosh/pico/pastes"
 
 func main() {
 	pastes.StartApiServer()

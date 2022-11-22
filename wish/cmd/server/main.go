@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"git.sr.ht/~erock/pico/wish/send"
-	"git.sr.ht/~erock/pico/wish/send/utils"
+	"github.com/picosh/pico/wish/send"
+	"github.com/picosh/pico/wish/send/utils"
 	"github.com/charmbracelet/wish"
 	"github.com/gliderlabs/ssh"
 )

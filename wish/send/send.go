@@ -1,12 +1,12 @@
 package send
 
 import (
-	"git.sr.ht/~erock/pico/wish/pipe"
-	"git.sr.ht/~erock/pico/wish/send/auth"
-	"git.sr.ht/~erock/pico/wish/send/rsync"
-	"git.sr.ht/~erock/pico/wish/send/scp"
-	"git.sr.ht/~erock/pico/wish/send/sftp"
-	"git.sr.ht/~erock/pico/wish/send/utils"
+	"github.com/picosh/pico/wish/pipe"
+	"github.com/picosh/pico/wish/send/auth"
+	"github.com/picosh/pico/wish/send/rsync"
+	"github.com/picosh/pico/wish/send/scp"
+	"github.com/picosh/pico/wish/send/sftp"
+	"github.com/picosh/pico/wish/send/utils"
 	"github.com/charmbracelet/wish"
 	"github.com/gliderlabs/ssh"
 )

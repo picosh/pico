@@ -8,7 +8,7 @@ import (
 	"os"
 	"path"
 
-	"git.sr.ht/~erock/pico/wish/send/utils"
+	"github.com/picosh/pico/wish/send/utils"
 	"github.com/antoniomika/go-rsync-receiver/rsyncreceiver"
 	"github.com/antoniomika/go-rsync-receiver/rsyncsender"
 	rsyncutils "github.com/antoniomika/go-rsync-receiver/utils"
