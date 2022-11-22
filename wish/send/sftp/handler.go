@@ -31,7 +31,7 @@ type handler struct {
 }
 
 func (f *handler) Filecmd(r *sftp.Request) error {
-	return errors.New("unsupported")
+	return nil
 }
 
 func (f *handler) Filelist(r *sftp.Request) (sftp.ListerAt, error) {
