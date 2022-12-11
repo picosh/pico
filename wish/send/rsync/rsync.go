@@ -8,12 +8,12 @@ import (
 	"os"
 	"path"
 
-	"github.com/picosh/pico/wish/send/utils"
 	"github.com/antoniomika/go-rsync-receiver/rsyncreceiver"
 	"github.com/antoniomika/go-rsync-receiver/rsyncsender"
 	rsyncutils "github.com/antoniomika/go-rsync-receiver/utils"
 	"github.com/charmbracelet/wish"
 	"github.com/gliderlabs/ssh"
+	"github.com/picosh/pico/wish/send/utils"
 )
 
 type handler struct {

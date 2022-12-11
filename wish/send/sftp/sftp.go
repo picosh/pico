@@ -5,8 +5,8 @@ import (
 	"io"
 	"log"
 
-	"github.com/picosh/pico/wish/send/utils"
 	"github.com/gliderlabs/ssh"
+	"github.com/picosh/pico/wish/send/utils"
 	"github.com/pkg/sftp"
 )
 

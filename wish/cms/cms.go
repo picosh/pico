@@ -4,6 +4,14 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/charmbracelet/bubbles/spinner"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	bm "github.com/charmbracelet/wish/bubbletea"
+	"github.com/gliderlabs/ssh"
+	"github.com/muesli/reflow/indent"
+	"github.com/muesli/reflow/wordwrap"
+	"github.com/muesli/reflow/wrap"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/imgs/storage"
@@ -15,14 +23,6 @@ import (
 	"github.com/picosh/pico/wish/cms/ui/posts"
 	"github.com/picosh/pico/wish/cms/ui/username"
 	"github.com/picosh/pico/wish/cms/util"
-	"github.com/charmbracelet/bubbles/spinner"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-	bm "github.com/charmbracelet/wish/bubbletea"
-	"github.com/gliderlabs/ssh"
-	"github.com/muesli/reflow/indent"
-	"github.com/muesli/reflow/wordwrap"
-	"github.com/muesli/reflow/wrap"
 )
 
 type status int
