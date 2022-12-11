@@ -14,56 +14,56 @@ services:
       - db
       - all
   lists-web:
-    image: neurosnap/lists-web:latest
+    image: ghcr.io/picosh/pico/lists-web:latest
     restart: always
     profiles:
       - lists
       - services
       - all
   lists-ssh:
-    image: neurosnap/lists-ssh:latest
+    image: ghcr.io/picosh/pico/lists-ssh:latest
     restart: always
     profiles:
       - lists
       - services
       - all
   pastes-web:
-    image: neurosnap/pastes-web:latest
+    image: ghcr.io/picosh/pico/pastes-web:latest
     restart: always
     profiles:
       - pastes
       - services
       - all
   pastes-ssh:
-    image: neurosnap/pastes-ssh:latest
+    image: ghcr.io/picosh/pico/pastes-ssh:latest
     restart: always
     profiles:
       - pastes
       - services
       - all
   prose-web:
-    image: neurosnap/prose-web:latest
+    image: ghcr.io/picosh/pico/prose-web:latest
     restart: always
     profiles:
       - prose
       - services
       - all
   prose-ssh:
-    image: neurosnap/prose-ssh:latest
+    image: ghcr.io/picosh/pico/prose-ssh:latest
     restart: always
     profiles:
       - prose
       - services
       - all
   imgs-web:
-    image: neurosnap/imgs-web:latest
+    image: ghcr.io/picosh/pico/imgs-web:latest
     restart: always
     profiles:
       - imgs
       - services
       - all
   imgs-ssh:
-    image: neurosnap/imgs-ssh:latest
+    image: ghcr.io/picosh/pico/imgs-ssh:latest
     restart: always
     profiles:
       - imgs

@@ -55,7 +55,7 @@ If you want to start prose:
 ## deployment
 
 We use an image based deployment, so all of our images are uploaded to
-[hub.docker.com](https://hub.docker.com/u/neurosnap)
+[ghcr.io/picosh/pico](https://github.com/picosh/pico/packages)
 
 ```bash
 DOCKER_TAG=latest make bp-all

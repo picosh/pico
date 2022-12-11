@@ -8,7 +8,7 @@ services:
     ports:
       - "5432:5432"
   minio-caddy:
-    image: neurosnap/pico-caddy:latest
+    image: ghcr.io/picosh/pico/caddy:latest
     restart: always
     env_file:
       - .env.prod
@@ -34,7 +34,7 @@ services:
       - "9000:9000"
       - "9001:9001"
   lists-caddy:
-    image: neurosnap/pico-caddy:latest
+    image: ghcr.io/picosh/pico/caddy:latest
     restart: always
     networks:
       - lists
@@ -76,7 +76,7 @@ services:
       - "${LISTS_SSH_V4:-22}:2222"
       - "${LISTS_SSH_V6:-[::1]:22}:2222"
   pastes-caddy:
-    image: neurosnap/pico-caddy:latest
+    image: ghcr.io/picosh/pico/caddy:latest
     restart: always
     networks:
       - pastes
@@ -118,7 +118,7 @@ services:
       - "${PASTES_SSH_V4:-22}:2222"
       - "${PASTES_SSH_V6:-[::1]:22}:2222"
   prose-caddy:
-    image: neurosnap/pico-caddy:latest
+    image: ghcr.io/picosh/pico/caddy:latest
     restart: always
     networks:
       - prose
@@ -160,7 +160,7 @@ services:
       - "${PROSE_SSH_V4:-22}:2222"
       - "${PROSE_SSH_V6:-[::1]:22}:2222"
   imgs-caddy:
-    image: neurosnap/pico-caddy:latest
+    image: ghcr.io/picosh/pico/caddy:latest
     restart: always
     networks:
       - imgs

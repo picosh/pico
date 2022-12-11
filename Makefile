@@ -18,7 +18,7 @@ css:
 .PHONY: css
 
 lint:
-	docker run --rm -v $(shell pwd):/app -w /app golangci/golangci-lint:latest bash -c 'apt-get update > /dev/null 2>&1 && apt-get install -y libwebp-dev > /dev/null 2>&1; golangci-lint run -E goimports -E godot'
+	docker run --rm -v $(shell pwd):/app -w /app golangci/golangci-lint:latest bash -c 'apt-get update > /dev/null 2>&1 && apt-get install -y libwebp-dev > /dev/null 2>&1; golangci-lint run -E goimports -E godot --timeout 10m'
 .PHONY: lint
 
 bp-setup:
@@ -27,12 +27,12 @@ bp-setup:
 .PHONY: bp-setup
 
 bp-caddy: bp-setup
-	$(DOCKER_BUILDX_BUILD) -t neurosnap/pico-caddy:$(DOCKER_TAG) -f caddy/Dockerfile .
+	$(DOCKER_BUILDX_BUILD) -t ghcr.io/picosh/pico/caddy:$(DOCKER_TAG) -f caddy/Dockerfile .
 .PHONY: bp-caddy
 
 bp-%: bp-setup
-	$(DOCKER_BUILDX_BUILD) --build-arg "APP=$*" -t "neurosnap/$*-ssh:$(DOCKER_TAG)" --target release-ssh .
-	$(DOCKER_BUILDX_BUILD) --build-arg "APP=$*" -t "neurosnap/$*-web:$(DOCKER_TAG)" --target release-web .
+	$(DOCKER_BUILDX_BUILD) --build-arg "APP=$*" -t "ghcr.io/picosh/pico/$*-ssh:$(DOCKER_TAG)" --target release-ssh .
+	$(DOCKER_BUILDX_BUILD) --build-arg "APP=$*" -t "ghcr.io/picosh/pico/$*-web:$(DOCKER_TAG)" --target release-web .
 .PHONY: bp-%
 
 bp-all: bp-prose bp-lists bp-pastes bp-imgs
