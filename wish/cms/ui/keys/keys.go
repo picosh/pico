@@ -3,13 +3,13 @@ package keys
 import (
 	"fmt"
 
+	pager "github.com/charmbracelet/bubbles/paginator"
+	"github.com/charmbracelet/bubbles/spinner"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/wish/cms/config"
 	"github.com/picosh/pico/wish/cms/ui/common"
 	"github.com/picosh/pico/wish/cms/ui/createkey"
-	pager "github.com/charmbracelet/bubbles/paginator"
-	"github.com/charmbracelet/bubbles/spinner"
-	tea "github.com/charmbracelet/bubbletea"
 )
 
 const keysPerPage = 4

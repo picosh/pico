@@ -8,6 +8,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/charmbracelet/promwish"
+	"github.com/charmbracelet/wish"
+	bm "github.com/charmbracelet/wish/bubbletea"
+	lm "github.com/charmbracelet/wish/logging"
+	"github.com/gliderlabs/ssh"
 	"github.com/picosh/pico/db/postgres"
 	uploadimgs "github.com/picosh/pico/filehandlers/imgs"
 	"github.com/picosh/pico/imgs"
@@ -22,11 +27,6 @@ import (
 	"github.com/picosh/pico/wish/send/scp"
 	"github.com/picosh/pico/wish/send/sftp"
 	"github.com/picosh/pico/wish/send/utils"
-	"github.com/charmbracelet/promwish"
-	"github.com/charmbracelet/wish"
-	bm "github.com/charmbracelet/wish/bubbletea"
-	lm "github.com/charmbracelet/wish/logging"
-	"github.com/gliderlabs/ssh"
 )
 
 type SSHServer struct{}

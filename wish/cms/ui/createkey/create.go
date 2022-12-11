@@ -3,12 +3,12 @@ package createkey
 import (
 	"strings"
 
-	"github.com/picosh/pico/db"
-	"github.com/picosh/pico/wish/cms/config"
-	"github.com/picosh/pico/wish/cms/ui/common"
 	"github.com/charmbracelet/bubbles/spinner"
 	input "github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/picosh/pico/db"
+	"github.com/picosh/pico/wish/cms/config"
+	"github.com/picosh/pico/wish/cms/ui/common"
 	"golang.org/x/crypto/ssh"
 )
 

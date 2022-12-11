@@ -1,10 +1,10 @@
 package info
 
 import (
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/wish/cms/config"
 	"github.com/picosh/pico/wish/cms/ui/common"
-	tea "github.com/charmbracelet/bubbletea"
 )
 
 type errMsg struct {

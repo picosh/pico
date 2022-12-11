@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
+	_ "github.com/lib/pq"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/wish/cms/config"
-	_ "github.com/lib/pq"
 	"go.uber.org/zap"
 	"golang.org/x/exp/slices"
 )

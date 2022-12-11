@@ -11,11 +11,11 @@ import (
 
 	_ "net/http/pprof"
 
+	"github.com/gorilla/feeds"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/imgs/storage"
 	"github.com/picosh/pico/shared"
-	"github.com/gorilla/feeds"
 	"go.uber.org/zap"
 	"golang.org/x/exp/slices"
 )

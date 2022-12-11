@@ -1,14 +1,14 @@
 package send
 
 import (
+	"github.com/charmbracelet/wish"
+	"github.com/gliderlabs/ssh"
 	"github.com/picosh/pico/wish/pipe"
 	"github.com/picosh/pico/wish/send/auth"
 	"github.com/picosh/pico/wish/send/rsync"
 	"github.com/picosh/pico/wish/send/scp"
 	"github.com/picosh/pico/wish/send/sftp"
 	"github.com/picosh/pico/wish/send/utils"
-	"github.com/charmbracelet/wish"
-	"github.com/gliderlabs/ssh"
 )
 
 func Middleware(writeHandler utils.CopyFromClientHandler) ssh.Option {

@@ -97,8 +97,8 @@ func main() {
 	datesFixed := []string{}
 	logger.Info("updating dates")
 	for _, post := range posts {
+		linkify := imgs.NewImgsLinkify(post.Username)
 		if post.Space == "prose" {
-			linkify := imgs.NewImgsLinkify(post.Username)
 			parsed, err := shared.ParseText(post.Text, linkify)
 			if err != nil {
 				logger.Error(err)
@@ -117,7 +117,7 @@ func main() {
 				}
 			}
 		} else if post.Space == "lists" {
-			parsed := lists.ParseText(post.Text)
+			parsed := lists.ParseText(post.Text, linkify)
 
 			if parsed.MetaData.PublishAt != nil && !parsed.MetaData.PublishAt.IsZero() {
 				err = updateDates(tx, post.ID, parsed.MetaData.PublishAt)

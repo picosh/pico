@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/gliderlabs/ssh"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/imgs/storage"
 	"github.com/picosh/pico/shared"
-	"github.com/gliderlabs/ssh"
 )
 
 func (h *UploadImgHandler) validateImg(data *PostMetaData) (bool, error) {

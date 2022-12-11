@@ -4,9 +4,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/picosh/pico/wish/send/utils"
 	"github.com/charmbracelet/wish"
 	"github.com/gliderlabs/ssh"
+	"github.com/picosh/pico/wish/send/utils"
 )
 
 func Middleware(writeHandler utils.CopyFromClientHandler) wish.Middleware {

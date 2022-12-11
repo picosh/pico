@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/picosh/pico/shared"
 	"github.com/araddon/dateparse"
+	"github.com/picosh/pico/shared"
 )
 
 var reIndent = regexp.MustCompile(`^[[:blank:]]+`)
