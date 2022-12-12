@@ -1,5 +1,7 @@
 name: Run a docker build
 
+description: Runs a docker build in a composite action
+
 inputs:
   app:
     description: The pico app to build
@@ -36,7 +38,7 @@ runs:
         tags: ${{ steps.webmeta.outputs.tags }}
         labels: ${{ steps.webmeta.outputs.labels }}
         target: release-web
-        platform: ${{ inputs.platforms }}
+        platforms: ${{ inputs.platforms }}
         build-args: |
           APP=${{ inputs.app }}
     - name: Build and push ssh
@@ -47,6 +49,6 @@ runs:
         tags: ${{ steps.sshmeta.outputs.tags }}
         labels: ${{ steps.sshmeta.outputs.labels }}
         target: release-ssh
-        platform: ${{ inputs.platforms }}
+        platforms: ${{ inputs.platforms }}
         build-args: |
           APP=${{ inputs.app }}
