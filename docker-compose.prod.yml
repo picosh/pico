@@ -206,6 +206,11 @@ services:
       - "${IMGS_SSH_V6:-[::1]:22}:2222"
 
 networks:
+  default:
+    ipam:
+      driver: default
+      config:
+        - subnet: "172.101.0.0/24"
   prose:
     driver_opts:
       com.docker.network.bridge.name: prose
