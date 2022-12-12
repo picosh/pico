@@ -1,0 +1,54 @@
+name: Run a docker build
+
+description: Runs a docker build in a composite action
+
+inputs:
+  app:
+    description: The pico app to build
+    required: true
+  platforms:
+    description: The docker platforms to build for
+    required: false
+    default: |
+      linux/amd64
+      linux/arm64
+  registry:
+    description: The docker registry to use
+    required: false
+    default: ghcr.io
+
+runs:
+  using: composite
+  steps:
+    - name: Collect web image metadata
+      id: webmeta
+      uses: docker/metadata-action@v4
+      with:
+        images: ${{ inputs.REGISTRY }}/${{ github.repository }}/${{ inputs.app }}-web
+    - name: Collect ssh image metadata
+      id: sshmeta
+      uses: docker/metadata-action@v4
+      with:
+        images: ${{ inputs.REGISTRY }}/${{ github.repository }}/${{ inputs.app }}-ssh
+    - name: Build and push web
+      uses: docker/build-push-action@v3
+      with:
+        context: .
+        push: true
+        tags: ${{ steps.webmeta.outputs.tags }}
+        labels: ${{ steps.webmeta.outputs.labels }}
+        target: release-web
+        platforms: ${{ inputs.platforms }}
+        build-args: |
+          APP=${{ inputs.app }}
+    - name: Build and push ssh
+      uses: docker/build-push-action@v3
+      with:
+        context: .
+        push: true
+        tags: ${{ steps.sshmeta.outputs.tags }}
+        labels: ${{ steps.sshmeta.outputs.labels }}
+        target: release-ssh
+        platforms: ${{ inputs.platforms }}
+        build-args: |
+          APP=${{ inputs.app }}
