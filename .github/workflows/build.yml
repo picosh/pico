@@ -11,6 +11,12 @@ on:
     branches:
       - main
 
+env:
+  REGISTRY: ghcr.io
+  PLATFORM: |
+    linux/amd64
+    linux/arm64
+
 jobs:
   test:
     runs-on: ubuntu-22.04
@@ -58,18 +64,26 @@ jobs:
       uses: ./.github/actions/build
       with:
         app: lists
+        platforms: ${{ env.PLATFORM }}
+        registry: ${{ env.REGISTRY }}
     - name: Run docker build for prose
       uses: ./.github/actions/build
       with:
         app: prose
+        platforms: ${{ env.PLATFORM }}
+        registry: ${{ env.REGISTRY }}
     - name: Run docker build for pastes
       uses: ./.github/actions/build
       with:
         app: pastes
+        platforms: ${{ env.PLATFORM }}
+        registry: ${{ env.REGISTRY }}
     - name: Run docker build for imgs
       uses: ./.github/actions/build
       with:
         app: imgs
+        platforms: ${{ env.PLATFORM }}
+        registry: ${{ env.REGISTRY }}
   build-caddy:
     runs-on: ubuntu-22.04
     needs: test
