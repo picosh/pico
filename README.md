@@ -5,6 +5,7 @@ This repo hosts the following pico services:
 - [prose.sh](https://prose.sh)
 - [lists.sh](https://lists.sh)
 - [pastes.sh](https://pastes.sh)
+- [imgs.sh](https://imgs.sh)
 
 ## comms
 
