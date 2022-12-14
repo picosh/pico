@@ -205,7 +205,7 @@ services:
       - "${IMGS_SSH_V4:-22}:2222"
       - "${IMGS_SSH_V6:-[::1]:22}:2222"
   feeds-caddy:
-    image: neurosnap/pico-caddy:latest
+    image: ghcr.io/picosh/pico/caddy:latest
     restart: always
     networks:
       - feeds
@@ -282,4 +282,4 @@ networks:
       com.docker.network.bridge.name: feeds
     ipam:
       config:
-        - subnet: 172.20.0.0/16
+        - subnet: 172.22.0.0/16

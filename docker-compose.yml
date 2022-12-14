@@ -70,14 +70,14 @@ services:
       - services
       - all
   feeds-web:
-    image: neurosnap/feeds-web:latest
+    image: ghcr.io/picosh/pico/feeds-web:latest
     restart: always
     profiles:
       - feeds
       - services
       - all
   feeds-ssh:
-    image: neurosnap/feeds-ssh:latest
+    image: ghcr.io/picosh/pico/feeds-ssh:latest
     restart: always
     profiles:
       - feeds
