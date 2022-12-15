@@ -21,6 +21,12 @@
             your public key.  That is the only piece of information we record for a user.
         </p>
         <p>
+            In order to email the user their RSS digest, we need to capture an email address.
+            We do not use this email address for anything other than sending digest emails.
+            We do not scrape posts and keep any email addresses.
+            If you delete a post containing an email address then that email address is no longer in our system.
+        </p>
+        <p>
             Because we use public-key cryptography, our security posture is a battle-tested
             and proven technique for authentication.
         </p>
@@ -46,7 +52,7 @@
     <section>
         <h2 class="text-xl">Cookies</h2>
         <p>
-            We do not use any cookies, not even account authentication.
+            We do not use any cookies, not even for account authentication.
         </p>
     </section>
 </main>
