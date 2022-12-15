@@ -1,0 +1,53 @@
+ALTER TYPE space ADD VALUE 'feeds';
+
+-- CREATE TABLE IF NOT EXISTS feeds (
+--   id          uuid NOT NULL DEFAULT uuid_generate_v4(),
+--   user_id     uuid NOT NULL,
+--   post_id     uuid NOT NULL,
+--   atom_id     character varying(250),
+--   title       character varying(250),
+--   subtitle    character varying(250),
+--   author      character varying(250),
+--   link        character varying(2000),
+--   fetched_at  timestamp without time zone,
+--   created_at  timestamp without time zone NOT NULL DEFAULT NOW(),
+--   updated_at  timestamp without time zone NOT NULL DEFAULT NOW(),
+--   CONSTRAINT  entry_unique_id UNIQUE (post_id, atom_id),
+--   CONSTRAINT  feed_pkey PRIMARY KEY (id),
+--   CONSTRAINT  fk_user_posts
+--     FOREIGN KEY(user_id)
+--   REFERENCES app_users(id)
+--   ON DELETE CASCADE
+--   ON UPDATE CASCADE,
+--   CONSTRAINT fk_feed_posts
+--     FOREIGN KEY(post_id)
+--   REFERENCES posts(id)
+--   ON DELETE CASCADE
+--   ON UPDATE CASCADE
+-- );
+--
+-- CREATE TABLE IF NOT EXISTS feed_entry (
+--   id          uuid NOT NULL DEFAULT uuid_generate_v4(),
+--   feed_id     uuid NOT NULL,
+--   atom_id     character varying(250),
+--   read        boolean NOT NULL DEFAULT false,
+--   author      character varying(250),
+--   category    character varying(250),
+--   rights      character varying(2000),
+--   source      character varying(2000),
+--   content     text,
+--   contributor character varying(250),
+--   link        character varying(2000),
+--   summary     text,
+--   title       character varying(250),
+--   published   timestamp without time zone NOT NULL DEFAULT NOW(),
+--   created_at  timestamp without time zone NOT NULL DEFAULT NOW(),
+--   updated_at  timestamp without time zone NOT NULL DEFAULT NOW(),
+--   CONSTRAINT  entry_unique_atom_id UNIQUE (feed_id, atom_id),
+--   CONSTRAINT  feed_entry_pkey PRIMARY KEY (id),
+--   CONSTRAINT  fk_entry_feed
+--     FOREIGN KEY(feed_id)
+--   REFERENCES feeds(id)
+--   ON DELETE CASCADE
+--   ON UPDATE CASCADE
+-- );
