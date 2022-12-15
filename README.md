@@ -6,6 +6,7 @@ This repo hosts the following pico services:
 - [lists.sh](https://lists.sh)
 - [pastes.sh](https://pastes.sh)
 - [imgs.sh](https://imgs.sh)
+- [feeds.sh](https://feeds.sh)
 
 ## comms
 
