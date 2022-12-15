@@ -78,7 +78,9 @@ func (f *Fetcher) Validate(lastDigest *time.Time, parsed *shared.ListParsedText)
 
 func (f *Fetcher) RunPost(user *db.User, post *db.Post) error {
 	f.cfg.Logger.Infof("(%s) running feed post (%s)", user.Name, post.Filename)
+
 	parsed := shared.ListParseText(post.Text, shared.NewNullLinkify())
+
 	err := f.Validate(post.Data.LastDigest, parsed)
 	if err != nil {
 		f.cfg.Logger.Info(err.Error())
@@ -118,10 +120,13 @@ func (f *Fetcher) RunPost(user *db.User, post *db.Post) error {
 }
 
 func (f *Fetcher) RunUser(user *db.User) error {
-	f.cfg.Logger.Infof("(%s) grabbing all feed posts", user.Name)
 	posts, err := f.db.FindPostsForUser(&db.Pager{Num: 1000}, user.ID, "feeds")
 	if err != nil {
 		return err
+	}
+
+	if posts.Total > 0 {
+		f.cfg.Logger.Infof("(%s) found (%d) feed posts", user.Name, posts.Total)
 	}
 
 	for _, post := range posts.Data {

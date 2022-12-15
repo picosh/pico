@@ -35,8 +35,16 @@
 
 <main>
     <section>
+        <h2 class="text-lg font-bold">Features</h2>
+        <ul>
+            <li>Receive email digests for your RSS feeds</li>
+            <li>Create 1-to-many email digests</li>
+            <li>Set digest interval from <a href="/help#digest-interval"><code>10min</code> to <code>30day</code></a></li>
+        </ul>
+    </section>
+
+    <section>
         <h2 class="text-lg font-bold">Create your account with Public-Key Cryptography</h2>
-        <p>We don't want your email address.</p>
         <p>To get started, simply ssh into our content management system:</p>
         <pre>ssh new@{{.Site.Domain}}</pre>
         <div class="text-sm font-italic note">
@@ -75,22 +83,25 @@
     </section>
 
     <section>
-        <h2 class="text-lg font-bold">Plain text format</h2>
-        <p>A simple specification that is flexible and with no frills.</p>
-        <p><a href="https://lists.sh/spec">specification</a></p>
+        <h2 class="text-lg font-bold">Privacy</h2>
+        <p>
+            We don't do anything with your email besides send an email digest.
+            If you delete the post containing your email address, we no longer have you email address.
+        </p>
     </section>
 
     <section>
-        <h2 class="text-lg font-bold">Features</h2>
-        <ul>
-            <li>Receive daily email digests</li>
-        </ul>
+        <h2 class="text-lg font-bold">Plain text format</h2>
+        <p>A simple list specification that is flexible and with no frills.</p>
+        <p><a href="https://lists.sh/spec">specification</a></p>
     </section>
 
     <section>
         <h2 class="text-lg font-bold">Roadmap</h2>
         <ol>
-            <li>Web rss reader</li>
+            <li>Require user to click link in digest to continue receiving digest</li>
+            <li>Digest email containing HTML instead of just plain text</li>
+            <li>Web RSS reader?</li>
         </ol>
     </section>
 </main>
