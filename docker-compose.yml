@@ -69,3 +69,17 @@ services:
       - imgs
       - services
       - all
+  feeds-web:
+    image: ghcr.io/picosh/pico/feeds-web:latest
+    restart: always
+    profiles:
+      - feeds
+      - services
+      - all
+  feeds-ssh:
+    image: ghcr.io/picosh/pico/feeds-ssh:latest
+    restart: always
+    profiles:
+      - feeds
+      - services
+      - all

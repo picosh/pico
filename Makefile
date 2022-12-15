@@ -12,6 +12,7 @@ css:
 	cp ./smol.css prose/public/main.css
 	cp ./smol.css pastes/public/main.css
 	cp ./smol.css imgs/public/main.css
+	cp ./smol.css feeds/public/main.css
 
 	cp ./syntax.css pastes/public/syntax.css
 	cp ./syntax.css prose/public/syntax.css
@@ -35,7 +36,7 @@ bp-%: bp-setup
 	$(DOCKER_BUILDX_BUILD) --build-arg "APP=$*" -t "ghcr.io/picosh/pico/$*-web:$(DOCKER_TAG)" --target release-web .
 .PHONY: bp-%
 
-bp-all: bp-prose bp-lists bp-pastes bp-imgs
+bp-all: bp-prose bp-lists bp-pastes bp-imgs bp-feeds
 .PHONY: bp-all
 
 build-%:
@@ -43,7 +44,7 @@ build-%:
 	go build -o "build/$*-ssh" "./cmd/$*/ssh"
 .PHONY: build-%
 
-build: build-prose build-lists build-pastes build-imgs
+build: build-prose build-lists build-pastes build-imgs build-feeds
 .PHONY: build
 
 format:

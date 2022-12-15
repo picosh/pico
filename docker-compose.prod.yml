@@ -204,6 +204,48 @@ services:
     ports:
       - "${IMGS_SSH_V4:-22}:2222"
       - "${IMGS_SSH_V6:-[::1]:22}:2222"
+  feeds-caddy:
+    image: ghcr.io/picosh/pico/caddy:latest
+    restart: always
+    networks:
+      - feeds
+    env_file:
+      - .env.prod
+    environment:
+      APP_DOMAIN: ${FEEDS_DOMAIN:-feeds.sh}
+      APP_EMAIL: ${FEEDS_EMAIL:-hello@pico.sh}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+      - ./data/feeds-caddy/data:/data
+      - ./data/feeds-caddy/config:/config
+    ports:
+      - "${FEEDS_HTTPS_V4:-443}:443"
+      - "${FEEDS_HTTP_V4:-80}:80"
+      - "${FEEDS_HTTPS_V6:-[::1]:443}:443"
+      - "${FEEDS_HTTP_V6:-[::1]:80}:80"
+    profiles:
+      - feeds
+      - caddy
+      - all
+  feeds-web:
+    networks:
+      feeds:
+        aliases:
+          - web
+    env_file:
+      - .env.prod
+  feeds-ssh:
+    networks:
+      feeds:
+        aliases:
+          - ssh
+    env_file:
+      - .env.prod
+    volumes:
+      - ./data/feeds-ssh/data:/app/ssh_data
+    ports:
+      - "${FEEDS_SSH_V4:-22}:2222"
+      - "${FEEDS_SSH_V6:-[::1]:22}:2222"
 
 networks:
   default:
@@ -235,3 +277,9 @@ networks:
     ipam:
       config:
         - subnet: 172.21.0.0/16
+  feeds:
+    driver_opts:
+      com.docker.network.bridge.name: feeds
+    ipam:
+      config:
+        - subnet: 172.22.0.0/16

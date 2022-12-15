@@ -10,7 +10,6 @@ import (
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/imgs"
-	"github.com/picosh/pico/lists"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/wish/cms/config"
 	"go.uber.org/zap"
@@ -117,15 +116,20 @@ func main() {
 				}
 			}
 		} else if post.Space == "lists" {
-			parsed := lists.ParseText(post.Text, linkify)
+			linkify := imgs.NewImgsLinkify(post.Username)
+			parsed := shared.ListParseText(post.Text, linkify)
+			if err != nil {
+				logger.Error(err)
+				continue
+			}
 
-			if parsed.MetaData.PublishAt != nil && !parsed.MetaData.PublishAt.IsZero() {
-				err = updateDates(tx, post.ID, parsed.MetaData.PublishAt)
+			if parsed.PublishAt != nil && !parsed.PublishAt.IsZero() {
+				err = updateDates(tx, post.ID, parsed.PublishAt)
 				if err != nil {
 					logger.Error(err)
 					continue
 				}
-				if !parsed.MetaData.PublishAt.Equal(*post.PublishAt) {
+				if !parsed.PublishAt.Equal(*post.PublishAt) {
 					datesFixed = append(datesFixed, post.ID)
 				}
 			}

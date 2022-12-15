@@ -84,6 +84,12 @@ jobs:
         app: imgs
         platforms: ${{ env.PLATFORMS }}
         registry: ${{ env.REGISTRY }}
+    - name: Run docker build for imgs
+      uses: ./.github/actions/build
+      with:
+        app: feeds
+        platforms: ${{ env.PLATFORMS }}
+        registry: ${{ env.REGISTRY }}
   build-caddy:
     runs-on: ubuntu-22.04
     needs: test

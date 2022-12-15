@@ -1,21 +1,30 @@
-package lists
+package shared
 
 import (
 	"fmt"
 	"html/template"
+	"log"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/araddon/dateparse"
-	"github.com/picosh/pico/shared"
+	"golang.org/x/exp/slices"
 )
 
 var reIndent = regexp.MustCompile(`^[[:blank:]]+`)
+var DigestIntervalOpts = []string{
+	"10min",
+	"1hour",
+	"12hour",
+	"1day",
+	"7day",
+	"30day",
+}
 
-type ParsedText struct {
+type ListParsedText struct {
 	Items []*ListItem
-	*MetaData
+	*ListMetaData
 }
 
 type ListItem struct {
@@ -32,13 +41,15 @@ type ListItem struct {
 	Indent      int
 }
 
-type MetaData struct {
-	PublishAt   *time.Time
-	Title       string
-	Description string
-	Layout      string
-	Tags        []string
-	ListType    string // https://developer.mozilla.org/en-US/docs/Web/CSS/list-style-type
+type ListMetaData struct {
+	PublishAt      *time.Time
+	Title          string
+	Description    string
+	Layout         string
+	Tags           []string
+	ListType       string // https://developer.mozilla.org/en-US/docs/Web/CSS/list-style-type
+	DigestInterval string
+	Email          string
 }
 
 var urlToken = "=>"
@@ -85,7 +96,7 @@ func PublishAtDate(date string) (*time.Time, error) {
 	return &t, err
 }
 
-func TokenToMetaField(meta *MetaData, token *SplitToken) {
+func TokenToMetaField(meta *ListMetaData, token *SplitToken) error {
 	if token.Key == "publish_at" {
 		publishAt, err := PublishAtDate(token.Value)
 		if err == nil {
@@ -105,7 +116,20 @@ func TokenToMetaField(meta *MetaData, token *SplitToken) {
 		}
 	} else if token.Key == "layout" {
 		meta.Layout = token.Value
+	} else if token.Key == "digest_interval" {
+		if !slices.Contains(DigestIntervalOpts, token.Value) {
+			return fmt.Errorf(
+				"(%s) is not a valid option, choose from [%s]",
+				token.Value,
+				strings.Join(DigestIntervalOpts, ","),
+			)
+		}
+		meta.DigestInterval = token.Value
+	} else if token.Key == "email" {
+		meta.Email = token.Value
 	}
+
+	return nil
 }
 
 func KeyAsValue(token *SplitToken) string {
@@ -115,7 +139,7 @@ func KeyAsValue(token *SplitToken) string {
 	return token.Value
 }
 
-func parseItem(meta *MetaData, li *ListItem, prevItem *ListItem, pre bool, mod int, linkify shared.Linkify) (bool, bool, int) {
+func parseItem(meta *ListMetaData, li *ListItem, prevItem *ListItem, pre bool, mod int, linkify Linkify) (bool, bool, int) {
 	skip := false
 
 	if strings.HasPrefix(li.Value, preToken) {
@@ -144,17 +168,20 @@ func parseItem(meta *MetaData, li *ListItem, prevItem *ListItem, pre bool, mod i
 		split := TextToSplitToken(strings.Replace(li.Value, imgToken, "", 1))
 		key := split.Key
 		if strings.HasPrefix(key, "/") {
-			frag := shared.SanitizeFileExt(key)
+			frag := SanitizeFileExt(key)
 			key = linkify.Create(frag)
 		} else if strings.HasPrefix(key, "./") {
-			name := shared.SanitizeFileExt(key[1:])
+			name := SanitizeFileExt(key[1:])
 			key = linkify.Create(name)
 		}
 		li.URL = template.URL(key)
 		li.Value = KeyAsValue(split)
 	} else if strings.HasPrefix(li.Value, varToken) {
 		split := TextToSplitToken(strings.Replace(li.Value, varToken, "", 1))
-		TokenToMetaField(meta, split)
+		err := TokenToMetaField(meta, split)
+		if err != nil {
+			log.Println(err)
+		}
 	} else if strings.HasPrefix(li.Value, headerTwoToken) {
 		li.IsHeaderTwo = true
 		li.Value = strings.Replace(li.Value, headerTwoToken, "", 1)
@@ -185,10 +212,10 @@ func parseItem(meta *MetaData, li *ListItem, prevItem *ListItem, pre bool, mod i
 	return pre, skip, mod
 }
 
-func ParseText(text string, linkify shared.Linkify) *ParsedText {
+func ListParseText(text string, linkify Linkify) *ListParsedText {
 	textItems := SplitByNewline(text)
 	items := []*ListItem{}
-	meta := MetaData{
+	meta := ListMetaData{
 		ListType: "disc",
 		Tags:     []string{},
 		Layout:   "default",
@@ -218,8 +245,8 @@ func ParseText(text string, linkify shared.Linkify) *ParsedText {
 		}
 	}
 
-	return &ParsedText{
-		Items:    items,
-		MetaData: &meta,
+	return &ListParsedText{
+		Items:        items,
+		ListMetaData: &meta,
 	}
 }
