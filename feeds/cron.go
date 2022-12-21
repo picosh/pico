@@ -125,7 +125,7 @@ func (f *Fetcher) RunUser(user *db.User) error {
 		return err
 	}
 
-	if posts.Total > 0 {
+	if len(posts.Data) > 0 {
 		f.cfg.Logger.Infof("(%s) found (%d) feed posts", user.Name, posts.Total)
 	}
 
@@ -217,7 +217,7 @@ func (f *Fetcher) FetchAll(urls []string, lastDigest *time.Time) (string, error)
 
 func (f *Fetcher) SendEmail(username, email, msg string) error {
 	if email == "" {
-		return fmt.Errorf("(%s) does not have an email associated with their account", username)
+		return fmt.Errorf("(%s) does not have an email associated with their feed post", username)
 	}
 
 	from := mail.NewEmail("team pico", f.cfg.Email)
