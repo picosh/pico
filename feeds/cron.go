@@ -3,6 +3,7 @@ package feeds
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"text/template"
 	"time"
@@ -15,6 +16,15 @@ import (
 )
 
 var ErrNoRecentArticles = errors.New("no recent articles")
+
+type UserAgentTransport struct {
+	http.RoundTripper
+}
+
+func (c *UserAgentTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	r.Header.Set("User-Agent", "linux:feeds:v1")
+	return c.RoundTripper.RoundTrip(r)
+}
 
 type FeedItem struct {
 	Title       string
@@ -81,6 +91,7 @@ func (f *Fetcher) RunPost(user *db.User, post *db.Post) error {
 
 	parsed := shared.ListParseText(post.Text, shared.NewNullLinkify())
 
+	f.cfg.Logger.Infof("Last digest at (%s)", post.Data.LastDigest)
 	err := f.Validate(post.Data.LastDigest, parsed)
 	if err != nil {
 		f.cfg.Logger.Info(err.Error())
@@ -126,7 +137,7 @@ func (f *Fetcher) RunUser(user *db.User) error {
 	}
 
 	if len(posts.Data) > 0 {
-		f.cfg.Logger.Infof("(%s) found (%d) feed posts", user.Name, posts.Total)
+		f.cfg.Logger.Infof("(%s) found (%d) feed posts", user.Name, len(posts.Data))
 	}
 
 	for _, post := range posts.Data {
@@ -140,6 +151,8 @@ func (f *Fetcher) RunUser(user *db.User) error {
 }
 
 func (f *Fetcher) Fetch(fp *gofeed.Parser, url string, lastDigest *time.Time) (*Feed, error) {
+	f.cfg.Logger.Infof("(%s) fetching feed", url)
+
 	feed, err := fp.ParseURL(url)
 	if err != nil {
 		return nil, err
@@ -192,6 +205,9 @@ func (f *Fetcher) Print(feedTmpl *DigestFeed) (string, error) {
 
 func (f *Fetcher) FetchAll(urls []string, lastDigest *time.Time) (string, error) {
 	fp := gofeed.NewParser()
+	fp.Client = &http.Client{
+		Transport: &UserAgentTransport{http.DefaultTransport},
+	}
 	feeds := &DigestFeed{}
 
 	for _, url := range urls {
@@ -205,6 +221,10 @@ func (f *Fetcher) FetchAll(urls []string, lastDigest *time.Time) (string, error)
 			continue
 		}
 		feeds.Feeds = append(feeds.Feeds, feedTmpl)
+	}
+
+	if len(feeds.Feeds) == 0 {
+		return "", fmt.Errorf("%w, skipping", ErrNoRecentArticles)
 	}
 
 	str, err := f.Print(feeds)
@@ -227,6 +247,8 @@ func (f *Fetcher) SendEmail(username, email, msg string) error {
 	plainTextContent := msg
 	htmlContent := msg
 
+	f.cfg.Logger.Infof("message body (%s)", plainTextContent)
+
 	message := mail.NewSingleEmail(from, subject, to, plainTextContent, htmlContent)
 	client := sendgrid.NewSendClient(f.cfg.SendgridKey)
 
@@ -236,11 +258,20 @@ func (f *Fetcher) SendEmail(username, email, msg string) error {
 		return err
 	}
 
-	f.cfg.Logger.Infof(
-		"(%s) successfully sent email digest (x-message-id: %s)",
-		email,
-		response.Headers["X-Message-Id"][0],
-	)
+	f.cfg.Logger.Infof("(%s) email digest response: %v", username, response)
+
+	if len(response.Headers["X-Message-Id"]) > 0 {
+		f.cfg.Logger.Infof(
+			"(%s) successfully sent email digest (x-message-id: %s)",
+			email,
+			response.Headers["X-Message-Id"][0],
+		)
+	} else {
+		f.cfg.Logger.Errorf(
+			"(%s) could not find x-message-id, which means sending an email failed",
+			email,
+		)
+	}
 
 	return nil
 }
