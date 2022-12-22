@@ -3,6 +3,8 @@ package feeds
 import (
 	"errors"
 	"fmt"
+	html "html/template"
+	"io"
 	"net/http"
 	"strings"
 	"text/template"
@@ -27,9 +29,9 @@ func (c *UserAgentTransport) RoundTrip(r *http.Request) (*http.Response, error) 
 }
 
 type FeedItem struct {
-	Title       string
-	Link        string
-	Description string
+	Title   string
+	Link    string
+	Content string
 }
 
 type Feed struct {
@@ -114,12 +116,12 @@ func (f *Fetcher) RunPost(user *db.User, post *db.Post) error {
 		urls = append(urls, url)
 	}
 
-	txt, err := f.FetchAll(urls, post.Data.LastDigest)
+	msgBody, err := f.FetchAll(urls, post.Data.LastDigest)
 	if err != nil {
 		return err
 	}
 
-	err = f.SendEmail(user.Name, parsed.Email, txt)
+	err = f.SendEmail(user.Name, parsed.Email, msgBody)
 	if err != nil {
 		return err
 	}
@@ -150,10 +152,47 @@ func (f *Fetcher) RunUser(user *db.User) error {
 	return nil
 }
 
+func (f *Fetcher) ParseURL(fp *gofeed.Parser, url string) (*gofeed.Feed, error) {
+	client := &http.Client{
+		Transport: &UserAgentTransport{http.DefaultTransport},
+	}
+	req, err := http.NewRequest("GET", url, nil)
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if strings.HasPrefix(url, "https://old") {
+		f.cfg.Logger.Infof("BODY: (%s)", string(body))
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode > 300 {
+		return nil, fmt.Errorf("fetching feed resulted in an error: %s %s", resp.Status, body)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	feed, err := fp.ParseString(string(body))
+
+	if err != nil {
+		return nil, err
+	}
+
+	return feed, nil
+}
+
 func (f *Fetcher) Fetch(fp *gofeed.Parser, url string, lastDigest *time.Time) (*Feed, error) {
 	f.cfg.Logger.Infof("(%s) fetching feed", url)
 
-	feed, err := fp.ParseURL(url)
+	feed, err := f.ParseURL(fp, url)
 	if err != nil {
 		return nil, err
 	}
@@ -166,14 +205,14 @@ func (f *Fetcher) Fetch(fp *gofeed.Parser, url string, lastDigest *time.Time) (*
 	items := []*FeedItem{}
 	// we only want to return feed items published since the last digest time we fetched
 	for _, item := range feed.Items {
-		if lastDigest == nil || item.PublishedParsed.Before(*lastDigest) {
+		if lastDigest != nil && item.PublishedParsed.Before(*lastDigest) {
 			continue
 		}
 
 		items = append(items, &FeedItem{
-			Title:       item.Title,
-			Link:        item.Link,
-			Description: item.Description,
+			Title:   item.Title,
+			Link:    item.Link,
+			Content: item.Content,
 		})
 	}
 
@@ -185,8 +224,26 @@ func (f *Fetcher) Fetch(fp *gofeed.Parser, url string, lastDigest *time.Time) (*
 	return feedTmpl, nil
 }
 
-func (f *Fetcher) Print(feedTmpl *DigestFeed) (string, error) {
+func (f *Fetcher) PrintText(feedTmpl *DigestFeed) (string, error) {
 	ts, err := template.ParseFiles(
+		f.cfg.StaticPath("html/digest_text.page.tmpl"),
+	)
+
+	if err != nil {
+		return "", err
+	}
+
+	w := new(strings.Builder)
+	err = ts.Execute(w, feedTmpl)
+	if err != nil {
+		return "", err
+	}
+
+	return w.String(), nil
+}
+
+func (f *Fetcher) PrintHtml(feedTmpl *DigestFeed) (string, error) {
+	ts, err := html.ParseFiles(
 		f.cfg.StaticPath("html/digest.page.tmpl"),
 	)
 
@@ -203,11 +260,13 @@ func (f *Fetcher) Print(feedTmpl *DigestFeed) (string, error) {
 	return w.String(), nil
 }
 
-func (f *Fetcher) FetchAll(urls []string, lastDigest *time.Time) (string, error) {
+type MsgBody struct {
+	Html string
+	Text string
+}
+
+func (f *Fetcher) FetchAll(urls []string, lastDigest *time.Time) (*MsgBody, error) {
 	fp := gofeed.NewParser()
-	fp.Client = &http.Client{
-		Transport: &UserAgentTransport{http.DefaultTransport},
-	}
 	feeds := &DigestFeed{}
 
 	for _, url := range urls {
@@ -224,18 +283,26 @@ func (f *Fetcher) FetchAll(urls []string, lastDigest *time.Time) (string, error)
 	}
 
 	if len(feeds.Feeds) == 0 {
-		return "", fmt.Errorf("%w, skipping", ErrNoRecentArticles)
+		return nil, fmt.Errorf("%w, skipping", ErrNoRecentArticles)
 	}
 
-	str, err := f.Print(feeds)
+	text, err := f.PrintText(feeds)
 	if err != nil {
-		return "", nil
+		return nil, err
 	}
 
-	return str, nil
+	html, err := f.PrintHtml(feeds)
+	if err != nil {
+		return nil, err
+	}
+
+	return &MsgBody{
+		Text: text,
+		Html: html,
+	}, nil
 }
 
-func (f *Fetcher) SendEmail(username, email, msg string) error {
+func (f *Fetcher) SendEmail(username, email string, msg *MsgBody) error {
 	if email == "" {
 		return fmt.Errorf("(%s) does not have an email associated with their feed post", username)
 	}
@@ -244,12 +311,9 @@ func (f *Fetcher) SendEmail(username, email, msg string) error {
 	subject := "feeds.sh daily digest"
 	to := mail.NewEmail(username, email)
 
-	plainTextContent := msg
-	htmlContent := msg
+	// f.cfg.Logger.Infof("message body (%s)", plainTextContent)
 
-	f.cfg.Logger.Infof("message body (%s)", plainTextContent)
-
-	message := mail.NewSingleEmail(from, subject, to, plainTextContent, htmlContent)
+	message := mail.NewSingleEmail(from, subject, to, msg.Text, msg.Html)
 	client := sendgrid.NewSendClient(f.cfg.SendgridKey)
 
 	f.cfg.Logger.Infof("(%s) sending email digest", username)
@@ -258,7 +322,7 @@ func (f *Fetcher) SendEmail(username, email, msg string) error {
 		return err
 	}
 
-	f.cfg.Logger.Infof("(%s) email digest response: %v", username, response)
+	// f.cfg.Logger.Infof("(%s) email digest response: %v", username, response)
 
 	if len(response.Headers["X-Message-Id"]) > 0 {
 		f.cfg.Logger.Infof(

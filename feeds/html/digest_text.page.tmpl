@@ -1,0 +1,13 @@
+{{range .Feeds}}
+    {{.Title}}
+    {{.Link}}
+    {{.Description}}
+
+    {{range .Items}}
+    {{.Title}}
+    {{.Link}}
+    {{end}}
+
+    ---
+
+{{end}}

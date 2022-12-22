@@ -1,15 +1,16 @@
-feeds.sh daily digest
-
 {{range .Feeds}}
-    {{.Title}}
-    {{.Link}}
-    {{.Description}}
+<div style="margin-bottom: 10px;">
+    <h2 style="margin-bottom: 3px;"><a href="{{.Link}}">{{.Title}}</a></h2>
+    <div>{{.Description}}</div>
+</div>
 
+<div>
     {{range .Items}}
-        {{.Title}}
-        {{.Link}}
+    <div>
+        <a href="{{.Link}}">{{.Title}}</a>
+    </div>
     {{end}}
+</div>
 
-    ---
-
+<hr style="margin: 10px 0;" />
 {{end}}
