@@ -80,7 +80,7 @@ func (f *Fetcher) Validate(lastDigest *time.Time, parsed *shared.ListParsedText)
 
 	digestAt := digestOptionToTime(*lastDigest, parsed.DigestInterval)
 	now := time.Now().UTC()
-	if digestAt.Before(now) {
+	if digestAt.After(now) {
 		return fmt.Errorf("(%s) not time to digest, skipping", digestAt)
 	}
 	return nil
