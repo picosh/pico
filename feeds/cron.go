@@ -121,7 +121,8 @@ func (f *Fetcher) RunPost(user *db.User, post *db.Post) error {
 		return err
 	}
 
-	err = f.SendEmail(user.Name, parsed.Email, msgBody)
+	subject := fmt.Sprintf("%s feed digest", post.Title)
+	err = f.SendEmail(user.Name, parsed.Email, subject, msgBody)
 	if err != nil {
 		return err
 	}
@@ -307,13 +308,12 @@ func (f *Fetcher) FetchAll(urls []string, lastDigest *time.Time) (*MsgBody, erro
 	}, nil
 }
 
-func (f *Fetcher) SendEmail(username, email string, msg *MsgBody) error {
+func (f *Fetcher) SendEmail(username, email string, subject string, msg *MsgBody) error {
 	if email == "" {
 		return fmt.Errorf("(%s) does not have an email associated with their feed post", username)
 	}
 
 	from := mail.NewEmail("team pico", f.cfg.Email)
-	subject := "feeds.sh daily digest"
 	to := mail.NewEmail(username, email)
 
 	// f.cfg.Logger.Infof("message body (%s)", plainTextContent)
