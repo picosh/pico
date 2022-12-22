@@ -156,7 +156,12 @@ func (f *Fetcher) ParseURL(fp *gofeed.Parser, url string) (*gofeed.Feed, error) 
 	client := &http.Client{
 		Transport: &UserAgentTransport{http.DefaultTransport},
 	}
+
 	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
