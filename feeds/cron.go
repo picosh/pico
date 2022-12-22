@@ -60,19 +60,20 @@ func NewFetcher(dbpool db.DB, cfg *shared.ConfigSite) *Fetcher {
 func digestOptionToTime(date time.Time, interval string) time.Time {
 	day := 24 * time.Hour
 	if interval == "10min" {
-		date.Add(10 * time.Minute)
+		return date.Add(10 * time.Minute)
 	} else if interval == "1hour" {
-		date.Add(1 * time.Hour)
+		return date.Add(1 * time.Hour)
 	} else if interval == "12hour" {
-		date.Add(12 * time.Hour)
+		return date.Add(12 * time.Hour)
 	} else if interval == "1day" || interval == "" {
-		date.Add(day)
+		return date.Add(day)
 	} else if interval == "7day" {
-		date.Add(7 * day)
+		return date.Add(7 * day)
 	} else if interval == "30day" {
-		date.Add(30 * day)
+		return date.Add(30 * day)
+	} else {
+		return date
 	}
-	return date
 }
 
 func (f *Fetcher) Validate(lastDigest *time.Time, parsed *shared.ListParsedText) error {
