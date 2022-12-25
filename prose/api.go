@@ -662,9 +662,6 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		realUrl := cfg.FullPostURL(curl, post.Username, post.Slug)
-		if !curl.Subdomain && !curl.UsernameInRoute {
-			realUrl = fmt.Sprintf("%s://%s%s", cfg.Protocol, r.Host, realUrl)
-		}
 
 		item := &feeds.Item{
 			Id:          realUrl,
