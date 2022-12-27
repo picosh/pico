@@ -63,10 +63,12 @@ func digestOptionToTime(date time.Time, interval string) time.Time {
 		return date.Add(10 * time.Minute)
 	} else if interval == "1hour" {
 		return date.Add(1 * time.Hour)
+	} else if interval == "6hour" {
+		return date.Add(6 * time.Hour)
 	} else if interval == "12hour" {
 		return date.Add(12 * time.Hour)
 	} else if interval == "1day" || interval == "" {
-		return date.Add(day)
+		return date.Add(1 * day)
 	} else if interval == "7day" {
 		return date.Add(7 * day)
 	} else if interval == "30day" {
