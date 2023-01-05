@@ -26,6 +26,10 @@ var GB = MB * 1024
 var maxSize = 1 * GB
 var maxImgSize = 10 * MB
 
+func bytesToGB(size int) float32 {
+	return (((float32(size) / 1024) / 1024) / 1024)
+}
+
 type ctxUserKey struct{}
 
 func getUser(s ssh.Session) (*db.User, error) {
@@ -254,11 +258,23 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		return "", err
 	}
 
+	totalFileSize, err := h.DBPool.FindTotalSizeForUser(user.ID)
+	if err != nil {
+		return "", err
+	}
+
 	curl := shared.NewCreateURL(h.Cfg)
 	url := h.Cfg.FullPostURL(
 		curl,
 		user.Name,
 		metadata.Slug,
 	)
-	return url, nil
+	str := fmt.Sprintf(
+		"%s (space: %.2f/%.2fGB, %.2f%%)",
+		url,
+		bytesToGB(totalFileSize),
+		bytesToGB(maxSize),
+		(float32(totalFileSize)/float32(maxSize))*100,
+	)
+	return str, nil
 }
