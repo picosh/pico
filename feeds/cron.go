@@ -177,10 +177,6 @@ func (f *Fetcher) ParseURL(fp *gofeed.Parser, url string) (*gofeed.Feed, error) 
 		return nil, err
 	}
 
-	if strings.HasPrefix(url, "https://old") {
-		f.cfg.Logger.Infof("BODY: (%s)", string(body))
-	}
-
 	if resp.StatusCode < 200 || resp.StatusCode > 300 {
 		return nil, fmt.Errorf("fetching feed resulted in an error: %s %s", resp.Status, body)
 	}
