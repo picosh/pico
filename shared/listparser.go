@@ -16,6 +16,7 @@ var reIndent = regexp.MustCompile(`^[[:blank:]]+`)
 var DigestIntervalOpts = []string{
 	"10min",
 	"1hour",
+	"6hour",
 	"12hour",
 	"1day",
 	"7day",
