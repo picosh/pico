@@ -39,6 +39,12 @@ func (h *UploadImgHandler) validateImg(data *PostMetaData) (bool, error) {
 }
 
 func (h *UploadImgHandler) metaImg(data *PostMetaData) error {
+	// if the file is empty that means we should delete it
+	// so we can skip all the meta info
+	if data.FileSize == 0 {
+		return nil
+	}
+
 	bucket, err := h.Storage.UpsertBucket(data.User.ID)
 	if err != nil {
 		return err
