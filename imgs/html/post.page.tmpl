@@ -48,6 +48,20 @@
         </figure>
 
         <div class="md">{{.Contents}}</div>
+
+        <dl>
+            <dt>Hotlink</dt>
+            <dd><a href="{{.ImgURL}}">{{.ImgURL}}</a></dd>
+
+            <dt>Resize width (preserve aspect)</dt>
+            <dd><a href="{{.ImgURL}}/300x">{{.ImgURL}}/300x</a></dd>
+
+            <dt>Resize height (preserve aspect)</dt>
+            <dd><a href="{{.ImgURL}}/x300">{{.ImgURL}}/300x</a></dd>
+
+            <dt>Resize width and height</dt>
+            <dd><a href="{{.ImgURL}}/300x300">{{.ImgURL}}/300x300</a></dd>
+        </dl>
     </article>
 </main>
 {{template "footer" .}}
