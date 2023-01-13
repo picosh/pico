@@ -132,18 +132,6 @@ var (
 		cur_space = $3
 	ORDER BY publish_at DESC
 	LIMIT $4 OFFSET $5`, SelectPost)
-
-	/* sqlSelectUserPostsWithTags = fmt.Sprintf(`
-	SELECT %s, STRING_AGG(coalesce(post_tags.name, ''), ',') tags
-	FROM posts
-	LEFT OUTER JOIN app_users ON app_users.id = posts.user_id
-	LEFT OUTER JOIN post_tags ON post_tags.post_id = posts.id
-	WHERE
-		user_id = $1 AND
-		publish_at::date <= CURRENT_DATE AND
-		cur_space = $2
-	GROUP BY %s
-	ORDER BY publish_at DESC`, SelectPost, SelectPost) */
 )
 
 const (
@@ -1024,53 +1012,6 @@ func (me *PsqlDB) FindTagsForPost(postID string) ([]string, error) {
 
 	return tags, nil
 }
-
-/* func (me *PsqlDB) FindPostsWithTagsForUser(userID, space string) ([]*db.Post, error) {
-	var posts []*db.Post
-	rs, err := me.Db.Query(sqlSelectUserPostsWithTags, userID, space)
-	if err != nil {
-		return posts, err
-	}
-	for rs.Next() {
-		tagStr := ""
-		post := &db.Post{}
-		err := rs.Scan(
-			&post.ID,
-			&post.UserID,
-			&post.Username,
-			&post.Filename,
-			&post.Slug,
-			&post.Title,
-			&post.Text,
-			&post.Description,
-			&post.CreatedAt,
-			&post.PublishAt,
-			&post.UpdatedAt,
-			&post.Hidden,
-			&post.FileSize,
-			&post.MimeType,
-			&post.Shasum,
-			&tagStr,
-		)
-		if err != nil {
-			return nil, err
-		}
-		tags := strings.Split(tagStr, ",")
-		for _, tag := range tags {
-			tg := strings.TrimSpace(tag)
-			if tg == "" {
-				continue
-			}
-			post.Tags = append(post.Tags, tg)
-		}
-
-		posts = append(posts, post)
-	}
-	if rs.Err() != nil {
-		return posts, rs.Err()
-	}
-	return posts, nil
-} */
 
 func (me *PsqlDB) HasFeatureForUser(userID string, feature string) bool {
 	var id string
