@@ -2,6 +2,7 @@ package shared
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"image"
 	gif "image/gif"
@@ -99,6 +100,8 @@ func GetRatio(dimes string) (*Ratio, error) {
 	return ratio, nil
 }
 
+var AlreadyWebP = errors.New("image is already webp")
+
 func (h *ImgOptimizer) GetImage(r io.Reader, mimeType string) (image.Image, error) {
 	switch mimeType {
 	case "image/png":
@@ -109,6 +112,8 @@ func (h *ImgOptimizer) GetImage(r io.Reader, mimeType string) (image.Image, erro
 		return jpeg.Decode(r)
 	case "image/gif":
 		return gif.Decode(r)
+	case "image/webp":
+		return nil, AlreadyWebP
 	}
 
 	return nil, fmt.Errorf("(%s) not supported for optimization", mimeType)

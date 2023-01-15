@@ -2,6 +2,7 @@ package uploadimgs
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -73,18 +74,28 @@ func (h *UploadImgHandler) metaImg(data *PostMetaData) error {
 		opt.Lossless = false
 	}
 
+	var webpReader *bytes.Reader
 	contents := &bytes.Buffer{}
+
 	img, err := opt.GetImage(tee, data.MimeType)
-	if err != nil {
+	if errors.Is(err, shared.AlreadyWebP) {
+		h.Cfg.Logger.Infof("(%s) is already webp, skipping encoding", data.Filename)
+		webpReader = tee
+	} else if err != nil {
 		return err
+	} else {
+		err = opt.EncodeWebp(contents, img)
+		if err != nil {
+			return err
+		}
+
+		webpReader = bytes.NewReader(contents.Bytes())
 	}
 
-	err = opt.EncodeWebp(contents, img)
-	if err != nil {
-		return err
+	if webpReader == nil {
+		return fmt.Errorf("contents of webp file is nil")
 	}
 
-	webpReader := bytes.NewReader(contents.Bytes())
 	_, err = h.Storage.PutFile(
 		bucket,
 		fmt.Sprintf("%s.webp", shared.SanitizeFileExt(data.Filename)),
