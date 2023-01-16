@@ -31,7 +31,7 @@ func (c *UserAgentTransport) RoundTrip(r *http.Request) (*http.Response, error) 
 type FeedItem struct {
 	Title   string
 	Link    string
-	Content string
+	Content html.HTML
 }
 
 type Feed struct {
@@ -217,7 +217,7 @@ func (f *Fetcher) Fetch(fp *gofeed.Parser, url string, lastDigest *time.Time) (*
 		items = append(items, &FeedItem{
 			Title:   item.Title,
 			Link:    item.Link,
-			Content: item.Content,
+			Content: html.HTML(item.Content),
 		})
 	}
 

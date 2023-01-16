@@ -1,16 +1,41 @@
+<style>
+img {
+    max-width: 100%;
+    height: auto;
+}
+
+.feeds {
+    max-width: 100%;
+}
+</style>
+
+<div class="feeds">
 {{range .Feeds}}
 <div style="margin-bottom: 10px;">
-    <h2 style="margin-bottom: 3px;"><a href="{{.Link}}">{{.Title}}</a></h2>
+    <h1 style="margin-bottom: 3px;"><a href="{{.Link}}">{{.Title}}</a></h1>
     <div>{{.Description}}</div>
+</div>
+
+<div class="summary">
+    <h2>Summary</h2>
+    {{range .Items}}
+    <ul>
+        <li><a href="{{.Link}}">{{.Title}}</a></li>
+    </ul>
+    {{end}}
+    <hr />
 </div>
 
 <div>
     {{range .Items}}
     <div>
-        <a href="{{.Link}}">{{.Title}}</a>
+        <h1><a href="{{.Link}}">{{.Title}}</a></h1>
+        <div>{{.Content}}</div>
     </div>
+    <hr />
     {{end}}
 </div>
 
 <hr style="margin: 10px 0;" />
 {{end}}
+</div>
