@@ -31,7 +31,10 @@ img {
     <div>
         <h1><a href="{{.Link}}">{{.Title}}</a></h1>
         <div>{{.Description}}</div>
-        {{if $.Options.InlineContent}}<div>{{.Content}}</div>{{end}}
+        {{if $.Options.InlineContent}}
+        <div>{{.Description}}</div>
+        <div>{{.Content}}</div>
+        {{end}}
     </div>
     <hr />
     {{end}}
