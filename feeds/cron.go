@@ -6,7 +6,6 @@ import (
 	html "html/template"
 	"io"
 	"net/http"
-	"strconv"
 	"strings"
 	"text/template"
 	"time"
@@ -126,12 +125,7 @@ func (f *Fetcher) RunPost(user *db.User, post *db.Post) error {
 		urls = append(urls, url)
 	}
 
-	InlineContent, err := strconv.ParseBool(parsed.InlineContent)
-	if err != nil {
-		// its empty or its improperly configured, just send the content
-		InlineContent = true
-	}
-	msgBody, err := f.FetchAll(urls, InlineContent, post.Data.LastDigest)
+	msgBody, err := f.FetchAll(urls, parsed.InlineContent, post.Data.LastDigest)
 	if err != nil {
 		return err
 	}

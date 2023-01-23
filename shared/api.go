@@ -41,10 +41,6 @@ func GetUsernameFromRequest(r *http.Request) string {
 	return subdomain
 }
 
-func ServeRobots() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {}
-}
-
 func ServeFile(file string, contentType string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := GetLogger(r)
