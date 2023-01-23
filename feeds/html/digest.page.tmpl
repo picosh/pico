@@ -26,19 +26,18 @@ img {
     <hr />
 </div>
 
+{{if $.Options.InlineContent}}
 <div>
     {{range .Items}}
     <div>
         <h1><a href="{{.Link}}">{{.Title}}</a></h1>
         <div>{{.Description}}</div>
-        {{if $.Options.InlineContent}}
-        <div>{{.Description}}</div>
         <div>{{.Content}}</div>
-        {{end}}
     </div>
     <hr />
     {{end}}
 </div>
+{{end}}
 
 <hr style="margin: 10px 0;" />
 {{end}}
