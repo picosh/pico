@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"log"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -51,6 +52,7 @@ type ListMetaData struct {
 	ListType       string // https://developer.mozilla.org/en-US/docs/Web/CSS/list-style-type
 	DigestInterval string
 	Email          string
+	InlineContent  bool // allows content inlining to be disabled in feeds.sh emails
 }
 
 var urlToken = "=>"
@@ -128,6 +130,13 @@ func TokenToMetaField(meta *ListMetaData, token *SplitToken) error {
 		meta.DigestInterval = token.Value
 	} else if token.Key == "email" {
 		meta.Email = token.Value
+	} else if token.Key == "inline_content" {
+		v, err := strconv.ParseBool(token.Value)
+		if err != nil {
+			// its empty or its improperly configured, just send the content
+			v = true
+		}
+		meta.InlineContent = v
 	}
 
 	return nil

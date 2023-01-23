@@ -43,7 +43,12 @@ type Feed struct {
 }
 
 type DigestFeed struct {
-	Feeds []*Feed
+	Feeds   []*Feed
+	Options DigestOptions
+}
+
+type DigestOptions struct {
+	InlineContent bool
 }
 
 type Fetcher struct {
@@ -120,7 +125,7 @@ func (f *Fetcher) RunPost(user *db.User, post *db.Post) error {
 		urls = append(urls, url)
 	}
 
-	msgBody, err := f.FetchAll(urls, post.Data.LastDigest)
+	msgBody, err := f.FetchAll(urls, parsed.InlineContent, post.Data.LastDigest)
 	if err != nil {
 		return err
 	}
@@ -272,9 +277,9 @@ type MsgBody struct {
 	Text string
 }
 
-func (f *Fetcher) FetchAll(urls []string, lastDigest *time.Time) (*MsgBody, error) {
+func (f *Fetcher) FetchAll(urls []string, inlineContent bool, lastDigest *time.Time) (*MsgBody, error) {
 	fp := gofeed.NewParser()
-	feeds := &DigestFeed{}
+	feeds := &DigestFeed{Options: DigestOptions{InlineContent: inlineContent}}
 
 	for _, url := range urls {
 		feedTmpl, err := f.Fetch(fp, url, lastDigest)
