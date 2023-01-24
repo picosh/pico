@@ -20,15 +20,23 @@ import (
 
 var ErrNoRecentArticles = errors.New("no recent articles")
 
-var userAgent = "linux:feeds:v2"
-
 type UserAgentTransport struct {
 	http.RoundTripper
 }
 
 func (c *UserAgentTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	userAgent := "linux:feeds:v2 (by /u/pico-sh)"
 	r.Header.Set("User-Agent", userAgent)
+	r.Header.Set("Accept", "*/*")
 	return c.RoundTripper.RoundTrip(r)
+}
+
+var httpClient = http.Client{
+	Transport: &UserAgentTransport{
+		&http.Transport{
+			TLSClientConfig: &tls.Config{},
+		},
+	},
 }
 
 type FeedItem struct {
@@ -166,20 +174,12 @@ func (f *Fetcher) RunUser(user *db.User) error {
 }
 
 func (f *Fetcher) ParseURL(fp *gofeed.Parser, url string) (*gofeed.Feed, error) {
-	client := &http.Client{
-		Transport: &UserAgentTransport{
-			&http.Transport{
-				TLSClientConfig: &tls.Config{},
-			},
-		},
-	}
-
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := client.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
