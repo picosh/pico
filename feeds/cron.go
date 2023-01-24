@@ -1,6 +1,7 @@
 package feeds
 
 import (
+	"crypto/tls"
 	"errors"
 	"fmt"
 	html "html/template"
@@ -19,12 +20,14 @@ import (
 
 var ErrNoRecentArticles = errors.New("no recent articles")
 
+var userAgent = "linux:feeds:v2"
+
 type UserAgentTransport struct {
 	http.RoundTripper
 }
 
 func (c *UserAgentTransport) RoundTrip(r *http.Request) (*http.Response, error) {
-	r.Header.Set("User-Agent", "linux:feeds:v1")
+	r.Header.Set("User-Agent", userAgent)
 	return c.RoundTripper.RoundTrip(r)
 }
 
@@ -164,7 +167,11 @@ func (f *Fetcher) RunUser(user *db.User) error {
 
 func (f *Fetcher) ParseURL(fp *gofeed.Parser, url string) (*gofeed.Feed, error) {
 	client := &http.Client{
-		Transport: &UserAgentTransport{http.DefaultTransport},
+		Transport: &UserAgentTransport{
+			&http.Transport{
+				TLSClientConfig: &tls.Config{},
+			},
+		},
 	}
 
 	req, err := http.NewRequest("GET", url, nil)
