@@ -93,7 +93,6 @@ func getPostsForUser(r *http.Request, user *db.User, tag string, num int) ([]*db
 	cfg := shared.GetCfg(r)
 	var err error
 
-	posts := make([]*db.Post, 0)
 	pager := &db.Pager{Num: num, Page: 0}
 	var p *db.Paginate[*db.Post]
 	if tag == "" {
@@ -101,7 +100,7 @@ func getPostsForUser(r *http.Request, user *db.User, tag string, num int) ([]*db
 	} else {
 		p, err = dbpool.FindUserPostsByTag(pager, tag, user.ID, cfg.Space)
 	}
-	posts = p.Data
+	posts := p.Data
 
 	if err != nil {
 		return posts, err

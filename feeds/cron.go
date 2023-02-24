@@ -223,7 +223,7 @@ func (f *Fetcher) Fetch(fp *gofeed.Parser, url string, lastDigest *time.Time) (*
 	items := []*FeedItem{}
 	// we only want to return feed items published since the last digest time we fetched
 	for _, item := range feed.Items {
-		if lastDigest != nil && item.PublishedParsed.Before(*lastDigest) {
+		if item == nil || (item.PublishedParsed != nil && lastDigest != nil && item.PublishedParsed.Before(*lastDigest)) {
 			continue
 		}
 
