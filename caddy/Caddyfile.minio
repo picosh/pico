@@ -2,6 +2,7 @@
 	reverse_proxy minio:9000
 	tls {$APP_EMAIL} {
 		dns cloudflare {$CF_API_TOKEN}
+		resolvers 1.1.1.1
 	}
 	encode zstd gzip
 
