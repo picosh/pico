@@ -9,30 +9,34 @@ import (
 )
 
 type styledKey struct {
-	styles    common.Styles
-	date      string
-	gutter    string
-	postLabel string
-	dateLabel string
-	dateVal   string
-	title     string
-	urlLabel  string
-	url       string
+	styles     common.Styles
+	date       string
+	gutter     string
+	postLabel  string
+	dateLabel  string
+	dateVal    string
+	title      string
+	urlLabel   string
+	url        string
+	views      int
+	viewsLabel string
 }
 
 func (m Model) newStyledKey(styles common.Styles, post *db.Post, urls config.ConfigURL) styledKey {
 	publishAt := post.PublishAt
 	// Default state
 	return styledKey{
-		styles:    styles,
-		gutter:    " ",
-		postLabel: "post:",
-		date:      publishAt.String(),
-		dateLabel: "publish_at:",
-		dateVal:   styles.LabelDim.Render(publishAt.Format("02 Jan, 2006")),
-		title:     post.Title,
-		urlLabel:  "url:",
-		url:       urls.PostURL(post.Username, post.Slug),
+		styles:     styles,
+		gutter:     " ",
+		postLabel:  "post:",
+		date:       publishAt.String(),
+		dateLabel:  "publish_at:",
+		dateVal:    styles.LabelDim.Render(publishAt.Format("02 Jan, 2006")),
+		title:      post.Title,
+		urlLabel:   "url:",
+		url:        urls.PostURL(post.Username, post.Slug),
+		viewsLabel: "views:",
+		views:      post.Views,
 	}
 }
 
@@ -41,6 +45,7 @@ func (k *styledKey) selected() {
 	k.gutter = common.VerticalLine(common.StateSelected)
 	k.postLabel = k.styles.Label.Render("post:")
 	k.dateLabel = k.styles.Label.Render("publish_at:")
+	k.viewsLabel = k.styles.Label.Render("views:")
 	k.urlLabel = k.styles.Label.Render("url:")
 }
 
@@ -50,6 +55,7 @@ func (k *styledKey) deleting() {
 	k.postLabel = k.styles.Delete.Render("post:")
 	k.dateLabel = k.styles.Delete.Render("publish_at:")
 	k.urlLabel = k.styles.Delete.Render("url:")
+	k.viewsLabel = k.styles.Delete.Render("views:")
 	k.title = k.styles.DeleteDim.Render(k.title)
 }
 
@@ -61,9 +67,10 @@ func (k styledKey) render(state postState) string {
 		k.deleting()
 	}
 	return fmt.Sprintf(
-		"%s %s %s\n%s %s %s\n%s %s %s\n\n",
+		"%s %s %s\n%s %s %s\n%s %s %d\n%s %s %s\n\n",
 		k.gutter, k.postLabel, k.title,
 		k.gutter, k.dateLabel, k.dateVal,
+		k.gutter, k.viewsLabel, k.views,
 		k.gutter, k.urlLabel, k.url,
 	)
 }
