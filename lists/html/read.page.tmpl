@@ -19,7 +19,7 @@
         <div class="font-italic text-sm post-date">popular tags</div>
         <div class="flex-1">
         {{range .Tags}}
-        <a href="/read?tag={{.}}">#{{.}}</a>
+        <span class="text-md"><a href="/read?tag={{.}}">#{{.}}</a></span>
         {{end}}
         </div>
     </div>
@@ -31,11 +31,11 @@
     </div>
 
     {{range .Posts}}
-    <article class="my">
+    <article class="my-2">
         <div class="flex items-center">
-            <time datetime="{{.UpdatedAtISO}}" class="font-italic text-sm post-date">{{.UpdatedTimeAgo}}</time>
+            <time datetime="{{.UpdatedAtISO}}" class="text-sm post-date">{{.UpdatedTimeAgo}}</time>
             <div class="flex-1">
-                <div class="inline"><a href="{{.URL}}">{{.Title}}</a></div>
+                <span class="text-lg"><a href="{{.URL}}">{{.Title}}</a></span>
                 <address class="text-sm inline">
                     <a href="{{.BlogURL}}" class="link-grey">({{.Username}})</a>
                 </address>

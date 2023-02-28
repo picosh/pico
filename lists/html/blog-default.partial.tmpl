@@ -5,10 +5,10 @@
     <nav>
         {{range .Header.Nav}}
             {{if .IsURL}}
-            <a href="{{.URL}}" class="text-lg">{{.Value}}</a> |
+            <a href="{{.URL}}" class="text-md">{{.Value}}</a> |
             {{end}}
         {{end}}
-        <a href="{{.RSSURL}}" class="text-lg">rss</a>
+        <a href="{{.RSSURL}}" class="text-md">rss</a>
     </nav>
     <hr />
 </header>
@@ -27,10 +27,10 @@
             <a href="{{.URL}}">clear filters</a>
         {{end}}
         {{range .Posts}}
-        <article class="my">
+        <article class="my-2">
             <div class="flex items-center">
-                <time datetime="{{.UpdatedAtISO}}" class="font-italic text-sm post-date">{{.UpdatedTimeAgo}}</time>
-                <div class="font-bold flex-1"><a href="{{.URL}}">{{.Title}}</a></div>
+                <time datetime="{{.UpdatedAtISO}}" class="text-sm post-date">{{.UpdatedAt}}</time>
+                <span class="text-lg flex-1"><a href="{{.URL}}">{{.Title}}</a></span>
             </div>
         </article>
         {{end}}

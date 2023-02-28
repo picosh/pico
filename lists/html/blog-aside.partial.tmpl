@@ -33,10 +33,10 @@
 
         <div class="posts">
         {{range .Posts}}
-            <article class="my">
+            <article class="my-2">
                 <div class="flex items-center">
-                    <time datetime="{{.PublishAtISO}}" class="font-italic text-sm post-date">{{.PublishAt}}</time>
-                    <div class="font-bold flex-1"><a href="{{.URL}}">{{.Title}}</a></div>
+                    <time datetime="{{.PublishAtISO}}" class="text-sm post-date">{{.PublishdAt}}</time>
+                    <span class="text-lg flex-1"><a href="{{.URL}}">{{.Title}}</a></span>
                 </div>
             </article>
         {{end}}
@@ -55,10 +55,10 @@
         <nav>
             {{range .Header.Nav}}
                 {{if .IsURL}}
-                <a href="{{.URL}}" class="text-lg">{{.Value}}</a> ·
+                <a href="{{.URL}}" class="text-md">{{.Value}}</a> ·
                 {{end}}
             {{end}}
-            <a href="{{.RSSURL}}" class="text-lg">rss</a>
+            <a href="{{.RSSURL}}" class="text-md">rss</a>
         </nav>
     </aside>
 </main>
