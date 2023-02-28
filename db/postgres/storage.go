@@ -20,7 +20,7 @@ var PAGER_SIZE = 15
 
 var SelectPost = `
 	posts.id, user_id, app_users.name, filename, slug, title, text, description,
-	posts.created_at, publish_at, posts.updated_at, hidden, file_size, mime_type, shasum, data, expires_at`
+	posts.created_at, publish_at, posts.updated_at, hidden, file_size, mime_type, shasum, data, expires_at, views`
 
 var (
 	sqlSelectPosts = fmt.Sprintf(`
@@ -268,6 +268,7 @@ func CreatePostFromRow(r RowScanner) (*db.Post, error) {
 		&post.Shasum,
 		&post.Data,
 		&post.ExpiresAt,
+		&post.Views,
 	)
 	if err != nil {
 		return nil, err
@@ -296,6 +297,7 @@ func CreatePostWithTagsFromRow(r RowScanner) (*db.Post, error) {
 		&post.Shasum,
 		&post.Data,
 		&post.ExpiresAt,
+		&post.Views,
 		&tagStr,
 	)
 	if err != nil {
