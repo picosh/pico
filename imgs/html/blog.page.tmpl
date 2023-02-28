@@ -21,6 +21,8 @@
 {{if .Header.Bio}}<meta property="twitter:description" content="{{.Header.Bio}}">{{end}}
 <meta name="twitter:image" content="https://{{.Site.Domain}}/card.png" />
 <meta name="twitter:image:src" content="https://{{.Site.Domain}}/card.png" />
+
+<link rel="alternate" href="{{.RSSURL}}" type="application/rss+xml" title="RSS feed for {{.Header.Title}}" />
 {{end}}
 
 {{define "attrs"}}id="blog"{{end}}

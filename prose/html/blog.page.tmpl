@@ -34,6 +34,7 @@
 <meta property="twitter:title" content="{{.Header.Title}}">
 {{if .Header.Bio}}<meta property="twitter:description" content="{{.Header.Bio}}">{{end}}
 
+<link rel="alternate" href="{{.RSSURL}}" type="application/rss+xml" title="RSS feed for {{.Header.Title}}" />
 <link rel="stylesheet" href="/syntax.css" />
 {{if .HasCSS}}<link rel="stylesheet" href="{{.CssURL}}" />{{end}}
 {{end}}
