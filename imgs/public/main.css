@@ -177,7 +177,7 @@ header {
 }
 
 p {
-  margin: 1rem 0;
+  margin: 0.8rem 0;
 }
 
 article {
@@ -257,6 +257,11 @@ figure {
   line-height: 1.15;
 }
 
+.text-md {
+  font-size: 1.15rem;
+  line-height: 1.15;
+}
+
 .text-sm {
   font-size: 0.875rem;
 }
@@ -289,6 +294,10 @@ figure {
   margin: 0;
 }
 
+.mt {
+  margin-top: 0.5rem;
+}
+
 .mb {
   margin-bottom: 0.5rem;
 }
@@ -304,6 +313,11 @@ figure {
 .my {
   margin-top: 0.5rem;
   margin-bottom: 0.5rem;
+}
+
+.my-2 {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
 }
 
 .mx {

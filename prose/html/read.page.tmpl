@@ -4,6 +4,7 @@
 
 {{define "meta"}}
 <meta name="description" content="discover interesting posts" />
+<link rel="alternate" href="/rss" type="application/rss+xml" title="RSS feed for prose.sh" />
 {{end}}
 
 {{define "attrs"}}{{end}}
@@ -20,23 +21,23 @@
         <div class="font-italic text-sm post-date">popular tags</div>
         <div class="flex-1">
         {{range .Tags}}
-        <a href="/read?tag={{.}}">#{{.}}</a>
+        <span class="text-md"><a href="/read?tag={{.}}">#{{.}}</a></span>
         {{end}}
         </div>
     </div>
     {{if .HasFilter}}<a href="/read">clear filter</a>{{end}}
 
-    <div class="mb">
+    <div class="mt">
         {{if .PrevPage}}<a href="{{.PrevPage}}">prev</a>{{else}}<span class="text-grey">prev</span>{{end}}
         {{if .NextPage}}<a href="{{.NextPage}}">next</a>{{else}}<span class="text-grey">next</span>{{end}}
     </div>
 
     {{range .Posts}}
-    <article class="my">
+    <article class="my-2">
         <div class="flex items-center">
-            <time datetime="{{.PublishAtISO}}" class="font-italic text-sm post-date">{{.PublishAt}}</time>
+            <time datetime="{{.PublishAtISO}}" class="font text-sm post-date">{{.PublishAt}}</time>
             <div class="flex-1">
-                <div class="inline"><a href="{{.URL}}">{{.Title}}</a></div>
+                <span class="text-lg"><a href="{{.URL}}">{{.Title}}</a></span>
                 <address class="text-sm inline">
                     <a href="{{.BlogURL}}" class="link-grey">({{.Username}})</a>
                 </address>
