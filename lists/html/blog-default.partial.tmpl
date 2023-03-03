@@ -29,7 +29,7 @@
         {{range .Posts}}
         <article class="my-2">
             <div class="flex items-center">
-                <time datetime="{{.UpdatedAtISO}}" class="text-sm post-date">{{.UpdatedAt}}</time>
+                <time datetime="{{.PublishAtISO}}" class="text-sm post-date">{{.PublishAt}}</time>
                 <span class="text-lg flex-1"><a href="{{.URL}}">{{.Title}}</a></span>
             </div>
         </article>
