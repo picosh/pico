@@ -3,6 +3,12 @@
 {{define "title"}}{{.PageTitle}}{{end}}
 
 {{define "meta"}}
+{{if .Header.Favicon}}
+<link rel="icon" href="{{.Header.Favicon}}">
+{{else}}
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+{{end}}
+
 <meta name="description" content="{{if .Header.Bio}}{{.Header.Bio}}{{else}}{{.Header.Title}}{{end}}" />
 
 <meta property="og:type" content="website">

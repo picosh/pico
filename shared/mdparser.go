@@ -34,6 +34,7 @@ type MetaData struct {
 	Layout      string
 	Image       string
 	ImageCard   string
+	Favicon     string
 	Hidden      bool
 }
 
@@ -213,8 +214,16 @@ func ParseText(text string, linkify Linkify) (*ParsedText, error) {
 	} else if strings.HasPrefix(parsed.Image, "./") {
 		parsed.Image = linkify.Create(parsed.Image[1:])
 	}
+
 	parsed.MetaData.ImageCard = toString(metaData["card"])
 	parsed.MetaData.Hidden = toBool(metaData["draft"])
+
+	parsed.MetaData.Favicon = toString(metaData["favicon"])
+	if strings.HasPrefix(parsed.Favicon, "/") {
+		parsed.Favicon = linkify.Create(parsed.Favicon)
+	} else if strings.HasPrefix(parsed.Favicon, "./") {
+		parsed.Favicon = linkify.Create(parsed.Favicon[1:])
+	}
 
 	var publishAt *time.Time = nil
 	var err error

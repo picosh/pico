@@ -79,6 +79,7 @@ type PostPageData struct {
 	Image        template.URL
 	ImageCard    string
 	Footer       template.HTML
+	Favicon      template.URL
 }
 
 type TransparencyPageData struct {
@@ -94,6 +95,7 @@ type HeaderTxt struct {
 	Layout    string
 	Image     template.URL
 	ImageCard string
+	Favicon   template.URL
 }
 
 type ReadmeTxt struct {
@@ -208,6 +210,7 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 		headerTxt.Layout = parsedText.Layout
 		headerTxt.Image = template.URL(parsedText.Image)
 		headerTxt.ImageCard = parsedText.ImageCard
+		headerTxt.Favicon = template.URL(parsedText.Favicon)
 		if parsedText.Title != "" {
 			headerTxt.Title = parsedText.Title
 		}
@@ -339,6 +342,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	blogName := GetBlogName(username)
 	curl := shared.CreateURLFromRequest(cfg, r)
 
+	favicon := ""
 	ogImage := ""
 	ogImageCard := ""
 	hasCSS := false
@@ -363,6 +367,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			ogImage = readmeParsed.Image
 			ogImageCard = readmeParsed.ImageCard
+			favicon = readmeParsed.Favicon
 		}
 
 		if parsedText.Image != "" {
@@ -416,6 +421,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			Tags:         parsedText.Tags,
 			Image:        template.URL(ogImage),
 			ImageCard:    ogImageCard,
+			Favicon:      template.URL(favicon),
 			Footer:       footerHTML,
 		}
 	} else {
