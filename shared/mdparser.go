@@ -31,6 +31,7 @@ type MetaData struct {
 	Description string
 	Nav         []Link
 	Tags        []string
+	Aliases     []string
 	Layout      string
 	Image       string
 	ImageCard   string
@@ -98,6 +99,24 @@ func toLinks(obj interface{}) ([]Link, error) {
 	}
 
 	return links, nil
+}
+
+func toAliases(obj interface{}) ([]string, error) {
+	arr := make([]string, 0)
+	if obj == nil {
+		return arr, nil
+	}
+
+	switch raw := obj.(type) {
+	case []interface{}:
+		for _, alias := range raw {
+			arr = append(arr, alias.(string))
+		}
+	default:
+		return arr, fmt.Errorf("unsupported type for `aliases` variable: %T", raw)
+	}
+
+	return arr, nil
 }
 
 func toTags(obj interface{}) ([]string, error) {
@@ -171,7 +190,8 @@ func (r *ImgRender) renderImage(w util.BufWriter, source []byte, node ast.Node, 
 func ParseText(text string, linkify Linkify) (*ParsedText, error) {
 	parsed := ParsedText{
 		MetaData: &MetaData{
-			Tags: []string{},
+			Tags:    []string{},
+			Aliases: []string{},
 		},
 	}
 	var buf bytes.Buffer
@@ -242,6 +262,12 @@ func ParseText(text string, linkify Linkify) (*ParsedText, error) {
 		return &parsed, err
 	}
 	parsed.MetaData.Nav = nav
+
+	aliases, err := toAliases(metaData["aliases"])
+	if err != nil {
+		return &parsed, err
+	}
+	parsed.MetaData.Aliases = aliases
 
 	tags, err := toTags(metaData["tags"])
 	if err != nil {
