@@ -35,6 +35,7 @@ type PostMetaData struct {
 	Tags      []string
 	User      *db.User
 	FileEntry *utils.FileEntry
+	Aliases   []string
 }
 
 type ScpFileHooks interface {
@@ -262,6 +263,18 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 			return "", fmt.Errorf("error for %s: %v", filename, err)
 		}
 
+		if len(metadata.Aliases) > 0 {
+			logger.Infof(
+				"Found (%s) post aliases, replacing with old aliases",
+				strings.Join(metadata.Aliases, ","),
+			)
+			err = h.DBPool.ReplaceAliasesForPost(metadata.Aliases, post.ID)
+			if err != nil {
+				logger.Errorf("error for %s: %v", filename, err)
+				return "", fmt.Errorf("error for %s: %v", filename, err)
+			}
+		}
+
 		if len(metadata.Tags) > 0 {
 			logger.Infof(
 				"Found (%s) post tags, replacing with old tags",
@@ -304,6 +317,16 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 			strings.Join(metadata.Tags, ","),
 		)
 		err = h.DBPool.ReplaceTagsForPost(metadata.Tags, post.ID)
+		if err != nil {
+			logger.Errorf("error for %s: %v", filename, err)
+			return "", fmt.Errorf("error for %s: %v", filename, err)
+		}
+
+		logger.Infof(
+			"Found (%s) post aliases, replacing with old aliases",
+			strings.Join(metadata.Aliases, ","),
+		)
+		err = h.DBPool.ReplaceAliasesForPost(metadata.Aliases, post.ID)
 		if err != nil {
 			logger.Errorf("error for %s: %v", filename, err)
 			return "", fmt.Errorf("error for %s: %v", filename, err)

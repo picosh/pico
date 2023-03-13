@@ -59,6 +59,7 @@ func (p *MarkdownHooks) FileMeta(data *filehandlers.PostMetaData) error {
 		data.Title = parsedText.Title
 	}
 
+	data.Aliases = parsedText.Aliases
 	data.Tags = parsedText.Tags
 	data.Description = parsedText.Description
 

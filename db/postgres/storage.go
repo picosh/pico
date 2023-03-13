@@ -151,7 +151,8 @@ const (
 	sqlSelectFeatureForUser = `SELECT id FROM feature_flags WHERE user_id = $1 AND name = $2`
 	sqlSelectSizeForUser    = `SELECT sum(file_size) FROM posts WHERE user_id = $1`
 
-	sqlSelectTagPostCount = `
+	sqlSelectPostIdByAliasSlug = `SELECT post_id FROM post_aliases WHERE slug = $1`
+	sqlSelectTagPostCount      = `
 	SELECT count(posts.id)
 	FROM posts
 	LEFT OUTER JOIN post_tags ON post_tags.post_id = posts.id
@@ -222,8 +223,9 @@ const (
 		file_size, mime_type, shasum, data, expires_at)
 	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 	RETURNING id`
-	sqlInsertUser = `INSERT INTO app_users DEFAULT VALUES returning id`
-	sqlInsertTag  = `INSERT INTO post_tags (post_id, name) VALUES($1, $2) RETURNING id;`
+	sqlInsertUser    = `INSERT INTO app_users DEFAULT VALUES returning id`
+	sqlInsertTag     = `INSERT INTO post_tags (post_id, name) VALUES($1, $2) RETURNING id;`
+	sqlInsertAliases = `INSERT INTO post_aliases (post_id, slug) VALUES($1, $2) RETURNING id;`
 
 	sqlUpdatePost = `
 	UPDATE posts
@@ -233,10 +235,11 @@ const (
 	sqlUpdateUserName = `UPDATE app_users SET name = $1 WHERE id = $2`
 	sqlIncrementViews = `UPDATE posts SET views = views + 1 WHERE id = $1 RETURNING views`
 
-	sqlRemoveTagsByPost = `DELETE FROM post_tags WHERE post_id = $1`
-	sqlRemovePosts      = `DELETE FROM posts WHERE id = ANY($1::uuid[])`
-	sqlRemoveKeys       = `DELETE FROM public_keys WHERE id = ANY($1::uuid[])`
-	sqlRemoveUsers      = `DELETE FROM app_users WHERE id = ANY($1::uuid[])`
+	sqlRemoveAliasesByPost = `DELETE FROM post_aliases WHERE post_id = $1`
+	sqlRemoveTagsByPost    = `DELETE FROM post_tags WHERE post_id = $1`
+	sqlRemovePosts         = `DELETE FROM posts WHERE id = ANY($1::uuid[])`
+	sqlRemoveKeys          = `DELETE FROM public_keys WHERE id = ANY($1::uuid[])`
+	sqlRemoveUsers         = `DELETE FROM app_users WHERE id = ANY($1::uuid[])`
 )
 
 type PsqlDB struct {
@@ -583,7 +586,15 @@ func (me *PsqlDB) FindPostWithSlug(slug string, user_id string, space string) (*
 	r := me.Db.QueryRow(sqlSelectPostWithSlug, slug, user_id, space)
 	post, err := CreatePostWithTagsFromRow(r)
 	if err != nil {
-		return nil, err
+		// attempt to find post inside post_aliases
+		alias := me.Db.QueryRow(sqlSelectPostIdByAliasSlug, slug)
+		postID := ""
+		err := alias.Scan(&postID)
+		if err != nil {
+			return nil, err
+		}
+
+		return me.FindPost(postID)
 	}
 
 	return post, nil
@@ -907,6 +918,74 @@ func (me *PsqlDB) ReplaceTagsForPost(tags []string, postID string) error {
 	}
 
 	_, err = me.insertTagsForPost(tx, tags, postID)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit()
+	return err
+}
+
+func (me *PsqlDB) removeAliasesForPost(tx *sql.Tx, postID string) error {
+	_, err := tx.Exec(sqlRemoveAliasesByPost, postID)
+	return err
+}
+
+func (me *PsqlDB) insertAliasesForPost(tx *sql.Tx, aliases []string, postID string) ([]string, error) {
+	// hardcoded
+	denyList := []string{
+		"rss",
+		"rss.xml",
+		"atom.xml",
+		"feed.xml",
+		"styles.css",
+		"main.css",
+		"prose.css",
+		"syntax.css",
+		"card.png",
+		"favicon-16x16.png",
+		"favicon-32x32.png",
+		"apple-touch-icon.png",
+		"favicon.ico",
+		"robots.txt",
+	}
+
+	ids := make([]string, 0)
+	for _, alias := range aliases {
+		if slices.Contains(denyList, alias) {
+			me.Logger.Infof(
+				"(%s) is in the deny list for aliases because it conflicts with a static route, skipping",
+				alias,
+			)
+			continue
+		}
+		id := ""
+		err := tx.QueryRow(sqlInsertAliases, postID, alias).Scan(&id)
+		if err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+
+	return ids, nil
+}
+
+func (me *PsqlDB) ReplaceAliasesForPost(aliases []string, postID string) error {
+	ctx := context.Background()
+	tx, err := me.Db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		err = tx.Rollback()
+	}()
+
+	err = me.removeAliasesForPost(tx, postID)
+	if err != nil {
+		return err
+	}
+
+	_, err = me.insertAliasesForPost(tx, aliases, postID)
 	if err != nil {
 		return err
 	}

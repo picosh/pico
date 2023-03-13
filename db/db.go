@@ -146,7 +146,6 @@ type DB interface {
 	FindPostWithSlug(slug string, userID string, space string) (*Post, error)
 	FindAllPosts(pager *Pager, space string) (*Paginate[*Post], error)
 	FindAllUpdatedPosts(pager *Pager, space string) (*Paginate[*Post], error)
-	// FindPostsWithTagsForUser(userID, space string) ([]*Post, error)
 	InsertPost(post *Post) (*Post, error)
 	UpdatePost(post *Post) (*Post, error)
 	RemovePosts(postIDs []string) error
@@ -156,6 +155,8 @@ type DB interface {
 	FindPostsByTag(pager *Pager, tag, space string) (*Paginate[*Post], error)
 	FindPopularTags(space string) ([]string, error)
 	FindTagsForPost(postID string) ([]string, error)
+
+	ReplaceAliasesForPost(aliases []string, postID string) error
 
 	AddViewCount(postID string) (int, error)
 
