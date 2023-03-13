@@ -112,6 +112,11 @@ func toAliases(obj interface{}) ([]string, error) {
 		for _, alias := range raw {
 			arr = append(arr, alias.(string))
 		}
+	case string:
+		aliases := strings.Split(raw, " ")
+		for _, alias := range aliases {
+			arr = append(arr, strings.TrimSpace(alias))
+		}
 	default:
 		return arr, fmt.Errorf("unsupported type for `aliases` variable: %T", raw)
 	}
