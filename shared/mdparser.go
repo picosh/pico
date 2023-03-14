@@ -18,6 +18,7 @@ import (
 	"github.com/yuin/goldmark/renderer"
 	ghtml "github.com/yuin/goldmark/renderer/html"
 	"github.com/yuin/goldmark/util"
+  mathjax "github.com/litao91/goldmark-mathjax"
 )
 
 type Link struct {
@@ -212,6 +213,7 @@ func ParseText(text string, linkify Linkify) (*ParsedText, error) {
 			extension.Footnote,
 			meta.Meta,
 			hili,
+      mathjax.MathJax,
 		),
 		goldmark.WithParserOptions(
 			parser.WithAutoHeadingID(),

@@ -66,6 +66,7 @@ require (
 	github.com/klauspost/cpuid/v2 v2.2.2 // indirect
 	github.com/kr/fs v0.1.0 // indirect
 	github.com/kr/pretty v0.3.0 // indirect
+	github.com/litao91/goldmark-mathjax v0.0.0-20210217064022-a43cf739a50f // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mattn/go-isatty v0.0.16 // indirect
 	github.com/mattn/go-localereader v0.0.1 // indirect

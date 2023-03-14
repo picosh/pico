@@ -42,6 +42,10 @@
 
 <link rel="stylesheet" href="/syntax.css" />
 {{if .HasCSS}}<link rel="stylesheet" href="{{.CssURL}}" />{{end}}
+
+<script type="text/javascript" async
+  src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/MathJax.js?config=TeX-MML-AM_CHTML">
+</script>
 {{end}}
 
 {{define "attrs"}}id="post" class="{{.Slug}}"{{end}}
