@@ -53,12 +53,14 @@
         {{end}}
 
         <nav>
-            {{range .Header.Nav}}
-                {{if .IsURL}}
-                <a href="{{.URL}}" class="text-md">{{.Value}}</a> ·
+            <ul>
+                {{range .Header.Nav}}
+                    {{if .IsURL}}
+                    <li><a href="{{.URL}}" class="text-md">{{.Value}}</a></li>
+                    {{end}}
                 {{end}}
-            {{end}}
-            <a href="{{.RSSURL}}" class="text-md">rss</a>
+                <li><a href="{{.RSSURL}}" class="text-md">rss</a></li>
+            </ul>
         </nav>
     </aside>
 </main>

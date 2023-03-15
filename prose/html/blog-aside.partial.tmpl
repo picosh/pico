@@ -44,10 +44,12 @@
         </section>
         {{end}}
         <nav>
-            {{range .Header.Nav}}
-            <a href="{{.URL}}" class="text-md">{{.Text}}</a> ·
-            {{end}}
-            <a href="{{.RSSURL}}" class="text-md">rss</a>
+            <ul>
+                {{range .Header.Nav}}
+                <li><a href="{{.URL}}" class="text-md">{{.Text}}</a></li>
+                {{end}}
+                <li><a href="{{.RSSURL}}" class="text-md">rss</a></li>
+            </ul>
         </nav>
     </aside>
 </main>
