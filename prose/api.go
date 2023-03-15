@@ -844,6 +844,8 @@ func createMainRoutes(staticRoutes []shared.Route) []shared.Route {
 		shared.NewRoute("GET", "/([^/]+)/rss", rssBlogHandler),
 		shared.NewRoute("GET", "/([^/]+)/rss.xml", rssBlogHandler),
 		shared.NewRoute("GET", "/([^/]+)/atom.xml", rssBlogHandler),
+		shared.NewRoute("GET", "/([^/]+)/atom", rssBlogHandler),
+		shared.NewRoute("GET", "/([^/]+)/blog/index.xml", rssBlogHandler),
 		shared.NewRoute("GET", "/([^/]+)/feed.xml", rssBlogHandler),
 		shared.NewRoute("GET", "/([^/]+)/_styles.css", blogStyleHandler),
 		shared.NewRoute("GET", "/([^/]+)/(.+)", postHandler),
@@ -861,6 +863,8 @@ func createSubdomainRoutes(staticRoutes []shared.Route) []shared.Route {
 		shared.NewRoute("GET", "/rss.xml", rssBlogHandler),
 		shared.NewRoute("GET", "/atom.xml", rssBlogHandler),
 		shared.NewRoute("GET", "/feed.xml", rssBlogHandler),
+		shared.NewRoute("GET", "/atom", rssBlogHandler),
+		shared.NewRoute("GET", "/blog/index.xml", rssBlogHandler),
 	}
 
 	routes = append(

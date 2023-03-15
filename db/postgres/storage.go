@@ -948,6 +948,8 @@ func (me *PsqlDB) insertAliasesForPost(tx *sql.Tx, aliases []string, postID stri
 		"apple-touch-icon.png",
 		"favicon.ico",
 		"robots.txt",
+		"atom",
+		"blog/index.xml",
 	}
 
 	ids := make([]string, 0)
