@@ -12,12 +12,12 @@
                 {{.Readme.Contents}}
             </section>
             {{end}}
-            <div>
+            <ul>
                 {{range .Header.Nav}}
-                <a href="{{.URL}}" class="text-lg">{{.Text}}</a> ·
+                <li><a href="{{.URL}}" class="text-lg">{{.Text}}</a></li>
                 {{end}}
-                <a href="{{.RSSURL}}" class="text-lg">rss</a>
-            </div>
+                <li><a href="{{.RSSURL}}" class="text-lg">rss</a></li>
+            </ul>
             <hr />
         </div>
 
