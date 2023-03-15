@@ -62,11 +62,7 @@ func GetImageForOptimization(r io.Reader, mimeType string) (image.Image, error) 
 
 func IsWebOptimized(mimeType string) bool {
 	switch mimeType {
-	case "image/png":
-	case "image/jpeg":
-	case "image/jpg":
-	case "image/gif":
-	case "image/webp":
+	case "image/png", "image/jpeg", "image/jpg", "image/gif", "image/webp":
 		return true
 	}
 
