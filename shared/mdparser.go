@@ -110,12 +110,20 @@ func toAliases(obj interface{}) ([]string, error) {
 	switch raw := obj.(type) {
 	case []interface{}:
 		for _, alias := range raw {
-			arr = append(arr, alias.(string))
+			als := alias.(string)
+			if strings.HasPrefix(als, "/") {
+				als = als[1:]
+			}
+			arr = append(arr, strings.TrimSpace(als))
 		}
 	case string:
 		aliases := strings.Split(raw, " ")
 		for _, alias := range aliases {
-			arr = append(arr, strings.TrimSpace(alias))
+			als := alias
+			if strings.HasPrefix(als, "/") {
+				als = als[1:]
+			}
+			arr = append(arr, strings.TrimSpace(als))
 		}
 	default:
 		return arr, fmt.Errorf("unsupported type for `aliases` variable: %T", raw)
