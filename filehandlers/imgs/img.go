@@ -54,6 +54,8 @@ func (h *UploadImgHandler) metaImg(data *PostMetaData) error {
 	reader := bytes.NewReader([]byte(data.Text))
 	tee := bytes.NewReader([]byte(data.Text))
 
+	// we want to keep the original file so people can use that
+	// if our webp optimizer doesn't work properly
 	fname, err := h.Storage.PutFile(
 		bucket,
 		data.Filename,
@@ -77,12 +79,16 @@ func (h *UploadImgHandler) metaImg(data *PostMetaData) error {
 	var webpReader *bytes.Reader
 	contents := &bytes.Buffer{}
 
-	img, err := opt.GetImage(tee, data.MimeType)
-	if errors.Is(err, shared.AlreadyWebP) {
+	img, err := shared.GetImageForOptimization(tee, data.MimeType)
+	finalName := data.Filename
+	if errors.Is(err, shared.AlreadyWebPError) {
 		h.Cfg.Logger.Infof("(%s) is already webp, skipping encoding", data.Filename)
+		finalName = fmt.Sprintf("%s.webp", shared.SanitizeFileExt(finalName))
 		webpReader = tee
 	} else if err != nil {
-		return err
+		h.Cfg.Logger.Infof("(%s) is a file format (%s) that we cannot convert to webp, skipping encoding", data.Filename, data.MimeType)
+		finalName = shared.SanitizeFileExt(finalName)
+		webpReader = tee
 	} else {
 		err = opt.EncodeWebp(contents, img)
 		if err != nil {
@@ -98,7 +104,7 @@ func (h *UploadImgHandler) metaImg(data *PostMetaData) error {
 
 	_, err = h.Storage.PutFile(
 		bucket,
-		fmt.Sprintf("%s.webp", shared.SanitizeFileExt(data.Filename)),
+		finalName,
 		storage.NopReaderAtCloser(webpReader),
 	)
 	if err != nil {

@@ -189,7 +189,10 @@ type ImgHandler struct {
 	Storage   storage.ObjectStorage
 	Logger    *zap.SugaredLogger
 	Img       *shared.ImgOptimizer
-	Optimized bool
+	// We should try to use the optimized image if it's available
+	// not all images are optimized so this flag isn't enough
+	// because we also need to check the mime type
+	UseOptimized bool
 }
 
 func imgHandler(w http.ResponseWriter, h *ImgHandler) {
@@ -221,14 +224,16 @@ func imgHandler(w http.ResponseWriter, h *ImgHandler) {
 
 	contentType := post.MimeType
 	fname := post.Filename
-	if h.Optimized {
+	isWebOptimized := shared.IsWebOptimized(contentType)
+
+	if h.UseOptimized && isWebOptimized {
 		contentType = "image/webp"
 		fname = fmt.Sprintf("%s.webp", shared.SanitizeFileExt(post.Filename))
 	}
 
 	contents, err := h.Storage.GetFile(bucket, fname)
 	if err != nil {
-		h.Logger.Infof("file not found %s/%s", h.Username, post.Filename)
+		h.Logger.Infof("file not found in storage %s/%s", h.Username, post.Filename)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -238,7 +243,7 @@ func imgHandler(w http.ResponseWriter, h *ImgHandler) {
 
 	resizeImg := h.Img.Width != 0 || h.Img.Height != 0
 
-	if h.Optimized && resizeImg {
+	if h.UseOptimized && resizeImg && isWebOptimized {
 		// when resizing an image we don't want to mess with quality
 		// since that was already applied when converting to webp
 		h.Img.Quality = 100
@@ -274,15 +279,15 @@ func imgRequestOriginal(w http.ResponseWriter, r *http.Request) {
 	logger := shared.GetLogger(r)
 
 	imgHandler(w, &ImgHandler{
-		Username:  username,
-		Subdomain: subdomain,
-		Slug:      slug,
-		Cfg:       cfg,
-		Dbpool:    dbpool,
-		Storage:   st,
-		Logger:    logger,
-		Img:       shared.NewImgOptimizer(logger, ""),
-		Optimized: false,
+		Username:     username,
+		Subdomain:    subdomain,
+		Slug:         slug,
+		Cfg:          cfg,
+		Dbpool:       dbpool,
+		Storage:      st,
+		Logger:       logger,
+		Img:          shared.NewImgOptimizer(logger, ""),
+		UseOptimized: false,
 	})
 }
 
@@ -310,15 +315,15 @@ func imgRequest(w http.ResponseWriter, r *http.Request) {
 	logger := shared.GetLogger(r)
 
 	imgHandler(w, &ImgHandler{
-		Username:  username,
-		Subdomain: subdomain,
-		Slug:      slug,
-		Cfg:       cfg,
-		Dbpool:    dbpool,
-		Storage:   st,
-		Logger:    logger,
-		Img:       shared.NewImgOptimizer(logger, dimes),
-		Optimized: true,
+		Username:     username,
+		Subdomain:    subdomain,
+		Slug:         slug,
+		Cfg:          cfg,
+		Dbpool:       dbpool,
+		Storage:      st,
+		Logger:       logger,
+		Img:          shared.NewImgOptimizer(logger, dimes),
+		UseOptimized: true,
 	})
 }
 

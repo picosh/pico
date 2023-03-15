@@ -51,7 +51,7 @@ func main() {
 
 		opt := shared.NewImgOptimizer(cfg.Logger, "")
 		contents := &bytes.Buffer{}
-		img, err := opt.GetImage(reader, post.MimeType)
+		img, err := shared.GetImageForOptimization(reader, post.MimeType)
 		if err != nil {
 			cfg.Logger.Error(err)
 			continue

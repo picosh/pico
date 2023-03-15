@@ -40,6 +40,39 @@ type Ratio struct {
 	Height int
 }
 
+var AlreadyWebPError = errors.New("image is already webp")
+var IsSvgError = errors.New("image is an svg")
+
+func GetImageForOptimization(r io.Reader, mimeType string) (image.Image, error) {
+	switch mimeType {
+	case "image/png":
+		return png.Decode(r)
+	case "image/jpeg":
+		return jpeg.Decode(r)
+	case "image/jpg":
+		return jpeg.Decode(r)
+	case "image/gif":
+		return gif.Decode(r)
+	case "image/webp":
+		return nil, AlreadyWebPError
+	}
+
+	return nil, fmt.Errorf("(%s) not supported for optimization", mimeType)
+}
+
+func IsWebOptimized(mimeType string) bool {
+	switch mimeType {
+	case "image/png":
+	case "image/jpeg":
+	case "image/jpg":
+	case "image/gif":
+	case "image/webp":
+		return true
+	}
+
+	return false
+}
+
 func CreateImgURL(linkify Linkify) func([]byte) []byte {
 	return func(url []byte) []byte {
 		if url[0] == '/' {
@@ -98,25 +131,6 @@ func GetRatio(dimes string) (*Ratio, error) {
 	ratio.Height = height
 
 	return ratio, nil
-}
-
-var AlreadyWebP = errors.New("image is already webp")
-
-func (h *ImgOptimizer) GetImage(r io.Reader, mimeType string) (image.Image, error) {
-	switch mimeType {
-	case "image/png":
-		return png.Decode(r)
-	case "image/jpeg":
-		return jpeg.Decode(r)
-	case "image/jpg":
-		return jpeg.Decode(r)
-	case "image/gif":
-		return gif.Decode(r)
-	case "image/webp":
-		return nil, AlreadyWebP
-	}
-
-	return nil, fmt.Errorf("(%s) not supported for optimization", mimeType)
 }
 
 func (h *ImgOptimizer) DecodeWebp(r io.Reader) (image.Image, error) {

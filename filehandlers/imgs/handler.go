@@ -230,6 +230,9 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 	// DetectContentType does not detect markdown
 	if ext == ".md" {
 		nextPost.MimeType = "text/markdown; charset=UTF-8"
+		// DetectContentType does not detect image/svg
+	} else if ext == ".svg" {
+		nextPost.MimeType = "image/svg+xml"
 	}
 
 	post, err := h.DBPool.FindPostWithFilename(
