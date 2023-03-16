@@ -80,14 +80,13 @@ func (h *UploadImgHandler) metaImg(data *PostMetaData) error {
 	contents := &bytes.Buffer{}
 
 	img, err := shared.GetImageForOptimization(tee, data.MimeType)
-	finalName := data.Filename
+	finalName := shared.SanitizeFileExt(data.Filename)
 	if errors.Is(err, shared.AlreadyWebPError) {
 		h.Cfg.Logger.Infof("(%s) is already webp, skipping encoding", data.Filename)
-		finalName = fmt.Sprintf("%s.webp", shared.SanitizeFileExt(finalName))
+		finalName = fmt.Sprintf("%s.webp", finalName)
 		webpReader = tee
 	} else if err != nil {
 		h.Cfg.Logger.Infof("(%s) is a file format (%s) that we cannot convert to webp, skipping encoding", data.Filename, data.MimeType)
-		finalName = shared.SanitizeFileExt(finalName)
 		webpReader = tee
 	} else {
 		err = opt.EncodeWebp(contents, img)
@@ -95,6 +94,7 @@ func (h *UploadImgHandler) metaImg(data *PostMetaData) error {
 			return err
 		}
 
+		finalName = fmt.Sprintf("%s.webp", finalName)
 		webpReader = bytes.NewReader(contents.Bytes())
 	}
 

@@ -233,7 +233,13 @@ func imgHandler(w http.ResponseWriter, h *ImgHandler) {
 
 	contents, err := h.Storage.GetFile(bucket, fname)
 	if err != nil {
-		h.Logger.Infof("file not found in storage %s/%s", h.Username, post.Filename)
+		h.Logger.Infof(
+			"file not found %s/%s in storage (bucket: %s, name: %s)",
+			h.Username,
+			post.Filename,
+			bucket.Name,
+			fname,
+		)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
