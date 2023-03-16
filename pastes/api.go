@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	gocache "github.com/patrickmn/go-cache"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/imgs/storage"
@@ -394,6 +395,8 @@ func StartApiServer() {
 		st, err = storage.NewStorageMinio(cfg.MinioURL, cfg.MinioUser, cfg.MinioPass)
 	}
 
+	cache := gocache.New(2*time.Minute, 5*time.Minute)
+
 	if err != nil {
 		logger.Fatal(err)
 	}
@@ -409,7 +412,7 @@ func StartApiServer() {
 	mainRoutes := createMainRoutes(staticRoutes)
 	subdomainRoutes := createSubdomainRoutes(staticRoutes)
 
-	handler := shared.CreateServe(mainRoutes, subdomainRoutes, cfg, db, st, logger)
+	handler := shared.CreateServe(mainRoutes, subdomainRoutes, cfg, db, st, logger, cache)
 	router := http.HandlerFunc(handler)
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)

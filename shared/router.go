@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/patrickmn/go-cache"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/imgs/storage"
 	"go.uber.org/zap"
@@ -45,7 +46,7 @@ func CreatePProfRoutes(routes []Route) []Route {
 
 type ServeFn func(http.ResponseWriter, *http.Request)
 
-func CreateServe(routes []Route, subdomainRoutes []Route, cfg *ConfigSite, dbpool db.DB, st storage.ObjectStorage, logger *zap.SugaredLogger) ServeFn {
+func CreateServe(routes []Route, subdomainRoutes []Route, cfg *ConfigSite, dbpool db.DB, st storage.ObjectStorage, logger *zap.SugaredLogger, cache *cache.Cache) ServeFn {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var allow []string
 		var subdomain string
@@ -82,7 +83,8 @@ func CreateServe(routes []Route, subdomainRoutes []Route, cfg *ConfigSite, dbpoo
 				dbCtx := context.WithValue(subdomainCtx, ctxDBKey{}, dbpool)
 				storageCtx := context.WithValue(dbCtx, ctxStorageKey{}, st)
 				cfgCtx := context.WithValue(storageCtx, ctxCfg{}, cfg)
-				ctx := context.WithValue(cfgCtx, ctxKey{}, matches[1:])
+				cacheCtx := context.WithValue(cfgCtx, ctxCacheKey{}, cache)
+				ctx := context.WithValue(cacheCtx, ctxKey{}, matches[1:])
 				route.handler(w, r.WithContext(ctx))
 				return
 			}
@@ -100,6 +102,7 @@ type ctxDBKey struct{}
 type ctxStorageKey struct{}
 type ctxKey struct{}
 type ctxLoggerKey struct{}
+type ctxCacheKey struct{}
 type ctxSubdomainKey struct{}
 type ctxCfg struct{}
 
@@ -109,6 +112,10 @@ func GetCfg(r *http.Request) *ConfigSite {
 
 func GetLogger(r *http.Request) *zap.SugaredLogger {
 	return r.Context().Value(ctxLoggerKey{}).(*zap.SugaredLogger)
+}
+
+func GetCache(r *http.Request) *cache.Cache {
+	return r.Context().Value(ctxCacheKey{}).(*cache.Cache)
 }
 
 func GetDB(r *http.Request) db.DB {

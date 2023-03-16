@@ -12,6 +12,7 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/gorilla/feeds"
+	gocache "github.com/patrickmn/go-cache"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/imgs/storage"
@@ -188,11 +189,60 @@ type ImgHandler struct {
 	Dbpool    db.DB
 	Storage   storage.ObjectStorage
 	Logger    *zap.SugaredLogger
+	Cache     *gocache.Cache
 	Img       *shared.ImgOptimizer
 	// We should try to use the optimized image if it's available
 	// not all images are optimized so this flag isn't enough
 	// because we also need to check the mime type
 	UseOptimized bool
+}
+
+type ImgResizer struct {
+	Key      string
+	contents storage.ReaderAtCloser
+	writer   io.Writer
+	Img      *shared.ImgOptimizer
+	Cache    *gocache.Cache
+}
+
+func (r *ImgResizer) Resize() error {
+	cached, found := r.Cache.Get(r.Key)
+	if found {
+		reader := bytes.NewReader(cached.([]byte))
+		_, err := io.Copy(r.writer, reader)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+
+	// when resizing an image we don't want to mess with quality
+	// since that was already applied when converting to webp
+	r.Img.Quality = 100
+	r.Img.Lossless = false
+	img, err := r.Img.DecodeWebp(r.contents)
+	if err != nil {
+		return err
+	}
+
+	buf := new(bytes.Buffer)
+	err = r.Img.EncodeWebp(buf, img)
+	if err != nil {
+		return err
+	}
+
+	r.Cache.Set(
+		r.Key,
+		buf.Bytes(),
+		gocache.DefaultExpiration,
+	)
+
+	err = r.Img.EncodeWebp(r.writer, img)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func imgHandler(w http.ResponseWriter, h *ImgHandler) {
@@ -250,11 +300,21 @@ func imgHandler(w http.ResponseWriter, h *ImgHandler) {
 	resizeImg := h.Img.Width != 0 || h.Img.Height != 0
 
 	if h.UseOptimized && resizeImg && isWebOptimized {
-		// when resizing an image we don't want to mess with quality
-		// since that was already applied when converting to webp
-		h.Img.Quality = 100
-		h.Img.Lossless = false
-		err = h.Img.Process(w, contents)
+		cacheKey := fmt.Sprintf(
+			"%s/%s (%d:%d)",
+			bucket.Name,
+			fname,
+			h.Img.Width,
+			h.Img.Height,
+		)
+		resizer := ImgResizer{
+			Img:      h.Img,
+			Cache:    h.Cache,
+			Key:      cacheKey,
+			contents: contents,
+			writer:   w,
+		}
+		err = resizer.Resize()
 	} else {
 		_, err = io.Copy(w, contents)
 	}
@@ -283,6 +343,7 @@ func imgRequestOriginal(w http.ResponseWriter, r *http.Request) {
 	dbpool := shared.GetDB(r)
 	st := shared.GetStorage(r)
 	logger := shared.GetLogger(r)
+	cache := shared.GetCache(r)
 
 	imgHandler(w, &ImgHandler{
 		Username:     username,
@@ -292,6 +353,7 @@ func imgRequestOriginal(w http.ResponseWriter, r *http.Request) {
 		Dbpool:       dbpool,
 		Storage:      st,
 		Logger:       logger,
+		Cache:        cache,
 		Img:          shared.NewImgOptimizer(logger, ""),
 		UseOptimized: false,
 	})
@@ -319,6 +381,7 @@ func imgRequest(w http.ResponseWriter, r *http.Request) {
 	dbpool := shared.GetDB(r)
 	st := shared.GetStorage(r)
 	logger := shared.GetLogger(r)
+	cache := shared.GetCache(r)
 
 	imgHandler(w, &ImgHandler{
 		Username:     username,
@@ -328,6 +391,7 @@ func imgRequest(w http.ResponseWriter, r *http.Request) {
 		Dbpool:       dbpool,
 		Storage:      st,
 		Logger:       logger,
+		Cache:        cache,
 		Img:          shared.NewImgOptimizer(logger, dimes),
 		UseOptimized: true,
 	})
@@ -724,6 +788,11 @@ func StartApiServer() {
 		st, err = storage.NewStorageMinio(cfg.MinioURL, cfg.MinioUser, cfg.MinioPass)
 	}
 
+	// cache resizing images since they are CPU-bound
+	// we want to clear the cache since we are storing images
+	// as []byte in-memory
+	cache := gocache.New(2*time.Minute, 5*time.Minute)
+
 	if err != nil {
 		logger.Fatal(err)
 	}
@@ -737,7 +806,7 @@ func StartApiServer() {
 	mainRoutes := createMainRoutes(staticRoutes)
 	subdomainRoutes := createSubdomainRoutes(staticRoutes)
 
-	handler := shared.CreateServe(mainRoutes, subdomainRoutes, cfg, db, st, logger)
+	handler := shared.CreateServe(mainRoutes, subdomainRoutes, cfg, db, st, logger, cache)
 	router := http.HandlerFunc(handler)
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)

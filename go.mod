@@ -22,6 +22,7 @@ require (
 	github.com/mmcdole/gofeed v1.1.3
 	github.com/muesli/reflow v0.3.0
 	github.com/neurosnap/go-exif-remove v0.0.0-20221010134343-50d1e3c35577
+	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pkg/sftp v1.13.5
 	github.com/sendgrid/sendgrid-go v3.12.0+incompatible
 	github.com/yuin/goldmark v1.5.3
