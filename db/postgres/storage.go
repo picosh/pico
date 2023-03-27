@@ -214,7 +214,8 @@ const (
 	GROUP BY name
 	ORDER BY tally DESC
 	LIMIT 5`
-	sqlSelectTagsForPost = `SELECT name FROM post_tags WHERE post_id=$1`
+	sqlSelectTagsForPost     = `SELECT name FROM post_tags WHERE post_id=$1`
+	sqlSelectFeedItemsByPost = `SELECT id, post_id, guid, data, created_at FROM feed_items WHERE post_id=$1`
 
 	sqlInsertPublicKey = `INSERT INTO public_keys (user_id, public_key) VALUES ($1, $2)`
 	sqlInsertPost      = `
@@ -223,9 +224,10 @@ const (
 		file_size, mime_type, shasum, data, expires_at)
 	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 	RETURNING id`
-	sqlInsertUser    = `INSERT INTO app_users DEFAULT VALUES returning id`
-	sqlInsertTag     = `INSERT INTO post_tags (post_id, name) VALUES($1, $2) RETURNING id;`
-	sqlInsertAliases = `INSERT INTO post_aliases (post_id, slug) VALUES($1, $2) RETURNING id;`
+	sqlInsertUser      = `INSERT INTO app_users DEFAULT VALUES returning id`
+	sqlInsertTag       = `INSERT INTO post_tags (post_id, name) VALUES($1, $2) RETURNING id;`
+	sqlInsertAliases   = `INSERT INTO post_aliases (post_id, slug) VALUES($1, $2) RETURNING id;`
+	sqlInsertFeedItems = `INSERT INTO feed_items (post_id, guid, data) VALUES ($1, $2, $3) RETURNING id;`
 
 	sqlUpdatePost = `
 	UPDATE posts
@@ -1112,4 +1114,61 @@ func (me *PsqlDB) FindTotalSizeForUser(userID string) (int, error) {
 		return 0, err
 	}
 	return fileSize, nil
+}
+
+func (me *PsqlDB) InsertFeedItems(postID string, items []*db.FeedItem) error {
+	ctx := context.Background()
+	tx, err := me.Db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		err = tx.Rollback()
+	}()
+
+	for _, item := range items {
+		_, err := tx.Exec(
+			sqlInsertFeedItems,
+			item.PostID,
+			item.GUID,
+			item.Data,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	err = tx.Commit()
+	return err
+}
+
+func (me *PsqlDB) FindFeedItemsByPostID(postID string) ([]*db.FeedItem, error) {
+	// sqlSelectFeedItemsByPost
+	items := make([]*db.FeedItem, 0)
+	rs, err := me.Db.Query(sqlSelectFeedItemsByPost, postID)
+	if err != nil {
+		return items, err
+	}
+
+	for rs.Next() {
+		item := &db.FeedItem{}
+		err := rs.Scan(
+			&item.ID,
+			&item.PostID,
+			&item.GUID,
+			&item.Data,
+			&item.CreatedAt,
+		)
+		if err != nil {
+			return items, err
+		}
+
+		items = append(items, item)
+	}
+
+	if rs.Err() != nil {
+		return items, rs.Err()
+	}
+
+	return items, nil
 }

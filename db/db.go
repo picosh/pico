@@ -48,6 +48,31 @@ func (p *PostData) Scan(value interface{}) error {
 	return json.Unmarshal(b, &p)
 }
 
+type FeedItemData struct {
+	Title       string     `json:"title"`
+	Description string     `json:"description"`
+	Content     string     `json:"content"`
+	Link        string     `json:"link"`
+	PublishedAt *time.Time `json:"published_at"`
+}
+
+// Make the Attrs struct implement the driver.Valuer interface. This method
+// simply returns the JSON-encoded representation of the struct.
+func (p FeedItemData) Value() (driver.Value, error) {
+	return json.Marshal(p)
+}
+
+// Make the Attrs struct implement the sql.Scanner interface. This method
+// simply decodes a JSON-encoded value into the struct fields.
+func (p *FeedItemData) Scan(value interface{}) error {
+	b, ok := value.([]byte)
+	if !ok {
+		return errors.New("type assertion to []byte failed")
+	}
+
+	return json.Unmarshal(b, &p)
+}
+
 type Post struct {
 	ID          string     `json:"id"`
 	UserID      string     `json:"user_id"`
@@ -95,6 +120,14 @@ type PostAnalytics struct {
 type Pager struct {
 	Num  int
 	Page int
+}
+
+type FeedItem struct {
+	ID        string
+	PostID    string
+	GUID      string
+	Data      FeedItemData
+	CreatedAt *time.Time
 }
 
 type ErrMultiplePublicKeys struct{}
@@ -162,6 +195,9 @@ type DB interface {
 
 	HasFeatureForUser(userID string, feature string) bool
 	FindTotalSizeForUser(userID string) (int, error)
+
+	InsertFeedItems(postID string, items []*FeedItem) error
+	FindFeedItemsByPostID(postID string) ([]*FeedItem, error)
 
 	Close() error
 }
