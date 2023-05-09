@@ -20,9 +20,17 @@ This repo hosts the following pico services:
 
 - `golang` >= 1.19
 - `direnv` to load environment vars
+- `webp` macOS dependency
+  - can be installed with `brew install webp`
 
 ```bash
 cp ./.env.example .env
+```
+
+Initialize local env variables using direnv
+
+```bash
+echo dotenv > .envrc && direnv allow
 ```
 
 Boot up database
@@ -46,13 +54,14 @@ make build
 
 All services are built inside the `./build` folder.
 
-If you want to start prose:
+If you want to start prose execute these binaries from the project root directory:
 
 ```bash
 ./build/prose-web
 # in a separate terminal
 ./build/prose-ssh
 ```
+
 
 ## deployment
 

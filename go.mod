@@ -14,7 +14,7 @@ require (
 	github.com/disintegration/imaging v1.6.2
 	github.com/gliderlabs/ssh v0.3.5
 	github.com/gorilla/feeds v1.1.1
-	github.com/kolesa-team/go-webp v1.0.2
+	github.com/kolesa-team/go-webp v1.0.4
 	github.com/lib/pq v1.10.7
 	github.com/matryer/is v1.4.0
 	github.com/microcosm-cc/bluemonday v1.0.21
