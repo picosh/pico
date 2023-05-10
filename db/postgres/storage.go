@@ -232,7 +232,7 @@ const (
 	sqlUpdatePost = `
 	UPDATE posts
 	SET slug = $1, title = $2, text = $3, description = $4, updated_at = $5, publish_at = $6,
-		file_size = $7, shasum = $8, data = $9
+		file_size = $7, shasum = $8, data = $9, hidden = $11
 	WHERE id = $10`
 	sqlUpdateUserName = `UPDATE app_users SET name = $1 WHERE id = $2`
 	sqlIncrementViews = `UPDATE posts SET views = views + 1 WHERE id = $1 RETURNING views`
@@ -714,6 +714,7 @@ func (me *PsqlDB) UpdatePost(post *db.Post) (*db.Post, error) {
 		post.Shasum,
 		post.Data,
 		post.ID,
+		post.Hidden,
 	)
 	if err != nil {
 		return nil, err
