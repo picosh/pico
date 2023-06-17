@@ -2,7 +2,7 @@ PGDATABASE?="pico"
 PGHOST?="db"
 PGUSER?="postgres"
 PORT?="5432"
-DB_CONTAINER?=pico-postgres-1
+DB_CONTAINER?=pico_postgres_1
 DOCKER_TAG?=$(shell git log --format="%H" -n 1)
 DOCKER_PLATFORM?=linux/amd64,linux/arm64
 DOCKER_CMD?=docker
@@ -61,26 +61,58 @@ teardown:
 .PHONY: teardown
 
 migrate:
-	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20220310_init.sql
-	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20220422_add_desc_to_user_and_post.sql
-	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20220426_add_index_for_filename.sql
-	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20220427_username_to_lower.sql
-	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20220523_timestamp_with_tz.sql
-	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20220721_analytics.sql
-	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20220722_post_hidden.sql
-	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20220727_post_change_post_contraints.sql
-	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20220730_post_change_filename_to_slug.sql
-	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20220801_add_post_tags.sql
-	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20220811_add_data_to_post.sql
-	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20220811_add_feature.sql
-	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20221108_add_expires_at_to_posts.sql
-	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20221112_add_feeds_space.sql
-	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20230310_add_aliases_table.sql
-	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20230326_add_feed_items.sql
+	$(DOCKER_CMD) cp ./sql/migrations/20220310_init.sql $(DB_CONTAINER):/tmp
+	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) -f /tmp/20220310_init.sql
+
+	$(DOCKER_CMD) cp ./sql/migrations/20220422_add_desc_to_user_and_post.sql $(DB_CONTAINER):/tmp
+	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) -f /tmp/20220422_add_desc_to_user_and_post.sql
+
+	$(DOCKER_CMD) cp ./sql/migrations/20220426_add_index_for_filename.sql $(DB_CONTAINER):/tmp
+	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) -f /tmp/20220426_add_index_for_filename.sql
+
+	$(DOCKER_CMD) cp ./sql/migrations/20220427_username_to_lower.sql $(DB_CONTAINER):/tmp
+	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) -f /tmp/20220427_username_to_lower.sql
+
+	$(DOCKER_CMD) cp ./sql/migrations/20220523_timestamp_with_tz.sql $(DB_CONTAINER):/tmp
+	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) -f /tmp/20220523_timestamp_with_tz.sql
+
+	$(DOCKER_CMD) cp ./sql/migrations/20220721_analytics.sql $(DB_CONTAINER):/tmp
+	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) -f /tmp/20220721_analytics.sql
+
+	$(DOCKER_CMD) cp ./sql/migrations/20220722_post_hidden.sql $(DB_CONTAINER):/tmp
+	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) -f /tmp/20220722_post_hidden.sql
+
+	$(DOCKER_CMD) cp ./sql/migrations/20220727_post_change_post_contraints.sql $(DB_CONTAINER):/tmp
+	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) -f /tmp/20220727_post_change_post_contraints.sql
+
+	$(DOCKER_CMD) cp ./sql/migrations/20220730_post_change_filename_to_slug.sql $(DB_CONTAINER):/tmp
+	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) -f /tmp/20220730_post_change_filename_to_slug.sql
+
+	$(DOCKER_CMD) cp ./sql/migrations/20220801_add_post_tags.sql $(DB_CONTAINER):/tmp
+	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) -f /tmp/20220801_add_post_tags.sql
+
+	$(DOCKER_CMD) cp ./sql/migrations/20220811_add_data_to_post.sql $(DB_CONTAINER):/tmp
+	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) -f /tmp/20220811_add_data_to_post.sql
+
+	$(DOCKER_CMD) cp ./sql/migrations/20220811_add_feature.sql $(DB_CONTAINER):/tmp
+	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) -f /tmp/20220811_add_feature.sql
+
+	$(DOCKER_CMD) cp ./sql/migrations/20221108_add_expires_at_to_posts.sql $(DB_CONTAINER):/tmp
+	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) -f /tmp/20221108_add_expires_at_to_posts.sql
+
+	$(DOCKER_CMD) cp ./sql/migrations/20221112_add_feeds_space.sql $(DB_CONTAINER):/tmp
+	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) -f /tmp/20221112_add_feeds_space.sql
+
+	$(DOCKER_CMD) cp ./sql/migrations/20230310_add_aliases_table.sql $(DB_CONTAINER):/tmp
+	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) -f /tmp/20230310_add_aliases_table.sql
+
+	$(DOCKER_CMD) cp ./sql/migrations/20230326_add_feed_items.sql $(DB_CONTAINER):/tmp
+	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) -f /tmp/20230326_add_feed_items.sql
 .PHONY: migrate
 
 latest:
-	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20230326_add_feed_items.sql
+	$(DOCKER_CMD) cp ./sql/migrations/20230326_add_feed_items.sql $(DB_CONTAINER):/tmp
+	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) -f /tmp/20230326_add_feed_items.sql
 .PHONY: latest
 
 psql:
