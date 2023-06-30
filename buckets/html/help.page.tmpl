@@ -1,0 +1,172 @@
+{{template "base" .}}
+
+{{define "title"}}help -- {{.Site.Domain}}{{end}}
+
+{{define "meta"}}
+<meta name="description" content="questions and answers" />
+{{end}}
+
+{{define "attrs"}}{{end}}
+
+{{define "body"}}
+<header>
+    <h1 class="text-2xl">Need help?</h1>
+    <p>Here are some common questions on using this platform that we would like to answer.</p>
+</header>
+<main>
+    <section id="permission-denied">
+        <h2 class="text-xl">
+            <a href="#permission-denied" rel="nofollow noopener">#</a>
+            I get a permission denied when trying to SSH
+        </h2>
+        <p>
+            Unfortunately SHA-2 RSA keys are <strong>not</strong> currently supported.
+        </p>
+        <p>
+            Unfortunately, due to a shortcoming in Go’s x/crypto/ssh package, we
+            not currently support access via new SSH RSA keys: only the old SHA-1 ones will work.
+            Until we sort this out you’ll either need an SHA-1 RSA key or a key with another
+            algorithm, e.g. Ed25519. Not sure what type of keys you have? You can check with the
+            following:
+        </p>
+        <pre>$ find ~/.ssh/id_*.pub -exec ssh-keygen -l -f {} \;</pre>
+        <p>If you’re curious about the inner workings of this problem have a look at:</p>
+        <ul>
+            <li><a href="https://github.com/golang/go/issues/37278">golang/go#37278</a></li>
+            <li><a href="https://go-review.googlesource.com/c/crypto/+/220037">go-review</a></li>
+            <li><a href="https://github.com/golang/crypto/pull/197">golang/crypto#197</a></li>
+        </ul>
+    </section>
+
+    <section id="blog-ssh-key">
+        <h2 class="text-xl">
+            <a href="#blog-ssh-key" rel="nofollow noopener">#</a>
+            Generating a new SSH key
+        </h2>
+        <p>
+            <a href="https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent">Github reference</a>
+        </p>
+        <pre>ssh-keygen -t ed25519 -C "your_email@example.com"</pre>
+        <ol>
+            <li>When you're prompted to "Enter a file in which to save the key," press Enter. This accepts the default file location.</li>
+            <li>At the prompt, type a secure passphrase.</li>
+        </ol>
+    </section>
+
+    <section id="web-optimized">
+        <h2 class="text-xl">
+            <a href="#web-optimized" rel="nofollow noopener">#</a>
+            Web optimized
+        </h2>
+        <p>
+            When a user uploads an image, we immediately convert it to <code>webp</code>.
+            Then we have an API that serves those web optimized images.
+        </p>
+    </section>
+
+    <section id="integrations">
+        <h2 class="text-xl">
+            <a href="#integrations" rel="nofollow noopener">#</a>
+           How does imgs integrate with other pico services?
+        </h2>
+        <p>
+            We allow any of our other services to upload images from those services to imgs.
+            For example, if you want to upload images for prose.sh all you have to do is include
+            your images in the <code>rsync</code> or <code>scp</code> command.
+        </p>
+        <pre>scp profile.jpg user@prose.sh:/</pre>
+        <p>Then when you want to reference the file, you can reference it like so:</p>
+        <pre>![profile pic](/profile.jpg)</pre>
+    </section>
+
+    <section id="file-types">
+        <h2 class="text-xl">
+            <a href="#file-types" rel="nofollow noopener">#</a>
+            What file types are supported?
+        </h2>
+        <ul>
+            <li>jpg</li>
+            <li>png</li>
+            <li>gif</li>
+            <li>webp</li>
+            <li>svg</li>
+        </ul>
+    </section>
+
+    <section id="image-manipulation">
+        <h2 class="text-xl">
+            <a href="#image-manipulation" rel="nofollow noopener">#</a>
+            Image manipulation
+        </h2>
+        <p>
+            We have an API that allows users to resize images on-the-fly.  Currently
+            we only support downscaling.
+        </p>
+
+        <pre>[!profile](/profile/x500)     # auto scale width
+[!profile](/profile/500x500)  # scale width and height
+[!profile](/profile/500x)     # auto scale height</pre>
+    </section>
+
+    <section id="img-update">
+        <h2 class="text-xl">
+            <a href="#img-update" rel="nofollow noopener">#</a>
+            How do I update a img?
+        </h2>
+        <p>
+            Updating a img requires that you update the source document and then run the <code>scp</code>
+            command again.  If the filename remains the same, then the img will be updated.
+        </p>
+    </section>
+
+    <section id="img-delete">
+        <h2 class="text-xl">
+            <a href="#img-delete" rel="nofollow noopener">#</a>
+            How do I delete a img?
+        </h2>
+        <p>
+            Because <code>scp</code> does not natively support deleting files, I didn't want to bake
+            that behavior into my ssh server.
+        </p>
+
+        <p>
+            However, if a user wants to delete a img they can delete the contents of the file and
+            then upload it to our server.  If the file contains 0 bytes, we will remove the img.
+            For example, if you want to delete <code>delete.jpg</code> you could:
+        </p>
+
+        <pre>
+cp /dev/null delete.jpg
+scp ./delete.jpg {{.Site.Domain}}:/</pre>
+
+        <p>
+            Alternatively, you can go to <code>ssh {{.Site.Domain}}</code> and select "Manage img."
+            Then you can highlight the img you want to delete and then press "X."  It will ask for
+            confirmation before actually removing the img.
+        </p>
+    </section>
+
+    <section id="custom-domain">
+        <h2 class="text-xl">
+            <a href="#custom-domain" rel="nofollow noopener">#</a>
+            Setup a custom domain
+        </h2>
+        <p>
+            A blog can be accessed from a custom domain.
+            HTTPS will be automatically enabled and a certificate will be retrieved
+            from <a href="https://letsencrypt.org/">Let's Encrypt</a>. In order for this to work,
+            2 DNS records need to be created:
+        </p>
+
+        <p>CNAME for the domain to imgs (subdomains or DNS hosting with CNAME flattening) or A record</p>
+        <pre>CNAME subdomain.yourcustomdomain.com -> imgs.sh</pre>
+        <p>Resulting in:</p>
+        <pre>subdomain.yourcustomdomain.com.         300     IN      CNAME   imgs.sh.</pre>
+        <p>And a TXT record to tell Prose what blog is hosted on that domain at the subdomain entry _imgs</p>
+        <pre>TXT _imgs.subdomain.yourcustomdomain.com -> yourusername</pre>
+        <p>Resulting in:</p>
+        <pre>_imgs.subdomain.yourcustomdomain.com.         300     IN      TXT     "hey"</pre>
+    </section>
+</main>
+{{template "marketing-footer" .}}
+{{end}}

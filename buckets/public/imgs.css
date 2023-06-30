@@ -1,0 +1,84 @@
+body {
+  max-width: 52rem;
+}
+
+img {
+  max-width: 100%;
+  max-height: 90vh;
+}
+
+.albums {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(auto-fill, 300px);
+  grid-row-gap: 0.5rem;
+  grid-column-gap: 1rem;
+}
+
+.thumbnail-container {
+  position: relative;
+}
+
+.thumbnail-container a, .thumbnail-container a:visited, .thumbnail-container a:hover {
+  color: var(--white);
+}
+
+.tag-text {
+  position: absolute;
+  bottom: 20px;
+  z-index: 1;
+  text-align: center;
+  width: 100%;
+}
+
+.thumbnail {
+  z-index: 1;
+  object-fit: contain;
+  width: 300px;
+  height: 300px;
+  background-color: #000;
+}
+
+.thumbnail-link {
+  z-index: 1;
+}
+
+.md h1 {
+  font-size: 1.85rem;
+  line-height: 1.15;
+  font-weight: bold;
+  padding: 0.6rem 0 0 0;
+}
+
+.md h2 {
+  font-size: 1.45rem;
+  line-height: 1.15;
+  font-weight: bold;
+  padding: 0.6rem 0 0 0;
+}
+
+.md h3 {
+  font-size: 1.25rem;
+  font-weight: bold;
+  padding: 0.6rem 0 0 0;
+}
+
+.md h4 {
+  font-size: 1rem;
+  font-weight: bold;
+  padding: 0.6rem 0 0 0;
+}
+
+@media only screen and (max-width: 900px) {
+  .albums {
+    grid-template-columns: repeat(1, 1fr);
+    justify-content: center;
+  }
+
+  .albums article {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+}

@@ -1,0 +1,68 @@
+{{template "base" .}}
+
+{{define "title"}}{{.PageTitle}}{{end}}
+
+{{define "meta"}}
+<meta name="description" content="{{.Caption}}" />
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="{{.Site.Domain}}">
+<meta property="og:url" content="{{.URL}}">
+<meta property="og:title" content="{{.PageTitle}}">
+{{if .Caption}}<meta property="og:description" content="{{.Caption}}">{{end}}
+<meta property="og:image:width" content="300" />
+<meta property="og:image:height" content="300" />
+<meta itemprop="image" content="https://{{.Site.Domain}}/card.png" />
+<meta property="og:image" content="https://{{.Site.Domain}}/card.png" />
+
+<meta property="twitter:card" content="summary">
+<meta property="twitter:url" content="{{.URL}}">
+<meta property="twitter:title" content="{{.PageTitle}}">
+{{if .Caption}}<meta property="twitter:description" content="{{.Caption}}">{{end}}
+<meta name="twitter:image" content="https://{{.Site.Domain}}/card.png" />
+<meta name="twitter:image:src" content="https://{{.Site.Domain}}/card.png" />
+{{end}}
+
+{{define "attrs"}}id="post" class="{{.Slug}}"{{end}}
+
+{{define "body"}}
+<header>
+    {{if .Title}}<h1 class="text-2xl font-bold">{{.Title}}</h1>{{end}}
+    <p class="font-bold m-0">
+        <time datetime="{{.PublishAtISO}}">{{.PublishAt}}</time>
+    </p>
+    <div class="tags">
+    <a href="{{.BlogURL}}">&lt; {{.BlogName}}</a>
+    {{range .Tags}}
+        <a class="tag" href="{{.URL}}">#{{.Text}}</a>
+    {{end}}
+    </div>
+</header>
+<main>
+    <article>
+        <figure class="img">
+            <a href="{{.ImgURL}}">
+                <img src="{{.ImgURL}}" alt="" />
+            </a>
+            {{if .Caption}}<figcaption class="my font-italic">{{.Caption}}</figcaption>{{end}}
+        </figure>
+
+        <div class="md">{{.Contents}}</div>
+
+        <dl>
+            <dt>Hotlink</dt>
+            <dd><a href="{{.ImgURL}}">{{.ImgURL}}</a></dd>
+
+            <dt>Resize width (preserve aspect)</dt>
+            <dd><a href="{{.ImgURL}}/300x">{{.ImgURL}}/300x</a></dd>
+
+            <dt>Resize height (preserve aspect)</dt>
+            <dd><a href="{{.ImgURL}}/x300">{{.ImgURL}}/x300</a></dd>
+
+            <dt>Resize width and height</dt>
+            <dd><a href="{{.ImgURL}}/300x300">{{.ImgURL}}/300x300</a></dd>
+        </dl>
+    </article>
+</main>
+{{template "footer" .}}
+{{end}}
