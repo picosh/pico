@@ -84,6 +84,12 @@ jobs:
         app: imgs
         platforms: ${{ env.PLATFORMS }}
         registry: ${{ env.REGISTRY }}
+    - name: Run docker build for pgs
+      uses: ./.github/actions/build
+      with:
+        app: pgs
+        platforms: ${{ env.PLATFORMS }}
+        registry: ${{ env.REGISTRY }}
     - name: Run docker build for feeds
       uses: ./.github/actions/build
       with:

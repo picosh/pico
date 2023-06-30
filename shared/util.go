@@ -125,3 +125,40 @@ func Shasum(data []byte) string {
 	bs := h.Sum(nil)
 	return hex.EncodeToString(bs)
 }
+
+func GetMimeType(fpath string) string {
+	ext := filepath.Ext(fpath)
+	if ext == ".svg" {
+		return "image/svg+xml"
+	} else if ext == ".css" {
+		return "text/css"
+	} else if ext == ".js" {
+		return "text/javascript"
+	} else if ext == ".ico" {
+		return "image/x-icon"
+	} else if ext == ".pdf" {
+		return "application/pdf"
+	} else if ext == ".html" || ext == ".htm" {
+		return "text/html"
+	} else if ext == ".jpg" || ext == ".jpeg" {
+		return "image/jpeg"
+	} else if ext == ".png" {
+		return "image/png"
+	} else if ext == ".gif" {
+		return "image/gif"
+	} else if ext == ".webp" {
+		return "image/webp"
+	} else if ext == ".otf" {
+		return "font/otf"
+	} else if ext == ".woff" {
+		return "font/woff"
+	} else if ext == ".woff2" {
+		return "font/woff2"
+	} else if ext == ".ttf" {
+		return "font/ttf"
+	} else if ext == ".md" {
+		return "text/markdown; charset=UTF-8"
+	}
+
+	return "text/plain"
+}

@@ -94,6 +94,29 @@ services:
       - ./data/imgs-ssh/data:/app/ssh_data
     ports:
       - "2223:2222"
+  pgs-web:
+    build:
+      args:
+        APP: pgs
+      target: release-web
+    env_file:
+      - .env.example
+    volumes:
+      - ./data/pgs-storage/data:/app/.storage
+    ports:
+      - "3003:3000"
+  pgs-ssh:
+    build:
+      args:
+        APP: pgs
+      target: release-ssh
+    env_file:
+      - .env.example
+    volumes:
+      - ./data/pgs-storage/data:/app/.storage
+      - ./data/pgs-ssh/data:/app/ssh_data
+    ports:
+      - "2223:2222"
   feeds-web:
     build:
       args:

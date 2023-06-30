@@ -1,0 +1,139 @@
+{{template "base" .}}
+
+{{define "title"}}{{.Site.Domain}} -- a static website hosting service for hackers.{{end}}
+
+{{define "meta"}}
+<meta name="description" content="A zero-dependency static site hosting service for hackers." />
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="{{.Site.Domain}}">
+<meta property="og:url" content="https://{{.Site.Domain}}">
+<meta property="og:title" content="{{.Site.Domain}}">
+<meta property="og:description" content="A zero-dependency static site hosting service for hackers.">
+
+<meta name="twitter:card" content="summary" />
+<meta property="twitter:url" content="https://{{.Site.Domain}}">
+<meta property="twitter:title" content="{{.Site.Domain}}">
+<meta property="twitter:description" content="A zero-dependency static site hosting service for hackers.">
+<meta name="twitter:image" content="https://{{.Site.Domain}}/card.png" />
+<meta name="twitter:image:src" content="https://{{.Site.Domain}}/card.png" />
+
+<meta property="og:image:width" content="300" />
+<meta property="og:image:height" content="300" />
+<meta itemprop="image" content="https://{{.Site.Domain}}/card.png" />
+<meta property="og:image" content="https://{{.Site.Domain}}/card.png" />
+{{end}}
+
+{{define "attrs"}}{{end}}
+
+{{define "body"}}
+<header class="text-center">
+  <h1 class="text-2xl font-bold">{{.Site.Domain}}</h1>
+  <p class="text-lg">A zero-dependency static site hosting service for hackers.</p>
+  <hr />
+</header>
+
+<main>
+  <section>
+    <h2 class="text-lg font-bold">Examples</h2>
+    <ul>
+      <li>The site you are reading right now</li>
+      <li><a href="https://git.erock.sh">git web viewer</a></li>
+    </ul>
+  </section>
+
+  <section>
+    <h2 class="text-lg font-bold">Features</h2>
+    <ul>
+      <li>Terminal workflow</li>
+      <li>No client-side installation required to fully manage static sites</li>
+      <li>Distinct static sites as "projects"</li>
+      <li>Unlimited projects created on-the-fly (no need to create a project first)</li>
+      <li>Deploy via <code>rsync -a . erock@{{.Site.Domain}}:/myproject</code></li>
+      <li>Symbolic linking from one project to another (to support promotions/rollbacks)</li>
+      <li>Managed HTTPS for all projects (e.g. [https://erock-myproject.{{.Site.Domain}}](https://erock-myproject.{{.Site.Domain}}))</li>
+      <li>Custom domains for projects (managed simply by `TXT` records)</li>
+      <li>1GB max storage</li>
+      <li>50MB max file size</li>
+      <li>All assets are public-only</li>
+      <li>Only web assets are supported</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2 class="text-lg font-bold">Create your account with Public-Key Cryptography</h2>
+    <p>We don't want your email address.</p>
+    <p>To get started, simply ssh into our content management system:</p>
+    <pre>ssh new@{{.Site.Domain}}</pre>
+    <div class="text-sm font-italic note">
+      note: <code>new</code> is a special username that will always send you to account
+      creation, even with multiple accounts associated with your key-pair.
+    </div>
+    <div class="text-sm font-italic note">
+      note: getting permission denied? <a href="/help#permission-denied">read this</a>
+    </div>
+    <p>
+      After that, just set a username and you're ready to start writing! When you SSH
+      again, use your username that you set in the CMS.
+    </p>
+  </section>
+
+  <section>
+    <h2 class="text-lg font-bold">Publish your site with one command</h2>
+    <p>
+        When your site is ready to be published, copy the files to our server with a familiar
+        command:
+    </p>
+    <pre>rsync -a . {{.Site.Domain}}:/myproject</pre>
+    <p>
+      That's it!  There's no need to formally create a project, we
+      create them on-the-fly.  Further, we provide TLS for every project
+      automatically.  In this case the url for the project above would
+      look something like <code>https://{username}-myproject.{{.Site.Domain}}</code>.
+    </p>
+  </section>
+
+  <section>
+    <h2 class="text-lg font-bold">Manage your projects with a remote CLI</h2>
+    <p>
+      Our management system is done via ssh commands.  Type the following command to learn more:
+    </p>
+    <pre>ssh {{.Site.Domain}} help</pre>
+  </section>
+
+  <section>
+    <h2 class="text-lg font-bold">Project promotion and rollbacks</h2>
+    <p>
+      Additionally you can setup a pipeline for promotion and rollbacks.
+    </p>
+    <pre>ssh {{.Site.Domain}} link project-prod project-d0131d4</pre>
+    <p>
+      A common way to perform promotions within {{.Site.Domain}} is to setup CI/CD so every
+      push to <code>main</code> would trigger a build and create a new project
+      based on the git commit hash (e.g. <code>project-d0131d4</code>).
+    </p>
+    <p>
+      This command will create a symbolic link from <code>project-prod</code>
+      to <code>project-d0131d4</code>. Want to rollback a release?
+      Just change the link for <code>project-prod</code> to a previous project.
+    </p>
+  </section>
+
+  <section>
+    <h2 class="text-lg font-bold">Philosophy</h2>
+    <p>
+      Creating a static website should be as simple as copying files from a local folder to a server.
+    </p>
+    <p>Read more about team pico's philosophy <a href="https://pico.sh">here</a>.</p>
+  </section>
+
+  <section>
+    <h2 class="text-lg font-bold">Roadmap</h2>
+    <ol>
+      <li>Not sure</li>
+    </ol>
+  </section>
+</main>
+
+{{template "marketing-footer" .}}
+{{end}}

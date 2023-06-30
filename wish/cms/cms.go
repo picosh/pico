@@ -14,7 +14,7 @@ import (
 	"github.com/muesli/reflow/wrap"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
-	"github.com/picosh/pico/imgs/storage"
+	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pico/wish/cms/config"
 	"github.com/picosh/pico/wish/cms/ui/account"
 	"github.com/picosh/pico/wish/cms/ui/common"

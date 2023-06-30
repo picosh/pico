@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/gliderlabs/ssh"
@@ -17,7 +18,6 @@ var NULL = []byte{'\x00'}
 // FileEntry is an Entry that reads from a Reader, defining a file and
 // its contents.
 type FileEntry struct {
-	Name     string
 	Filepath string
 	Mode     fs.FileMode
 	Size     int64
@@ -33,7 +33,8 @@ func (e *FileEntry) Write(w io.Writer) error {
 			return fmt.Errorf("failed to write file: %q: %w", e.Filepath, err)
 		}
 	}
-	if _, err := fmt.Fprintf(w, "C%s %d %s\n", octalPerms(e.Mode), e.Size, e.Name); err != nil {
+	fname := filepath.Base(e.Filepath)
+	if _, err := fmt.Fprintf(w, "C%s %d %s\n", octalPerms(e.Mode), e.Size, fname); err != nil {
 		return fmt.Errorf("failed to write file: %q: %w", e.Filepath, err)
 	}
 
@@ -56,7 +57,7 @@ func octalPerms(info fs.FileMode) string {
 type CopyFromClientHandler interface {
 	// Write should write the given file.
 	Write(ssh.Session, *FileEntry) (string, error)
-	Read(ssh.Session, string) (os.FileInfo, io.ReaderAt, error)
+	Read(ssh.Session, *FileEntry) (os.FileInfo, io.ReaderAt, error)
 	List(ssh.Session, string) ([]os.FileInfo, error)
 	Validate(ssh.Session) error
 }
