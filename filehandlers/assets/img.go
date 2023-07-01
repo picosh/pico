@@ -7,8 +7,8 @@ import (
 
 	"github.com/gliderlabs/ssh"
 	"github.com/picosh/pico/db"
-	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pico/shared"
+	"github.com/picosh/pico/shared/storage"
 )
 
 func (h *UploadAssetHandler) validateAsset(data *PostMetaData) (bool, error) {
