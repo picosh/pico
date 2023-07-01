@@ -15,7 +15,7 @@ import (
 	"github.com/gliderlabs/ssh"
 	"github.com/picosh/pico/buckets"
 	"github.com/picosh/pico/db/postgres"
-	uploadimgs "github.com/picosh/pico/filehandlers/imgs"
+	"github.com/picosh/pico/filehandlers/assets"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pico/wish/cms"
@@ -81,7 +81,7 @@ func main() {
 		logger.Fatal(err)
 	}
 
-	handler := uploadimgs.NewUploadImgHandler(
+	handler := uploadassets.NewUploadAssetHandler(
 		dbh,
 		cfg,
 		st,

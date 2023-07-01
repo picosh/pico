@@ -1,4 +1,4 @@
-package uploadimgs
+package uploadassets
 
 import (
 	"bytes"
