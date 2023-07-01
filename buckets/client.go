@@ -4,7 +4,7 @@ import (
 	"github.com/gliderlabs/ssh"
 	"github.com/picosh/pico/db"
 	uploadimgs "github.com/picosh/pico/filehandlers/imgs"
-	"github.com/picosh/pico/imgs/storage"
+	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/wish/send/utils"
 )

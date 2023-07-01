@@ -1,15 +1,15 @@
 {{template "base" .}}
 
-{{define "title"}}{{.Site.Domain}} -- image hosting for hackers{{end}}
+{{define "title"}}{{.Site.Domain}} -- a static website hosting service for hackers.{{end}}
 
 {{define "meta"}}
-<meta name="description" content="image hosting for hackers" />
+<meta name="description" content="a static website hosting service for hackers." />
 
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="{{.Site.Domain}}">
 <meta property="og:url" content="https://{{.Site.Domain}}">
 <meta property="og:title" content="{{.Site.Domain}}">
-<meta property="og:description" content="image hosting for hackers">
+<meta property="og:description" content="a static website hosting service for hackers.">
 
 <meta name="twitter:card" content="summary" />
 <meta property="twitter:url" content="https://{{.Site.Domain}}">
@@ -29,27 +29,20 @@
 {{define "body"}}
 <header class="text-center">
     <h1 class="text-2xl font-bold">{{.Site.Domain}}</h1>
-    <p class="text-lg">image hosting for hackers</p>
+    <p class="text-lg">a static website hosting service for hackers.</p>
     <hr />
 </header>
 
 <main>
     <section>
         <h2 class="text-lg font-bold">Examples</h2>
-        <p><a href="https://erock.imgs.sh">feed</a></p>
+        <p><a href="https://git.erock.sh">git web viewer</a></p>
     </section>
 
     <section>
         <h2 class="text-lg font-bold">Features</h2>
         <ul>
             <li>Delightful terminal workflow</li>
-            <li>Share public images from the terminal</li>
-            <li>Seamless integration with other pico services (e.g. <a href="https://prose.sh">prose</a>)</li>
-            <li>Images are web optimized by default</li>
-            <li>API to modify images on-the-fly (e.g. dimensions)</li>
-            <li>Hotlinking encouraged!</li>
-            <li>No javascript</li>
-            <li>No ads</li>
             <li>10MB max image size</li>
             <li>1GB max storage</li>
         </ul>
@@ -86,12 +79,7 @@
     <section>
         <h2 class="text-lg font-bold">Philosophy</h2>
         <p>
-            Sharing photos is such an important part of the web.  From writing a blog to creating
-            memes, we want to enable hackers to quickly share images while never leaving the terminal.
-        </p>
-        <p>
-            We built imgs out of necessity, it's something we really wanted as part of the pico
-            ecosystem and are excited to share it with you.
+          Creating a static website should be as simple as copying files from a local folder to a server.
         </p>
         <p>Read more about team pico's philosophy <a href="https://pico.sh">here</a>.</p>
     </section>
@@ -99,8 +87,7 @@
     <section>
         <h2 class="text-lg font-bold">Roadmap</h2>
         <ol>
-            <li>Ability to create albums</li>
-            <li>Device optimized images</li>
+            <li>Not sure</li>
         </ol>
     </section>
 </main>

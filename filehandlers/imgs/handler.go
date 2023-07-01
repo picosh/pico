@@ -13,7 +13,7 @@ import (
 	"github.com/gliderlabs/ssh"
 	exifremove "github.com/neurosnap/go-exif-remove"
 	"github.com/picosh/pico/db"
-	"github.com/picosh/pico/imgs/storage"
+	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/wish/cms/util"
 	"github.com/picosh/pico/wish/send/utils"

@@ -53,97 +53,23 @@
         </ol>
     </section>
 
-    <section id="web-optimized">
-        <h2 class="text-xl">
-            <a href="#web-optimized" rel="nofollow noopener">#</a>
-            Web optimized
-        </h2>
-        <p>
-            When a user uploads an image, we immediately convert it to <code>webp</code>.
-            Then we have an API that serves those web optimized images.
-        </p>
-    </section>
-
-    <section id="integrations">
-        <h2 class="text-xl">
-            <a href="#integrations" rel="nofollow noopener">#</a>
-           How does imgs integrate with other pico services?
-        </h2>
-        <p>
-            We allow any of our other services to upload images from those services to imgs.
-            For example, if you want to upload images for prose.sh all you have to do is include
-            your images in the <code>rsync</code> or <code>scp</code> command.
-        </p>
-        <pre>scp profile.jpg user@prose.sh:/</pre>
-        <p>Then when you want to reference the file, you can reference it like so:</p>
-        <pre>![profile pic](/profile.jpg)</pre>
-    </section>
-
     <section id="file-types">
         <h2 class="text-xl">
             <a href="#file-types" rel="nofollow noopener">#</a>
             What file types are supported?
         </h2>
         <ul>
+            <li>html</li>
+            <li>css</li>
+            <li>js</li>
             <li>jpg</li>
             <li>png</li>
             <li>gif</li>
             <li>webp</li>
             <li>svg</li>
+            <li>ico</li>
+            <li>pdf</li>
         </ul>
-    </section>
-
-    <section id="image-manipulation">
-        <h2 class="text-xl">
-            <a href="#image-manipulation" rel="nofollow noopener">#</a>
-            Image manipulation
-        </h2>
-        <p>
-            We have an API that allows users to resize images on-the-fly.  Currently
-            we only support downscaling.
-        </p>
-
-        <pre>[!profile](/profile/x500)     # auto scale width
-[!profile](/profile/500x500)  # scale width and height
-[!profile](/profile/500x)     # auto scale height</pre>
-    </section>
-
-    <section id="img-update">
-        <h2 class="text-xl">
-            <a href="#img-update" rel="nofollow noopener">#</a>
-            How do I update a img?
-        </h2>
-        <p>
-            Updating a img requires that you update the source document and then run the <code>scp</code>
-            command again.  If the filename remains the same, then the img will be updated.
-        </p>
-    </section>
-
-    <section id="img-delete">
-        <h2 class="text-xl">
-            <a href="#img-delete" rel="nofollow noopener">#</a>
-            How do I delete a img?
-        </h2>
-        <p>
-            Because <code>scp</code> does not natively support deleting files, I didn't want to bake
-            that behavior into my ssh server.
-        </p>
-
-        <p>
-            However, if a user wants to delete a img they can delete the contents of the file and
-            then upload it to our server.  If the file contains 0 bytes, we will remove the img.
-            For example, if you want to delete <code>delete.jpg</code> you could:
-        </p>
-
-        <pre>
-cp /dev/null delete.jpg
-scp ./delete.jpg {{.Site.Domain}}:/</pre>
-
-        <p>
-            Alternatively, you can go to <code>ssh {{.Site.Domain}}</code> and select "Manage img."
-            Then you can highlight the img you want to delete and then press "X."  It will ask for
-            confirmation before actually removing the img.
-        </p>
     </section>
 
     <section id="custom-domain">

@@ -8,7 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/picosh/pico/db"
-	"github.com/picosh/pico/imgs/storage"
+	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pico/wish/cms/config"
 	"github.com/picosh/pico/wish/cms/ui/common"
 

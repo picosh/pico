@@ -7,7 +7,7 @@ import (
 
 	gocache "github.com/patrickmn/go-cache"
 	"github.com/picosh/pico/db/postgres"
-	"github.com/picosh/pico/imgs/storage"
+	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pico/shared"
 )
 
