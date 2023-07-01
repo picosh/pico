@@ -16,7 +16,7 @@ import (
 	"github.com/picosh/pico/db/postgres"
 	uploadimgs "github.com/picosh/pico/filehandlers/imgs"
 	"github.com/picosh/pico/buckets"
-	"github.com/picosh/pico/buckets/storage"
+	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/wish/cms"
 	"github.com/picosh/pico/wish/list"

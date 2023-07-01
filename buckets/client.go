@@ -10,7 +10,6 @@ import (
 )
 
 type IImgsAPI interface {
-	HasAccess(userID string) bool
 	Upload(file *utils.FileEntry) (string, error)
 }
 
@@ -27,10 +26,6 @@ func NewImgsAPI(dbpool db.DB, st storage.ObjectStorage) *ImgsAPI {
 		Db:  dbpool,
 		St:  st,
 	}
-}
-
-func (img *ImgsAPI) HasAccess(userID string) bool {
-	return img.Db.HasFeatureForUser(userID, "imgs")
 }
 
 func (img *ImgsAPI) Upload(s ssh.Session, file *utils.FileEntry) (string, error) {

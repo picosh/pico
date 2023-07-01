@@ -46,7 +46,7 @@ build-%:
 	go build -o "build/$*-ssh" "./cmd/$*/ssh"
 .PHONY: build-%
 
-build: build-prose build-lists build-pastes build-imgs build-feeds
+build: build-prose build-lists build-pastes build-imgs build-feeds build-buckets
 .PHONY: build
 
 format:
