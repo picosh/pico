@@ -81,7 +81,8 @@ migrate:
 .PHONY: migrate
 
 latest:
-	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20230326_add_feed_items.sql
+	$(DOCKER_CMD) cp ./sql/migrations/20230630_add_buckets_space.sql $(DB_CONTAINER):/tmp
+	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) -f /tmp/20230630_add_buckets_space.sql
 .PHONY: latest
 
 psql:
