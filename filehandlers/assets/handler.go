@@ -15,6 +15,7 @@ import (
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pico/wish/cms/util"
+	"github.com/picosh/pico/wish/send/scp"
 	"github.com/picosh/pico/wish/send/utils"
 )
 
@@ -36,6 +37,11 @@ func getUser(s ssh.Session) (*db.User, error) {
 		return user, fmt.Errorf("user not set on `ssh.Context()` for connection")
 	}
 	return user, nil
+}
+
+func GetAssetBucketName(s ssh.Session, userID string) string {
+	info := scp.GetInfo(s.Command())
+	return fmt.Sprintf("%s:%s", userID, info.Path)
 }
 
 type PostMetaData struct {
@@ -102,7 +108,7 @@ func (h *UploadAssetHandler) Read(s ssh.Session, filename string) (os.FileInfo, 
 		FModTime: *post.UpdatedAt,
 	}
 
-	bucket, err := h.Storage.GetBucket(user.ID)
+	bucket, err := h.Storage.GetBucket(GetAssetBucketName(s, user.ID))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -187,7 +193,6 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 		return "", err
 	}
 
-	fmt.Println(s.Command())
 	filename := entry.Name
 
 	var text []byte

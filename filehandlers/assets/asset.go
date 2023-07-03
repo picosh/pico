@@ -53,8 +53,6 @@ func (h *UploadAssetHandler) metaAsset(data *PostMetaData) error {
 	reader := bytes.NewReader([]byte(data.Text))
 	contents := bytes.NewReader([]byte(data.Text))
 
-	// we want to keep the original file so people can use that
-	// if our webp optimizer doesn't work properly
 	fname, err := h.Storage.PutFile(
 		bucket,
 		data.Filename,
@@ -64,7 +62,7 @@ func (h *UploadAssetHandler) metaAsset(data *PostMetaData) error {
 		return err
 	}
 
-	finalName := shared.SanitizeFileExt(data.Filename)
+	finalName := data.Filename
 
 	_, err = h.Storage.PutFile(
 		bucket,
@@ -111,11 +109,6 @@ func (h *UploadAssetHandler) writeAsset(s ssh.Session, data *PostMetaData) error
 			return err
 		}
 		err = h.Storage.DeleteFile(bucket, data.Filename)
-		if err != nil {
-			return err
-		}
-		webp := fmt.Sprintf("%s.webp", shared.SanitizeFileExt(data.Filename))
-		err = h.Storage.DeleteFile(bucket, webp)
 		if err != nil {
 			return err
 		}
