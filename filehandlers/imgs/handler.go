@@ -217,6 +217,7 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 	shasum := shared.Shasum(text)
 
 	nextPost := db.Post{
+		Path:      entry.Path,
 		Filename:  filename,
 		Slug:      slug,
 		PublishAt: &now,

@@ -87,6 +87,7 @@ func copyFromClient(session ssh.Session, info Info, handler utils.CopyFromClient
 
 			result, err := handler.Write(session, &utils.FileEntry{
 				Name:     name,
+				Path:     path,
 				Filepath: filepath.Join(path, name),
 				Mode:     fs.FileMode(mode),
 				Size:     size,

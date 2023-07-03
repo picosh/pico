@@ -45,9 +45,11 @@ func (h *handler) Read(path string) (os.FileInfo, io.ReaderAt, error) {
 
 func (h *handler) Put(fileName string, content io.Reader, fileSize int64, mTime int64, aTime int64) (int64, error) {
 	cleanName := path.Base(fileName)
+	fpath := "/"
 	fileEntry := &utils.FileEntry{
 		Name:     cleanName,
-		Filepath: fmt.Sprintf("/%s", cleanName),
+		Path:     fpath,
+		Filepath: path.Join(fpath, cleanName),
 		Mode:     fs.FileMode(0600),
 		Size:     fileSize,
 		Mtime:    mTime,

@@ -31,6 +31,7 @@ func Middleware(writeHandler utils.CopyFromClientHandler, ext string) wish.Middl
 
 			result, err := writeHandler.Write(session, &utils.FileEntry{
 				Name:     name,
+				Path:     "",
 				Filepath: name,
 				Mode:     fs.FileMode(0777),
 				Size:     0,

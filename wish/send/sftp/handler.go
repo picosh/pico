@@ -57,6 +57,7 @@ func (f *handler) Filelist(r *sftp.Request) (sftp.ListerAt, error) {
 func (f *handler) Filewrite(r *sftp.Request) (io.WriterAt, error) {
 	fileEntry := &utils.FileEntry{
 		Name:     path.Base(r.Filepath),
+		Path:     path.Dir(r.Filepath),
 		Filepath: r.Filepath,
 		Mode:     r.Attributes().FileMode(),
 		Size:     int64(r.Attributes().Size),

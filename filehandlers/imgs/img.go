@@ -163,6 +163,7 @@ func (h *UploadImgHandler) writeImg(s ssh.Session, data *PostMetaData) error {
 
 			Data:        data.Data,
 			Description: data.Description,
+			Path:        data.Path,
 			Filename:    data.Filename,
 			FileSize:    data.FileSize,
 			Hidden:      data.Hidden,

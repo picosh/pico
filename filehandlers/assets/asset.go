@@ -38,14 +38,14 @@ func (h *UploadAssetHandler) validateAsset(data *PostMetaData) (bool, error) {
 	return true, nil
 }
 
-func (h *UploadAssetHandler) metaAsset(data *PostMetaData) error {
+func (h *UploadAssetHandler) metaAsset(s ssh.Session, data *PostMetaData) error {
 	// if the file is empty that means we should delete it
 	// so we can skip all the meta info
 	if data.FileSize == 0 {
 		return nil
 	}
 
-	bucket, err := h.Storage.UpsertBucket(data.User.ID)
+	bucket, err := h.Storage.UpsertBucket(GetAssetBucketName(s, data.User.ID))
 	if err != nil {
 		return err
 	}
@@ -92,7 +92,7 @@ func (h *UploadAssetHandler) writeAsset(s ssh.Session, data *PostMetaData) error
 		return err
 	}
 
-	err = h.metaAsset(data)
+	err = h.metaAsset(s, data)
 	if err != nil {
 		h.Cfg.Logger.Info(err)
 		return err
@@ -104,7 +104,7 @@ func (h *UploadAssetHandler) writeAsset(s ssh.Session, data *PostMetaData) error
 			return err
 		}
 
-		bucket, err := h.Storage.UpsertBucket(data.User.ID)
+		bucket, err := h.Storage.UpsertBucket(GetAssetBucketName(s, data.User.ID))
 		if err != nil {
 			return err
 		}
@@ -120,6 +120,7 @@ func (h *UploadAssetHandler) writeAsset(s ssh.Session, data *PostMetaData) error
 
 			Data:        data.Data,
 			Description: data.Description,
+			Path:        data.Path,
 			Filename:    data.Filename,
 			FileSize:    data.FileSize,
 			Hidden:      data.Hidden,

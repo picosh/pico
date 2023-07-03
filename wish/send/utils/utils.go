@@ -18,6 +18,7 @@ var NULL = []byte{'\x00'}
 // its contents.
 type FileEntry struct {
 	Name     string
+	Path     string
 	Filepath string
 	Mode     fs.FileMode
 	Size     int64

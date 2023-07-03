@@ -76,6 +76,7 @@ func (p *FeedItemData) Scan(value interface{}) error {
 type Post struct {
 	ID          string     `json:"id"`
 	UserID      string     `json:"user_id"`
+	Path        string     `json:"path"`
 	Filename    string     `json:"filename"`
 	Slug        string     `json:"slug"`
 	Title       string     `json:"title"`

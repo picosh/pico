@@ -220,7 +220,7 @@ const (
 	sqlInsertPublicKey = `INSERT INTO public_keys (user_id, public_key) VALUES ($1, $2)`
 	sqlInsertPost      = `
 	INSERT INTO posts
-		(user_id, filename, slug, title, text, description, publish_at, hidden, cur_space,
+		(user_id, path, filename, slug, title, text, description, publish_at, hidden, cur_space,
 		file_size, mime_type, shasum, data, expires_at)
 	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 	RETURNING id`
@@ -680,6 +680,7 @@ func (me *PsqlDB) InsertPost(post *db.Post) (*db.Post, error) {
 	err := me.Db.QueryRow(
 		sqlInsertPost,
 		post.UserID,
+		post.Path,
 		post.Filename,
 		post.Slug,
 		post.Title,

@@ -186,6 +186,7 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 	shasum := shared.Shasum(origText)
 
 	nextPost := db.Post{
+		Path:      entry.Path,
 		Filename:  filename,
 		Slug:      slug,
 		PublishAt: &now,
@@ -246,6 +247,7 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 
 			Data:        metadata.Data,
 			Description: metadata.Description,
+			Path:        metadata.Path,
 			Filename:    metadata.Filename,
 			FileSize:    metadata.FileSize,
 			Hidden:      metadata.Hidden,
