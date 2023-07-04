@@ -208,6 +208,7 @@ func (h *UploadImgHandler) writeImg(s ssh.Session, data *PostMetaData) error {
 			Shasum:      data.Shasum,
 			Text:        data.Text,
 			Title:       data.Title,
+			Hidden:      data.Hidden,
 		}
 		_, err = h.DBPool.UpdatePost(&updatePost)
 		if err != nil {

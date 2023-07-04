@@ -305,6 +305,7 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 			Shasum:      metadata.Shasum,
 			Text:        metadata.Text,
 			Title:       metadata.Title,
+			Hidden:      metadata.Hidden,
 		}
 		_, err = h.DBPool.UpdatePost(&updatePost)
 		if err != nil {
