@@ -261,7 +261,7 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 	curl := shared.NewCreateURL(h.Cfg)
 	url := h.Cfg.FullPostURL(
 		curl,
-		fmt.Sprintf("%s-%s", user.Name, metadata.Path),
+		fmt.Sprintf("%s-%s", user.Name, strings.TrimPrefix(metadata.Path, "/")),
 		metadata.Filename,
 	)
 	str := fmt.Sprintf(
