@@ -2,7 +2,6 @@ package buckets
 
 import (
 	"fmt"
-	"html/template"
 	"io"
 	"net/http"
 	"net/url"
@@ -17,20 +16,6 @@ import (
 	"github.com/picosh/pico/shared/storage"
 	"go.uber.org/zap"
 )
-
-type TransparencyPageData struct {
-	Site      shared.SitePageData
-	Analytics *db.Analytics
-}
-
-type Link struct {
-	URL  template.URL
-	Text string
-}
-
-func GetBlogName(username string) string {
-	return username
-}
 
 type AssetHandler struct {
 	Username  string
@@ -129,74 +114,9 @@ func assetRequest(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func transparencyHandler(w http.ResponseWriter, r *http.Request) {
-	dbpool := shared.GetDB(r)
-	logger := shared.GetLogger(r)
-	cfg := shared.GetCfg(r)
-
-	analytics, err := dbpool.FindSiteAnalytics(cfg.Space)
-	if err != nil {
-		logger.Error(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	ts, err := template.ParseFiles(
-		cfg.StaticPath("html/transparency.page.tmpl"),
-		cfg.StaticPath("html/footer.partial.tmpl"),
-		cfg.StaticPath("html/marketing-footer.partial.tmpl"),
-		cfg.StaticPath("html/base.layout.tmpl"),
-	)
-
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-
-	data := TransparencyPageData{
-		Site:      *cfg.GetSiteData(),
-		Analytics: analytics,
-	}
-	err = ts.Execute(w, data)
-	if err != nil {
-		logger.Error(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-}
-
-func createStaticRoutes() []shared.Route {
-	return []shared.Route{
-		shared.NewRoute("GET", "/main.css", shared.ServeFile("main.css", "text/css")),
-		shared.NewRoute("GET", "/imgs.css", shared.ServeFile("imgs.css", "text/css")),
-		shared.NewRoute("GET", "/card.png", shared.ServeFile("card.png", "image/png")),
-		shared.NewRoute("GET", "/favicon-16x16.png", shared.ServeFile("favicon-16x16.png", "image/png")),
-		shared.NewRoute("GET", "/favicon-32x32.png", shared.ServeFile("favicon-32x32.png", "image/png")),
-		shared.NewRoute("GET", "/apple-touch-icon.png", shared.ServeFile("apple-touch-icon.png", "image/png")),
-		shared.NewRoute("GET", "/favicon.ico", shared.ServeFile("favicon.ico", "image/x-icon")),
-		shared.NewRoute("GET", "/robots.txt", shared.ServeFile("robots.txt", "text/plain")),
-	}
-}
-
-func createMainRoutes(staticRoutes []shared.Route) []shared.Route {
-	routes := []shared.Route{
-		shared.NewRoute("GET", "/", shared.CreatePageHandler("html/marketing.page.tmpl")),
-		shared.NewRoute("GET", "/ops", shared.CreatePageHandler("html/ops.page.tmpl")),
-		shared.NewRoute("GET", "/privacy", shared.CreatePageHandler("html/privacy.page.tmpl")),
-		shared.NewRoute("GET", "/help", shared.CreatePageHandler("html/help.page.tmpl")),
-		shared.NewRoute("GET", "/transparency", transparencyHandler),
-		shared.NewRoute("GET", "/check", shared.CheckHandler),
-	}
-
-	routes = append(
-		routes,
-		staticRoutes...,
-	)
-
-	return routes
-}
-
 func createSubdomainRoutes(staticRoutes []shared.Route) []shared.Route {
 	routes := []shared.Route{
-		shared.NewRoute("GET", "/([^/]+)/(.+)", assetRequest),
+		shared.NewRoute("GET", "/(.+)", assetRequest),
 	}
 
 	routes = append(
@@ -231,14 +151,9 @@ func StartApiServer() {
 		logger.Fatal(err)
 	}
 
-	staticRoutes := createStaticRoutes()
 
-	if cfg.Debug {
-		staticRoutes = shared.CreatePProfRoutes(staticRoutes)
-	}
-
-	mainRoutes := createMainRoutes(staticRoutes)
-	subdomainRoutes := createSubdomainRoutes(staticRoutes)
+	mainRoutes := []shared.Route{}
+	subdomainRoutes := createSubdomainRoutes([]shared.Route{})
 
 	handler := shared.CreateServe(mainRoutes, subdomainRoutes, cfg, db, st, logger, cache)
 	router := http.HandlerFunc(handler)
