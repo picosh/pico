@@ -36,7 +36,7 @@ type AssetHandler struct {
 	Username  string
 	Subdomain string
 	Path      string
-	Filename string
+	Filename  string
 	Cfg       *shared.ConfigSite
 	Dbpool    db.DB
 	Storage   storage.ObjectStorage
@@ -117,15 +117,15 @@ func assetRequest(w http.ResponseWriter, r *http.Request) {
 	cache := shared.GetCache(r)
 
 	assetHandler(w, &AssetHandler{
-		Username:     username,
-		Subdomain:    subdomain,
-		Filename: fname,
-		Path: fpath,
-		Cfg:          cfg,
-		Dbpool:       dbpool,
-		Storage:      st,
-		Logger:       logger,
-		Cache:        cache,
+		Username:  username,
+		Subdomain: subdomain,
+		Filename:  fname,
+		Path:      fpath,
+		Cfg:       cfg,
+		Dbpool:    dbpool,
+		Storage:   st,
+		Logger:    logger,
+		Cache:     cache,
 	})
 }
 
