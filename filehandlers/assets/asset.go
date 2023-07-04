@@ -97,6 +97,7 @@ func (h *UploadAssetHandler) writeAsset(s ssh.Session, data *PostMetaData) error
 		h.Cfg.Logger.Info(err)
 		return err
 	}
+	assetFilename := shared.GetAssetFileName(data.Path, data.Filename)
 
 	if len(data.OrigText) == 0 {
 		err = h.removePost(data)
@@ -108,12 +109,12 @@ func (h *UploadAssetHandler) writeAsset(s ssh.Session, data *PostMetaData) error
 		if err != nil {
 			return err
 		}
-		err = h.Storage.DeleteFile(bucket, shared.GetAssetFileName(data.Path, data.Filename))
+		err = h.Storage.DeleteFile(bucket, assetFilename)
 		if err != nil {
 			return err
 		}
 	} else if data.Cur == nil {
-		h.Cfg.Logger.Infof("(%s) not found, adding record", data.Filename)
+		h.Cfg.Logger.Infof("(%s) not found, adding record", assetFilename)
 		insertPost := db.Post{
 			UserID: user.ID,
 			Space:  h.Cfg.Space,
@@ -133,16 +134,16 @@ func (h *UploadAssetHandler) writeAsset(s ssh.Session, data *PostMetaData) error
 		}
 		_, err := h.DBPool.InsertPost(&insertPost)
 		if err != nil {
-			h.Cfg.Logger.Errorf("error for %s: %v", data.Filename, err)
-			return fmt.Errorf("error for %s: %v", data.Filename, err)
+			h.Cfg.Logger.Errorf("error for %s: %v", assetFilename, err)
+			return fmt.Errorf("error for %s: %v", assetFilename, err)
 		}
 	} else {
 		if data.Shasum == data.Cur.Shasum {
-			h.Cfg.Logger.Infof("(%s) found, but asset is identical, skipping", data.Filename)
+			h.Cfg.Logger.Infof("(%s) found, but asset is identical, skipping", assetFilename)
 			return nil
 		}
 
-		h.Cfg.Logger.Infof("(%s) found, updating record", data.Filename)
+		h.Cfg.Logger.Infof("(%s) found, updating record", assetFilename)
 		updatePost := db.Post{
 			ID: data.Cur.ID,
 
@@ -157,8 +158,8 @@ func (h *UploadAssetHandler) writeAsset(s ssh.Session, data *PostMetaData) error
 		}
 		_, err = h.DBPool.UpdatePost(&updatePost)
 		if err != nil {
-			h.Cfg.Logger.Errorf("error for %s: %v", data.Filename, err)
-			return fmt.Errorf("error for %s: %v", data.Filename, err)
+			h.Cfg.Logger.Errorf("error for %s: %v", assetFilename, err)
+			return fmt.Errorf("error for %s: %v", assetFilename, err)
 		}
 	}
 

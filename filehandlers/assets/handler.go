@@ -233,7 +233,7 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 		h.Cfg.Space,
 	)
 	if err != nil {
-		h.Cfg.Logger.Infof("(%s) unable to find post (%s), continuing", nextPost.Filename, err)
+		h.Cfg.Logger.Infof("(%s) unable to find post (%s), continuing", shared.GetAssetFileName(nextPost.Path, nextPost.Filename), err)
 	}
 
 	metadata := PostMetaData{
@@ -262,9 +262,10 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 	preUrl := h.Cfg.FullPostURL(
 		curl,
 		user.Name,
-		metadata.Path,
+		"",
 	)
-	url := fmt.Sprintf("%s/%s", preUrl, metadata.Filename)
+	// hack
+	url := path.Join(preUrl, metadata.Path, metadata.Filename)
 	str := fmt.Sprintf(
 		"%s (space: %.2f/%.2fGB, %.2f%%)",
 		url,
