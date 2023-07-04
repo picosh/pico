@@ -15,7 +15,7 @@ import (
 	"github.com/gliderlabs/ssh"
 	"github.com/picosh/pico/buckets"
 	"github.com/picosh/pico/db/postgres"
-	"github.com/picosh/pico/filehandlers/assets"
+	uploadassets "github.com/picosh/pico/filehandlers/assets"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pico/wish/cms"

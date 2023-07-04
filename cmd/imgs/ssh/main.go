@@ -14,7 +14,7 @@ import (
 	lm "github.com/charmbracelet/wish/logging"
 	"github.com/gliderlabs/ssh"
 	"github.com/picosh/pico/db/postgres"
-	"github.com/picosh/pico/filehandlers/imgs"
+	uploadimgs "github.com/picosh/pico/filehandlers/imgs"
 	"github.com/picosh/pico/imgs"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
