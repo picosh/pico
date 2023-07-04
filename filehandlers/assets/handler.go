@@ -259,13 +259,11 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 	}
 
 	curl := shared.NewCreateURL(h.Cfg)
-	preUrl := h.Cfg.FullPostURL(
+	url := h.Cfg.FullPostURL(
 		curl,
-		user.Name,
-		"",
+		fmt.Sprintf("%s-%s", user.Name, metadata.Path),
+		metadata.Filename,
 	)
-	// hack
-	url := path.Join(preUrl, metadata.Path, metadata.Filename)
 	str := fmt.Sprintf(
 		"%s (space: %.2f/%.2fGB, %.2f%%)",
 		url,

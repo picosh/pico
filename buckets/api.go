@@ -5,6 +5,8 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"path"
+	"strings"
 	"time"
 
 	_ "net/http/pprof"
@@ -32,15 +34,26 @@ type AssetHandler struct {
 func assetHandler(w http.ResponseWriter, h *AssetHandler) {
 	user, err := h.Dbpool.FindUserForName(h.Username)
 	if err != nil {
-		h.Logger.Infof("blog not found: %s", h.Username)
-		http.Error(w, "blog not found", http.StatusNotFound)
+		h.Logger.Infof("user not found: %s", h.Username)
+		http.Error(w, "user not found", http.StatusNotFound)
 		return
 	}
 
-	post, err := h.Dbpool.FindPostWithPath(fmt.Sprintf("/%s", h.Path), h.Filename, user.ID, h.Cfg.Space)
+	post, err := h.Dbpool.FindPostWithPath(
+		fmt.Sprintf("/%s", h.Path),
+		h.Filename,
+		user.ID,
+		h.Cfg.Space,
+	)
 	if err != nil {
-		h.Logger.Infof("asset not found %s/%s/%s", h.Username, h.Path, h.Filename)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.Logger.Infof(
+			"asset not found: path:[%s], filename:[%s], user:[%s], space:[%s]",
+			h.Path,
+			h.Filename,
+			h.Username,
+			h.Cfg.Space,
+		)
+		http.Error(w, "asset not found", http.StatusNotFound)
 		return
 	}
 
@@ -62,9 +75,7 @@ func assetHandler(w http.ResponseWriter, h *AssetHandler) {
 	contents, err := h.Storage.GetFile(bucket, fname)
 	if err != nil {
 		h.Logger.Infof(
-			"file not found %s/%s in storage (bucket: %s, name: %s)",
-			h.Username,
-			fname,
+			"asset not found in bucket: bucket:[%s], file:[%s]",
 			bucket.Name,
 			fname,
 		)
@@ -82,19 +93,26 @@ func assetHandler(w http.ResponseWriter, h *AssetHandler) {
 }
 
 func assetRequest(w http.ResponseWriter, r *http.Request) {
-	username := shared.GetUsernameFromRequest(r)
 	subdomain := shared.GetSubdomain(r)
 	cfg := shared.GetCfg(r)
 
-	var fpath string
-	var fname string
-	if !cfg.IsSubdomains() || subdomain == "" {
-		fpath, _ = url.PathUnescape(shared.GetField(r, 1))
-		fname, _ = url.PathUnescape(shared.GetField(r, 2))
-	} else {
-		fpath, _ = url.PathUnescape(shared.GetField(r, 0))
-		fname, _ = url.PathUnescape(shared.GetField(r, 1))
+	floc, _ := url.PathUnescape(shared.GetField(r, 0))
+	strs := strings.SplitN(subdomain, "-", 2)
+	project := ""
+	username := ""
+	if len(strs) > 1 {
+		username = strs[0]
+		project = strs[1]
 	}
+	fname := path.Base(floc)
+	fdir := path.Dir(floc)
+	// hack: we need to accommodate routes that are just directories
+	// and point the user to the index.html of each root dir.
+	if fname == "." || path.Ext(floc) == "" {
+		fname = "index.html"
+		fdir = floc
+	}
+	fpath := path.Join(project, fdir)
 
 	dbpool := shared.GetDB(r)
 	st := shared.GetStorage(r)
@@ -116,6 +134,7 @@ func assetRequest(w http.ResponseWriter, r *http.Request) {
 
 func createSubdomainRoutes(staticRoutes []shared.Route) []shared.Route {
 	routes := []shared.Route{
+		shared.NewRoute("GET", "/", assetRequest),
 		shared.NewRoute("GET", "/(.+)", assetRequest),
 	}
 
@@ -150,7 +169,6 @@ func StartApiServer() {
 	if err != nil {
 		logger.Fatal(err)
 	}
-
 
 	mainRoutes := []shared.Route{}
 	subdomainRoutes := createSubdomainRoutes([]shared.Route{})
