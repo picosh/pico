@@ -3,6 +3,7 @@ package buckets
 import (
 	"fmt"
 	"html/template"
+	"io"
 	"net/http"
 	"net/url"
 	"time"
@@ -17,51 +18,6 @@ import (
 	"go.uber.org/zap"
 )
 
-type PageData struct {
-	Site shared.SitePageData
-}
-
-type PostItemData struct {
-	BlogURL      template.URL
-	URL          template.URL
-	ImgURL       template.URL
-	PublishAtISO string
-	PublishAt    string
-	Caption      string
-}
-
-type BlogPageData struct {
-	Site      shared.SitePageData
-	PageTitle string
-	URL       template.URL
-	RSSURL    template.URL
-	Username  string
-	Readme    *ReadmeTxt
-	Header    *HeaderTxt
-	Posts     []*PostItemData
-	HasFilter bool
-}
-
-type PostPageData struct {
-	Site         shared.SitePageData
-	PageTitle    string
-	URL          template.URL
-	BlogURL      template.URL
-	Slug         string
-	Title        string
-	Caption      string
-	Contents     template.HTML
-	Text         string
-	Username     string
-	BlogName     string
-	PublishAtISO string
-	PublishAt    string
-	Tags         []Link
-	ImgURL       template.URL
-	PrevPage     template.URL
-	NextPage     template.URL
-}
-
 type TransparencyPageData struct {
 	Site      shared.SitePageData
 	Analytics *db.Analytics
@@ -72,39 +28,23 @@ type Link struct {
 	Text string
 }
 
-type HeaderTxt struct {
-	Title    string
-	Bio      string
-	Nav      []Link
-	HasLinks bool
-}
-
-type ReadmeTxt struct {
-	HasText  bool
-	Contents template.HTML
-}
-
 func GetBlogName(username string) string {
 	return username
 }
 
-type ImgHandler struct {
+type AssetHandler struct {
 	Username  string
 	Subdomain string
-	Slug      string
+	Path      string
+	Filename string
 	Cfg       *shared.ConfigSite
 	Dbpool    db.DB
 	Storage   storage.ObjectStorage
 	Logger    *zap.SugaredLogger
 	Cache     *gocache.Cache
-	Img       *shared.ImgOptimizer
-	// We should try to use the optimized image if it's available
-	// not all images are optimized so this flag isn't enough
-	// because we also need to check the mime type
-	UseOptimized bool
 }
 
-func assetHandler(w http.ResponseWriter, h *ImgHandler) {
+func assetHandler(w http.ResponseWriter, h *AssetHandler) {
 	user, err := h.Dbpool.FindUserForName(h.Username)
 	if err != nil {
 		h.Logger.Infof("blog not found: %s", h.Username)
@@ -112,9 +52,9 @@ func assetHandler(w http.ResponseWriter, h *ImgHandler) {
 		return
 	}
 
-	post, err := h.Dbpool.FindPostWithSlug(h.Slug, user.ID, h.Cfg.Space)
+	post, err := h.Dbpool.FindPostWithPath(fmt.Sprintf("/%s", h.Path), h.Filename, user.ID, h.Cfg.Space)
 	if err != nil {
-		h.Logger.Infof("image not found %s/%s", h.Username, h.Slug)
+		h.Logger.Infof("asset not found %s/%s/%s", h.Username, h.Path, h.Filename)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -124,7 +64,7 @@ func assetHandler(w http.ResponseWriter, h *ImgHandler) {
 		h.Logger.Error(err)
 	}
 
-	bucket, err := h.Storage.GetBucket(user.ID)
+	bucket, err := h.Storage.GetBucket(shared.GetAssetBucketName(user.ID))
 	if err != nil {
 		h.Logger.Infof("bucket not found %s/%s", h.Username, post.Filename)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -132,14 +72,14 @@ func assetHandler(w http.ResponseWriter, h *ImgHandler) {
 	}
 
 	contentType := post.MimeType
-	fname := post.Filename
+	fname := shared.GetAssetFileName(post.Path, post.Filename)
 
 	contents, err := h.Storage.GetFile(bucket, fname)
 	if err != nil {
 		h.Logger.Infof(
 			"file not found %s/%s in storage (bucket: %s, name: %s)",
 			h.Username,
-			post.Filename,
+			fname,
 			bucket.Name,
 			fname,
 		)
@@ -149,6 +89,7 @@ func assetHandler(w http.ResponseWriter, h *ImgHandler) {
 	defer contents.Close()
 
 	w.Header().Add("Content-Type", contentType)
+	_, err = io.Copy(w, contents)
 
 	if err != nil {
 		h.Logger.Error(err)
@@ -160,36 +101,31 @@ func assetRequest(w http.ResponseWriter, r *http.Request) {
 	subdomain := shared.GetSubdomain(r)
 	cfg := shared.GetCfg(r)
 
-	var dimes string
-	var slug string
+	var fpath string
+	var fname string
 	if !cfg.IsSubdomains() || subdomain == "" {
-		slug, _ = url.PathUnescape(shared.GetField(r, 1))
-		dimes, _ = url.PathUnescape(shared.GetField(r, 2))
+		fpath, _ = url.PathUnescape(shared.GetField(r, 1))
+		fname, _ = url.PathUnescape(shared.GetField(r, 2))
 	} else {
-		slug, _ = url.PathUnescape(shared.GetField(r, 0))
-		dimes, _ = url.PathUnescape(shared.GetField(r, 1))
+		fpath, _ = url.PathUnescape(shared.GetField(r, 0))
+		fname, _ = url.PathUnescape(shared.GetField(r, 1))
 	}
-
-	// users might add the file extension when requesting an image
-	// but we want to remove that
-	slug = shared.SanitizeFileExt(slug)
 
 	dbpool := shared.GetDB(r)
 	st := shared.GetStorage(r)
 	logger := shared.GetLogger(r)
 	cache := shared.GetCache(r)
 
-	assetHandler(w, &ImgHandler{
+	assetHandler(w, &AssetHandler{
 		Username:     username,
 		Subdomain:    subdomain,
-		Slug:         slug,
+		Filename: fname,
+		Path: fpath,
 		Cfg:          cfg,
 		Dbpool:       dbpool,
 		Storage:      st,
 		Logger:       logger,
 		Cache:        cache,
-		Img:          shared.NewImgOptimizer(logger, dimes),
-		UseOptimized: true,
 	})
 }
 
@@ -260,7 +196,7 @@ func createMainRoutes(staticRoutes []shared.Route) []shared.Route {
 
 func createSubdomainRoutes(staticRoutes []shared.Route) []shared.Route {
 	routes := []shared.Route{
-		shared.NewRoute("GET", "*", assetRequest),
+		shared.NewRoute("GET", "/([^/]+)/(.+)", assetRequest),
 	}
 
 	routes = append(

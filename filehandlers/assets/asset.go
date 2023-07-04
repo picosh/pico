@@ -45,7 +45,7 @@ func (h *UploadAssetHandler) metaAsset(s ssh.Session, data *PostMetaData) error 
 		return nil
 	}
 
-	bucket, err := h.Storage.UpsertBucket(GetAssetBucketName(s, data.User.ID))
+	bucket, err := h.Storage.UpsertBucket(shared.GetAssetBucketName(data.User.ID))
 	if err != nil {
 		return err
 	}
@@ -55,7 +55,7 @@ func (h *UploadAssetHandler) metaAsset(s ssh.Session, data *PostMetaData) error 
 
 	fname, err := h.Storage.PutFile(
 		bucket,
-		data.Filename,
+		shared.GetAssetFileName(data.Path, data.Filename),
 		storage.NopReaderAtCloser(reader),
 	)
 	if err != nil {
@@ -104,11 +104,11 @@ func (h *UploadAssetHandler) writeAsset(s ssh.Session, data *PostMetaData) error
 			return err
 		}
 
-		bucket, err := h.Storage.UpsertBucket(GetAssetBucketName(s, data.User.ID))
+		bucket, err := h.Storage.UpsertBucket(shared.GetAssetBucketName(data.User.ID))
 		if err != nil {
 			return err
 		}
-		err = h.Storage.DeleteFile(bucket, data.Filename)
+		err = h.Storage.DeleteFile(bucket, shared.GetAssetFileName(data.Path, data.Filename))
 		if err != nil {
 			return err
 		}
@@ -138,7 +138,7 @@ func (h *UploadAssetHandler) writeAsset(s ssh.Session, data *PostMetaData) error
 		}
 	} else {
 		if data.Shasum == data.Cur.Shasum {
-			h.Cfg.Logger.Infof("(%s) found, but image is identical, skipping", data.Filename)
+			h.Cfg.Logger.Infof("(%s) found, but asset is identical, skipping", data.Filename)
 			return nil
 		}
 

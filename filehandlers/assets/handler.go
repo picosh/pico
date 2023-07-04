@@ -15,7 +15,6 @@ import (
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pico/wish/cms/util"
-	"github.com/picosh/pico/wish/send/scp"
 	"github.com/picosh/pico/wish/send/utils"
 )
 
@@ -37,11 +36,6 @@ func getUser(s ssh.Session) (*db.User, error) {
 		return user, fmt.Errorf("user not set on `ssh.Context()` for connection")
 	}
 	return user, nil
-}
-
-func GetAssetBucketName(s ssh.Session, userID string) string {
-	info := scp.GetInfo(s.Command())
-	return fmt.Sprintf("%s:%s", userID, info.Path)
 }
 
 type PostMetaData struct {
@@ -108,12 +102,13 @@ func (h *UploadAssetHandler) Read(s ssh.Session, filename string) (os.FileInfo, 
 		FModTime: *post.UpdatedAt,
 	}
 
-	bucket, err := h.Storage.GetBucket(GetAssetBucketName(s, user.ID))
+	bucket, err := h.Storage.GetBucket(shared.GetAssetBucketName(user.ID))
 	if err != nil {
 		return nil, nil, err
 	}
 
-	contents, err := h.Storage.GetFile(bucket, post.Filename)
+	fname := shared.GetAssetFileName(post.Path, post.Filename)
+	contents, err := h.Storage.GetFile(bucket, fname)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -218,11 +213,21 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 	}
 
 	ext := path.Ext(filename)
+	fmt.Println(ext)
 	if ext == ".svg" {
 		nextPost.MimeType = "image/svg+xml"
+	} else if ext == ".css" {
+		nextPost.MimeType = "text/css"
+	} else if ext == ".js" {
+		nextPost.MimeType = "text/javascript"
+	} else if ext == ".ico" {
+		nextPost.MimeType = "image/x-icon"
+	} else if ext == ".pdf" {
+		nextPost.MimeType = "application/pdf"
 	}
 
-	post, err := h.DBPool.FindPostWithFilename(
+	post, err := h.DBPool.FindPostWithPath(
+		nextPost.Path,
 		nextPost.Filename,
 		user.ID,
 		h.Cfg.Space,
@@ -254,11 +259,12 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 	}
 
 	curl := shared.NewCreateURL(h.Cfg)
-	url := h.Cfg.FullPostURL(
+	preUrl := h.Cfg.FullPostURL(
 		curl,
 		user.Name,
-		metadata.Slug,
+		metadata.Path,
 	)
+	url := fmt.Sprintf("%s/%s", preUrl, metadata.Filename)
 	str := fmt.Sprintf(
 		"%s (space: %.2f/%.2fGB, %.2f%%)",
 		url,

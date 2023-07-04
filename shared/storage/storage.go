@@ -99,6 +99,10 @@ func (s *StorageFS) GetFile(bucket Bucket, fname string) (ReaderAtCloser, error)
 
 func (s *StorageFS) PutFile(bucket Bucket, fname string, contents ReaderAtCloser) (string, error) {
 	loc := path.Join(bucket.Path, fname)
+	err := os.MkdirAll(path.Dir(loc), os.ModePerm)
+	if err != nil {
+		return "", err
+	}
 	f, err := os.OpenFile(loc, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return "", err

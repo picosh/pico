@@ -19,7 +19,7 @@ import (
 var PAGER_SIZE = 15
 
 var SelectPost = `
-	posts.id, user_id, app_users.name, filename, slug, title, text, description,
+	posts.id, user_id, app_users.name, path, filename, slug, title, text, description,
 	posts.created_at, publish_at, posts.updated_at, hidden, file_size, mime_type, shasum, data, expires_at, views`
 
 var (
@@ -48,6 +48,14 @@ var (
 	LEFT OUTER JOIN app_users ON app_users.id = posts.user_id
 	LEFT OUTER JOIN post_tags ON post_tags.post_id = posts.id
 	WHERE slug = $1 AND user_id = $2 AND cur_space = $3
+	GROUP BY %s`, SelectPost, SelectPost)
+
+	sqlSelectPostWithPath = fmt.Sprintf(`
+	SELECT %s, STRING_AGG(coalesce(post_tags.name, ''), ',') tags
+	FROM posts
+	LEFT OUTER JOIN app_users ON app_users.id = posts.user_id
+	LEFT OUTER JOIN post_tags ON post_tags.post_id = posts.id
+	WHERE path = $1 AND filename = $2 AND user_id = $3 AND cur_space = $4
 	GROUP BY %s`, SelectPost, SelectPost)
 
 	sqlSelectPost = fmt.Sprintf(`
@@ -162,6 +170,7 @@ const (
 	SELECT
 		posts.id,
 		user_id,
+		path,
 		filename,
 		slug,
 		title,
@@ -181,6 +190,7 @@ const (
 	SELECT
 		posts.id,
 		user_id,
+		path,
 		filename,
 		slug,
 		title,
@@ -222,7 +232,7 @@ const (
 	INSERT INTO posts
 		(user_id, path, filename, slug, title, text, description, publish_at, hidden, cur_space,
 		file_size, mime_type, shasum, data, expires_at)
-	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 	RETURNING id`
 	sqlInsertUser      = `INSERT INTO app_users DEFAULT VALUES returning id`
 	sqlInsertTag       = `INSERT INTO post_tags (post_id, name) VALUES($1, $2) RETURNING id;`
@@ -259,6 +269,7 @@ func CreatePostFromRow(r RowScanner) (*db.Post, error) {
 		&post.ID,
 		&post.UserID,
 		&post.Username,
+		&post.Path,
 		&post.Filename,
 		&post.Slug,
 		&post.Title,
@@ -288,6 +299,7 @@ func CreatePostWithTagsFromRow(r RowScanner) (*db.Post, error) {
 		&post.ID,
 		&post.UserID,
 		&post.Username,
+		&post.Path,
 		&post.Filename,
 		&post.Slug,
 		&post.Title,
@@ -602,6 +614,16 @@ func (me *PsqlDB) FindPostWithSlug(slug string, user_id string, space string) (*
 	return post, nil
 }
 
+func (me *PsqlDB) FindPostWithPath(fpath string, fname string, user_id string, space string) (*db.Post, error) {
+	r := me.Db.QueryRow(sqlSelectPostWithPath, fpath, fname, user_id, space)
+	post, err := CreatePostWithTagsFromRow(r)
+	if err != nil {
+		return nil, err
+	}
+
+	return post, nil
+}
+
 func (me *PsqlDB) FindPost(postID string) (*db.Post, error) {
 	r := me.Db.QueryRow(sqlSelectPost, postID)
 	post, err := CreatePostFromRow(r)
@@ -619,6 +641,7 @@ func (me *PsqlDB) postPager(rs *sql.Rows, pageNum int, space string, tag string)
 		err := rs.Scan(
 			&post.ID,
 			&post.UserID,
+			&post.Path,
 			&post.Filename,
 			&post.Slug,
 			&post.Title,

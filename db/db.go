@@ -178,6 +178,7 @@ type DB interface {
 	FindUpdatedPostsForUser(userID string, space string) ([]*Post, error)
 	FindPostWithFilename(filename string, userID string, space string) (*Post, error)
 	FindPostWithSlug(slug string, userID string, space string) (*Post, error)
+	FindPostWithPath(fpath string, fname string, userID string, space string) (*Post, error)
 	FindAllPosts(pager *Pager, space string) (*Paginate[*Post], error)
 	FindAllUpdatedPosts(pager *Pager, space string) (*Paginate[*Post], error)
 	InsertPost(post *Post) (*Post, error)

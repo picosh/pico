@@ -63,7 +63,7 @@ func NewConfigSite() *shared.ConfigSite {
 			Description:   "a static website hosting service for hackers.",
 			IntroText:     intro,
 			Space:         "buckets",
-			AllowedExt:    []string{".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".ico", ".html", ".css", ".js", ".pdf"},
+			AllowedExt:    []string{".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".ico", ".html", ".css", ".js", ".pdf", ".txt"},
 			Logger:        shared.CreateLogger(),
 			AllowRegister: allowRegister == "1",
 		},
