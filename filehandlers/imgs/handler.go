@@ -6,15 +6,14 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path"
-	"strings"
+	"path/filepath"
 	"time"
 
 	"github.com/gliderlabs/ssh"
 	exifremove "github.com/neurosnap/go-exif-remove"
 	"github.com/picosh/pico/db"
-	"github.com/picosh/pico/imgs/storage"
 	"github.com/picosh/pico/shared"
+	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pico/wish/cms/util"
 	"github.com/picosh/pico/wish/send/utils"
 	"golang.org/x/exp/slices"
@@ -80,13 +79,13 @@ func (h *UploadImgHandler) removePost(data *PostMetaData) error {
 	return nil
 }
 
-func (h *UploadImgHandler) Read(s ssh.Session, filename string) (os.FileInfo, io.ReaderAt, error) {
+func (h *UploadImgHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileInfo, io.ReaderAt, error) {
 	user, err := getUser(s)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	cleanFilename := strings.ReplaceAll(filename, "/", "")
+	cleanFilename := filepath.Base(entry.Filepath)
 
 	if cleanFilename == "" || cleanFilename == "." {
 		return nil, nil, os.ErrNotExist
@@ -117,13 +116,13 @@ func (h *UploadImgHandler) Read(s ssh.Session, filename string) (os.FileInfo, io
 	return fileInfo, contents, nil
 }
 
-func (h *UploadImgHandler) List(s ssh.Session, filename string) ([]os.FileInfo, error) {
+func (h *UploadImgHandler) List(s ssh.Session, fpath string) ([]os.FileInfo, error) {
 	var fileList []os.FileInfo
 	user, err := getUser(s)
 	if err != nil {
 		return fileList, err
 	}
-	cleanFilename := strings.ReplaceAll(filename, "/", "")
+	cleanFilename := filepath.Base(fpath)
 
 	var post *db.Post
 	var posts []*db.Post
@@ -189,7 +188,7 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		return "", err
 	}
 
-	filename := entry.Name
+	filename := filepath.Base(entry.Filepath)
 
 	var text []byte
 	if b, err := io.ReadAll(entry.Reader); err == nil {
@@ -226,7 +225,7 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		Shasum:    shasum,
 	}
 
-	ext := path.Ext(filename)
+	ext := filepath.Ext(filename)
 	// DetectContentType does not detect markdown
 	if ext == ".md" {
 		nextPost.MimeType = "text/markdown; charset=UTF-8"

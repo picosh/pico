@@ -11,7 +11,7 @@ import (
 
 	"github.com/patrickmn/go-cache"
 	"github.com/picosh/pico/db"
-	"github.com/picosh/pico/imgs/storage"
+	"github.com/picosh/pico/shared/storage"
 	"go.uber.org/zap"
 )
 

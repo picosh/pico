@@ -6,15 +6,15 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/gliderlabs/ssh"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/imgs"
-	"github.com/picosh/pico/imgs/storage"
 	"github.com/picosh/pico/shared"
+	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pico/wish/cms/util"
 	"github.com/picosh/pico/wish/send/utils"
 )
@@ -61,12 +61,12 @@ func NewScpPostHandler(dbpool db.DB, cfg *shared.ConfigSite, hooks ScpFileHooks,
 	}
 }
 
-func (h *ScpUploadHandler) Read(s ssh.Session, filename string) (os.FileInfo, io.ReaderAt, error) {
+func (h *ScpUploadHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileInfo, io.ReaderAt, error) {
 	user, err := getUser(s)
 	if err != nil {
 		return nil, nil, err
 	}
-	cleanFilename := strings.ReplaceAll(filename, "/", "")
+	cleanFilename := filepath.Base(entry.Filepath)
 
 	if cleanFilename == "" || cleanFilename == "." {
 		return nil, nil, os.ErrNotExist
@@ -87,14 +87,14 @@ func (h *ScpUploadHandler) Read(s ssh.Session, filename string) (os.FileInfo, io
 	return fileInfo, strings.NewReader(post.Text), nil
 }
 
-func (h *ScpUploadHandler) List(s ssh.Session, filename string) ([]os.FileInfo, error) {
+func (h *ScpUploadHandler) List(s ssh.Session, fpath string) ([]os.FileInfo, error) {
 	var fileList []os.FileInfo
 	user, err := getUser(s)
 	if err != nil {
 		return fileList, err
 	}
 
-	cleanFilename := strings.ReplaceAll(filename, "/", "")
+	cleanFilename := filepath.Base(fpath)
 
 	var post *db.Post
 	var posts []*db.Post
@@ -162,7 +162,7 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 	}
 
 	userID := user.ID
-	filename := entry.Name
+	filename := filepath.Base(entry.Filepath)
 
 	if shared.IsExtAllowed(filename, h.ImgClient.Cfg.AllowedExt) {
 		return h.ImgClient.Upload(s, entry)
@@ -174,7 +174,7 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 	}
 
 	mimeType := http.DetectContentType(origText)
-	ext := path.Ext(filename)
+	ext := filepath.Ext(filename)
 	// DetectContentType does not detect markdown
 	if ext == ".md" {
 		mimeType = "text/markdown; charset=UTF-8"

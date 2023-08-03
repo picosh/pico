@@ -204,6 +204,51 @@ services:
     ports:
       - "${IMGS_SSH_V4:-22}:2222"
       - "${IMGS_SSH_V6:-[::1]:22}:2222"
+  pgs-caddy:
+    image: ghcr.io/picosh/pico/caddy:latest
+    restart: always
+    networks:
+      - pgs
+    env_file:
+      - .env.prod
+    environment:
+      APP_DOMAIN: ${PGS_DOMAIN:-pgs.sh}
+      APP_EMAIL: ${PGS_EMAIL:-hello@pico.sh}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+      - ./data/pgs-caddy/data:/data
+      - ./data/pgs-caddy/config:/config
+    ports:
+      - "${PGS_HTTPS_V4:-443}:443"
+      - "${PGS_HTTP_V4:-80}:80"
+      - "${PGS_HTTPS_V6:-[::1]:443}:443"
+      - "${PGS_HTTP_V6:-[::1]:80}:80"
+    profiles:
+      - pgs
+      - caddy
+      - all
+  pgs-web:
+    networks:
+      pgs:
+        aliases:
+          - web
+    env_file:
+      - .env.prod
+    volumes:
+      - ./data/pgs-storage/data:/app/.storage
+  pgs-ssh:
+    networks:
+      pgs:
+        aliases:
+          - ssh
+    env_file:
+      - .env.prod
+    volumes:
+      - ./data/pgs-storage/data:/app/.storage
+      - ./data/pgs-ssh/data:/app/ssh_data
+    ports:
+      - "${PGS_SSH_V4:-22}:2222"
+      - "${PGS_SSH_V6:-[::1]:22}:2222"
   feeds-caddy:
     image: ghcr.io/picosh/pico/caddy:latest
     restart: always
@@ -283,3 +328,9 @@ networks:
     ipam:
       config:
         - subnet: 172.22.0.0/16
+  pgs:
+    driver_opts:
+      com.docker.network.bridge.name: pgs
+    ipam:
+      config:
+        - subnet: 172.23.0.0/16

@@ -31,6 +31,13 @@ type PostData struct {
 	LastDigest *time.Time `json:"last_digest"`
 }
 
+type Project struct {
+	ID         string `json:"id"`
+	UserID     string `json:"user_id"`
+	Name       string `json:"name"`
+	ProjectDir string `json:"project_dir"`
+}
+
 // Make the Attrs struct implement the driver.Valuer interface. This method
 // simply returns the JSON-encoded representation of the struct.
 func (p PostData) Value() (driver.Value, error) {
@@ -198,6 +205,12 @@ type DB interface {
 
 	InsertFeedItems(postID string, items []*FeedItem) error
 	FindFeedItemsByPostID(postID string) ([]*FeedItem, error)
+
+	InsertProject(userID, name, projectDir string) (string, error)
+	UpdateProject(projectID, projectDir string) error
+	RemoveProject(projectID string) error
+	FindProjectByName(userID, name string) (*Project, error)
+	FindProjectsByUser(userID string) ([]*Project, error)
 
 	Close() error
 }

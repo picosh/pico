@@ -6,7 +6,7 @@ import (
 	"io/fs"
 	"log"
 	"os"
-	"path"
+	"path/filepath"
 
 	"github.com/antoniomika/go-rsync-receiver/rsyncreceiver"
 	"github.com/antoniomika/go-rsync-receiver/rsyncsender"
@@ -25,7 +25,7 @@ func (h *handler) Skip(file *rsyncutils.ReceiverFile) bool {
 	return false
 }
 
-func (h *handler) List(path string) ([]os.FileInfo, error) {
+func (h *handler) List(path string) ([]fs.FileInfo, error) {
 	list, err := h.writeHandler.List(h.session, path)
 	if err != nil {
 		return nil, err
@@ -40,20 +40,19 @@ func (h *handler) List(path string) ([]os.FileInfo, error) {
 }
 
 func (h *handler) Read(path string) (os.FileInfo, io.ReaderAt, error) {
-	return h.writeHandler.Read(h.session, path)
+	return h.writeHandler.Read(h.session, &utils.FileEntry{Filepath: path})
 }
 
 func (h *handler) Put(fileName string, content io.Reader, fileSize int64, mTime int64, aTime int64) (int64, error) {
-	cleanName := path.Base(fileName)
+	cleanName := filepath.Base(fileName)
+	fpath := "/"
 	fileEntry := &utils.FileEntry{
-		Name:     cleanName,
-		Filepath: fmt.Sprintf("/%s", cleanName),
+		Filepath: filepath.Join(fpath, cleanName),
 		Mode:     fs.FileMode(0600),
 		Size:     fileSize,
 		Mtime:    mTime,
 		Atime:    aTime,
 	}
-
 	fileEntry.Reader = content
 
 	msg, err := h.writeHandler.Write(h.session, fileEntry)

@@ -69,6 +69,20 @@ services:
       - imgs
       - services
       - all
+  pgs-web:
+    image: ghcr.io/picosh/pico/pgs-web:latest
+    restart: always
+    profiles:
+      - pgs
+      - services
+      - all
+  pgs-ssh:
+    image: ghcr.io/picosh/pico/pgs-ssh:latest
+    restart: always
+    profiles:
+      - pgs
+      - services
+      - all
   feeds-web:
     image: ghcr.io/picosh/pico/feeds-web:latest
     restart: always

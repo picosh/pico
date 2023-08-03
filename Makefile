@@ -14,6 +14,7 @@ css:
 	cp ./smol.css pastes/public/main.css
 	cp ./smol.css imgs/public/main.css
 	cp ./smol.css feeds/public/main.css
+	cp ./smol.css pgs/public/main.css
 
 	cp ./syntax.css pastes/public/syntax.css
 	cp ./syntax.css prose/public/syntax.css
@@ -37,7 +38,7 @@ bp-%: bp-setup
 	$(DOCKER_BUILDX_BUILD) --build-arg "APP=$*" -t "ghcr.io/picosh/pico/$*-web:$(DOCKER_TAG)" --target release-web .
 .PHONY: bp-%
 
-bp-all: bp-prose bp-lists bp-pastes bp-imgs bp-feeds
+bp-all: bp-prose bp-lists bp-pastes bp-imgs bp-feeds bp-pgs
 .PHONY: bp-all
 
 build-%:
@@ -45,8 +46,19 @@ build-%:
 	go build -o "build/$*-ssh" "./cmd/$*/ssh"
 .PHONY: build-%
 
-build: build-prose build-lists build-pastes build-imgs build-feeds
+build: build-prose build-lists build-pastes build-imgs build-feeds build-pgs
 .PHONY: build
+
+pgs-static:
+	go build -o "build/pgs-static" "./cmd/pgs/static"
+.PHONY: pgs-static
+
+pgs-site:
+	rm -rf tmp
+	mkdir tmp
+	./build/pgs-static -out ./tmp
+	cp ./pgs/public/* ./tmp
+.PHONY: pgs-site
 
 format:
 	go fmt ./...
@@ -77,10 +89,12 @@ migrate:
 	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20221112_add_feeds_space.sql
 	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20230310_add_aliases_table.sql
 	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20230326_add_feed_items.sql
+	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20230707_add_projects_table.sql
 .PHONY: migrate
 
 latest:
-	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20230326_add_feed_items.sql
+	$(DOCKER_CMD) cp ./sql/migrations/20230707_add_projects_table.sql $(DB_CONTAINER):/tmp
+	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) -f /tmp/20230707_add_projects_table.sql
 .PHONY: latest
 
 psql:

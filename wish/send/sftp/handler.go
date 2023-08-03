@@ -4,7 +4,6 @@ import (
 	"errors"
 	"io"
 	"os"
-	"path"
 
 	"github.com/gliderlabs/ssh"
 	"github.com/picosh/pico/wish/send/utils"
@@ -54,20 +53,23 @@ func (f *handler) Filelist(r *sftp.Request) (sftp.ListerAt, error) {
 	return nil, errors.New("unsupported")
 }
 
-func (f *handler) Filewrite(r *sftp.Request) (io.WriterAt, error) {
-	fileEntry := &utils.FileEntry{
-		Name:     path.Base(r.Filepath),
+func toFileEntry(r *sftp.Request) *utils.FileEntry {
+	entry := &utils.FileEntry{
 		Filepath: r.Filepath,
 		Mode:     r.Attributes().FileMode(),
 		Size:     int64(r.Attributes().Size),
 		Mtime:    int64(r.Attributes().Mtime),
 		Atime:    int64(r.Attributes().Atime),
 	}
+	return entry
+}
 
+func (f *handler) Filewrite(r *sftp.Request) (io.WriterAt, error) {
+	entry := toFileEntry(r)
 	buf := &buffer{}
-	fileEntry.Reader = buf
+	entry.Reader = buf
 
-	return fakeWrite{fileEntry: fileEntry, buf: buf, handler: f}, nil
+	return fakeWrite{fileEntry: entry, buf: buf, handler: f}, nil
 }
 
 func (f *handler) Fileread(r *sftp.Request) (io.ReaderAt, error) {
@@ -75,7 +77,8 @@ func (f *handler) Fileread(r *sftp.Request) (io.ReaderAt, error) {
 		return nil, os.ErrInvalid
 	}
 
-	_, reader, err := f.writeHandler.Read(f.session, r.Filepath)
+	fileEntry := toFileEntry(r)
+	_, reader, err := f.writeHandler.Read(f.session, fileEntry)
 
 	return reader, err
 }

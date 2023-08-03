@@ -16,8 +16,8 @@ import (
 	"github.com/picosh/pico/db/postgres"
 	uploadimgs "github.com/picosh/pico/filehandlers/imgs"
 	"github.com/picosh/pico/imgs"
-	"github.com/picosh/pico/imgs/storage"
 	"github.com/picosh/pico/shared"
+	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pico/wish/cms"
 	"github.com/picosh/pico/wish/list"
 	"github.com/picosh/pico/wish/pipe"
@@ -95,7 +95,7 @@ func main() {
 		withProxy(
 			cfg,
 			handler,
-			promwish.Middleware(fmt.Sprintf("%s:%s", host, promPort), "pastes-ssh"),
+			promwish.Middleware(fmt.Sprintf("%s:%s", host, promPort), "imgs-ssh"),
 		),
 	)
 	if err != nil {

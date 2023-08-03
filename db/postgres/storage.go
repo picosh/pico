@@ -242,6 +242,12 @@ const (
 	sqlRemovePosts         = `DELETE FROM posts WHERE id = ANY($1::uuid[])`
 	sqlRemoveKeys          = `DELETE FROM public_keys WHERE id = ANY($1::uuid[])`
 	sqlRemoveUsers         = `DELETE FROM app_users WHERE id = ANY($1::uuid[])`
+
+	sqlInsertProject      = `INSERT INTO projects (user_id, name, project_dir) VALUES ($1, $2, $3) RETURNING id;`
+	sqlFindProjectByName  = `SELECT id, user_id, name, project_dir FROM projects WHERE user_id = $1 AND name = $2;`
+	sqlFindProjectsByUser = `SELECT id, user_id, name, project_dir FROM projects WHERE user_id = $1;`
+	sqlUpdateProject      = `UPDATE projects SET project_dir = $1, updated_at = $2 WHERE id = $3;`
+	sqlRemoveProject      = `DELETE FROM projects WHERE id = $1;`
 )
 
 type PsqlDB struct {
@@ -1172,4 +1178,71 @@ func (me *PsqlDB) FindFeedItemsByPostID(postID string) ([]*db.FeedItem, error) {
 	}
 
 	return items, nil
+}
+
+func (me *PsqlDB) InsertProject(userID, name, projectDir string) (string, error) {
+	var id string
+	err := me.Db.QueryRow(sqlInsertProject, userID, name, projectDir).Scan(&id)
+	if err != nil {
+		return "", err
+	}
+	return id, nil
+}
+
+func (me *PsqlDB) UpdateProject(projectID, projectDir string) error {
+	_, err := me.Db.Exec(
+		sqlUpdateProject,
+		projectDir,
+		time.Now(),
+		projectID,
+	)
+	return err
+}
+func (me *PsqlDB) RemoveProject(projectID string) error {
+	_, err := me.Db.Exec(sqlRemoveProject, projectID)
+	return err
+}
+
+func (me *PsqlDB) FindProjectByName(userID, name string) (*db.Project, error) {
+	project := &db.Project{}
+	r := me.Db.QueryRow(sqlFindProjectByName, userID, name)
+	err := r.Scan(
+		&project.ID,
+		&project.UserID,
+		&project.Name,
+		&project.ProjectDir,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return project, nil
+}
+
+func (me *PsqlDB) FindProjectsByUser(userID string) ([]*db.Project, error) {
+	var projects []*db.Project
+	rs, err := me.Db.Query(sqlFindProjectsByUser, userID)
+	if err != nil {
+		return nil, err
+	}
+	for rs.Next() {
+		project := &db.Project{}
+		err := rs.Scan(
+			&project.ID,
+			&project.UserID,
+			&project.Name,
+			&project.ProjectDir,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		projects = append(projects, project)
+	}
+
+	if rs.Err() != nil {
+		return nil, rs.Err()
+	}
+
+	return projects, nil
 }
