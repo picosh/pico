@@ -6,7 +6,7 @@ DB_CONTAINER?=pico-postgres-1
 DOCKER_TAG?=$(shell git log --format="%H" -n 1)
 DOCKER_PLATFORM?=linux/amd64,linux/arm64
 DOCKER_CMD?=docker
-DOCKER_BUILDX_BUILD?=$(DOCKER_CMD) buildx build --push --platform $(DOCKER_PLATFORM)
+DOCKER_BUILDX_BUILD?=$(DOCKER_CMD) buildx build --platform $(DOCKER_PLATFORM)
 
 css:
 	cp ./smol.css lists/public/main.css
@@ -33,7 +33,7 @@ bp-caddy: bp-setup
 	$(DOCKER_BUILDX_BUILD) -t ghcr.io/picosh/pico/caddy:$(DOCKER_TAG) -f caddy/Dockerfile .
 .PHONY: bp-caddy
 
-bp-%: bp-setup
+bp-%:
 	$(DOCKER_BUILDX_BUILD) --build-arg "APP=$*" -t "ghcr.io/picosh/pico/$*-ssh:$(DOCKER_TAG)" --target release-ssh .
 	$(DOCKER_BUILDX_BUILD) --build-arg "APP=$*" -t "ghcr.io/picosh/pico/$*-web:$(DOCKER_TAG)" --target release-web .
 .PHONY: bp-%
