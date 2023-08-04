@@ -4,8 +4,10 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/gliderlabs/ssh"
@@ -16,17 +18,21 @@ import (
 	"github.com/picosh/pico/wish/send/utils"
 )
 
-var KB = 1024
-var MB = KB * 1024
-var GB = MB * 1024
-var maxSize = 1 * GB
-var maxAssetSize = 50 * MB
-
-func bytesToGB(size int) float32 {
-	return (((float32(size) / 1024) / 1024) / 1024)
-}
-
 type ctxUserKey struct{}
+
+func getAssetURL(c *shared.ConfigSite, username, projectName, dir, slug string) string {
+	fname := url.PathEscape(strings.TrimLeft(slug, "/"))
+	fdir := strings.TrimLeft(dir, "/")
+	return fmt.Sprintf(
+		"%s://%s-%s.%s/%s/%s",
+		c.Protocol,
+		username,
+		projectName,
+		c.Domain,
+		fdir,
+		fname,
+	)
+}
 
 func getUser(s ssh.Session) (*db.User, error) {
 	user := s.Context().Value(ctxUserKey{}).(*db.User)
@@ -38,8 +44,9 @@ func getUser(s ssh.Session) (*db.User, error) {
 
 type FileData struct {
 	*utils.FileEntry
-	Text []byte
-	User *db.User
+	Text   []byte
+	User   *db.User
+	Bucket storage.Bucket
 }
 
 type UploadAssetHandler struct {
@@ -137,8 +144,24 @@ func (h *UploadAssetHandler) Validate(s ssh.Session) error {
 		return fmt.Errorf("you do not have access to this service")
 	}
 
+	assetBucket := shared.GetAssetBucketName(user.ID)
+	bucket, err := h.Storage.UpsertBucket(assetBucket)
+	if err != nil {
+		return err
+	}
+	totalFileSize, err := h.Storage.GetBucketQuota(bucket)
+	if err != nil {
+		return err
+	}
+
+	h.Cfg.Logger.Infof("(%s) bucket size is current (%d bytes)", user.Name, totalFileSize)
+	if totalFileSize >= uint64(h.Cfg.MaxSize) {
+		return fmt.Errorf("ERROR: user (%s) has exceeded (%d bytes) max (%d bytes)", user.Name, totalFileSize, h.Cfg.MaxSize)
+	}
+
 	s.Context().SetValue(ctxUserKey{}, user)
 	h.Cfg.Logger.Infof("(%s) attempting to upload files to (%s)", user.Name, h.Cfg.Space)
+
 	return nil
 }
 
@@ -157,10 +180,17 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 	// filesize from sftp,scp,rsync
 	entry.Size = int64(fileSize)
 
+	assetBucket := shared.GetAssetBucketName(user.ID)
+	bucket, err := h.Storage.UpsertBucket(assetBucket)
+	if err != nil {
+		return "", err
+	}
+
 	data := &FileData{
 		FileEntry: entry,
 		User:      user,
 		Text:      origText,
+		Bucket:    bucket,
 	}
 	err = h.writeAsset(data)
 	if err != nil {
@@ -178,29 +208,13 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 		}
 	}
 
-	bucketName := shared.GetAssetBucketName(user.ID)
-	bucket, err := h.Storage.UpsertBucket(bucketName)
-	if err != nil {
-		return "", err
-	}
-
-	totalFileSize, err := h.Storage.GetBucketQuota(bucket)
-	if err != nil {
-		return "", err
-	}
-
-	curl := shared.NewCreateURL(h.Cfg)
-	url := h.Cfg.FullPostURL(
-		curl,
-		fmt.Sprintf("%s-%s", user.Name, projectName),
+	url := getAssetURL(
+		h.Cfg,
+		user.Name,
+		projectName,
+		filepath.Dir(strings.Replace(data.Filepath, "/"+projectName, "", 1)),
 		filepath.Base(data.Filepath),
 	)
-	str := fmt.Sprintf(
-		"%s (space: %.2f/%.2fGB, %.2f%%)",
-		url,
-		bytesToGB(int(totalFileSize)),
-		bytesToGB(maxSize),
-		(float32(totalFileSize)/float32(maxSize))*100,
-	)
-	return str, nil
+
+	return url, nil
 }

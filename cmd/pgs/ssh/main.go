@@ -38,7 +38,7 @@ func createRouter(cfg *shared.ConfigSite, handler *uploadassets.UploadAssetHandl
 		return []wish.Middleware{
 			pipe.Middleware(handler, ""),
 			list.Middleware(handler),
-			pgs.WishMiddleware(handler.DBPool, handler.Storage, handler.Cfg.Logger),
+			pgs.WishMiddleware(handler),
 			scp.Middleware(handler),
 			wishrsync.Middleware(handler),
 			auth.Middleware(handler),

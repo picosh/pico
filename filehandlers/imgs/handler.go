@@ -19,15 +19,8 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-var KB = 1024
-var MB = KB * 1024
-var GB = MB * 1024
-var maxSize = 1 * GB
-var maxImgSize = 10 * MB
-
-func bytesToGB(size int) float32 {
-	return (((float32(size) / 1024) / 1024) / 1024)
-}
+var maxSize = 1 * shared.GB
+var maxImgSize = 10 * shared.MB
 
 type ctxUserKey struct{}
 
@@ -274,8 +267,8 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 	str := fmt.Sprintf(
 		"%s (space: %.2f/%.2fGB, %.2f%%)",
 		url,
-		bytesToGB(totalFileSize),
-		bytesToGB(maxSize),
+		shared.BytesToGB(totalFileSize),
+		shared.BytesToGB(maxSize),
 		(float32(totalFileSize)/float32(maxSize))*100,
 	)
 	return str, nil
