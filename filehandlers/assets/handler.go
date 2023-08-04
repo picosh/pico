@@ -24,7 +24,7 @@ func getAssetURL(c *shared.ConfigSite, username, projectName, dir, slug string) 
 	fname := url.PathEscape(strings.TrimLeft(slug, "/"))
 	fdir := strings.TrimLeft(dir, "/")
 	return fmt.Sprintf(
-		"%s://%s-%s.%s/%s/%s",
+		"%s://%s-%s.%s/%s%s",
 		c.Protocol,
 		username,
 		projectName,
@@ -212,7 +212,7 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 		h.Cfg,
 		user.Name,
 		projectName,
-		filepath.Dir(strings.Replace(data.Filepath, "/"+projectName, "", 1)),
+		filepath.Dir(strings.Replace(data.Filepath, projectName, "", 1)),
 		filepath.Base(data.Filepath),
 	)
 
