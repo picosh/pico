@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,17 +19,14 @@ import (
 
 type ctxUserKey struct{}
 
-func getAssetURL(c *shared.ConfigSite, username, projectName, dir, slug string) string {
-	fname := url.PathEscape(strings.TrimLeft(slug, "/"))
-	fdir := strings.TrimLeft(dir, "/")
+func getAssetURL(c *shared.ConfigSite, username, projectName, fpath string) string {
 	return fmt.Sprintf(
-		"%s://%s-%s.%s/%s%s",
+		"%s://%s-%s.%s/%s",
 		c.Protocol,
 		username,
 		projectName,
 		c.Domain,
-		fdir,
-		fname,
+		fpath,
 	)
 }
 
@@ -212,8 +208,7 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 		h.Cfg,
 		user.Name,
 		projectName,
-		filepath.Dir(strings.Replace(data.Filepath, projectName, "", 1)),
-		filepath.Base(data.Filepath),
+		strings.Replace(data.Filepath, "/"+projectName+"/", "", 1),
 	)
 
 	return url, nil
