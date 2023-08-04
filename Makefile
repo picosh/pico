@@ -41,6 +41,16 @@ bp-%: bp-setup
 bp-all: bp-prose bp-lists bp-pastes bp-imgs bp-feeds bp-pgs
 .PHONY: bp-all
 
+bp-podman-%:
+	$(DOCKER_CMD) buildx build --platform $(DOCKER_PLATFORM) --build-arg "APP=$*" -t "ghcr.io/picosh/pico/$*-ssh:$(DOCKER_TAG)" --target release-ssh .
+	$(DOCKER_CMD) buildx build --platform $(DOCKER_PLATFORM) --build-arg "APP=$*" -t "ghcr.io/picosh/pico/$*-web:$(DOCKER_TAG)" --target release-web .
+	$(DOCKER_CMD) push "ghcr.io/picosh/pico/$*-ssh:$(DOCKER_TAG)"
+	$(DOCKER_CMD) push "ghcr.io/picosh/pico/$*-web:$(DOCKER_TAG)"
+.PHONY: bp-%
+
+bp-podman-all: bp-podman-prose bp-podman-lists bp-podman-pastes bp-podman-imgs bp-podman-feeds bp-podman-pgs
+.PHONY: all
+
 build-%:
 	go build -o "build/$*-web" "./cmd/$*/web"
 	go build -o "build/$*-ssh" "./cmd/$*/ssh"
