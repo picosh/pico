@@ -68,7 +68,7 @@ func (h *UploadImgHandler) metaImg(data *PostMetaData) error {
 	opt := shared.NewImgOptimizer(h.Cfg.Logger, "")
 	// for small images we want to preserve quality
 	// since it can have a dramatic effect
-	if data.FileSize < 3*MB {
+	if data.FileSize < 3*shared.MB {
 		opt.Quality = 100
 		opt.Lossless = true
 	} else {

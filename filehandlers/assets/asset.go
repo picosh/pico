@@ -11,23 +11,9 @@ import (
 )
 
 func (h *UploadAssetHandler) validateAsset(data *FileData) (bool, error) {
-	assetBucket := shared.GetAssetBucketName(data.User.ID)
-	bucket, err := h.Storage.UpsertBucket(assetBucket)
-	if err != nil {
-		return false, err
-	}
-	totalFileSize, err := h.Storage.GetBucketQuota(bucket)
-	if err != nil {
-		return false, err
-	}
-
 	fname := filepath.Base(data.Filepath)
-	if int(data.Size) > maxAssetSize {
-		return false, fmt.Errorf("ERROR: file (%s) has exceeded maximum file size (%d bytes)", fname, maxAssetSize)
-	}
-
-	if totalFileSize+uint64(data.Size) > uint64(maxSize) {
-		return false, fmt.Errorf("ERROR: user (%s) has exceeded (%d bytes) max (%d bytes)", data.User.Name, totalFileSize, maxSize)
+	if int(data.Size) > h.Cfg.MaxAssetSize {
+		return false, fmt.Errorf("ERROR: file (%s) has exceeded maximum file size (%d bytes)", fname, h.Cfg.MaxAssetSize)
 	}
 
 	if !shared.IsExtAllowed(fname, h.Cfg.AllowedExt) {
@@ -49,22 +35,23 @@ func (h *UploadAssetHandler) writeAsset(data *FileData) error {
 		return err
 	}
 
-	assetBucket := shared.GetAssetBucketName(data.User.ID)
 	assetFilename := shared.GetAssetFileName(data.FileEntry)
-	bucket, err := h.Storage.UpsertBucket(assetBucket)
-	if err != nil {
-		return err
-	}
 
 	if data.Size == 0 {
-		err = h.Storage.DeleteFile(bucket, assetFilename)
+		err = h.Storage.DeleteFile(data.Bucket, assetFilename)
 		if err != nil {
 			return err
 		}
 	} else {
 		reader := bytes.NewReader(data.Text)
+		h.Cfg.Logger.Infof(
+			"(%s) uploading to (bucket: %s) (%s)",
+			data.User.Name,
+			data.Bucket.Name,
+			assetFilename,
+		)
 		_, err := h.Storage.PutFile(
-			bucket,
+			data.Bucket,
 			assetFilename,
 			storage.NopReaderAtCloser(reader),
 		)

@@ -21,6 +21,10 @@ import (
 
 var fnameRe = regexp.MustCompile(`[-_]+`)
 
+var KB = 1024
+var MB = KB * 1024
+var GB = MB * 1024
+
 func FilenameToTitle(filename string, title string) string {
 	if filename != title {
 		return title
@@ -161,4 +165,8 @@ func GetMimeType(fpath string) string {
 	}
 
 	return "text/plain"
+}
+
+func BytesToGB(size int) float32 {
+	return (((float32(size) / 1024) / 1024) / 1024)
 }

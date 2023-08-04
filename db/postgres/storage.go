@@ -246,7 +246,7 @@ const (
 	sqlInsertProject      = `INSERT INTO projects (user_id, name, project_dir) VALUES ($1, $2, $3) RETURNING id;`
 	sqlFindProjectByName  = `SELECT id, user_id, name, project_dir FROM projects WHERE user_id = $1 AND name = $2;`
 	sqlFindProjectsByUser = `SELECT id, user_id, name, project_dir FROM projects WHERE user_id = $1;`
-	sqlUpdateProject      = `UPDATE projects SET project_dir = $1, updated_at = $2 WHERE id = $3;`
+	sqlLinkToProject      = `UPDATE projects SET project_dir = $1, updated_at = $2 WHERE id = $3;`
 	sqlRemoveProject      = `DELETE FROM projects WHERE id = $1;`
 )
 
@@ -1189,9 +1189,39 @@ func (me *PsqlDB) InsertProject(userID, name, projectDir string) (string, error)
 	return id, nil
 }
 
-func (me *PsqlDB) UpdateProject(projectID, projectDir string) error {
-	_, err := me.Db.Exec(
-		sqlUpdateProject,
+func (me *PsqlDB) LinkToProject(userID, projectID, projectDir string) error {
+	linkToProject, err := me.FindProjectByName(userID, projectDir)
+	if err != nil {
+		return err
+	}
+
+	/*
+		A project linked to another project which is also linked to a
+		project is forbidden.  CI/CD Example:
+			- ProjectProd links to ProjectStaging
+			- ProjectStaging links to ProjectMain
+			- We merge `main` and trigger a deploy which uploads to ProjectMain
+			- All three get updated immediately
+		This scenario was not the intent of our CI/CD.  What we actually
+		wanted was to create a snapshot of ProjectMain and have ProjectStaging
+		link to the snapshot, but that's not the intended design of pgs.
+
+		So we want to close that gap here.
+
+		We ensure that `project.Name` and `project.ProjectDir` are identical
+		when there is no aliasing.
+	*/
+	if linkToProject.Name != linkToProject.ProjectDir {
+		return fmt.Errorf(
+			"cannot link (%s) to (%s) because it is also a link to (%s)",
+			projectID,
+			projectDir,
+			linkToProject.ProjectDir,
+		)
+	}
+
+	_, err = me.Db.Exec(
+		sqlLinkToProject,
 		projectDir,
 		time.Now(),
 		projectID,

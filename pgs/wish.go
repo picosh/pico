@@ -7,11 +7,10 @@ import (
 	"github.com/charmbracelet/wish"
 	"github.com/gliderlabs/ssh"
 	"github.com/picosh/pico/db"
+	uploadassets "github.com/picosh/pico/filehandlers/assets"
 	"github.com/picosh/pico/shared"
-	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pico/wish/cms/util"
 	"github.com/picosh/pico/wish/send/utils"
-	"go.uber.org/zap"
 )
 
 func getUser(s ssh.Session, dbpool db.DB) (*db.User, error) {
@@ -44,7 +43,12 @@ func getHelpText(userName, projectName string) string {
 	return helpStr
 }
 
-func WishMiddleware(dbpool db.DB, store storage.ObjectStorage, log *zap.SugaredLogger) wish.Middleware {
+func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
+	dbpool := handler.DBPool
+	log := handler.Cfg.Logger
+	cfg := handler.Cfg
+	store := handler.Storage
+
 	return func(sshHandler ssh.Handler) ssh.Handler {
 		return func(session ssh.Session) {
 			_, _, activePty := session.Pty()
@@ -65,7 +69,41 @@ func WishMiddleware(dbpool db.DB, store storage.ObjectStorage, log *zap.SugaredL
 				cmd := strings.TrimSpace(args[0])
 				if cmd == "help" {
 					_, _ = session.Write([]byte(getHelpText(user.Name, "projectA")))
-				} else if cmd == "list" {
+				} else if cmd == "stats" {
+					bucketName := shared.GetAssetBucketName(user.ID)
+					bucket, err := store.UpsertBucket(bucketName)
+					if err != nil {
+						log.Error(err)
+						utils.ErrorHandler(session, err)
+						return
+					}
+
+					totalFileSize, err := store.GetBucketQuota(bucket)
+					if err != nil {
+						log.Error(err)
+						utils.ErrorHandler(session, err)
+						return
+					}
+
+					projects, err := dbpool.FindProjectsByUser(user.ID)
+					if err != nil {
+						log.Error(err)
+						utils.ErrorHandler(session, err)
+						return
+					}
+
+					str := "stats\n"
+					str += "=====\n"
+					str += fmt.Sprintf(
+						"space:\t\t%.4f/%.2fGB, %.2f%%\n",
+						shared.BytesToGB(int(totalFileSize)),
+						shared.BytesToGB(cfg.MaxSize),
+						(float32(totalFileSize)/float32(cfg.MaxSize))*100,
+					)
+					str += fmt.Sprintf("projects:\t%d\n", len(projects))
+					_, _ = session.Write([]byte(str))
+					return
+				} else if cmd == "list" || cmd == "ls" {
 					projects, err := dbpool.FindProjectsByUser(user.ID)
 					if err != nil {
 						log.Error(err)
@@ -125,7 +163,7 @@ func WishMiddleware(dbpool db.DB, store storage.ObjectStorage, log *zap.SugaredL
 				project, err := dbpool.FindProjectByName(user.ID, projectName)
 				if err == nil {
 					log.Infof("user (%s) already has project (%s), updating ...", user.Name, projectName)
-					err = dbpool.UpdateProject(project.ID, projectDir)
+					err = dbpool.LinkToProject(user.ID, project.ID, projectDir)
 					if err != nil {
 						log.Error(err)
 						utils.ErrorHandler(session, err)
