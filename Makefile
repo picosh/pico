@@ -66,9 +66,13 @@ pgs-static:
 pgs-site:
 	rm -rf tmp
 	mkdir tmp
-	./build/pgs-static -out ./tmp
+	PGS_EMAIL=hello@pico.sh PGS_DOMAIN=pgs.sh PGS_PROTOCOL=https ./build/pgs-static -out ./tmp
 	cp ./pgs/public/* ./tmp
 .PHONY: pgs-site
+
+pgs-deploy: pgs-static pgs-site
+	scp -R ./tmp/* hey@pgs.sh:/pgs-prod
+.PHONY: pgs-site-deploy
 
 format:
 	go fmt ./...
