@@ -28,7 +28,7 @@
 
 {{define "body"}}
 <header class="text-center">
-  <h1 class="text-2xl font-bold">{{.Site.Domain}}</h1>
+  <h1 class="text-2xl font-bold">{{.Site.Domain}} [beta]</h1>
   <p class="text-lg">A zero-dependency static site hosting service for hackers.</p>
   <hr />
 </header>
@@ -49,7 +49,7 @@
       <li>No client-side installation required to fully manage static sites</li>
       <li>Distinct static sites as "projects"</li>
       <li>Unlimited projects created on-the-fly (no need to create a project first)</li>
-      <li>Deploy via <code>rsync -a . erock@{{.Site.Domain}}:/myproject</code></li>
+      <li>Deploy via <code>scp -r * erock@{{.Site.Domain}}:/myproject</code></li>
       <li>Symbolic linking from one project to another (to support promotions/rollbacks)</li>
       <li>Managed HTTPS for all projects (e.g. [https://erock-myproject.{{.Site.Domain}}](https://erock-myproject.{{.Site.Domain}}))</li>
       <li>Custom domains for projects (managed simply by `TXT` records)</li>
@@ -84,7 +84,7 @@
         When your site is ready to be published, copy the files to our server with a familiar
         command:
     </p>
-    <pre>rsync -a . {{.Site.Domain}}:/myproject</pre>
+    <pre>scp -r * {{.Site.Domain}}:/myproject</pre>
     <p>
       That's it!  There's no need to formally create a project, we
       create them on-the-fly.  Further, we provide TLS for every project
