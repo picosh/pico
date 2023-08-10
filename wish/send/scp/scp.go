@@ -23,12 +23,6 @@ func Middleware(writeHandler utils.CopyFromClientHandler) wish.Middleware {
 				return
 			}
 
-			if info.Recursive {
-				err := fmt.Errorf("recursive not supported")
-				utils.ErrorHandler(session, err)
-				return
-			}
-
 			var err error
 
 			switch info.Op {
