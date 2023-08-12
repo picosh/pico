@@ -101,7 +101,7 @@ func (s *StorageMinio) ListFiles(bucket Bucket, dir string) ([]os.FileInfo, erro
 	opts := minio.ListObjectsOptions{Prefix: dir, Recursive: false}
 	for obj := range s.Client.ListObjects(context.TODO(), bucket.Name, opts) {
 		if obj.Err != nil {
-			fmt.Println(obj.Err)
+			return fileList, obj.Err
 		}
 		isDir := false
 		if obj.Size == 0 {
