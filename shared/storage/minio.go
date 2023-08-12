@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"path"
+	"strings"
 
 	"github.com/minio/madmin-go/v3"
 	"github.com/minio/minio-go/v7"
@@ -97,11 +97,19 @@ func (s *StorageMinio) GetBucketQuota(bucket Bucket) (uint64, error) {
 
 func (s *StorageMinio) ListFiles(bucket Bucket, dir string) ([]os.FileInfo, error) {
 	var fileList []os.FileInfo
-	objs := s.Client.ListObjects(context.TODO(), bucket.Name, minio.ListObjectsOptions{Prefix: dir})
-	for obj := range objs {
+
+	opts := minio.ListObjectsOptions{Prefix: dir, Recursive: false}
+	for obj := range s.Client.ListObjects(context.TODO(), bucket.Name, opts) {
+		if obj.Err != nil {
+			fmt.Println(obj.Err)
+		}
+		isDir := false
+		if obj.Size == 0 {
+			isDir = true
+		}
 		info := &utils.VirtualFile{
-			FName:    path.Join(dir, obj.Key),
-			FIsDir:   false,
+			FName:    strings.TrimSuffix(obj.Key, "/"),
+			FIsDir:   isDir,
 			FSize:    obj.Size,
 			FModTime: obj.LastModified,
 		}

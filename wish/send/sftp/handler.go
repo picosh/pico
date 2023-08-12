@@ -43,10 +43,6 @@ func (f *handler) Filelist(r *sftp.Request) (sftp.ListerAt, error) {
 			return nil, err
 		}
 
-		if r.Method == "List" {
-			listData = listData[1:]
-		}
-
 		return listerat(listData), nil
 	}
 
