@@ -210,7 +210,9 @@ type DB interface {
 	LinkToProject(userID, projectID, projectDir string) error
 	RemoveProject(projectID string) error
 	FindProjectByName(userID, name string) (*Project, error)
+	FindProjectLinks(userID, name string) ([]*Project, error)
 	FindProjectsByUser(userID string) ([]*Project, error)
+	FindProjectsByPrefix(userID, name string) ([]*Project, error)
 
 	Close() error
 }

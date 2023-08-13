@@ -243,11 +243,13 @@ const (
 	sqlRemoveKeys          = `DELETE FROM public_keys WHERE id = ANY($1::uuid[])`
 	sqlRemoveUsers         = `DELETE FROM app_users WHERE id = ANY($1::uuid[])`
 
-	sqlInsertProject      = `INSERT INTO projects (user_id, name, project_dir) VALUES ($1, $2, $3) RETURNING id;`
-	sqlFindProjectByName  = `SELECT id, user_id, name, project_dir FROM projects WHERE user_id = $1 AND name = $2;`
-	sqlFindProjectsByUser = `SELECT id, user_id, name, project_dir FROM projects WHERE user_id = $1;`
-	sqlLinkToProject      = `UPDATE projects SET project_dir = $1, updated_at = $2 WHERE id = $3;`
-	sqlRemoveProject      = `DELETE FROM projects WHERE id = $1;`
+	sqlInsertProject        = `INSERT INTO projects (user_id, name, project_dir) VALUES ($1, $2, $3) RETURNING id;`
+	sqlFindProjectByName    = `SELECT id, user_id, name, project_dir FROM projects WHERE user_id = $1 AND name = $2;`
+	sqlFindProjectsByUser   = `SELECT id, user_id, name, project_dir FROM projects WHERE user_id = $1;`
+	sqlFindProjectsByPrefix = `SELECT id, user_id, name, project_dir FROM projects WHERE user_id = $1 AND name = project_dir AND name ILIKE $2;`
+	sqlFindProjectLinks     = `SELECT id, user_id, name, project_dir FROM projects WHERE user_id = $1 AND name != project_dir AND project_dir = $2;`
+	sqlLinkToProject        = `UPDATE projects SET project_dir = $1, updated_at = $2 WHERE id = $3;`
+	sqlRemoveProject        = `DELETE FROM projects WHERE id = $1;`
 )
 
 type PsqlDB struct {
@@ -1247,6 +1249,62 @@ func (me *PsqlDB) FindProjectByName(userID, name string) (*db.Project, error) {
 	}
 
 	return project, nil
+}
+
+func (me *PsqlDB) FindProjectLinks(userID, name string) ([]*db.Project, error) {
+	var projects []*db.Project
+	rs, err := me.Db.Query(sqlFindProjectLinks, userID, name)
+	if err != nil {
+		return nil, err
+	}
+	for rs.Next() {
+		project := &db.Project{}
+		err := rs.Scan(
+			&project.ID,
+			&project.UserID,
+			&project.Name,
+			&project.ProjectDir,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		projects = append(projects, project)
+	}
+
+	if rs.Err() != nil {
+		return nil, rs.Err()
+	}
+
+	return projects, nil
+}
+
+func (me *PsqlDB) FindProjectsByPrefix(userID, prefix string) ([]*db.Project, error) {
+	var projects []*db.Project
+	rs, err := me.Db.Query(sqlFindProjectsByPrefix, userID, prefix+"%")
+	if err != nil {
+		return nil, err
+	}
+	for rs.Next() {
+		project := &db.Project{}
+		err := rs.Scan(
+			&project.ID,
+			&project.UserID,
+			&project.Name,
+			&project.ProjectDir,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		projects = append(projects, project)
+	}
+
+	if rs.Err() != nil {
+		return nil, rs.Err()
+	}
+
+	return projects, nil
 }
 
 func (me *PsqlDB) FindProjectsByUser(userID string) ([]*db.Project, error) {

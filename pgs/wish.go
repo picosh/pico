@@ -39,6 +39,8 @@ func getHelpText(userName, projectName string) string {
 	helpStr += fmt.Sprintf("`%s stats`: prints stats for user\n", sshCmdStr)
 	helpStr += fmt.Sprintf("`%s ls`: lists projects\n", sshCmdStr)
 	helpStr += fmt.Sprintf("`%s %s rm`: deletes `%s`\n", sshCmdStr, projectName, projectName)
+	helpStr += fmt.Sprintf("`%s %s clean`: removes all projects that matches `%s` which is not linked\n", sshCmdStr, projectName, projectName)
+	helpStr += fmt.Sprintf("`%s %s links`: lists all projects linked to `%s`\n", sshCmdStr, projectName, projectName)
 	helpStr += fmt.Sprintf("`%s %s link projectB`: symbolic link from `%s` to `projectB`\n", sshCmdStr, projectName, projectName)
 	helpStr += fmt.Sprintf("`%s %s unlink`: removes symbolic link for `%s`\n", sshCmdStr, projectName, projectName)
 	return helpStr
@@ -183,7 +185,15 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 					}
 				} else {
 					log.Infof("user (%s) has no project record (%s), creating ...", user.Name, projectName)
-					_, err := dbpool.InsertProject(user.ID, projectName, projectDir)
+					id, err := dbpool.InsertProject(user.ID, projectName, projectName)
+					if err != nil {
+						log.Error(err)
+						utils.ErrorHandler(session, err)
+						return
+					}
+
+					log.Infof("user (%s) linking (%s) to (%s) ...", user.Name, projectName, projectDir)
+					err = dbpool.LinkToProject(user.ID, id, projectDir)
 					if err != nil {
 						log.Error(err)
 						utils.ErrorHandler(session, err)
@@ -193,11 +203,106 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 				out := fmt.Sprintf("(%s) now points to (%s)\n", projectName, linkTo)
 				_, _ = session.Write([]byte(out))
 				return
+			} else if cmd == "links" {
+				projects, err := dbpool.FindProjectLinks(user.ID, projectName)
+				if err != nil {
+					log.Error(err)
+					utils.ErrorHandler(session, err)
+					return
+				}
+
+				if len(projects) == 0 {
+					out := fmt.Sprintf("no projects linked to this project (%s) found\n", projectName)
+					_, _ = session.Write([]byte(out))
+					return
+				}
+
+				for _, project := range projects {
+					out := fmt.Sprintf("%s (links to: %s)\n", project.Name, project.ProjectDir)
+					if project.Name == project.ProjectDir {
+						out = fmt.Sprintf("%s\n", project.Name)
+					}
+					_, _ = session.Write([]byte(out))
+				}
+			} else if cmd == "clean" {
+				log.Infof("user (%s) running `clean` command for (%s)", user.Name, projectName)
+				if projectName == "" || projectName == "*" {
+					e := fmt.Errorf("must provide valid prefix")
+					log.Error(e)
+					utils.ErrorHandler(session, e)
+					return
+				}
+
+				projects, err := dbpool.FindProjectsByPrefix(user.ID, projectName)
+				if err != nil {
+					log.Error(err)
+					utils.ErrorHandler(session, err)
+				}
+
+				bucketName := shared.GetAssetBucketName(user.ID)
+				bucket, err := store.GetBucket(bucketName)
+				if err != nil {
+					log.Error(err)
+					utils.ErrorHandler(session, err)
+					return
+				}
+
+				rmProjects := []*db.Project{}
+				for _, project := range projects {
+					links, err := dbpool.FindProjectLinks(user.ID, project.Name)
+					if err != nil {
+						log.Error(err)
+						utils.ErrorHandler(session, err)
+					}
+
+					if len(links) == 0 {
+						out := fmt.Sprintf("project (%s) is available to delete", project.Name)
+						_, _ = session.Write([]byte(out))
+						rmProjects = append(rmProjects, project)
+					}
+				}
+
+				for _, project := range rmProjects {
+					fileList, err := store.ListFiles(bucket, project.Name, true)
+					if err != nil {
+						log.Error(err)
+						return
+					}
+
+					for _, file := range fileList {
+						err = store.DeleteFile(bucket, file.Name())
+						if err == nil {
+							// _, _ = session.Write([]byte(fmt.Sprintf("deleted (%s)\n", file.Name())))
+						} else {
+							log.Error(err)
+							utils.ErrorHandler(session, err)
+						}
+					}
+
+					err = dbpool.RemoveProject(project.ID)
+					if err != nil {
+						log.Error(err)
+						utils.ErrorHandler(session, err)
+					}
+				}
 			} else if cmd == "rm" {
 				log.Infof("user (%s) running `rm` command for (%s)", user.Name, projectName)
 				project, err := dbpool.FindProjectByName(user.ID, projectName)
 				if err == nil {
-					log.Infof("found project (%s) (%s), removing ...", projectName, project.ID)
+					log.Infof("found project (%s) (%s), checking dependencies ...", projectName, project.ID)
+
+					links, err := dbpool.FindProjectLinks(user.ID, projectName)
+					if err != nil {
+						log.Error(err)
+						utils.ErrorHandler(session, err)
+					}
+
+					if len(links) > 0 {
+						e := fmt.Errorf("project (%s) has (%d) other projects linking to it, can't delete project until they have been unlinked or removed, aborting ...", projectName, len(links))
+						log.Error(e)
+						return
+					}
+
 					err = dbpool.RemoveProject(project.ID)
 					if err != nil {
 						log.Error(err)
