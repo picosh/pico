@@ -7,6 +7,7 @@ This repo hosts the following pico services:
 - [pastes.sh](https://pastes.sh)
 - [imgs.sh](https://imgs.sh)
 - [feeds.sh](https://feeds.sh)
+- [pgs.sh](https://pgs.sh)
 
 ## comms
 
@@ -36,7 +37,7 @@ echo dotenv > .envrc && direnv allow
 Boot up database
 
 ```bash
-docker compose up --profile db -d
+docker compose up -f docker-compose.yml -f docker-compose.override.yml --profile db -d
 ```
 
 Create db and migrate
