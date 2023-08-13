@@ -2,12 +2,12 @@ version: "3.8"
 services:
   postgres:
     env_file:
-      - .env.example
+      - .env
     ports:
       - "5432:5432"
   minio:
     env_file:
-      - .env.example
+      - .env
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -17,7 +17,7 @@ services:
         APP: lists
       target: release-web
     env_file:
-      - .env.example
+      - .env
     ports:
       - "3000:3000"
   lists-ssh:
@@ -26,7 +26,7 @@ services:
         APP: lists
       target: release-ssh
     env_file:
-      - .env.example
+      - .env
     volumes:
       - ./data/lists-ssh/data:/app/ssh_data
     ports:
@@ -37,7 +37,7 @@ services:
         APP: pastes
       target: release-web
     env_file:
-      - .env.example
+      - .env
     ports:
       - "3001:3000"
   pastes-ssh:
@@ -46,7 +46,7 @@ services:
         APP: pastes
       target: release-ssh
     env_file:
-      - .env.example
+      - .env
     volumes:
       - ./data/pastes-ssh/data:/app/ssh_data
     ports:
@@ -57,7 +57,7 @@ services:
         APP: prose
       target: release-web
     env_file:
-      - .env.example
+      - .env
     ports:
       - "3002:3000"
   prose-ssh:
@@ -66,7 +66,7 @@ services:
         APP: prose
       target: release-ssh
     env_file:
-      - .env.example
+      - .env
     volumes:
       - ./data/prose-ssh/data:/app/ssh_data
     ports:
@@ -77,7 +77,7 @@ services:
         APP: imgs
       target: release-web
     env_file:
-      - .env.example
+      - .env
     volumes:
       - ./data/imgs-storage/data:/app/.storage
     ports:
@@ -88,7 +88,7 @@ services:
         APP: imgs
       target: release-ssh
     env_file:
-      - .env.example
+      - .env
     volumes:
       - ./data/imgs-storage/data:/app/.storage
       - ./data/imgs-ssh/data:/app/ssh_data
@@ -100,7 +100,7 @@ services:
         APP: pgs
       target: release-web
     env_file:
-      - .env.example
+      - .env
     volumes:
       - ./data/pgs-storage/data:/app/.storage
     ports:
@@ -111,7 +111,7 @@ services:
         APP: pgs
       target: release-ssh
     env_file:
-      - .env.example
+      - .env
     volumes:
       - ./data/pgs-storage/data:/app/.storage
       - ./data/pgs-ssh/data:/app/ssh_data
@@ -123,7 +123,7 @@ services:
         APP: feeds
       target: release-web
     env_file:
-      - .env.example
+      - .env
     ports:
       - "3004:3000"
   feeds-ssh:
@@ -132,7 +132,7 @@ services:
         APP: feeds
       target: release-ssh
     env_file:
-      - .env.example
+      - .env
     volumes:
       - ./data/feeds-ssh/data:/app/ssh_data
     ports:
