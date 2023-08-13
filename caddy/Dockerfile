@@ -1,6 +1,7 @@
 FROM caddy:builder-alpine AS builder
 
-RUN xcaddy build \
+# https://github.com/caddyserver/caddy-docker/issues/307#issuecomment-1670301042
+RUN xcaddy build v2.7.3 \
     --with github.com/caddy-dns/cloudflare
 
 FROM caddy:alpine
