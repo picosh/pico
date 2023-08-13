@@ -11,6 +11,11 @@ import (
 )
 
 func (h *UploadAssetHandler) validateAsset(data *FileData) (bool, error) {
+	projectName := shared.GetProjectName(data.FileEntry)
+	if projectName == "" || projectName == "/" || projectName == "." {
+		return false, fmt.Errorf("ERROR: invalid project name, you must copy files to a non-root folder (e.g. pgs.sh:/project-name)")
+	}
+
 	fname := filepath.Base(data.Filepath)
 	if int(data.Size) > h.Cfg.MaxAssetSize {
 		return false, fmt.Errorf("ERROR: file (%s) has exceeded maximum file size (%d bytes)", fname, h.Cfg.MaxAssetSize)

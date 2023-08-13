@@ -39,5 +39,5 @@ type ObjectStorage interface {
 	GetFile(bucket Bucket, fpath string) (ReaderAtCloser, error)
 	PutFile(bucket Bucket, fpath string, contents ReaderAtCloser) (string, error)
 	DeleteFile(bucket Bucket, fpath string) error
-	ListFiles(bucket Bucket, dir string) ([]os.FileInfo, error)
+	ListFiles(bucket Bucket, dir string, recursive bool) ([]os.FileInfo, error)
 }

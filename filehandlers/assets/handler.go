@@ -111,7 +111,7 @@ func (h *UploadAssetHandler) List(s ssh.Session, fpath string) ([]os.FileInfo, e
 		}
 		fileList = append(fileList, info)
 	} else {
-		fileList, err = h.Storage.ListFiles(bucket, fpath)
+		fileList, err = h.Storage.ListFiles(bucket, fpath, false)
 		if err != nil {
 			return fileList, err
 		}

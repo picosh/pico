@@ -121,7 +121,7 @@ func (s *StorageFS) DeleteFile(bucket Bucket, fpath string) error {
 	return nil
 }
 
-func (s *StorageFS) ListFiles(bucket Bucket, dir string) ([]os.FileInfo, error) {
+func (s *StorageFS) ListFiles(bucket Bucket, dir string, recursive bool) ([]os.FileInfo, error) {
 	var fileList []os.FileInfo
 	fpath := filepath.Join(bucket.Path, dir)
 	err := filepath.WalkDir(fpath, func(s string, d fs.DirEntry, err error) error {

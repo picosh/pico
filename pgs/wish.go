@@ -36,7 +36,8 @@ func getHelpText(userName, projectName string) string {
 	helpStr := "commands: [rm, list, link, unlink]\n\n"
 	sshCmdStr := fmt.Sprintf("ssh %s@pgs.sh", userName)
 	helpStr += fmt.Sprintf("`%s help`: prints this screen\n", sshCmdStr)
-	helpStr += fmt.Sprintf("`%s list`: lists projects\n", sshCmdStr)
+	helpStr += fmt.Sprintf("`%s stats`: prints stats for user\n", sshCmdStr)
+	helpStr += fmt.Sprintf("`%s ls`: lists projects\n", sshCmdStr)
 	helpStr += fmt.Sprintf("`%s %s rm`: deletes `%s`\n", sshCmdStr, projectName, projectName)
 	helpStr += fmt.Sprintf("`%s %s link projectB`: symbolic link from `%s` to `projectB`\n", sshCmdStr, projectName, projectName)
 	helpStr += fmt.Sprintf("`%s %s unlink`: removes symbolic link for `%s`\n", sshCmdStr, projectName, projectName)
@@ -95,7 +96,7 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 					str := "stats\n"
 					str += "=====\n"
 					str += fmt.Sprintf(
-						"space:\t\t%.4f/%.2fGB, %.2f%%\n",
+						"space:\t\t%.4f/%.4fGB, %.4f%%\n",
 						shared.BytesToGB(int(totalFileSize)),
 						shared.BytesToGB(cfg.MaxSize),
 						(float32(totalFileSize)/float32(cfg.MaxSize))*100,
@@ -118,6 +119,9 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 
 					for _, project := range projects {
 						out := fmt.Sprintf("%s (links to: %s)\n", project.Name, project.ProjectDir)
+						if project.Name == project.ProjectDir {
+							out = fmt.Sprintf("%s\n", project.Name)
+						}
 						_, _ = session.Write([]byte(out))
 					}
 				}
@@ -160,6 +164,14 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 				log.Infof("user (%s) running `link` command with (%s) (%s)", user.Name, projectName, linkTo)
 
 				projectDir := linkTo
+				_, err := dbpool.FindProjectByName(user.ID, linkTo)
+				if err != nil {
+					e := fmt.Errorf("(%s) project doesn't exist", linkTo)
+					log.Error(e)
+					utils.ErrorHandler(session, e)
+					return
+				}
+
 				project, err := dbpool.FindProjectByName(user.ID, projectName)
 				if err == nil {
 					log.Infof("user (%s) already has project (%s), updating ...", user.Name, projectName)
@@ -191,6 +203,11 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 						log.Error(err)
 						utils.ErrorHandler(session, err)
 					}
+				} else {
+					e := fmt.Errorf("(%s) project not found for user (%s)", projectName, user.Name)
+					log.Error(e)
+					utils.ErrorHandler(session, e)
+					return
 				}
 
 				bucketName := shared.GetAssetBucketName(user.ID)
@@ -201,7 +218,7 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 					return
 				}
 
-				fileList, err := store.ListFiles(bucket, projectName)
+				fileList, err := store.ListFiles(bucket, projectName, true)
 				if err != nil {
 					log.Error(err)
 					return
@@ -217,9 +234,12 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 					}
 				}
 				return
+			} else {
+				e := fmt.Errorf("%s not a valid command", args)
+				log.Error(e)
+				utils.ErrorHandler(session, e)
+				return
 			}
-
-			sshHandler(session)
 		}
 	}
 }

@@ -95,11 +95,11 @@ func (s *StorageMinio) GetBucketQuota(bucket Bucket) (uint64, error) {
 	return 0, fmt.Errorf("%s bucket not found in account info", bucket.Name)
 }
 
-func (s *StorageMinio) ListFiles(bucket Bucket, dir string) ([]os.FileInfo, error) {
+func (s *StorageMinio) ListFiles(bucket Bucket, dir string, recursive bool) ([]os.FileInfo, error) {
 	var fileList []os.FileInfo
 
 	resolved := strings.TrimPrefix(dir, "/")
-	opts := minio.ListObjectsOptions{Prefix: resolved, Recursive: false}
+	opts := minio.ListObjectsOptions{Prefix: resolved, Recursive: recursive}
 	for obj := range s.Client.ListObjects(context.Background(), bucket.Name, opts) {
 		if obj.Err != nil {
 			return fileList, obj.Err
