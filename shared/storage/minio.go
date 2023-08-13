@@ -98,8 +98,9 @@ func (s *StorageMinio) GetBucketQuota(bucket Bucket) (uint64, error) {
 func (s *StorageMinio) ListFiles(bucket Bucket, dir string) ([]os.FileInfo, error) {
 	var fileList []os.FileInfo
 
-	opts := minio.ListObjectsOptions{Prefix: dir, Recursive: false}
-	for obj := range s.Client.ListObjects(context.TODO(), bucket.Name, opts) {
+	resolved := strings.TrimPrefix(dir, "/")
+	opts := minio.ListObjectsOptions{Prefix: resolved, Recursive: false}
+	for obj := range s.Client.ListObjects(context.Background(), bucket.Name, opts) {
 		if obj.Err != nil {
 			return fileList, obj.Err
 		}
