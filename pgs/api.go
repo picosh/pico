@@ -84,7 +84,7 @@ func assetHandler(w http.ResponseWriter, h *AssetHandler) {
 			bucket.Name,
 			h.Filepath,
 		)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "404 not found", http.StatusNotFound)
 		return
 	}
 	defer contents.Close()
