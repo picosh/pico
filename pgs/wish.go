@@ -33,16 +33,19 @@ func getUser(s ssh.Session, dbpool db.DB) (*db.User, error) {
 }
 
 func getHelpText(userName, projectName string) string {
-	helpStr := "commands: [rm, list, link, unlink]\n\n"
+	helpStr := "commands: [help, stats, ls, rm, clean, link, links, unlink]\n\n"
 	sshCmdStr := fmt.Sprintf("ssh %s@pgs.sh", userName)
 	helpStr += fmt.Sprintf("`%s help`: prints this screen\n", sshCmdStr)
 	helpStr += fmt.Sprintf("`%s stats`: prints stats for user\n", sshCmdStr)
 	helpStr += fmt.Sprintf("`%s ls`: lists projects\n", sshCmdStr)
 	helpStr += fmt.Sprintf("`%s %s rm`: deletes `%s`\n", sshCmdStr, projectName, projectName)
-	helpStr += fmt.Sprintf("`%s %s clean`: removes all projects that matches `%s` which is not linked\n", sshCmdStr, projectName, projectName)
+	helpStr += fmt.Sprintf("`%s %s clean`: removes all projects that match prefix `%s` and is not linked to another project\n", sshCmdStr, projectName, projectName)
 	helpStr += fmt.Sprintf("`%s %s links`: lists all projects linked to `%s`\n", sshCmdStr, projectName, projectName)
-	helpStr += fmt.Sprintf("`%s %s link projectB`: symbolic link from `%s` to `projectB`\n", sshCmdStr, projectName, projectName)
-	helpStr += fmt.Sprintf("`%s %s unlink`: removes symbolic link for `%s`\n", sshCmdStr, projectName, projectName)
+	helpStr += fmt.Sprintf("`%s %s link project-b`: symbolic link from `%s` to `project-b`\n", sshCmdStr, projectName, projectName)
+	helpStr += fmt.Sprintf(
+		"`%s %s unlink`: alias for `%s link %s`, which removes symbolic link for `%s`\n",
+		sshCmdStr, projectName, projectName, projectName, projectName,
+	)
 	return helpStr
 }
 
@@ -71,7 +74,7 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 			if len(args) == 1 {
 				cmd := strings.TrimSpace(args[0])
 				if cmd == "help" {
-					_, _ = session.Write([]byte(getHelpText(user.Name, "projectA")))
+					_, _ = session.Write([]byte(getHelpText(user.Name, "project-a")))
 				} else if cmd == "stats" {
 					bucketName := shared.GetAssetBucketName(user.ID)
 					bucket, err := store.UpsertBucket(bucketName)
@@ -149,7 +152,7 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 					utils.ErrorHandler(session, fmt.Errorf("project (%s) does not exit", projectName))
 					return
 				}
-				err = dbpool.RemoveProject(project.ID)
+				err = dbpool.LinkToProject(user.ID, project.ID, project.Name)
 				if err != nil {
 					log.Error(err)
 					utils.ErrorHandler(session, err)
@@ -256,7 +259,7 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 					}
 
 					if len(links) == 0 {
-						out := fmt.Sprintf("project (%s) is available to delete", project.Name)
+						out := fmt.Sprintf("project (%s) is available to delete\n", project.Name)
 						_, _ = session.Write([]byte(out))
 						rmProjects = append(rmProjects, project)
 					}
@@ -272,7 +275,7 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 					for _, file := range fileList {
 						err = store.DeleteFile(bucket, file.Name())
 						if err == nil {
-							// _, _ = session.Write([]byte(fmt.Sprintf("deleted (%s)\n", file.Name())))
+							_, _ = session.Write([]byte(fmt.Sprintf("deleted (%s)\n", file.Name())))
 						} else {
 							log.Error(err)
 							utils.ErrorHandler(session, err)

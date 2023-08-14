@@ -1196,6 +1196,8 @@ func (me *PsqlDB) LinkToProject(userID, projectID, projectDir string) error {
 	if err != nil {
 		return err
 	}
+	isAlreadyLinked := linkToProject.Name != linkToProject.ProjectDir
+	sameProject := linkToProject.ID == projectID
 
 	/*
 		A project linked to another project which is also linked to a
@@ -1213,7 +1215,7 @@ func (me *PsqlDB) LinkToProject(userID, projectID, projectDir string) error {
 		We ensure that `project.Name` and `project.ProjectDir` are identical
 		when there is no aliasing.
 	*/
-	if linkToProject.Name != linkToProject.ProjectDir {
+	if !sameProject && isAlreadyLinked {
 		return fmt.Errorf(
 			"cannot link (%s) to (%s) because it is also a link to (%s)",
 			projectID,
@@ -1230,6 +1232,7 @@ func (me *PsqlDB) LinkToProject(userID, projectID, projectDir string) error {
 	)
 	return err
 }
+
 func (me *PsqlDB) RemoveProject(projectID string) error {
 	_, err := me.Db.Exec(sqlRemoveProject, projectID)
 	return err
