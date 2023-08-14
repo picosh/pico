@@ -21,15 +21,41 @@ import (
 )
 
 type AssetHandler struct {
-	Username  string
-	Subdomain string
-	Filepath  string
-	Cfg       *shared.ConfigSite
-	Dbpool    db.DB
-	Storage   storage.ObjectStorage
-	Logger    *zap.SugaredLogger
-	Cache     *gocache.Cache
-	UserID    string
+	Username   string
+	Subdomain  string
+	Filepath   string
+	ProjectDir string
+	Cfg        *shared.ConfigSite
+	Dbpool     db.DB
+	Storage    storage.ObjectStorage
+	Logger     *zap.SugaredLogger
+	Cache      *gocache.Cache
+	UserID     string
+}
+
+func calcPossibleRoutes(projectName, fp string) []string {
+	fname := filepath.Base(fp)
+	fdir := filepath.Dir(fp)
+	fext := filepath.Ext(fp)
+
+	// hack: we need to accommodate routes that are just directories
+	// and point the user to the index.html of each root dir.
+	if fname == "." || fext == "" {
+		return []string{
+			shared.GetAssetFileName(&utils.FileEntry{
+				Filepath: filepath.Join(projectName, fp, "index.html"),
+			}),
+		}
+	}
+
+	return []string{
+		shared.GetAssetFileName(&utils.FileEntry{
+			Filepath: filepath.Join(projectName, fdir, fname),
+		}),
+		shared.GetAssetFileName(&utils.FileEntry{
+			Filepath: filepath.Join(projectName, fp, "index.html"),
+		}),
+	}
 }
 
 func assetHandler(w http.ResponseWriter, h *AssetHandler) {
@@ -40,22 +66,30 @@ func assetHandler(w http.ResponseWriter, h *AssetHandler) {
 		return
 	}
 
-	fname := shared.GetAssetFileName(&utils.FileEntry{Filepath: h.Filepath})
+	routes := calcPossibleRoutes(h.ProjectDir, h.Filepath)
+	var contents storage.ReaderAtCloser
+	assetFilepath := ""
+	for _, fp := range routes {
+		c, err := h.Storage.GetFile(bucket, fp)
+		if err == nil {
+			contents = c
+			assetFilepath = fp
+			break
+		}
+	}
 
-	contents, err := h.Storage.GetFile(bucket, fname)
-	if err != nil {
+	if assetFilepath == "" {
 		h.Logger.Infof(
 			"asset not found in bucket: bucket:[%s], file:[%s]",
 			bucket.Name,
-			fname,
+			h.Filepath,
 		)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	defer contents.Close()
 
-	contentType := shared.GetMimeType(fname)
-
+	contentType := shared.GetMimeType(assetFilepath)
 	w.Header().Add("Content-Type", contentType)
 	_, err = io.Copy(w, contents)
 
@@ -94,7 +128,6 @@ func serveAsset(subdomain string, w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	projectDir := props.ProjectName
 
 	user, err := dbpool.FindUserForName(props.Username)
 	if err != nil {
@@ -102,31 +135,23 @@ func serveAsset(subdomain string, w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "user not found", http.StatusNotFound)
 		return
 	}
+	projectDir := props.ProjectName
 	project, err := dbpool.FindProjectByName(user.ID, props.ProjectName)
 	if err == nil {
 		projectDir = project.ProjectDir
 	}
 
-	fname := filepath.Base(floc)
-	fdir := filepath.Dir(floc)
-	// hack: we need to accommodate routes that are just directories
-	// and point the user to the index.html of each root dir.
-	if fname == "." || filepath.Ext(floc) == "" {
-		fname = "index.html"
-		fdir = floc
-	}
-	fpath := filepath.Join(projectDir, fdir, fname)
-
 	assetHandler(w, &AssetHandler{
-		Username:  props.Username,
-		UserID:    user.ID,
-		Subdomain: subdomain,
-		Filepath:  fpath,
-		Cfg:       cfg,
-		Dbpool:    dbpool,
-		Storage:   st,
-		Logger:    logger,
-		Cache:     cache,
+		Username:   props.Username,
+		UserID:     user.ID,
+		Subdomain:  subdomain,
+		ProjectDir: projectDir,
+		Filepath:   floc,
+		Cfg:        cfg,
+		Dbpool:     dbpool,
+		Storage:    st,
+		Logger:     logger,
+		Cache:      cache,
 	})
 }
 
