@@ -192,6 +192,7 @@ func StartApiServer() {
 	mainRoutes := []shared.Route{
 		shared.NewRoute("GET", "/", marketingRequest),
 		shared.NewRoute("GET", "/(.+)", marketingRequest),
+		shared.NewRoute("GET", "/check", shared.CheckHandler),
 	}
 	subdomainRoutes := []shared.Route{
 		shared.NewRoute("GET", "/", assetRequest),
