@@ -207,7 +207,7 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 					return
 				}
 
-				bucketName := shared.GetAssetBucketName(user.ID)
+				/* bucketName := shared.GetAssetBucketName(user.ID)
 				bucket, err := store.GetBucket(bucketName)
 				if err != nil {
 					log.Error(err)
@@ -234,7 +234,7 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 						log.Error(err)
 						utils.ErrorHandler(session, err)
 					}
-				}
+				} */
 
 				out := fmt.Sprintf("(%s) now points to (%s)\n", projectName, linkTo)
 				_, _ = session.Write([]byte(out))
