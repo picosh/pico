@@ -12,4 +12,4 @@ ssh_data
 .storage
 __debug_bin
 .bin
-tmp/
+public/

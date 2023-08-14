@@ -64,10 +64,10 @@ pgs-static:
 .PHONY: pgs-static
 
 pgs-site:
-	rm -rf tmp
-	mkdir tmp
+	rm -rf public
+	mkdir public
 	PGS_EMAIL=hello@pico.sh PGS_DOMAIN=pgs.sh PGS_PROTOCOL=https ./build/pgs-static -out ./tmp
-	cp ./pgs/public/* ./tmp
+	cp ./pgs/public/* ./public
 .PHONY: pgs-site
 
 pgs-deploy: pgs-static pgs-site
