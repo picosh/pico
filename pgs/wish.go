@@ -215,7 +215,7 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 					return
 				}
 
-				fileList, err := store.ListFiles(bucket, projectName, true)
+				fileList, err := store.ListFiles(bucket, projectName+"/", true)
 				if err != nil {
 					log.Error(err)
 					return
