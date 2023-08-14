@@ -66,12 +66,12 @@ pgs-static:
 pgs-site:
 	rm -rf public
 	mkdir public
-	PGS_EMAIL=hello@pico.sh PGS_DOMAIN=pgs.sh PGS_PROTOCOL=https ./build/pgs-static -out ./tmp
+	PGS_EMAIL=hello@pico.sh PGS_DOMAIN=pgs.sh PGS_PROTOCOL=https ./build/pgs-static -out ./public
 	cp ./pgs/public/* ./public
 .PHONY: pgs-site
 
 pgs-deploy: pgs-static pgs-site
-	scp -R ./tmp/* hey@pgs.sh:/pgs-prod
+	scp -R ./public/* hey@pgs.sh:/pgs-prod
 .PHONY: pgs-site-deploy
 
 format:
