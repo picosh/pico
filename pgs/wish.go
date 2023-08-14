@@ -178,7 +178,9 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 				}
 
 				project, err := dbpool.FindProjectByName(user.ID, projectName)
+				projectID := ""
 				if err == nil {
+					projectID = project.ID
 					log.Infof("user (%s) already has project (%s), updating ...", user.Name, projectName)
 					err = dbpool.LinkToProject(user.ID, project.ID, projectDir)
 					if err != nil {
@@ -194,15 +196,46 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 						utils.ErrorHandler(session, err)
 						return
 					}
+					projectID = id
+				}
 
-					log.Infof("user (%s) linking (%s) to (%s) ...", user.Name, projectName, projectDir)
-					err = dbpool.LinkToProject(user.ID, id, projectDir)
-					if err != nil {
+				log.Infof("user (%s) linking (%s) to (%s) ...", user.Name, projectName, projectDir)
+				err = dbpool.LinkToProject(user.ID, projectID, projectDir)
+				if err != nil {
+					log.Error(err)
+					utils.ErrorHandler(session, err)
+					return
+				}
+
+				bucketName := shared.GetAssetBucketName(user.ID)
+				bucket, err := store.GetBucket(bucketName)
+				if err != nil {
+					log.Error(err)
+					utils.ErrorHandler(session, err)
+					return
+				}
+
+				fileList, err := store.ListFiles(bucket, projectName, true)
+				if err != nil {
+					log.Error(err)
+					return
+				}
+
+				if len(fileList) > 0 {
+					out := fmt.Sprintf("(%s) assets now orphaned, deleting files (%d) ...\n", projectName, len(fileList))
+					_, _ = session.Write([]byte(out))
+				}
+
+				for _, file := range fileList {
+					err = store.DeleteFile(bucket, file.Name())
+					if err == nil {
+						_, _ = session.Write([]byte(fmt.Sprintf("deleted orphaned (%s)\n", file.Name())))
+					} else {
 						log.Error(err)
 						utils.ErrorHandler(session, err)
-						return
 					}
 				}
+
 				out := fmt.Sprintf("(%s) now points to (%s)\n", projectName, linkTo)
 				_, _ = session.Write([]byte(out))
 				return
