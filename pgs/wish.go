@@ -236,36 +236,20 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 					return
 				}
 
-				/* bucketName := shared.GetAssetBucketName(user.ID)
-				bucket, err := store.GetBucket(bucketName)
+				out := fmt.Sprintf("(%s) might have orphaned assets, removing ...\n", projectName)
+				_, _ = session.Write([]byte(out))
+
+				pd := ProjectDetails{
+					session: session,
+					store:   store,
+				}
+				err = pd.rmProjectAssets(user.ID, project.Name)
 				if err != nil {
 					log.Error(err)
 					utils.ErrorHandler(session, err)
-					return
 				}
 
-				fileList, err := store.ListFiles(bucket, projectName+"/", true)
-				if err != nil {
-					log.Error(err)
-					return
-				}
-
-				if len(fileList) > 0 {
-					out := fmt.Sprintf("(%s) assets now orphaned, deleting files (%d) ...\n", projectName, len(fileList))
-					_, _ = session.Write([]byte(out))
-				}
-
-				for _, file := range fileList {
-					err = store.DeleteFile(bucket, file.Name())
-					if err == nil {
-						_, _ = session.Write([]byte(fmt.Sprintf("deleted orphaned (%s)\n", file.Name())))
-					} else {
-						log.Error(err)
-						utils.ErrorHandler(session, err)
-					}
-				} */
-
-				out := fmt.Sprintf("(%s) now points to (%s)\n", projectName, linkTo)
+				out = fmt.Sprintf("(%s) now points to (%s)\n", projectName, linkTo)
 				_, _ = session.Write([]byte(out))
 				return
 			} else if cmd == "links" {
