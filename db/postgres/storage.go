@@ -246,9 +246,9 @@ const (
 
 	sqlInsertProject        = `INSERT INTO projects (user_id, name, project_dir) VALUES ($1, $2, $3) RETURNING id;`
 	sqlFindProjectByName    = `SELECT id, user_id, name, project_dir FROM projects WHERE user_id = $1 AND name = $2;`
-	sqlFindProjectsByUser   = `SELECT id, user_id, name, project_dir FROM projects WHERE user_id = $1;`
-	sqlFindProjectsByPrefix = `SELECT id, user_id, name, project_dir FROM projects WHERE user_id = $1 AND name = project_dir AND name ILIKE $2;`
-	sqlFindProjectLinks     = `SELECT id, user_id, name, project_dir FROM projects WHERE user_id = $1 AND name != project_dir AND project_dir = $2;`
+	sqlFindProjectsByUser   = `SELECT id, user_id, name, project_dir FROM projects WHERE user_id = $1 ORDER BY name ASC;`
+	sqlFindProjectsByPrefix = `SELECT id, user_id, name, project_dir FROM projects WHERE user_id = $1 AND name = project_dir AND name ILIKE $2 ORDER BY name ASC;`
+	sqlFindProjectLinks     = `SELECT id, user_id, name, project_dir FROM projects WHERE user_id = $1 AND name != project_dir AND project_dir = $2 ORDER BY name ASC;`
 	sqlLinkToProject        = `UPDATE projects SET project_dir = $1, updated_at = $2 WHERE id = $3;`
 	sqlRemoveProject        = `DELETE FROM projects WHERE id = $1;`
 )
