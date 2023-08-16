@@ -11,6 +11,7 @@ import (
 
 	_ "github.com/lib/pq"
 	"github.com/picosh/pico/db"
+	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/wish/cms/config"
 	"go.uber.org/zap"
 	"golang.org/x/exp/slices"
@@ -1183,6 +1184,10 @@ func (me *PsqlDB) FindFeedItemsByPostID(postID string) ([]*db.FeedItem, error) {
 }
 
 func (me *PsqlDB) InsertProject(userID, name, projectDir string) (string, error) {
+	if !shared.IsValidSubdomain(name) {
+		return "", fmt.Errorf("(%s) is not a valid project name, must match /^[a-z0-9-]+$/", name)
+	}
+
 	var id string
 	err := me.Db.QueryRow(sqlInsertProject, userID, name, projectDir).Scan(&id)
 	if err != nil {

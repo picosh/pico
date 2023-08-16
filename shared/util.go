@@ -20,10 +20,15 @@ import (
 )
 
 var fnameRe = regexp.MustCompile(`[-_]+`)
+var subdomainRe = regexp.MustCompile(`^[a-z0-9-]+$`)
 
 var KB = 1024
 var MB = KB * 1024
 var GB = MB * 1024
+
+func IsValidSubdomain(subd string) bool {
+	return subdomainRe.MatchString(subd)
+}
 
 func FilenameToTitle(filename string, title string) string {
 	if filename != title {
