@@ -9,6 +9,7 @@ import (
 	"github.com/picosh/pico/db"
 	uploadassets "github.com/picosh/pico/filehandlers/assets"
 	"github.com/picosh/pico/shared"
+	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pico/wish/cms/util"
 	"github.com/picosh/pico/wish/send/utils"
 )
@@ -30,6 +31,34 @@ func getUser(s ssh.Session, dbpool db.DB) (*db.User, error) {
 	}
 
 	return user, nil
+}
+
+type ProjectDetails struct {
+	session ssh.Session
+	store   storage.ObjectStorage
+}
+
+func (pd *ProjectDetails) rmProjectAssets(userID string, projectName string) error {
+	bucketName := shared.GetAssetBucketName(userID)
+	bucket, err := pd.store.GetBucket(bucketName)
+	if err != nil {
+		return err
+	}
+
+	fileList, err := pd.store.ListFiles(bucket, projectName+"/", true)
+	if err != nil {
+		return err
+	}
+
+	for _, file := range fileList {
+		err = pd.store.DeleteFile(bucket, file.Name())
+		if err == nil {
+			_, _ = pd.session.Write([]byte(fmt.Sprintf("deleted (%s)\n", file.Name())))
+		} else {
+			return err
+		}
+	}
+	return nil
 }
 
 func getHelpText(userName, projectName string) string {
@@ -275,14 +304,6 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 					utils.ErrorHandler(session, err)
 				}
 
-				bucketName := shared.GetAssetBucketName(user.ID)
-				bucket, err := store.GetBucket(bucketName)
-				if err != nil {
-					log.Error(err)
-					utils.ErrorHandler(session, err)
-					return
-				}
-
 				rmProjects := []*db.Project{}
 				for _, project := range projects {
 					links, err := dbpool.FindProjectLinks(user.ID, project.Name)
@@ -299,20 +320,14 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 				}
 
 				for _, project := range rmProjects {
-					fileList, err := store.ListFiles(bucket, project.Name, true)
+					pd := ProjectDetails{
+						session: session,
+						store:   store,
+					}
+					err = pd.rmProjectAssets(user.ID, project.Name)
 					if err != nil {
 						log.Error(err)
-						return
-					}
-
-					for _, file := range fileList {
-						err = store.DeleteFile(bucket, file.Name())
-						if err == nil {
-							_, _ = session.Write([]byte(fmt.Sprintf("deleted (%s)\n", file.Name())))
-						} else {
-							log.Error(err)
-							utils.ErrorHandler(session, err)
-						}
+						utils.ErrorHandler(session, err)
 					}
 
 					err = dbpool.RemoveProject(project.ID)
@@ -351,29 +366,16 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 					return
 				}
 
-				bucketName := shared.GetAssetBucketName(user.ID)
-				bucket, err := store.GetBucket(bucketName)
+				pd := ProjectDetails{
+					session: session,
+					store:   store,
+				}
+				err = pd.rmProjectAssets(user.ID, project.Name)
 				if err != nil {
 					log.Error(err)
 					utils.ErrorHandler(session, err)
-					return
 				}
 
-				fileList, err := store.ListFiles(bucket, projectName, true)
-				if err != nil {
-					log.Error(err)
-					return
-				}
-
-				for _, file := range fileList {
-					err = store.DeleteFile(bucket, file.Name())
-					if err == nil {
-						_, _ = session.Write([]byte(fmt.Sprintf("deleted (%s)\n", file.Name())))
-					} else {
-						log.Error(err)
-						utils.ErrorHandler(session, err)
-					}
-				}
 				return
 			} else {
 				e := fmt.Errorf("%s not a valid command", args)
