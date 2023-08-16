@@ -243,7 +243,7 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 					session: session,
 					store:   store,
 				}
-				err = pd.rmProjectAssets(user.ID, project.Name)
+				err = pd.rmProjectAssets(user.ID, projectName)
 				if err != nil {
 					log.Error(err)
 					utils.ErrorHandler(session, err)
