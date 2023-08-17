@@ -247,7 +247,7 @@ const (
 	sqlInsertProject        = `INSERT INTO projects (user_id, name, project_dir) VALUES ($1, $2, $3) RETURNING id;`
 	sqlFindProjectByName    = `SELECT id, user_id, name, project_dir FROM projects WHERE user_id = $1 AND name = $2;`
 	sqlFindProjectsByUser   = `SELECT id, user_id, name, project_dir FROM projects WHERE user_id = $1 ORDER BY name ASC;`
-	sqlFindProjectsByPrefix = `SELECT id, user_id, name, project_dir FROM projects WHERE user_id = $1 AND name = project_dir AND name ILIKE $2 ORDER BY name ASC;`
+	sqlFindProjectsByPrefix = `SELECT id, user_id, name, project_dir FROM projects WHERE user_id = $1 AND name = project_dir AND name ILIKE $2 ORDER BY updated_at ASC, name ASC;`
 	sqlFindProjectLinks     = `SELECT id, user_id, name, project_dir FROM projects WHERE user_id = $1 AND name != project_dir AND project_dir = $2 ORDER BY name ASC;`
 	sqlLinkToProject        = `UPDATE projects SET project_dir = $1, updated_at = $2 WHERE id = $3;`
 	sqlRemoveProject        = `DELETE FROM projects WHERE id = $1;`
@@ -1196,7 +1196,7 @@ func (me *PsqlDB) InsertProject(userID, name, projectDir string) (string, error)
 	return id, nil
 }
 
-func (me *PsqlDB) LinkToProject(userID, projectID, projectDir string) error {
+func (me *PsqlDB) LinkToProject(userID, projectID, projectDir string, commit bool) error {
 	linkToProject, err := me.FindProjectByName(userID, projectDir)
 	if err != nil {
 		return err
@@ -1229,12 +1229,14 @@ func (me *PsqlDB) LinkToProject(userID, projectID, projectDir string) error {
 		)
 	}
 
-	_, err = me.Db.Exec(
-		sqlLinkToProject,
-		projectDir,
-		time.Now(),
-		projectID,
-	)
+	if commit {
+		_, err = me.Db.Exec(
+			sqlLinkToProject,
+			projectDir,
+			time.Now(),
+			projectID,
+		)
+	}
 	return err
 }
 
