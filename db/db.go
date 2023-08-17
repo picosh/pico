@@ -207,6 +207,7 @@ type DB interface {
 	FindFeedItemsByPostID(postID string) ([]*FeedItem, error)
 
 	InsertProject(userID, name, projectDir string) (string, error)
+	UpdateProject(userID, name string) error
 	LinkToProject(userID, projectID, projectDir string, commit bool) error
 	RemoveProject(projectID string) error
 	FindProjectByName(userID, name string) (*Project, error)

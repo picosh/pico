@@ -245,6 +245,7 @@ const (
 	sqlRemoveUsers         = `DELETE FROM app_users WHERE id = ANY($1::uuid[])`
 
 	sqlInsertProject        = `INSERT INTO projects (user_id, name, project_dir) VALUES ($1, $2, $3) RETURNING id;`
+	sqlUpdateProject        = `UPDATE projects SET updated_at = $3 WHERE user_id = $1 AND name = $2;`
 	sqlFindProjectByName    = `SELECT id, user_id, name, project_dir FROM projects WHERE user_id = $1 AND name = $2;`
 	sqlFindProjectsByUser   = `SELECT id, user_id, name, project_dir FROM projects WHERE user_id = $1 ORDER BY name ASC;`
 	sqlFindProjectsByPrefix = `SELECT id, user_id, name, project_dir FROM projects WHERE user_id = $1 AND name = project_dir AND name ILIKE $2 ORDER BY updated_at ASC, name ASC;`
@@ -1194,6 +1195,11 @@ func (me *PsqlDB) InsertProject(userID, name, projectDir string) (string, error)
 		return "", err
 	}
 	return id, nil
+}
+
+func (me *PsqlDB) UpdateProject(userID, name string) error {
+	_, err := me.Db.Exec(sqlUpdateProject, userID, name, time.Now())
+	return err
 }
 
 func (me *PsqlDB) LinkToProject(userID, projectID, projectDir string, commit bool) error {

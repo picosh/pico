@@ -18,6 +18,8 @@ import (
 )
 
 type ctxUserKey struct{}
+type ctxBucketKey struct{}
+type ctxProjectKey struct{}
 
 func getAssetURL(c *shared.ConfigSite, username, projectName, fpath string) string {
 	return fmt.Sprintf(
@@ -28,6 +30,23 @@ func getAssetURL(c *shared.ConfigSite, username, projectName, fpath string) stri
 		c.Domain,
 		fpath,
 	)
+}
+
+func getProject(s ssh.Session) *db.Project {
+	v := s.Context().Value(ctxProjectKey{})
+	if v == nil {
+		return nil
+	}
+	project := s.Context().Value(ctxProjectKey{}).(*db.Project)
+	return project
+}
+
+func getBucket(s ssh.Session) (storage.Bucket, error) {
+	bucket := s.Context().Value(ctxBucketKey{}).(storage.Bucket)
+	if bucket.Name == "" {
+		return bucket, fmt.Errorf("bucket not set on `ssh.Context()` for connection")
+	}
+	return bucket, nil
 }
 
 func getUser(s ssh.Session) (*db.User, error) {
@@ -145,6 +164,8 @@ func (h *UploadAssetHandler) Validate(s ssh.Session) error {
 	if err != nil {
 		return err
 	}
+	s.Context().SetValue(ctxBucketKey{}, bucket)
+
 	totalFileSize, err := h.Storage.GetBucketQuota(bucket)
 	if err != nil {
 		return err
@@ -176,10 +197,33 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 	// filesize from sftp,scp,rsync
 	entry.Size = int64(fileSize)
 
-	assetBucket := shared.GetAssetBucketName(user.ID)
-	bucket, err := h.Storage.UpsertBucket(assetBucket)
+	bucket, err := getBucket(s)
 	if err != nil {
 		return "", err
+	}
+
+	hasProject := getProject(s)
+	projectName := shared.GetProjectName(entry)
+
+	// find, create, or update project if we haven't already done it
+	if hasProject == nil {
+		project, err := h.DBPool.FindProjectByName(user.ID, projectName)
+		if err == nil {
+			err = h.DBPool.UpdateProject(user.ID, projectName)
+			if err != nil {
+				return "", err
+			}
+		} else {
+			_, err = h.DBPool.InsertProject(user.ID, projectName, projectName)
+			if err != nil {
+				return "", err
+			}
+			project, err = h.DBPool.FindProjectByName(user.ID, projectName)
+			if err != nil {
+				return "", err
+			}
+		}
+		s.Context().SetValue(ctxProjectKey{}, project)
 	}
 
 	data := &FileData{
@@ -191,17 +235,6 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 	err = h.writeAsset(data)
 	if err != nil {
 		return "", err
-	}
-
-	projectName := shared.GetProjectName(entry)
-
-	// find and create project
-	_, err = h.DBPool.FindProjectByName(user.ID, projectName)
-	if err != nil {
-		_, err = h.DBPool.InsertProject(user.ID, projectName, projectName)
-		if err != nil {
-			return "", err
-		}
 	}
 
 	url := getAssetURL(
