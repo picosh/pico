@@ -74,7 +74,7 @@ pgs-deploy: pgs-static pgs-site
 	scp -R ./public/* hey@pgs.sh:/pgs-prod
 .PHONY: pgs-site-deploy
 
-format:
+fmt:
 	go fmt ./...
 .PHONY: format
 
