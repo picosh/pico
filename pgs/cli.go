@@ -215,7 +215,7 @@ func (c *Cmd) depends(projectName string) error {
 }
 
 // delete all the projects and associated assets matching prefix
-// but keep the latest N records
+// but keep the latest N records.
 func (c *Cmd) prune(prefix string, keepNumLatest int) error {
 	c.log.Infof("user (%s) running `clean` command for (%s)", c.user.Name, prefix)
 	if prefix == "" || prefix == "*" {
@@ -312,7 +312,7 @@ func (c *Cmd) bail(err error) {
 
 func (c *Cmd) notice() {
 	if !c.write {
-		out := fmt.Sprintf("\nNOTICE: changes not commited, use `--write` to save operation\n")
+		out := "\nNOTICE: changes not commited, use `--write` to save operation\n"
 		_, _ = c.session.Write([]byte(out))
 	}
 }
