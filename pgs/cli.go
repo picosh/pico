@@ -272,14 +272,24 @@ func (c *Cmd) prune(prefix string, keepNumLatest int) error {
 		if len(links) == 0 {
 			rmProjects = append(rmProjects, project)
 		} else {
-			out := fmt.Sprintf("project (%s) has (%d) projects linked to it, cannot prune", project.Name, len(projects))
+			out := fmt.Sprintf("project (%s) has (%d) projects linked to it, cannot prune", project.Name, len(links))
 			c.output(out)
 		}
 	}
 
 	goodbye := rmProjects
 	if keepNumLatest > 0 {
-		goodbye = rmProjects[:len(rmProjects)-keepNumLatest]
+		max := len(rmProjects) - (keepNumLatest)
+		if max <= 0 {
+			out := fmt.Sprintf(
+				"no projects available to prune (retention policy: %d, total: %d)",
+				keepNumLatest,
+				len(rmProjects),
+			)
+			c.output(out)
+			return nil
+		}
+		goodbye = rmProjects[:max]
 	}
 
 	for _, project := range goodbye {
@@ -300,6 +310,12 @@ func (c *Cmd) prune(prefix string, keepNumLatest int) error {
 				return err
 			}
 		}
+	}
+
+	c.output("\nsummary")
+	c.output("=======")
+	for _, project := range goodbye {
+		c.output(fmt.Sprintf("project (%s) removed", project.Name))
 	}
 
 	return nil
