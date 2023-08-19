@@ -1,6 +1,6 @@
 {{template "base" .}}
 
-{{define "title"}}{{.Site.Domain}} -- a static website hosting service for hackers.{{end}}
+{{define "title"}}{{.Site.Domain}} -- A zero-dependency static site hosting service for hackers.{{end}}
 
 {{define "meta"}}
 <meta name="description" content="A zero-dependency static site hosting service for hackers." />
@@ -44,6 +44,7 @@
     <ul>
       <li>The site you are reading right now</li>
       <li><a href="https://git.erock.io">git web viewer</a></li>
+      <li><a href="https://neovimcraft.com">neovimcraft</a></li>
     </ul>
   </section>
 
@@ -52,10 +53,10 @@
     <ul>
       <li>Terminal workflow</li>
       <li>No client-side installation required to fully manage static sites</li>
-      <li>Distinct static sites as "projects"</li>
+      <li>Distinct static sites as <code>projects</code></li>
       <li>Unlimited projects created on-the-fly (no need to create a project first)</li>
-      <li>Deploy via <code>scp -r * erock@{{.Site.Domain}}:/myproject</code></li>
-      <li>Symbolic linking from one project to another (to support promotions/rollbacks)</li>
+      <li>Deploy via <code>scp -r ./public/* erock@{{.Site.Domain}}:/myproject</code></li>
+      <li>Promotion/rollback support (via symbolic linking from one project to another)</li>
       <li>Managed HTTPS for all projects (e.g. https://erock-myproject.{{.Site.Domain}})</li>
       <li>Custom domains for projects (managed simply by `TXT` records)</li>
       <li>1GB max storage</li>
@@ -109,7 +110,8 @@
   <section>
     <h2 class="text-lg font-bold">Project promotion and rollbacks</h2>
     <p>
-      Additionally you can setup a pipeline for promotion and rollbacks.
+      Additionally you can setup a pipeline for promotion and rollbacks,
+      which will instantly update your project.
     </p>
     <pre>ssh {{.Site.Domain}} link project-prod project-d0131d4</pre>
     <p>
@@ -122,12 +124,19 @@
       to <code>project-d0131d4</code>. Want to rollback a release?
       Just change the link for <code>project-prod</code> to a previous project.
     </p>
+    <p>
+      We also built a <a href="https://github.com/picosh/pgs-action">github action</a>
+      that handles all the logic for uploading to {{.Site.Domain}}.
+      <a href="https://erock-git-neovimcraft.pgs.sh/tree/main/item/.github/workflows/deploy.yml.html#27">Here's an example of it in action</a>.
+    </p>
   </section>
 
   <section>
     <h2 class="text-lg font-bold">Philosophy</h2>
     <p>
       Creating a static website should be as simple as copying files from a local folder to a server.
+      We also believe in creating limited but feature-rich products without the user needing to install
+      anything on their computer.
     </p>
     <p>Read more about team pico's philosophy <a href="https://pico.sh">here</a>.</p>
   </section>
@@ -135,7 +144,8 @@
   <section>
     <h2 class="text-lg font-bold">Roadmap</h2>
     <ol>
-      <li>Not sure</li>
+      <li>Should we charge customers for more storage?</li>
+      <li>Github integration (e.g. post comment on PR with preview site)</li>
     </ol>
   </section>
 </main>

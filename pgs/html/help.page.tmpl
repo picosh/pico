@@ -38,9 +38,9 @@
     </ul>
   </section>
 
-  <section id="blog-ssh-key">
+  <section id="ssh-key">
     <h2 class="text-xl">
-      <a href="#blog-ssh-key" rel="nofollow noopener">#</a>
+      <a href="#ssh-key" rel="nofollow noopener">#</a>
       Generating a new SSH key
     </h2>
     <p>
@@ -58,7 +58,30 @@
       <a href="#cli-commands" rel="nofollow noopener">#</a>
       CLI Commands
     </h2>
+    <p>
+      Our CLI commands are currently in active development so the list of available commands are changing.
+    </p>
+    <p>The best way to learn about all the commands we support is via an SSH command:</p>
     <pre>ssh {{.Site.Domain}} help</pre>
+    <p>
+      Having said that, we do want to demonstrate the power of {{.Site.Domain}} by discussing design goals.
+      All of our SSH commands are safe-by-default.  Meaning, they never mutate server state by default.
+      This provides users an opportunity to experiment with our commands to see how they work.  In order to
+      actually trigger server mutations, every command must be appended with <code>--write</code>.
+    </p>
+    <p>
+      Further, we want to make sure users are able to manage their static sites exclusively from SSH commands.
+      Below is list of features we support via SSH commands:
+    </p>
+    <ul>
+      <li>Storage usage stats: <code>ssh <user>@{{.Site.Domain}} stats</code></li>
+      <li>List all projects (and their links): <code>ssh <user>@{{.Site.Domain}} ls</code></li>
+      <li>List all project dependencies: <code>ssh <user>@{{.Site.Domain}} depends project-x</code></li>
+      <li>Link a project: <code>ssh <user>@{{.Site.Domain}} link project-x project-y</code></li>
+      <li>Unlink a project: <code>ssh <user>@{{.Site.Domain}} unlink project-x</code></li>
+      <li>Delete a project (and all assets): <code>ssh <user>@{{.Site.Domain}} rm project-x</code></li>
+      <li>Delete all projects matching a prefix (except projects that have linked projects): <code>ssh <user>@{{.Site.Domain}} prune prefix</code></li>
+    </ul>
   </section>
 
   <section id="file-types">
