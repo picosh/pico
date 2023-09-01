@@ -99,7 +99,7 @@ func (h *ScpUploadHandler) List(s ssh.Session, fpath string) ([]os.FileInfo, err
 	var post *db.Post
 	var posts []*db.Post
 
-	if cleanFilename == "" || cleanFilename == "." {
+	if cleanFilename == "" || cleanFilename == "." || cleanFilename == "/" {
 		name := cleanFilename
 		if name == "" {
 			name = "/"
