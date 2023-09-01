@@ -19,6 +19,7 @@ import (
 
 type ctxUserKey struct{}
 type ctxBucketKey struct{}
+type ctxBucketQuotaKey struct{}
 type ctxProjectKey struct{}
 
 func getAssetURL(c *shared.ConfigSite, username, projectName, fpath string) string {
@@ -49,6 +50,10 @@ func getBucket(s ssh.Session) (storage.Bucket, error) {
 	return bucket, nil
 }
 
+func getBucketQuota(s ssh.Session) uint64 {
+	return s.Context().Value(ctxBucketQuotaKey{}).(uint64)
+}
+
 func getUser(s ssh.Session) (*db.User, error) {
 	user := s.Context().Value(ctxUserKey{}).(*db.User)
 	if user == nil {
@@ -59,9 +64,10 @@ func getUser(s ssh.Session) (*db.User, error) {
 
 type FileData struct {
 	*utils.FileEntry
-	Text   []byte
-	User   *db.User
-	Bucket storage.Bucket
+	Text        []byte
+	User        *db.User
+	Bucket      storage.Bucket
+	BucketQuota uint64
 }
 
 type UploadAssetHandler struct {
@@ -170,11 +176,8 @@ func (h *UploadAssetHandler) Validate(s ssh.Session) error {
 	if err != nil {
 		return err
 	}
-
+	s.Context().SetValue(ctxBucketQuotaKey{}, totalFileSize)
 	h.Cfg.Logger.Infof("(%s) bucket size is current (%d bytes)", user.Name, totalFileSize)
-	if totalFileSize >= uint64(h.Cfg.MaxSize) {
-		return fmt.Errorf("ERROR: user (%s) has exceeded (%d bytes) max (%d bytes)", user.Name, totalFileSize, h.Cfg.MaxSize)
-	}
 
 	s.Context().SetValue(ctxUserKey{}, user)
 	h.Cfg.Logger.Infof("(%s) attempting to upload files to (%s)", user.Name, h.Cfg.Space)
@@ -226,11 +229,13 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 		s.Context().SetValue(ctxProjectKey{}, project)
 	}
 
+	bucketQuota := getBucketQuota(s)
 	data := &FileData{
-		FileEntry: entry,
-		User:      user,
-		Text:      origText,
-		Bucket:    bucket,
+		FileEntry:   entry,
+		User:        user,
+		Text:        origText,
+		Bucket:      bucket,
+		BucketQuota: bucketQuota,
 	}
 	err = h.writeAsset(data)
 	if err != nil {

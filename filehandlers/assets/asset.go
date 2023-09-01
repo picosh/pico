@@ -11,6 +11,15 @@ import (
 )
 
 func (h *UploadAssetHandler) validateAsset(data *FileData) (bool, error) {
+	if data.BucketQuota >= uint64(h.Cfg.MaxSize) {
+		return false, fmt.Errorf(
+			"ERROR: user (%s) has exceeded (%d bytes) max (%d bytes)",
+			data.User.Name,
+			data.BucketQuota,
+			h.Cfg.MaxSize,
+		)
+	}
+
 	projectName := shared.GetProjectName(data.FileEntry)
 	if projectName == "" || projectName == "/" || projectName == "." {
 		return false, fmt.Errorf("ERROR: invalid project name, you must copy files to a non-root folder (e.g. pgs.sh:/project-name)")
