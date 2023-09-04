@@ -73,7 +73,7 @@ func toLinks(orderedMetaData yaml.MapSlice) ([]Link, error) {
 	for i:= 0; i < len(orderedMetaData); i++ {
 	var item = orderedMetaData[i]
 		if (item.Key == "nav") {
-			navData = item.Value.(interface{})
+			navData = item.Value
 			break;
 		}
 	}
