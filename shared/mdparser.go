@@ -18,6 +18,7 @@ import (
 	"github.com/yuin/goldmark/renderer"
 	ghtml "github.com/yuin/goldmark/renderer/html"
 	"github.com/yuin/goldmark/util"
+    yaml "gopkg.in/yaml.v2"
 )
 
 type Link struct {
@@ -67,29 +68,38 @@ func toBool(obj interface{}) bool {
 	return obj.(bool)
 }
 
-func toLinks(obj interface{}) ([]Link, error) {
+func toLinks(orderedMetaData yaml.MapSlice) ([]Link, error) {
+	var navData interface{}
+	for i:= 0; i < len(orderedMetaData); i++ {
+	var item = orderedMetaData[i]
+		if (item.Key == "nav") {
+			navData = item.Value.(interface{})
+			break;
+		}
+	}
+
 	links := []Link{}
-	if obj == nil {
+	if navData == nil {
 		return links, nil
 	}
 
-	addLinks := func(raw map[interface{}]interface{}) {
-		for k, v := range raw {
+	addLinks := func(raw yaml.MapSlice) {
+		for _, k := range raw {
 			links = append(links, Link{
-				Text: k.(string),
-				URL:  v.(string),
+				Text: k.Key.(string),
+				URL:  k.Value.(string),
 			})
 		}
 	}
 
-	switch raw := obj.(type) {
-	case map[interface{}]interface{}:
+	switch raw := navData.(type) {
+	case yaml.MapSlice:
 		addLinks(raw)
 	case []interface{}:
 		for _, v := range raw {
 			switch linkRaw := v.(type) {
-			case map[interface{}]interface{}:
-				addLinks(v.(map[interface{}]interface{}))
+			case yaml.MapSlice:
+				addLinks(v.(yaml.MapSlice))
 			default:
 				return links, fmt.Errorf("unsupported type for `nav` link item (%T), looking for map (`text: href`)", linkRaw)
 			}
@@ -264,7 +274,9 @@ func ParseText(text string, linkify Linkify) (*ParsedText, error) {
 	}
 	parsed.MetaData.PublishAt = publishAt
 
-	nav, err := toLinks(metaData["nav"])
+	orderedMetaData := meta.GetItems(context);
+
+	nav, err := toLinks(orderedMetaData)
 	if err != nil {
 		return &parsed, err
 	}
