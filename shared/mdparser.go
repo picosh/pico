@@ -18,7 +18,7 @@ import (
 	"github.com/yuin/goldmark/renderer"
 	ghtml "github.com/yuin/goldmark/renderer/html"
 	"github.com/yuin/goldmark/util"
-    yaml "gopkg.in/yaml.v2"
+	yaml "gopkg.in/yaml.v2"
 )
 
 type Link struct {
@@ -70,11 +70,11 @@ func toBool(obj interface{}) bool {
 
 func toLinks(orderedMetaData yaml.MapSlice) ([]Link, error) {
 	var navData interface{}
-	for i:= 0; i < len(orderedMetaData); i++ {
-	var item = orderedMetaData[i]
-		if (item.Key == "nav") {
+	for i := 0; i < len(orderedMetaData); i++ {
+		var item = orderedMetaData[i]
+		if item.Key == "nav" {
 			navData = item.Value
-			break;
+			break
 		}
 	}
 
@@ -274,7 +274,7 @@ func ParseText(text string, linkify Linkify) (*ParsedText, error) {
 	}
 	parsed.MetaData.PublishAt = publishAt
 
-	orderedMetaData := meta.GetItems(context);
+	orderedMetaData := meta.GetItems(context)
 
 	nav, err := toLinks(orderedMetaData)
 	if err != nil {
