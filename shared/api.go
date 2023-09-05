@@ -11,13 +11,14 @@ import (
 func CheckHandler(w http.ResponseWriter, r *http.Request) {
 	dbpool := GetDB(r)
 	cfg := GetCfg(r)
+	logger := GetLogger(r)
 
 	if cfg.IsCustomdomains() {
 		hostDomain := r.URL.Query().Get("domain")
 		appDomain := strings.Split(cfg.ConfigCms.Domain, ":")[0]
 
 		if !strings.Contains(hostDomain, appDomain) {
-			subdomain := GetCustomDomain(hostDomain, cfg.Space)
+			subdomain := GetCustomDomain(logger, hostDomain, cfg.Space)
 			if subdomain != "" {
 				u, err := dbpool.FindUserForName(subdomain)
 				if u != nil && err == nil {
