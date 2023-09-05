@@ -47,21 +47,21 @@ func checkHandler(w http.ResponseWriter, r *http.Request) {
 			props, err := getProjectFromSubdomain(subdomain)
 			if err != nil {
 				logger.Error(err)
-				w.WriteHeader(http.StatusUnprocessableEntity)
+				w.WriteHeader(http.StatusNotFound)
 				return
 			}
 
 			u, err := dbpool.FindUserForName(props.Username)
 			if err != nil {
 				logger.Error(err)
-				w.WriteHeader(http.StatusUnprocessableEntity)
+				w.WriteHeader(http.StatusNotFound)
 				return
 			}
 
 			p, err := dbpool.FindProjectByName(u.ID, props.ProjectName)
 			if err != nil {
 				logger.Error(err)
-				w.WriteHeader(http.StatusUnprocessableEntity)
+				w.WriteHeader(http.StatusNotFound)
 				return
 			}
 
