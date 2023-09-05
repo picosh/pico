@@ -19,10 +19,11 @@ This repo hosts the following pico services:
 
 ## development
 
-- `golang` >= 1.19
+- `golang` >= 1.21.0
 - `direnv` to load environment vars
-- `webp` macOS dependency
-  - can be installed with `brew install webp`
+- `webp` package dependency
+  - on mac can be installed with `brew install webp`
+  - on ubuntu can be installed with `sudo apt install libwebp-dev`
 
 ```bash
 cp ./.env.example .env
