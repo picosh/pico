@@ -33,6 +33,48 @@ type AssetHandler struct {
 	UserID     string
 }
 
+func checkHandler(w http.ResponseWriter, r *http.Request) {
+	dbpool := shared.GetDB(r)
+	cfg := shared.GetCfg(r)
+	logger := shared.GetLogger(r)
+
+	if cfg.IsCustomdomains() {
+		hostDomain := r.URL.Query().Get("domain")
+		appDomain := strings.Split(cfg.ConfigCms.Domain, ":")[0]
+
+		if !strings.Contains(hostDomain, appDomain) {
+			subdomain := shared.GetCustomDomain(logger, hostDomain, cfg.Space)
+			props, err := getProjectFromSubdomain(subdomain)
+			if err != nil {
+				logger.Error(err)
+				w.WriteHeader(http.StatusUnprocessableEntity)
+				return
+			}
+
+			u, err := dbpool.FindUserForName(props.Username)
+			if err != nil {
+				logger.Error(err)
+				w.WriteHeader(http.StatusUnprocessableEntity)
+				return
+			}
+
+			p, err := dbpool.FindProjectByName(u.ID, props.ProjectName)
+			if err != nil {
+				logger.Error(err)
+				w.WriteHeader(http.StatusUnprocessableEntity)
+				return
+			}
+
+			if u != nil && p != nil {
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+		}
+	}
+
+	w.WriteHeader(http.StatusNotFound)
+}
+
 func calcPossibleRoutes(projectName, fp string) []string {
 	fname := filepath.Base(fp)
 	fdir := filepath.Dir(fp)
@@ -107,7 +149,7 @@ func getProjectFromSubdomain(subdomain string) (*SubdomainProps, error) {
 	props := &SubdomainProps{}
 	strs := strings.SplitN(subdomain, "-", 2)
 	if len(strs) < 2 {
-		return nil, fmt.Errorf("subdomain incorrect format, must have period: %s", subdomain)
+		return nil, fmt.Errorf("subdomain incorrect format, must have `-` separating username and project: %s", subdomain)
 	}
 	props.Username = strs[0]
 	props.ProjectName = strs[1]
@@ -191,7 +233,7 @@ func StartApiServer() {
 
 	mainRoutes := []shared.Route{
 		shared.NewRoute("GET", "/", marketingRequest),
-		shared.NewRoute("GET", "/check", shared.CheckHandler),
+		shared.NewRoute("GET", "/check", checkHandler),
 		shared.NewRoute("GET", "/(.+)", marketingRequest),
 	}
 	subdomainRoutes := []shared.Route{
