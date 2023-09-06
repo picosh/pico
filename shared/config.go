@@ -227,6 +227,27 @@ func (c *ConfigSite) TagURL(curl *CreateURL, username, tag string) string {
 	return fmt.Sprintf("%s?tag=%s", c.FullBlogURL(curl, username), tg)
 }
 
+func (c *ConfigSite) AssetURL(username, projectName, fpath string) string {
+	if username == projectName {
+		return fmt.Sprintf(
+			"%s://%s.%s/%s",
+			c.Protocol,
+			username,
+			c.Domain,
+			fpath,
+		)
+	}
+
+	return fmt.Sprintf(
+		"%s://%s-%s.%s/%s",
+		c.Protocol,
+		username,
+		projectName,
+		c.Domain,
+		fpath,
+	)
+}
+
 func CreateLogger() *zap.SugaredLogger {
 	logger, err := zap.NewProduction()
 	if err != nil {

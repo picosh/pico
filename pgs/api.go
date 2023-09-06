@@ -2,6 +2,7 @@ package pgs
 
 import (
 	"fmt"
+	"html/template"
 	"io"
 	"net/http"
 	"net/url"
@@ -11,6 +12,7 @@ import (
 
 	_ "net/http/pprof"
 
+	"github.com/gorilla/feeds"
 	gocache "github.com/patrickmn/go-cache"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
@@ -73,6 +75,65 @@ func checkHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNotFound)
+}
+
+type RssData struct {
+	Contents template.HTML
+}
+
+func rssHandler(w http.ResponseWriter, r *http.Request) {
+	dbpool := shared.GetDB(r)
+	logger := shared.GetLogger(r)
+	cfg := shared.GetCfg(r)
+
+	pager, err := dbpool.FindAllProjects(&db.Pager{Num: 50, Page: 0})
+	if err != nil {
+		logger.Error(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	feed := &feeds.Feed{
+		Title:       fmt.Sprintf("%s discovery feed", cfg.Domain),
+		Link:        &feeds.Link{Href: cfg.ReadURL()},
+		Description: fmt.Sprintf("%s latest projects", cfg.Domain),
+		Author:      &feeds.Author{Name: cfg.Domain},
+		Created:     time.Now(),
+	}
+
+	var feedItems []*feeds.Item
+	for _, project := range pager.Data {
+		realUrl := strings.TrimSuffix(
+			cfg.AssetURL(project.Username, project.Name, ""),
+			"/",
+		)
+
+		item := &feeds.Item{
+			Id:          realUrl,
+			Title:       project.Name,
+			Link:        &feeds.Link{Href: realUrl},
+			Content:     fmt.Sprintf(`<a href="%s">%s</a>`, realUrl, realUrl),
+			Created:     *project.CreatedAt,
+			Updated:     *project.CreatedAt,
+			Description: "",
+			Author:      &feeds.Author{Name: project.Username},
+		}
+
+		feedItems = append(feedItems, item)
+	}
+	feed.Items = feedItems
+
+	rss, err := feed.ToAtom()
+	if err != nil {
+		logger.Fatal(err)
+		http.Error(w, "Could not generate atom rss feed", http.StatusInternalServerError)
+	}
+
+	w.Header().Add("Content-Type", "application/atom+xml")
+	_, err = w.Write([]byte(rss))
+	if err != nil {
+		logger.Error(err)
+	}
 }
 
 func calcPossibleRoutes(projectName, fp string) []string {
@@ -237,6 +298,7 @@ func StartApiServer() {
 	mainRoutes := []shared.Route{
 		shared.NewRoute("GET", "/", marketingRequest),
 		shared.NewRoute("GET", "/check", checkHandler),
+		shared.NewRoute("GET", "/rss", rssHandler),
 		shared.NewRoute("GET", "/(.+)", marketingRequest),
 	}
 	subdomainRoutes := []shared.Route{

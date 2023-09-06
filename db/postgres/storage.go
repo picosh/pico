@@ -244,9 +244,16 @@ const (
 	sqlRemoveKeys          = `DELETE FROM public_keys WHERE id = ANY($1::uuid[])`
 	sqlRemoveUsers         = `DELETE FROM app_users WHERE id = ANY($1::uuid[])`
 
-	sqlInsertProject        = `INSERT INTO projects (user_id, name, project_dir) VALUES ($1, $2, $3) RETURNING id;`
-	sqlUpdateProject        = `UPDATE projects SET updated_at = $3 WHERE user_id = $1 AND name = $2;`
-	sqlFindProjectByName    = `SELECT id, user_id, name, project_dir FROM projects WHERE user_id = $1 AND name = $2;`
+	sqlInsertProject      = `INSERT INTO projects (user_id, name, project_dir) VALUES ($1, $2, $3) RETURNING id;`
+	sqlUpdateProject      = `UPDATE projects SET updated_at = $3 WHERE user_id = $1 AND name = $2;`
+	sqlFindProjectByName  = `SELECT id, user_id, name, project_dir FROM projects WHERE user_id = $1 AND name = $2;`
+	sqlSelectProjectCount = `SELECT count(id) FROM projects`
+	sqlFindAllProjects    = `
+	SELECT projects.id, user_id, app_users.name as username, projects.name, project_dir, projects.created_at
+	FROM projects
+	LEFT OUTER JOIN app_users ON app_users.id = projects.user_id
+	ORDER BY created_at ASC
+	LIMIT $1 OFFSET $2`
 	sqlFindProjectsByUser   = `SELECT id, user_id, name, project_dir FROM projects WHERE user_id = $1 ORDER BY name ASC;`
 	sqlFindProjectsByPrefix = `SELECT id, user_id, name, project_dir FROM projects WHERE user_id = $1 AND name = project_dir AND name ILIKE $2 ORDER BY updated_at ASC, name ASC;`
 	sqlFindProjectLinks     = `SELECT id, user_id, name, project_dir FROM projects WHERE user_id = $1 AND name != project_dir AND project_dir = $2 ORDER BY name ASC;`
@@ -1349,4 +1356,45 @@ func (me *PsqlDB) FindProjectsByUser(userID string) ([]*db.Project, error) {
 	}
 
 	return projects, nil
+}
+
+func (me *PsqlDB) FindAllProjects(page *db.Pager) (*db.Paginate[*db.Project], error) {
+	var projects []*db.Project
+	rs, err := me.Db.Query(sqlFindAllProjects, page.Num, page.Num*page.Page)
+	if err != nil {
+		return nil, err
+	}
+	for rs.Next() {
+		project := &db.Project{}
+		err := rs.Scan(
+			&project.ID,
+			&project.UserID,
+			&project.Username,
+			&project.Name,
+			&project.ProjectDir,
+			&project.CreatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		projects = append(projects, project)
+	}
+
+	if rs.Err() != nil {
+		return nil, rs.Err()
+	}
+
+	var count int
+	err = me.Db.QueryRow(sqlSelectProjectCount).Scan(&count)
+	if err != nil {
+		return nil, err
+	}
+
+	pager := &db.Paginate[*db.Project]{
+		Data:  projects,
+		Total: int(math.Ceil(float64(count) / float64(page.Num))),
+	}
+
+	return pager, nil
 }

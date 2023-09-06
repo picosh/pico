@@ -22,27 +22,6 @@ type ctxBucketKey struct{}
 type ctxBucketQuotaKey struct{}
 type ctxProjectKey struct{}
 
-func getAssetURL(c *shared.ConfigSite, username, projectName, fpath string) string {
-	if username == projectName {
-		return fmt.Sprintf(
-			"%s://%s.%s/%s",
-			c.Protocol,
-			username,
-			c.Domain,
-			fpath,
-		)
-	}
-
-	return fmt.Sprintf(
-		"%s://%s-%s.%s/%s",
-		c.Protocol,
-		username,
-		projectName,
-		c.Domain,
-		fpath,
-	)
-}
-
 func getProject(s ssh.Session) *db.Project {
 	v := s.Context().Value(ctxProjectKey{})
 	if v == nil {
@@ -252,8 +231,7 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 		return "", err
 	}
 
-	url := getAssetURL(
-		h.Cfg,
+	url := h.Cfg.AssetURL(
 		user.Name,
 		projectName,
 		strings.Replace(data.Filepath, "/"+projectName+"/", "", 1),

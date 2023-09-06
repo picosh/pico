@@ -32,10 +32,12 @@ type PostData struct {
 }
 
 type Project struct {
-	ID         string `json:"id"`
-	UserID     string `json:"user_id"`
-	Name       string `json:"name"`
-	ProjectDir string `json:"project_dir"`
+	ID         string     `json:"id"`
+	UserID     string     `json:"user_id"`
+	Name       string     `json:"name"`
+	ProjectDir string     `json:"project_dir"`
+	Username   string     `json:"username"`
+	CreatedAt  *time.Time `json:"created_at"`
 }
 
 // Make the Attrs struct implement the driver.Valuer interface. This method
@@ -214,6 +216,7 @@ type DB interface {
 	FindProjectLinks(userID, name string) ([]*Project, error)
 	FindProjectsByUser(userID string) ([]*Project, error)
 	FindProjectsByPrefix(userID, name string) ([]*Project, error)
+	FindAllProjects(page *Pager) (*Paginate[*Project], error)
 
 	Close() error
 }
