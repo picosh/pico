@@ -148,11 +148,14 @@ type SubdomainProps struct {
 func getProjectFromSubdomain(subdomain string) (*SubdomainProps, error) {
 	props := &SubdomainProps{}
 	strs := strings.SplitN(subdomain, "-", 2)
-	if len(strs) < 2 {
-		return nil, fmt.Errorf("subdomain incorrect format, must have `-` separating username and project: %s", subdomain)
-	}
 	props.Username = strs[0]
-	props.ProjectName = strs[1]
+
+	if len(strs) == 2 {
+		props.ProjectName = strs[1]
+	} else {
+		props.ProjectName = props.Username
+	}
+
 	return props, nil
 }
 

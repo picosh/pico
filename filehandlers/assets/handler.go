@@ -23,6 +23,16 @@ type ctxBucketQuotaKey struct{}
 type ctxProjectKey struct{}
 
 func getAssetURL(c *shared.ConfigSite, username, projectName, fpath string) string {
+	if username == projectName {
+		return fmt.Sprintf(
+			"%s://%s.%s/%s",
+			c.Protocol,
+			username,
+			c.Domain,
+			fpath,
+		)
+	}
+
 	return fmt.Sprintf(
 		"%s://%s-%s.%s/%s",
 		c.Protocol,
