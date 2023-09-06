@@ -71,7 +71,8 @@ pgs-site:
 .PHONY: pgs-site
 
 pgs-deploy: pgs-static pgs-site
-	scp -R ./public/* hey@pgs.sh:/pgs-prod
+	scp -R ./public/* hey@pgs.sh:/pgs-local
+	ssh hey@pgs.sh link pgs-prod pgs-local --write
 .PHONY: pgs-site-deploy
 
 fmt:

@@ -14,9 +14,10 @@ import (
 )
 
 type SitePageData struct {
-	Domain  template.URL
-	HomeURL template.URL
-	Email   string
+	Domain      template.URL
+	HomeURL     template.URL
+	Email       string
+	Description string
 }
 
 type PageData struct {
@@ -66,9 +67,10 @@ func CreateURLFromRequest(cfg *ConfigSite, r *http.Request) *CreateURL {
 
 func (c *ConfigSite) GetSiteData() *SitePageData {
 	return &SitePageData{
-		Domain:  template.URL(c.Domain),
-		HomeURL: template.URL(c.HomeURL()),
-		Email:   c.Email,
+		Domain:      template.URL(c.Domain),
+		HomeURL:     template.URL(c.HomeURL()),
+		Email:       c.Email,
+		Description: c.Description,
 	}
 }
 

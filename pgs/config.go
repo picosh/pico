@@ -44,7 +44,7 @@ func NewConfigSite() *shared.ConfigSite {
 			MinioURL:    minioURL,
 			MinioUser:   minioUser,
 			MinioPass:   minioPass,
-			Description: "a zero-dependency static site hosting platform",
+			Description: "A zero-dependency static site hosting service for hackers.",
 			IntroText:   intro,
 			Space:       "pgs",
 			AllowedExt: []string{
