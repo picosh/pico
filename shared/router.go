@@ -56,17 +56,14 @@ func CreateServe(routes []Route, subdomainRoutes []Route, cfg *ConfigSite, dbpoo
 			hostDomain := strings.ToLower(strings.Split(r.Host, ":")[0])
 			appDomain := strings.ToLower(strings.Split(cfg.ConfigCms.Domain, ":")[0])
 
-			logger.Infof("servicing request with (hostDomain: %s, appDomain: %s)", hostDomain, appDomain)
 			if hostDomain != appDomain {
 				if strings.Contains(hostDomain, appDomain) {
 					subdomain = strings.TrimSuffix(hostDomain, fmt.Sprintf(".%s", appDomain))
-					logger.Infof("servicing request with (subdomain: %s)", subdomain)
 					if subdomain != "" {
 						curRoutes = subdomainRoutes
 					}
 				} else {
 					subdomain = GetCustomDomain(logger, hostDomain, cfg.Space)
-					logger.Infof("servicing request with (custom domain %s)", subdomain)
 					if subdomain != "" {
 						curRoutes = subdomainRoutes
 					}
@@ -143,7 +140,6 @@ func GetSubdomain(r *http.Request) string {
 
 func GetCustomDomain(logger *zap.SugaredLogger, host string, space string) string {
 	txt := fmt.Sprintf("_%s.%s", space, host)
-	logger.Infof("looking up TXT (%s)", txt)
 	records, err := net.LookupTXT(txt)
 	if err != nil {
 		logger.Error(err)
