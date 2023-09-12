@@ -148,6 +148,13 @@ func calcPossibleRoutes(projectName, fp string) []string {
 			shared.GetAssetFileName(&utils.FileEntry{
 				Filepath: filepath.Join(projectName, fp, "index.html"),
 			}),
+			shared.GetAssetFileName(&utils.FileEntry{
+				Filepath: filepath.Join(
+					projectName,
+					fdir,
+					fmt.Sprintf("%s.html", fname),
+				),
+			}),
 		}
 	}
 
