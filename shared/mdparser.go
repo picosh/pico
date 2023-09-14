@@ -18,6 +18,7 @@ import (
 	"github.com/yuin/goldmark/renderer"
 	ghtml "github.com/yuin/goldmark/renderer/html"
 	"github.com/yuin/goldmark/util"
+	"go.abhg.dev/goldmark/anchor"
 	yaml "gopkg.in/yaml.v2"
 )
 
@@ -224,6 +225,10 @@ func ParseText(text string, linkify Linkify) (*ParsedText, error) {
 			extension.Footnote,
 			meta.Meta,
 			hili,
+			&anchor.Extender{
+				Position: anchor.Before,
+				Texter:   anchor.Text("#"),
+			},
 		),
 		goldmark.WithParserOptions(
 			parser.WithAutoHeadingID(),

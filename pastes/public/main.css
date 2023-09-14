@@ -130,6 +130,18 @@ h3 {
   font-size: inherit;
 }
 
+h1 > code {
+  font-size: inherit;
+}
+
+h2 > code {
+  font-size: inherit;
+}
+
+h3 > code {
+  font-size: inherit;
+}
+
 hr {
   color: inherit;
   border: 0;
