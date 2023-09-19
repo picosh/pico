@@ -65,7 +65,7 @@ func main() {
 	promPort := shared.GetEnv("PASTES_PROM_PORT", "9222")
 	cfg := pastes.NewConfigSite()
 	logger := cfg.Logger
-	dbh := postgres.NewDB(&cfg.ConfigCms)
+	dbh := postgres.NewDB(cfg.DbURL, cfg.Logger)
 	defer dbh.Close()
 	hooks := &pastes.FileHooks{
 		Cfg: cfg,

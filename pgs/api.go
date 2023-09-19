@@ -282,7 +282,7 @@ func StartApiServer() {
 	cfg := NewConfigSite()
 	logger := cfg.Logger
 
-	db := postgres.NewDB(&cfg.ConfigCms)
+	db := postgres.NewDB(cfg.DbURL, cfg.Logger)
 	defer db.Close()
 
 	var st storage.ObjectStorage

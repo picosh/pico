@@ -885,7 +885,7 @@ func createSubdomainRoutes(staticRoutes []shared.Route) []shared.Route {
 
 func StartApiServer() {
 	cfg := NewConfigSite()
-	db := postgres.NewDB(&cfg.ConfigCms)
+	db := postgres.NewDB(cfg.ConfigCms.DbURL, cfg.Logger)
 	defer db.Close()
 	logger := cfg.Logger
 

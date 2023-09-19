@@ -94,7 +94,7 @@ func CmsMiddleware(cfg *config.ConfigCms, urls config.ConfigURL) bm.Handler {
 
 		sshUser := s.User()
 
-		dbpool := postgres.NewDB(cfg)
+		dbpool := postgres.NewDB(cfg.DbURL, cfg.Logger)
 
 		var st storage.ObjectStorage
 		if cfg.MinioURL == "" {

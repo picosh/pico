@@ -12,7 +12,6 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared"
-	"github.com/picosh/pico/wish/cms/config"
 	"go.uber.org/zap"
 	"golang.org/x/exp/slices"
 )
@@ -338,11 +337,10 @@ func CreatePostWithTagsFromRow(r RowScanner) (*db.Post, error) {
 	return post, nil
 }
 
-func NewDB(cfg *config.ConfigCms) *PsqlDB {
-	databaseUrl := cfg.DbURL
+func NewDB(databaseUrl string, logger *zap.SugaredLogger) *PsqlDB {
 	var err error
 	d := &PsqlDB{
-		Logger: cfg.Logger,
+		Logger: logger,
 	}
 	d.Logger.Infof("Connecting to postgres: %s", databaseUrl)
 
