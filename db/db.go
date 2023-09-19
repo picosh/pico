@@ -172,6 +172,7 @@ type DB interface {
 	FindUsers() ([]*User, error)
 	FindUserForName(name string) (*User, error)
 	FindUserForNameAndKey(name string, key string) (*User, error)
+	FindUserForNameAndPass(name string, pass string) (*User, error)
 	FindUserForKey(name string, key string) (*User, error)
 	FindUser(userID string) (*User, error)
 	ValidateName(name string) (bool, error)

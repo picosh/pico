@@ -135,12 +135,13 @@ var (
 )
 
 const (
-	sqlSelectPublicKey         = `SELECT id, user_id, public_key, created_at FROM public_keys WHERE public_key = $1`
-	sqlSelectPublicKeys        = `SELECT id, user_id, public_key, created_at FROM public_keys WHERE user_id = $1`
-	sqlSelectUser              = `SELECT id, name, created_at FROM app_users WHERE id = $1`
-	sqlSelectUserForName       = `SELECT id, name, created_at FROM app_users WHERE name = $1`
-	sqlSelectUserForNameAndKey = `SELECT app_users.id, app_users.name, app_users.created_at, public_keys.id as pk_id, public_keys.public_key, public_keys.created_at as pk_created_at FROM app_users LEFT OUTER JOIN public_keys ON public_keys.user_id = app_users.id WHERE app_users.name = $1 AND public_keys.public_key = $2`
-	sqlSelectUsers             = `SELECT id, name, created_at FROM app_users ORDER BY name ASC`
+	sqlSelectPublicKey          = `SELECT id, user_id, public_key, created_at FROM public_keys WHERE public_key = $1`
+	sqlSelectPublicKeys         = `SELECT id, user_id, public_key, created_at FROM public_keys WHERE user_id = $1`
+	sqlSelectUser               = `SELECT id, name, created_at FROM app_users WHERE id = $1`
+	sqlSelectUserForName        = `SELECT id, name, created_at FROM app_users WHERE name = $1`
+	sqlSelectUserForNameAndKey  = `SELECT app_users.id, app_users.name, app_users.created_at, public_keys.id as pk_id, public_keys.public_key, public_keys.created_at as pk_created_at FROM app_users LEFT OUTER JOIN public_keys ON public_keys.user_id = app_users.id WHERE app_users.name = $1 AND public_keys.public_key = $2`
+	sqlSelectUsers              = `SELECT id, name, created_at FROM app_users ORDER BY name ASC`
+	sqlSelectUserForNameAndPass = `SELECT id, name, created_at FROM app_users WHERE name = $1 AND pass = $2`
 
 	sqlSelectTotalUsers          = `SELECT count(id) FROM app_users`
 	sqlSelectUsersAfterDate      = `SELECT count(id) FROM app_users WHERE created_at >= $1`
@@ -575,6 +576,18 @@ func (me *PsqlDB) FindUserForNameAndKey(name string, key string) (*db.User, erro
 	}
 
 	user.PublicKey = pk
+	return user, nil
+}
+
+func (me *PsqlDB) FindUserForNameAndPass(name string, pass string) (*db.User, error) {
+	user := &db.User{}
+
+	r := me.Db.QueryRow(sqlSelectUserForNameAndKey, strings.ToLower(name), pass)
+	err := r.Scan(&user.ID, &user.Name, &user.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+
 	return user, nil
 }
 

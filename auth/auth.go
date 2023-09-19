@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -21,10 +22,45 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+type oauth2Server struct {
+	Issuer                                    string   `json:"issuer"`
+	IntrospectionEndpoint                     string   `json:"introspection_endpoint"`
+	IntrospectionEndpointAuthMethodsSupported []string `json:"introspection_endpoint_auth_methods_supported"`
+}
+
+func wellKnownHandler(w http.ResponseWriter, r *http.Request) {
+	p := oauth2Server{
+		Issuer:                "pico.sh",
+		IntrospectionEndpoint: "https://auth.pico.sh/introspect",
+		IntrospectionEndpointAuthMethodsSupported: []string{
+			"client_secret_basic",
+		},
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(p)
+}
+
+type oauth2Introspection struct {
+	Active   bool   `json:"active"`
+	Username string `json:"username"`
+}
+
+func introspectHandler(w http.ResponseWriter, r *http.Request) {
+	p := oauth2Introspection{
+		Active:   true,
+		Username: "",
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(p)
+}
+
 func createMainRoutes() []shared.Route {
 	routes := []shared.Route{
 		shared.NewRoute("GET", "/login", loginHandler),
-		// shared.NewRoute("GET", "/([^/]+)", blogHandler),
+		shared.NewRoute("GET", "/.well-known/oauth-authorization-server", wellKnownHandler),
+		shared.NewRoute("GET", "/introspect", introspectHandler),
 	}
 
 	return routes
