@@ -6,6 +6,8 @@ import (
 	"errors"
 	"regexp"
 	"time"
+
+	"github.com/golang-jwt/jwt"
 )
 
 var ErrNameTaken = errors.New("username has already been claimed")
@@ -159,6 +161,19 @@ var DenyList = []string{
 	"www",
 }
 
+func GenerateToken(secret string, user *User) (string, error) {
+	// Create a new token object, specifying signing method and the claims
+	// you would like it to contain.
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"user_id":  user.ID,
+		"username": user.Name,
+	})
+
+	// Sign and get the complete encoded token as a string using the secret
+	tokenString, err := token.SignedString([]byte(secret))
+	return tokenString, err
+}
+
 type DB interface {
 	AddUser() (string, error)
 	RemoveUsers(userIDs []string) error
@@ -172,11 +187,13 @@ type DB interface {
 	FindUsers() ([]*User, error)
 	FindUserForName(name string) (*User, error)
 	FindUserForNameAndKey(name string, key string) (*User, error)
-	FindUserForNameAndPass(name string, pass string) (*User, error)
 	FindUserForKey(name string, key string) (*User, error)
 	FindUser(userID string) (*User, error)
 	ValidateName(name string) (bool, error)
 	SetUserName(userID string, name string) error
+
+	FindUserForToken(token string) (*User, error)
+	InsertToken(userID, token string, expiresAt *time.Time) (string, error)
 
 	FindPosts() ([]*Post, error)
 	FindPost(postID string) (*Post, error)

@@ -16,9 +16,9 @@ import (
 )
 
 type Route struct {
-	method  string
-	regex   *regexp.Regexp
-	handler http.HandlerFunc
+	Method  string
+	Regex   *regexp.Regexp
+	Handler http.HandlerFunc
 }
 
 func NewRoute(method, pattern string, handler http.HandlerFunc) Route {
@@ -72,10 +72,10 @@ func CreateServe(routes []Route, subdomainRoutes []Route, cfg *ConfigSite, dbpoo
 		}
 
 		for _, route := range curRoutes {
-			matches := route.regex.FindStringSubmatch(r.URL.Path)
+			matches := route.Regex.FindStringSubmatch(r.URL.Path)
 			if len(matches) > 0 {
-				if r.Method != route.method {
-					allow = append(allow, route.method)
+				if r.Method != route.Method {
+					allow = append(allow, route.Method)
 					continue
 				}
 				loggerCtx := context.WithValue(r.Context(), ctxLoggerKey{}, logger)
@@ -85,7 +85,7 @@ func CreateServe(routes []Route, subdomainRoutes []Route, cfg *ConfigSite, dbpoo
 				cfgCtx := context.WithValue(storageCtx, ctxCfg{}, cfg)
 				cacheCtx := context.WithValue(cfgCtx, ctxCacheKey{}, cache)
 				ctx := context.WithValue(cacheCtx, ctxKey{}, matches[1:])
-				route.handler(w, r.WithContext(ctx))
+				route.Handler(w, r.WithContext(ctx))
 				return
 			}
 		}

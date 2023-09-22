@@ -26,47 +26,47 @@ var (
 	sqlSelectPosts = fmt.Sprintf(`
 	SELECT %s
 	FROM posts
-	LEFT OUTER JOIN app_users ON app_users.id = posts.user_id`, SelectPost)
+	LEFT JOIN app_users ON app_users.id = posts.user_id`, SelectPost)
 
 	sqlSelectPostsBeforeDate = fmt.Sprintf(`
 	SELECT %s
 	FROM posts
-	LEFT OUTER JOIN app_users ON app_users.id = posts.user_id
+	LEFT JOIN app_users ON app_users.id = posts.user_id
 	WHERE publish_at::date <= $1 AND cur_space = $2`, SelectPost)
 
 	sqlSelectPostWithFilename = fmt.Sprintf(`
 	SELECT %s, STRING_AGG(coalesce(post_tags.name, ''), ',') tags
 	FROM posts
-	LEFT OUTER JOIN app_users ON app_users.id = posts.user_id
-	LEFT OUTER JOIN post_tags ON post_tags.post_id = posts.id
+	LEFT JOIN app_users ON app_users.id = posts.user_id
+	LEFT JOIN post_tags ON post_tags.post_id = posts.id
 	WHERE filename = $1 AND user_id = $2 AND cur_space = $3
 	GROUP BY %s`, SelectPost, SelectPost)
 
 	sqlSelectPostWithSlug = fmt.Sprintf(`
 	SELECT %s, STRING_AGG(coalesce(post_tags.name, ''), ',') tags
 	FROM posts
-	LEFT OUTER JOIN app_users ON app_users.id = posts.user_id
-	LEFT OUTER JOIN post_tags ON post_tags.post_id = posts.id
+	LEFT JOIN app_users ON app_users.id = posts.user_id
+	LEFT JOIN post_tags ON post_tags.post_id = posts.id
 	WHERE slug = $1 AND user_id = $2 AND cur_space = $3
 	GROUP BY %s`, SelectPost, SelectPost)
 
 	sqlSelectPost = fmt.Sprintf(`
 	SELECT %s
 	FROM posts
-	LEFT OUTER JOIN app_users ON app_users.id = posts.user_id
+	LEFT JOIN app_users ON app_users.id = posts.user_id
 	WHERE posts.id = $1`, SelectPost)
 
 	sqlSelectUpdatedPostsForUser = fmt.Sprintf(`
 	SELECT %s
 	FROM posts
-	LEFT OUTER JOIN app_users ON app_users.id = posts.user_id
+	LEFT JOIN app_users ON app_users.id = posts.user_id
 	WHERE user_id = $1 AND publish_at::date <= CURRENT_DATE AND cur_space = $2
 	ORDER BY posts.updated_at DESC`, SelectPost)
 
 	sqlSelectExpiredPosts = fmt.Sprintf(`
 		SELECT %s
 		FROM posts
-		LEFT OUTER JOIN app_users ON app_users.id = posts.user_id
+		LEFT JOIN app_users ON app_users.id = posts.user_id
 		WHERE
 			cur_space = $1 AND
 			expires_at <= now();
@@ -75,8 +75,8 @@ var (
 	sqlSelectPostsForUser = fmt.Sprintf(`
 	SELECT %s, STRING_AGG(coalesce(post_tags.name, ''), ',') tags
 	FROM posts
-	LEFT OUTER JOIN app_users ON app_users.id = posts.user_id
-	LEFT OUTER JOIN post_tags ON post_tags.post_id = posts.id
+	LEFT JOIN app_users ON app_users.id = posts.user_id
+	LEFT JOIN post_tags ON post_tags.post_id = posts.id
 	WHERE
 		hidden = FALSE AND
 		user_id = $1 AND
@@ -89,7 +89,7 @@ var (
 	sqlSelectAllPostsForUser = fmt.Sprintf(`
 	SELECT %s
 	FROM posts
-	LEFT OUTER JOIN app_users ON app_users.id = posts.user_id
+	LEFT JOIN app_users ON app_users.id = posts.user_id
 	WHERE
 		user_id = $1 AND
 		cur_space = $2
@@ -110,8 +110,8 @@ var (
 		posts.mime_type,
 		0 AS "score"
 	FROM posts
-	LEFT OUTER JOIN app_users ON app_users.id = posts.user_id
-	LEFT OUTER JOIN post_tags ON post_tags.post_id = posts.id
+	LEFT JOIN app_users ON app_users.id = posts.user_id
+	LEFT JOIN post_tags ON post_tags.post_id = posts.id
 	WHERE
 		post_tags.name = $3 AND
 		publish_at::date <= CURRENT_DATE AND
@@ -122,8 +122,8 @@ var (
 	sqlSelectUserPostsByTag = fmt.Sprintf(`
 	SELECT %s
 	FROM posts
-	LEFT OUTER JOIN app_users ON app_users.id = posts.user_id
-	LEFT OUTER JOIN post_tags ON post_tags.post_id = posts.id
+	LEFT JOIN app_users ON app_users.id = posts.user_id
+	LEFT JOIN post_tags ON post_tags.post_id = posts.id
 	WHERE
 		hidden = FALSE AND
 		user_id = $1 AND
@@ -135,13 +135,19 @@ var (
 )
 
 const (
-	sqlSelectPublicKey          = `SELECT id, user_id, public_key, created_at FROM public_keys WHERE public_key = $1`
-	sqlSelectPublicKeys         = `SELECT id, user_id, public_key, created_at FROM public_keys WHERE user_id = $1`
-	sqlSelectUser               = `SELECT id, name, created_at FROM app_users WHERE id = $1`
-	sqlSelectUserForName        = `SELECT id, name, created_at FROM app_users WHERE name = $1`
-	sqlSelectUserForNameAndKey  = `SELECT app_users.id, app_users.name, app_users.created_at, public_keys.id as pk_id, public_keys.public_key, public_keys.created_at as pk_created_at FROM app_users LEFT OUTER JOIN public_keys ON public_keys.user_id = app_users.id WHERE app_users.name = $1 AND public_keys.public_key = $2`
-	sqlSelectUsers              = `SELECT id, name, created_at FROM app_users ORDER BY name ASC`
-	sqlSelectUserForNameAndPass = `SELECT id, name, created_at FROM app_users WHERE name = $1 AND pass = $2`
+	sqlSelectPublicKey         = `SELECT id, user_id, public_key, created_at FROM public_keys WHERE public_key = $1`
+	sqlSelectPublicKeys        = `SELECT id, user_id, public_key, created_at FROM public_keys WHERE user_id = $1`
+	sqlSelectUser              = `SELECT id, name, created_at FROM app_users WHERE id = $1`
+	sqlSelectUserForName       = `SELECT id, name, created_at FROM app_users WHERE name = $1`
+	sqlSelectUserForNameAndKey = `SELECT app_users.id, app_users.name, app_users.created_at, public_keys.id as pk_id, public_keys.public_key, public_keys.created_at as pk_created_at FROM app_users LEFT JOIN public_keys ON public_keys.user_id = app_users.id WHERE app_users.name = $1 AND public_keys.public_key = $2`
+	sqlSelectUsers             = `SELECT id, name, created_at FROM app_users ORDER BY name ASC`
+	sqlSelectUserForToken      = `
+	SELECT app_users.id, name, app_users.created_at
+	FROM app_users
+	LEFT JOIN user_tokens ON tokens.user_id = app_users.id
+	WHERE tokens.token = $1 AND tokens.expires_at > NOW()`
+
+	sqlInsertToken = `INSERT INTO tokens (user_id, token, expires_at) VALUES($1, $2, $3) RETURNING id;`
 
 	sqlSelectTotalUsers          = `SELECT count(id) FROM app_users`
 	sqlSelectUsersAfterDate      = `SELECT count(id) FROM app_users WHERE created_at >= $1`
@@ -156,7 +162,7 @@ const (
 	sqlSelectTagPostCount      = `
 	SELECT count(posts.id)
 	FROM posts
-	LEFT OUTER JOIN post_tags ON post_tags.post_id = posts.id
+	LEFT JOIN post_tags ON post_tags.post_id = posts.id
 	WHERE hidden = FALSE AND cur_space=$1 and post_tags.name = $2`
 	sqlSelectPostCount       = `SELECT count(id) FROM posts WHERE hidden = FALSE AND cur_space=$1`
 	sqlSelectAllUpdatedPosts = `
@@ -174,7 +180,7 @@ const (
 		posts.mime_type,
 		0 AS "score"
 	FROM posts
-	LEFT OUTER JOIN app_users ON app_users.id = posts.user_id
+	LEFT JOIN app_users ON app_users.id = posts.user_id
 	WHERE hidden = FALSE AND publish_at::date <= CURRENT_DATE AND cur_space = $3
 	ORDER BY updated_at DESC
 	LIMIT $1 OFFSET $2`
@@ -199,7 +205,7 @@ const (
 			)
 		) AS "score"
 	FROM posts
-	LEFT OUTER JOIN app_users ON app_users.id = posts.user_id
+	LEFT JOIN app_users ON app_users.id = posts.user_id
 	WHERE
 		hidden = FALSE AND
 		publish_at::date <= CURRENT_DATE AND
@@ -210,7 +216,7 @@ const (
 	sqlSelectPopularTags = `
 	SELECT name, count(post_id) as "tally"
 	FROM post_tags
-	LEFT OUTER JOIN posts ON posts.id = post_id
+	LEFT JOIN posts ON posts.id = post_id
 	WHERE posts.cur_space = $1
 	GROUP BY name
 	ORDER BY tally DESC
@@ -251,7 +257,7 @@ const (
 	sqlFindAllProjects    = `
 	SELECT projects.id, user_id, app_users.name as username, projects.name, project_dir, projects.created_at
 	FROM projects
-	LEFT OUTER JOIN app_users ON app_users.id = projects.user_id
+	LEFT JOIN app_users ON app_users.id = projects.user_id
 	ORDER BY created_at ASC
 	LIMIT $1 OFFSET $2`
 	sqlFindProjectsByUser   = `SELECT id, user_id, name, project_dir FROM projects WHERE user_id = $1 ORDER BY name ASC;`
@@ -579,10 +585,10 @@ func (me *PsqlDB) FindUserForNameAndKey(name string, key string) (*db.User, erro
 	return user, nil
 }
 
-func (me *PsqlDB) FindUserForNameAndPass(name string, pass string) (*db.User, error) {
+func (me *PsqlDB) FindUserForToken(token string) (*db.User, error) {
 	user := &db.User{}
 
-	r := me.Db.QueryRow(sqlSelectUserForNameAndKey, strings.ToLower(name), pass)
+	r := me.Db.QueryRow(sqlSelectUserForToken, token)
 	err := r.Scan(&user.ID, &user.Name, &user.CreatedAt)
 	if err != nil {
 		return nil, err
@@ -1408,4 +1414,13 @@ func (me *PsqlDB) FindAllProjects(page *db.Pager) (*db.Paginate[*db.Project], er
 	}
 
 	return pager, nil
+}
+
+func (me *PsqlDB) InsertToken(userID, token string, expiresAt *time.Time) (string, error) {
+	var id string
+	err := me.Db.QueryRow(sqlInsertToken, userID, token, expiresAt).Scan(&id)
+	if err != nil {
+		return "", err
+	}
+	return id, nil
 }

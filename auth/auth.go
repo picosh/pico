@@ -1,25 +1,28 @@
 package auth
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
+	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
 	"go.uber.org/zap"
 )
 
-func loginHandler(w http.ResponseWriter, r *http.Request) {
-	// dbpool := shared.GetDB(r)
-	logger := shared.GetLogger(r)
-	// cfg := shared.GetCfg(r)
+type Client struct {
+	Cfg    *AuthCfg
+	Dbpool db.DB
+	Logger *zap.SugaredLogger
+}
 
-	w.Header().Set("Content-Type", "text/plain")
-	_, err := w.Write([]byte("message"))
-	if err != nil {
-		logger.Error(err)
-	}
+type ctxClient struct{}
+
+func getClient(r *http.Request) *Client {
+	return r.Context().Value(ctxClient{}).(*Client)
 }
 
 type oauth2Server struct {
@@ -29,11 +32,14 @@ type oauth2Server struct {
 }
 
 func wellKnownHandler(w http.ResponseWriter, r *http.Request) {
+	client := getClient(r)
+
 	p := oauth2Server{
-		Issuer:                "pico.sh",
-		IntrospectionEndpoint: "https://auth.pico.sh/introspect",
+		Issuer:                client.Cfg.Domain,
+		IntrospectionEndpoint: fmt.Sprintf("http://%s/introspect", client.Cfg.Domain),
 		IntrospectionEndpointAuthMethodsSupported: []string{
 			"client_secret_basic",
+			"none",
 		},
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -46,10 +52,29 @@ type oauth2Introspection struct {
 	Username string `json:"username"`
 }
 
+type AuthBody struct {
+	token string
+}
+
 func introspectHandler(w http.ResponseWriter, r *http.Request) {
+	client := getClient(r)
+
+	var body AuthBody
+	err := json.NewDecoder(r.Body).Decode(&body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	user, err := client.Dbpool.FindUserForToken(body.token)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+
 	p := oauth2Introspection{
 		Active:   true,
-		Username: "",
+		Username: user.Name,
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -58,7 +83,6 @@ func introspectHandler(w http.ResponseWriter, r *http.Request) {
 
 func createMainRoutes() []shared.Route {
 	routes := []shared.Route{
-		shared.NewRoute("GET", "/login", loginHandler),
 		shared.NewRoute("GET", "/.well-known/oauth-authorization-server", wellKnownHandler),
 		shared.NewRoute("GET", "/introspect", introspectHandler),
 	}
@@ -66,8 +90,28 @@ func createMainRoutes() []shared.Route {
 	return routes
 }
 
-func handler(routes []shared.Route, cfg *AuthCfg) shared.ServeFn {
+func handler(routes []shared.Route, client *Client) shared.ServeFn {
 	return func(w http.ResponseWriter, r *http.Request) {
+		var allow []string
+
+		for _, route := range routes {
+			matches := route.Regex.FindStringSubmatch(r.URL.Path)
+			if len(matches) > 0 {
+				if r.Method != route.Method {
+					allow = append(allow, route.Method)
+					continue
+				}
+				clientCtx := context.WithValue(r.Context(), ctxClient{}, client)
+				route.Handler(w, r.WithContext(clientCtx))
+				return
+			}
+		}
+		if len(allow) > 0 {
+			w.Header().Set("Allow", strings.Join(allow, ", "))
+			http.Error(w, "405 method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		http.NotFound(w, r)
 	}
 }
 
@@ -75,31 +119,37 @@ type AuthCfg struct {
 	Debug  bool
 	Port   string
 	DbURL  string
-	Logger *zap.SugaredLogger
+	Domain string
 }
 
 func StartApiServer() {
 	debug := shared.GetEnv("AUTH_DEBUG", "0")
 	cfg := &AuthCfg{
 		DbURL:  shared.GetEnv("DATABASE_URL", ""),
-		Logger: shared.CreateLogger(),
 		Debug:  debug == "1",
+		Domain: shared.GetEnv("AUTH_DOMAIN", "0.0.0.0"),
 		Port:   shared.GetEnv("AUTH_WEB_PORT", "3000"),
 	}
 
-	db := postgres.NewDB(cfg.DbURL, cfg.Logger)
+	logger := shared.CreateLogger()
+	db := postgres.NewDB(cfg.DbURL, logger)
 	defer db.Close()
 
-	logger := cfg.Logger
+	client := &Client{
+		Cfg:    cfg,
+		Dbpool: db,
+		Logger: logger,
+	}
+
 	routes := createMainRoutes()
 
 	if cfg.Debug {
 		routes = shared.CreatePProfRoutes(routes)
 	}
 
-	router := http.HandlerFunc(handler(routes, cfg))
+	router := http.HandlerFunc(handler(routes, client))
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)
-	logger.Infof("Starting server on port %s", cfg.Port)
-	logger.Fatal(http.ListenAndServe(portStr, router))
+	client.Logger.Infof("Starting server on port %s", cfg.Port)
+	client.Logger.Fatal(http.ListenAndServe(portStr, router))
 }
