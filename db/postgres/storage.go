@@ -141,13 +141,15 @@ const (
 	sqlSelectUserForName       = `SELECT id, name, created_at FROM app_users WHERE name = $1`
 	sqlSelectUserForNameAndKey = `SELECT app_users.id, app_users.name, app_users.created_at, public_keys.id as pk_id, public_keys.public_key, public_keys.created_at as pk_created_at FROM app_users LEFT JOIN public_keys ON public_keys.user_id = app_users.id WHERE app_users.name = $1 AND public_keys.public_key = $2`
 	sqlSelectUsers             = `SELECT id, name, created_at FROM app_users ORDER BY name ASC`
+
 	sqlSelectUserForToken      = `
 	SELECT app_users.id, name, app_users.created_at
 	FROM app_users
 	LEFT JOIN user_tokens ON tokens.user_id = app_users.id
 	WHERE tokens.token = $1 AND tokens.expires_at > NOW()`
-
-	sqlInsertToken = `INSERT INTO tokens (user_id, token, expires_at) VALUES($1, $2, $3) RETURNING id;`
+	sqlInsertToken = `INSERT INTO tokens (user_id, name) VALUES($1, $2) RETURNING id;`
+	sqlRemoveToken = `DELETE FROM tokens WHERE id = $1`
+	sqlSelectTokensForUser        = `SELECT id, user_id, name, created_at, expires_at FROM tokens WHERE user_id = $1`
 
 	sqlSelectTotalUsers          = `SELECT count(id) FROM app_users`
 	sqlSelectUsersAfterDate      = `SELECT count(id) FROM app_users WHERE created_at >= $1`
@@ -1416,11 +1418,37 @@ func (me *PsqlDB) FindAllProjects(page *db.Pager) (*db.Paginate[*db.Project], er
 	return pager, nil
 }
 
-func (me *PsqlDB) InsertToken(userID, token string, expiresAt *time.Time) (string, error) {
+func (me *PsqlDB) InsertToken(userID, name string) (string, error) {
 	var id string
-	err := me.Db.QueryRow(sqlInsertToken, userID, token, expiresAt).Scan(&id)
+	err := me.Db.QueryRow(sqlInsertToken, userID, name).Scan(&id)
 	if err != nil {
 		return "", err
 	}
 	return id, nil
+}
+
+func (me *PsqlDB) RemoveToken(tokenID string) error {
+	_, err := me.Db.Exec(sqlRemoveToken, tokenID)
+	return err
+}
+
+func (me *PsqlDB) FindTokensForUser(userID string) ([]*db.Token, error) {
+	var keys []*db.Token
+	rs, err := me.Db.Query(sqlSelectTokensForUser, userID)
+	if err != nil {
+		return keys, err
+	}
+	for rs.Next() {
+		pk := &db.Token{}
+		err := rs.Scan(&pk.ID, &pk.UserID, &pk.Name, &pk.CreatedAt, &pk.ExpiresAt)
+		if err != nil {
+			return keys, err
+		}
+
+		keys = append(keys, pk)
+	}
+	if rs.Err() != nil {
+		return keys, rs.Err()
+	}
+	return keys, nil
 }
