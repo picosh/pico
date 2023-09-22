@@ -140,9 +140,9 @@ type FeedItem struct {
 }
 
 type Token struct {
-	ID string
-	UserID string
-	Name string
+	ID        string
+	UserID    string
+	Name      string
 	CreatedAt *time.Time
 	ExpiresAt *time.Time
 }

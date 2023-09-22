@@ -72,15 +72,15 @@ func (f fingerprint) state(s keyState, styles common.Styles) string {
 }
 
 type styledKey struct {
-	styles      common.Styles
+	styles       common.Styles
 	nameLabel    string
-	name string
-	date        string
-	gutter      string
-	dateLabel   string
-	dateVal     string
-	expiresLabel   string
-	expiresVal     string
+	name         string
+	date         string
+	gutter       string
+	dateLabel    string
+	dateVal      string
+	expiresLabel string
+	expiresVal   string
 }
 
 func (m Model) newStyledKey(styles common.Styles, token *db.Token, active bool) styledKey {
@@ -89,15 +89,15 @@ func (m Model) newStyledKey(styles common.Styles, token *db.Token, active bool) 
 
 	// Default state
 	return styledKey{
-		styles:      styles,
-		date:        date,
-		name: token.Name,
-		gutter:      " ",
+		styles:       styles,
+		date:         date,
+		name:         token.Name,
+		gutter:       " ",
 		nameLabel:    "Name:",
-		dateLabel:   "Added:",
-		dateVal:     styles.LabelDim.Render(date),
+		dateLabel:    "Added:",
+		dateVal:      styles.LabelDim.Render(date),
 		expiresLabel: "Expires:",
-		expiresVal:     styles.LabelDim.Render(expires),
+		expiresVal:   styles.LabelDim.Render(expires),
 	}
 }
 

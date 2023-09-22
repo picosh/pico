@@ -142,14 +142,14 @@ const (
 	sqlSelectUserForNameAndKey = `SELECT app_users.id, app_users.name, app_users.created_at, public_keys.id as pk_id, public_keys.public_key, public_keys.created_at as pk_created_at FROM app_users LEFT JOIN public_keys ON public_keys.user_id = app_users.id WHERE app_users.name = $1 AND public_keys.public_key = $2`
 	sqlSelectUsers             = `SELECT id, name, created_at FROM app_users ORDER BY name ASC`
 
-	sqlSelectUserForToken      = `
-	SELECT app_users.id, name, app_users.created_at
+	sqlSelectUserForToken = `
+	SELECT app_users.id, app_users.name, app_users.created_at
 	FROM app_users
-	LEFT JOIN user_tokens ON tokens.user_id = app_users.id
+	LEFT JOIN tokens ON tokens.user_id = app_users.id
 	WHERE tokens.token = $1 AND tokens.expires_at > NOW()`
-	sqlInsertToken = `INSERT INTO tokens (user_id, name) VALUES($1, $2) RETURNING id;`
-	sqlRemoveToken = `DELETE FROM tokens WHERE id = $1`
-	sqlSelectTokensForUser        = `SELECT id, user_id, name, created_at, expires_at FROM tokens WHERE user_id = $1`
+	sqlInsertToken         = `INSERT INTO tokens (user_id, name) VALUES($1, $2) RETURNING id;`
+	sqlRemoveToken         = `DELETE FROM tokens WHERE id = $1`
+	sqlSelectTokensForUser = `SELECT id, user_id, name, created_at, expires_at FROM tokens WHERE user_id = $1`
 
 	sqlSelectTotalUsers          = `SELECT count(id) FROM app_users`
 	sqlSelectUsersAfterDate      = `SELECT count(id) FROM app_users WHERE created_at >= $1`

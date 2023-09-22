@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
@@ -31,14 +30,18 @@ type oauth2Server struct {
 	IntrospectionEndpointAuthMethodsSupported []string `json:"introspection_endpoint_auth_methods_supported"`
 }
 
+func getIntrospectURL(cfg *AuthCfg) string {
+	return fmt.Sprintf("%s/introspect", cfg.Domain)
+}
+
 func wellKnownHandler(w http.ResponseWriter, r *http.Request) {
 	client := getClient(r)
+	introspectURL := getIntrospectURL(client.Cfg)
 
 	p := oauth2Server{
-		Issuer:                client.Cfg.Domain,
-		IntrospectionEndpoint: fmt.Sprintf("http://%s/introspect", client.Cfg.Domain),
+		Issuer:                client.Cfg.Issuer,
+		IntrospectionEndpoint: introspectURL,
 		IntrospectionEndpointAuthMethodsSupported: []string{
-			"client_secret_basic",
 			"none",
 		},
 	}
@@ -58,16 +61,12 @@ type AuthBody struct {
 
 func introspectHandler(w http.ResponseWriter, r *http.Request) {
 	client := getClient(r)
+	token := r.FormValue("token")
+	client.Logger.Infof("introspect token (%s)", token)
 
-	var body AuthBody
-	err := json.NewDecoder(r.Body).Decode(&body)
+	user, err := client.Dbpool.FindUserForToken(token)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	user, err := client.Dbpool.FindUserForToken(body.token)
-	if err != nil {
+		client.Logger.Error(err)
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
 	}
@@ -84,7 +83,7 @@ func introspectHandler(w http.ResponseWriter, r *http.Request) {
 func createMainRoutes() []shared.Route {
 	routes := []shared.Route{
 		shared.NewRoute("GET", "/.well-known/oauth-authorization-server", wellKnownHandler),
-		shared.NewRoute("GET", "/introspect", introspectHandler),
+		shared.NewRoute("POST", "/introspect", introspectHandler),
 	}
 
 	return routes
@@ -106,11 +105,6 @@ func handler(routes []shared.Route, client *Client) shared.ServeFn {
 				return
 			}
 		}
-		if len(allow) > 0 {
-			w.Header().Set("Allow", strings.Join(allow, ", "))
-			http.Error(w, "405 method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
 		http.NotFound(w, r)
 	}
 }
@@ -120,6 +114,7 @@ type AuthCfg struct {
 	Port   string
 	DbURL  string
 	Domain string
+	Issuer string
 }
 
 func StartApiServer() {
@@ -127,7 +122,8 @@ func StartApiServer() {
 	cfg := &AuthCfg{
 		DbURL:  shared.GetEnv("DATABASE_URL", ""),
 		Debug:  debug == "1",
-		Domain: shared.GetEnv("AUTH_DOMAIN", "0.0.0.0"),
+		Issuer: shared.GetEnv("AUTH_ISSUER", "pico.sh"),
+		Domain: shared.GetEnv("AUTH_DOMAIN", "http://0.0.0.0:3000"),
 		Port:   shared.GetEnv("AUTH_WEB_PORT", "3000"),
 	}
 

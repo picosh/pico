@@ -20,8 +20,8 @@ import (
 	"github.com/picosh/pico/wish/cms/ui/common"
 	"github.com/picosh/pico/wish/cms/ui/info"
 	"github.com/picosh/pico/wish/cms/ui/keys"
-	"github.com/picosh/pico/wish/cms/ui/tokens"
 	"github.com/picosh/pico/wish/cms/ui/posts"
+	"github.com/picosh/pico/wish/cms/ui/tokens"
 	"github.com/picosh/pico/wish/cms/ui/username"
 	"github.com/picosh/pico/wish/cms/util"
 )
@@ -68,7 +68,7 @@ const (
 var menuChoices = map[menuChoice]string{
 	setUserChoice: "Set username",
 	keysChoice:    "Manage keys",
-	tokensChoice:    "Manage tokens",
+	tokensChoice:  "Manage tokens",
 	postsChoice:   "Manage posts",
 	exitChoice:    "Exit",
 }
@@ -160,7 +160,7 @@ type model struct {
 	username      username.Model
 	posts         posts.Model
 	keys          keys.Model
-	tokens          tokens.Model
+	tokens        tokens.Model
 	createAccount account.CreateModel
 }
 

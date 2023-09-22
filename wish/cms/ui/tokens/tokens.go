@@ -52,9 +52,9 @@ type Model struct {
 	pager          pager.Model
 	state          state
 	err            error
-	activeKeyIndex int             // index of the key in the below slice which is currently in use
-	tokens           []*db.Token // keys linked to user's account
-	index          int             // index of selected key in relation to the current page
+	activeKeyIndex int         // index of the key in the below slice which is currently in use
+	tokens         []*db.Token // keys linked to user's account
+	index          int         // index of selected key in relation to the current page
 	Exit           bool
 	Quit           bool
 	spinner        spinner.Model
@@ -97,7 +97,7 @@ func NewModel(cfg *config.ConfigCms, dbpool db.DB, user *db.User) Model {
 		state:          stateLoading,
 		err:            nil,
 		activeKeyIndex: -1,
-		tokens:           []*db.Token{},
+		tokens:         []*db.Token{},
 		index:          0,
 		spinner:        common.NewSpinner(),
 		Exit:           false,
