@@ -13,7 +13,6 @@ require (
 	github.com/charmbracelet/wish v0.7.0
 	github.com/disintegration/imaging v1.6.2
 	github.com/gliderlabs/ssh v0.3.5
-	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/gorilla/feeds v1.1.1
 	github.com/kolesa-team/go-webp v1.0.4
 	github.com/lib/pq v1.10.7

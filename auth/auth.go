@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
@@ -47,16 +48,16 @@ func wellKnownHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(p)
+	err := json.NewEncoder(w).Encode(p)
+	if err != nil {
+		client.Logger.Error(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 type oauth2Introspection struct {
 	Active   bool   `json:"active"`
 	Username string `json:"username"`
-}
-
-type AuthBody struct {
-	token string
 }
 
 func introspectHandler(w http.ResponseWriter, r *http.Request) {
@@ -77,7 +78,11 @@ func introspectHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(p)
+	err = json.NewEncoder(w).Encode(p)
+	if err != nil {
+		client.Logger.Error(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func createMainRoutes() []shared.Route {
@@ -104,6 +109,11 @@ func handler(routes []shared.Route, client *Client) shared.ServeFn {
 				route.Handler(w, r.WithContext(clientCtx))
 				return
 			}
+		}
+		if len(allow) > 0 {
+			w.Header().Set("Allow", strings.Join(allow, ", "))
+			http.Error(w, "405 method not allowed", http.StatusMethodNotAllowed)
+			return
 		}
 		http.NotFound(w, r)
 	}

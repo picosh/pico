@@ -58,7 +58,7 @@ type Model struct {
 	Exit           bool
 	Quit           bool
 	spinner        spinner.Model
-	createKey      createkey.Model
+	createKey      createtoken.Model
 }
 
 // getSelectedIndex returns the index of the cursor in relation to the total
@@ -195,7 +195,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		return m, nil
 
-	case createkey.KeySetMsg:
+	case createtoken.KeySetMsg:
 		m.state = stateNormal
 		return m, fetchKeys(m.dbpool, m.user)
 
@@ -209,7 +209,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch m.state {
 	case stateNormal:
-		m.createKey = createkey.NewModel(m.cfg, m.dbpool, m.user)
+		m.createKey = createtoken.NewModel(m.cfg, m.dbpool, m.user)
 	case stateDeletingKey:
 		// If an item is being confirmed for delete, any key (other than the key
 		// used for confirmation above) cancels the deletion
@@ -235,14 +235,14 @@ func updateChildren(msg tea.Msg, m Model) (Model, tea.Cmd) {
 	switch m.state {
 	case stateCreateKey:
 		newModel, newCmd := m.createKey.Update(msg)
-		createKeyModel, ok := newModel.(createkey.Model)
+		createKeyModel, ok := newModel.(createtoken.Model)
 		if !ok {
 			panic("could not perform assertion on posts model")
 		}
 		m.createKey = createKeyModel
 		cmd = newCmd
 		if m.createKey.Done {
-			m.createKey = createkey.NewModel(m.cfg, m.dbpool, m.user) // reset the state
+			m.createKey = createtoken.NewModel(m.cfg, m.dbpool, m.user) // reset the state
 			m.state = stateNormal
 		} else if m.createKey.Quit {
 			m.state = stateQuitting

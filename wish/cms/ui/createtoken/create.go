@@ -1,4 +1,4 @@
-package createkey
+package createtoken
 
 import (
 	"strings"

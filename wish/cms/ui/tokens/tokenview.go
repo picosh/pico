@@ -2,74 +2,10 @@ package tokens
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/wish/cms/ui/common"
-	"golang.org/x/crypto/ssh"
 )
-
-var styles = common.DefaultStyles()
-
-func algo(keyType string) string {
-	if idx := strings.Index(keyType, "@"); idx > 0 {
-		return algo(keyType[0:idx])
-	}
-	parts := strings.Split(keyType, "-")
-	if len(parts) == 2 {
-		return parts[1]
-	}
-	if parts[0] == "sk" {
-		return algo(strings.TrimPrefix(keyType, "sk-"))
-	}
-	return parts[0]
-}
-
-type Fingerprint struct {
-	Type      string
-	Value     string
-	Algorithm string
-}
-
-// String outputs a string representation of the fingerprint.
-func (f Fingerprint) String() string {
-	return fmt.Sprintf(
-		"%s %s",
-		styles.ListDim.Render(strings.ToUpper(f.Algorithm)),
-		styles.ListKey.Render(f.Type+":"+f.Value),
-	)
-}
-
-// FingerprintSHA256 returns the algorithm and SHA256 fingerprint for the given
-// key.
-func FingerprintSHA256(k *db.PublicKey) (Fingerprint, error) {
-	key, _, _, _, err := ssh.ParseAuthorizedKey([]byte(k.Key))
-	if err != nil {
-		return Fingerprint{}, fmt.Errorf("failed to parse public key: %w", err)
-	}
-
-	return Fingerprint{
-		Algorithm: algo(key.Type()),
-		Type:      "SHA256",
-		Value:     strings.TrimPrefix(ssh.FingerprintSHA256(key), "SHA256:"),
-	}, nil
-}
-
-// wrap fingerprint to support additional states.
-type fingerprint struct {
-	Fingerprint
-}
-
-func (f fingerprint) state(s keyState, styles common.Styles) string {
-	if s == keyDeleting {
-		return fmt.Sprintf(
-			"%s %s",
-			styles.DeleteDim.Render(strings.ToUpper(f.Algorithm)),
-			styles.Delete.Render(f.Type+":"+f.Value),
-		)
-	}
-	return f.String()
-}
 
 type styledKey struct {
 	styles       common.Styles
