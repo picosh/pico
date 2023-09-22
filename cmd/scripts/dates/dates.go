@@ -73,7 +73,7 @@ func main() {
 	picoCfg := config.NewConfigCms()
 	picoCfg.Logger = logger
 	picoCfg.DbURL = os.Getenv("DATABASE_URL")
-	picoDb := postgres.NewDB(picoCfg)
+	picoDb := postgres.NewDB(picoCfg.DbURL, picoCfg.Logger)
 
 	logger.Info("fetching all posts")
 	posts, err := findPosts(picoDb.Db)

@@ -114,17 +114,17 @@ func main() {
 	listsCfg := config.NewConfigCms()
 	listsCfg.Logger = logger
 	listsCfg.DbURL = os.Getenv("LISTS_DB_URL")
-	listsDb := postgres.NewDB(listsCfg)
+	listsDb := postgres.NewDB(listsCfg.DbURL, listsCfg.Logger)
 
 	proseCfg := config.NewConfigCms()
 	proseCfg.DbURL = os.Getenv("PROSE_DB_URL")
 	proseCfg.Logger = logger
-	proseDb := postgres.NewDB(proseCfg)
+	proseDb := postgres.NewDB(proseCfg.DbURL, proseCfg.Logger)
 
 	picoCfg := config.NewConfigCms()
 	picoCfg.Logger = logger
 	picoCfg.DbURL = os.Getenv("PICO_DB_URL")
-	picoDb := postgres.NewDB(picoCfg)
+	picoDb := postgres.NewDB(picoCfg.DbURL, picoCfg.Logger)
 
 	ctx := context.Background()
 	tx, err := picoDb.Db.BeginTx(ctx, nil)

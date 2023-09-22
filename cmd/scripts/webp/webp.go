@@ -13,7 +13,7 @@ import (
 
 func main() {
 	cfg := imgs.NewConfigSite()
-	dbp := postgres.NewDB(&cfg.ConfigCms)
+	dbp := postgres.NewDB(cfg.DbURL, cfg.Logger)
 
 	cfg.Logger.Info("fetching all img posts")
 	posts, err := dbp.FindAllPosts(&db.Pager{Num: 1000, Page: 0}, "imgs")
