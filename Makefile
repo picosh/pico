@@ -33,12 +33,16 @@ bp-caddy: bp-setup
 	$(DOCKER_BUILDX_BUILD) -t ghcr.io/picosh/pico/caddy:$(DOCKER_TAG) -f caddy/Dockerfile .
 .PHONY: bp-caddy
 
+bp-auth: bp-setup
+	$(DOCKER_BUILDX_BUILD) -t ghcr.io/picosh/pico/auth:$(DOCKER_TAG) -f auth/Dockerfile .
+.PHONY: bp-auth
+
 bp-%: bp-setup
 	$(DOCKER_BUILDX_BUILD) --build-arg "APP=$*" -t "ghcr.io/picosh/pico/$*-ssh:$(DOCKER_TAG)" --target release-ssh .
 	$(DOCKER_BUILDX_BUILD) --build-arg "APP=$*" -t "ghcr.io/picosh/pico/$*-web:$(DOCKER_TAG)" --target release-web .
 .PHONY: bp-%
 
-bp-all: bp-prose bp-lists bp-pastes bp-imgs bp-feeds bp-pgs
+bp-all: bp-prose bp-lists bp-pastes bp-imgs bp-feeds bp-pgs bp-auth
 .PHONY: bp-all
 
 bp-podman-%:
@@ -60,7 +64,7 @@ build-%:
 	go build -o "build/$*-ssh" "./cmd/$*/ssh"
 .PHONY: build-%
 
-build: build-prose build-lists build-pastes build-imgs build-feeds build-pgs
+build: build-prose build-lists build-pastes build-imgs build-feeds build-pgs build-auth
 .PHONY: build
 
 pgs-static:
