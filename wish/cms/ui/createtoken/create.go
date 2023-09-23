@@ -232,8 +232,8 @@ func (m Model) View() string {
 	if m.state == submitting {
 		s += spinnerView(m)
 	} else if m.state == submitted {
-		s = fmt.Sprintf("Save this token: %s\n\n", m.token)
-		s += "After you exit this screen you will not be able to see it again."
+		s = fmt.Sprintf("Save this token:\n%s\n\n", m.token)
+		s += "After you exit this screen you will *not* be able to see it again.\n\n"
 		s += common.OKButtonView(m.index == 1, true)
 	} else {
 		s += common.OKButtonView(m.index == 1, true)
