@@ -1,6 +1,7 @@
 package createtoken
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -16,6 +17,7 @@ type state int
 const (
 	ready state = iota
 	submitting
+	submitted
 )
 
 type index int
@@ -26,7 +28,11 @@ const (
 	cancelButton
 )
 
-type KeySetMsg string
+type TokenDismissed int
+
+type TokenSetMsg struct {
+	token string
+}
 
 type errMsg struct {
 	err error
@@ -38,15 +44,16 @@ type Model struct {
 	Done bool
 	Quit bool
 
-	dbpool  db.DB
-	user    *db.User
-	styles  common.Styles
-	state   state
-	newKey  string
-	index   index
-	errMsg  string
-	input   input.Model
-	spinner spinner.Model
+	dbpool    db.DB
+	user      *db.User
+	styles    common.Styles
+	state     state
+	tokenName string
+	token     string
+	index     index
+	errMsg    string
+	input     input.Model
+	spinner   spinner.Model
 }
 
 // updateFocus updates the focused states in the model based on the current
@@ -93,17 +100,18 @@ func NewModel(cfg *config.ConfigCms, dbpool db.DB, user *db.User) Model {
 	im.Focus()
 
 	return Model{
-		Done:    false,
-		Quit:    false,
-		dbpool:  dbpool,
-		user:    user,
-		styles:  st,
-		state:   ready,
-		newKey:  "",
-		index:   textInput,
-		errMsg:  "",
-		input:   im,
-		spinner: common.NewSpinner(),
+		Done:      false,
+		Quit:      false,
+		dbpool:    dbpool,
+		user:      user,
+		styles:    st,
+		state:     ready,
+		tokenName: "",
+		token:     "",
+		index:     textInput,
+		errMsg:    "",
+		input:     im,
+		spinner:   common.NewSpinner(),
 	}
 }
 
@@ -114,15 +122,16 @@ func (m Model) Init() tea.Cmd {
 
 // Update is the Bubble Tea update loop.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	fmt.Println(msg)
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyCtrlC: // quit
 			m.Quit = true
-			return m, nil
+			return m, dismiss
 		case tea.KeyEscape: // exit this mini-app
 			m.Done = true
-			return m, nil
+			return m, dismiss
 
 		default:
 			// Ignore keys if we're submitting
@@ -155,9 +164,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				case textInput:
 					fallthrough
 				case okButton: // Submit the form
+					// form already submitted so ok button exits
+					if m.state == submitted {
+						m.Done = true
+						return m, dismiss
+					}
+
 					m.state = submitting
 					m.errMsg = ""
-					m.newKey = strings.TrimSpace(m.input.Value())
+					m.tokenName = strings.TrimSpace(m.input.Value())
 
 					return m, tea.Batch(
 						addToken(m), // fire off the command, too
@@ -165,7 +180,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					)
 				case cancelButton: // Exit this mini-app
 					m.Done = true
-					return m, nil
+					return m, dismiss
 				}
 			}
 
@@ -180,6 +195,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			return m, nil
 		}
+
+	case TokenSetMsg:
+		fmt.Println("TOKEN SET")
+		m.state = submitted
+		m.token = msg.token
+		return m, nil
 
 	case errMsg:
 		m.state = ready
@@ -210,6 +231,10 @@ func (m Model) View() string {
 
 	if m.state == submitting {
 		s += spinnerView(m)
+	} else if m.state == submitted {
+		s = fmt.Sprintf("Save this token: %s\n\n", m.token)
+		s += "After you exit this screen you will not be able to see it again."
+		s += common.OKButtonView(m.index == 1, true)
 	} else {
 		s += common.OKButtonView(m.index == 1, true)
 		s += " " + common.CancelButtonView(m.index == 2, false)
@@ -225,13 +250,15 @@ func spinnerView(m Model) string {
 	return m.spinner.View() + " Submitting..."
 }
 
+func dismiss() tea.Msg { return TokenDismissed(1) }
+
 func addToken(m Model) tea.Cmd {
 	return func() tea.Msg {
-		_, err := m.dbpool.InsertToken(m.user.ID, m.newKey)
+		token, err := m.dbpool.InsertToken(m.user.ID, m.tokenName)
 		if err != nil {
 			return errMsg{err}
 		}
 
-		return KeySetMsg(m.newKey)
+		return TokenSetMsg{token}
 	}
 }

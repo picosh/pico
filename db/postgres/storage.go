@@ -147,7 +147,7 @@ const (
 	FROM app_users
 	LEFT JOIN tokens ON tokens.user_id = app_users.id
 	WHERE tokens.token = $1 AND tokens.expires_at > NOW()`
-	sqlInsertToken         = `INSERT INTO tokens (user_id, name) VALUES($1, $2) RETURNING id;`
+	sqlInsertToken         = `INSERT INTO tokens (user_id, name) VALUES($1, $2) RETURNING token;`
 	sqlRemoveToken         = `DELETE FROM tokens WHERE id = $1`
 	sqlSelectTokensForUser = `SELECT id, user_id, name, created_at, expires_at FROM tokens WHERE user_id = $1`
 
@@ -1419,12 +1419,12 @@ func (me *PsqlDB) FindAllProjects(page *db.Pager) (*db.Paginate[*db.Project], er
 }
 
 func (me *PsqlDB) InsertToken(userID, name string) (string, error) {
-	var id string
-	err := me.Db.QueryRow(sqlInsertToken, userID, name).Scan(&id)
+	var token string
+	err := me.Db.QueryRow(sqlInsertToken, userID, name).Scan(&token)
 	if err != nil {
 		return "", err
 	}
-	return id, nil
+	return token, nil
 }
 
 func (me *PsqlDB) RemoveToken(tokenID string) error {

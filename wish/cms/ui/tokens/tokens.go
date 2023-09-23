@@ -195,7 +195,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		return m, nil
 
-	case createtoken.KeySetMsg:
+	case createtoken.TokenDismissed:
 		m.state = stateNormal
 		return m, fetchKeys(m.dbpool, m.user)
 
@@ -270,7 +270,7 @@ func (m Model) View() string {
 	case stateCreateKey:
 		s = m.createKey.View()
 	default:
-		s = fmt.Sprintf("Here are the keys linked to your %s account.\n\n", m.cfg.Domain)
+		s = fmt.Sprintf("Here are the tokens linked to your account.\n\n")
 
 		// Keys
 		s += keysView(m)

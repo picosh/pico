@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS tokens (
   expires_at timestamp without time zone NOT NULL DEFAULT '2100-01-01 00:00:00',
   CONSTRAINT user_tokens_pkey PRIMARY KEY (id),
   CONSTRAINT unique_token UNIQUE (token),
+  CONSTRAINT unique_user_name UNIQUE (user_id, name),
   CONSTRAINT fk_user_tokens_owner
     FOREIGN KEY(user_id)
   REFERENCES app_users(id)
