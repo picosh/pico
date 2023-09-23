@@ -21,6 +21,7 @@ import (
 	"github.com/picosh/pico/wish/cms/ui/info"
 	"github.com/picosh/pico/wish/cms/ui/keys"
 	"github.com/picosh/pico/wish/cms/ui/posts"
+	"github.com/picosh/pico/wish/cms/ui/tokens"
 	"github.com/picosh/pico/wish/cms/ui/username"
 	"github.com/picosh/pico/wish/cms/util"
 )
@@ -33,6 +34,7 @@ const (
 	statusNoAccount
 	statusBrowsingPosts
 	statusBrowsingKeys
+	statusBrowsingTokens
 	statusSettingUsername
 	statusQuitting
 )
@@ -57,6 +59,7 @@ const (
 	setUserChoice menuChoice = iota
 	postsChoice
 	keysChoice
+	tokensChoice
 	exitChoice
 	unsetChoice // set when no choice has been made
 )
@@ -65,6 +68,7 @@ const (
 var menuChoices = map[menuChoice]string{
 	setUserChoice: "Set username",
 	keysChoice:    "Manage keys",
+	tokensChoice:  "Manage tokens",
 	postsChoice:   "Manage posts",
 	exitChoice:    "Exit",
 }
@@ -99,7 +103,7 @@ func Middleware(cfg *config.ConfigCms, urls config.ConfigURL) bm.Handler {
 
 		sshUser := s.User()
 
-		dbpool := postgres.NewDB(cfg)
+		dbpool := postgres.NewDB(cfg.DbURL, cfg.Logger)
 
 		var st storage.ObjectStorage
 		if cfg.MinioURL == "" {
@@ -156,6 +160,7 @@ type model struct {
 	username      username.Model
 	posts         posts.Model
 	keys          keys.Model
+	tokens        tokens.Model
 	createAccount account.CreateModel
 }
 
@@ -242,6 +247,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.info = info.NewModel(m.cfg, m.urls, m.user)
 		m.posts = posts.NewModel(m.cfg, m.urls, m.dbpool, m.user, m.st)
 		m.keys = keys.NewModel(m.cfg, m.dbpool, m.user)
+		m.tokens = tokens.NewModel(m.cfg, m.dbpool, m.user)
 		m.createAccount = account.NewCreateModel(m.cfg, m.dbpool, m.publicKey)
 	}
 
@@ -251,6 +257,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.info = info.NewModel(m.cfg, m.urls, m.user)
 		m.posts = posts.NewModel(m.cfg, m.urls, m.dbpool, m.user, m.st)
 		m.keys = keys.NewModel(m.cfg, m.dbpool, m.user)
+		m.tokens = tokens.NewModel(m.cfg, m.dbpool, m.user)
 		m.createAccount = account.NewCreateModel(m.cfg, m.dbpool, m.publicKey)
 		if m.user == nil {
 			m.status = statusNoAccount
@@ -303,6 +310,22 @@ func updateChildren(msg tea.Msg, m model) (model, tea.Cmd) {
 			m.status = statusQuitting
 			return m, tea.Quit
 		}
+	case statusBrowsingTokens:
+		newModel, newCmd := m.tokens.Update(msg)
+		tokensModel, ok := newModel.(tokens.Model)
+		if !ok {
+			panic("could not perform assertion on posts model")
+		}
+		m.tokens = tokensModel
+		cmd = newCmd
+
+		if m.tokens.Exit {
+			m.tokens = tokens.NewModel(m.cfg, m.dbpool, m.user)
+			m.status = statusReady
+		} else if m.tokens.Quit {
+			m.status = statusQuitting
+			return m, tea.Quit
+		}
 	case statusSettingUsername:
 		m.username, cmd = username.Update(msg, m.username)
 		if m.username.Done {
@@ -337,6 +360,10 @@ func updateChildren(msg tea.Msg, m model) (model, tea.Cmd) {
 		m.status = statusBrowsingKeys
 		m.menuChoice = unsetChoice
 		cmd = keys.LoadKeys(m.keys)
+	case tokensChoice:
+		m.status = statusBrowsingTokens
+		m.menuChoice = unsetChoice
+		cmd = tokens.LoadKeys(m.tokens)
 	case exitChoice:
 		m.status = statusQuitting
 		m.dbpool.Close()
@@ -396,6 +423,8 @@ func (m model) View() string {
 		s += m.posts.View()
 	case statusBrowsingKeys:
 		s += m.keys.View()
+	case statusBrowsingTokens:
+		s += m.tokens.View()
 	}
 	return m.styles.App.Render(wrap.String(wordwrap.String(s, w), w))
 }

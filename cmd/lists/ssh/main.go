@@ -65,7 +65,7 @@ func main() {
 	promPort := shared.GetEnv("LISTS_PROM_PORT", "9222")
 	cfg := lists.NewConfigSite()
 	logger := cfg.Logger
-	dbh := postgres.NewDB(&cfg.ConfigCms)
+	dbh := postgres.NewDB(cfg.DbURL, cfg.Logger)
 	defer dbh.Close()
 
 	hooks := &lists.ListHooks{

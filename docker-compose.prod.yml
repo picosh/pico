@@ -33,6 +33,35 @@ services:
     ports:
       - "9000:9000"
       - "9001:9001"
+  auth-caddy:
+    image: ghcr.io/picosh/pico/caddy:latest
+    restart: always
+    networks:
+      - auth
+    env_file:
+      - .env.prod
+    environment:
+      APP_DOMAIN: ${AUTH_DOMAIN:-auth.pico.sh}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+      - ./data/auth-caddy/data:/data
+      - ./data/auth-caddy/config:/config
+    ports:
+      - "${AUTH_HTTPS_V4:-443}:443"
+      - "${AUTH_HTTP_V4:-80}:80"
+      - "${AUTH_HTTPS_V6:-[::1]:443}:443"
+      - "${AUTH_HTTP_V6:-[::1]:80}:80"
+    profiles:
+      - auth
+      - caddy
+      - all
+  auth-web:
+    networks:
+      auth:
+        aliases:
+          - web
+    env_file:
+      - .env.prod
   lists-caddy:
     image: ghcr.io/picosh/pico/caddy:latest
     restart: always

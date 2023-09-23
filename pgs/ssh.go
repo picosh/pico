@@ -64,7 +64,7 @@ func StartSshServer() {
 	promPort := shared.GetEnv("PGS_PROM_PORT", "9222")
 	cfg := NewConfigSite()
 	logger := cfg.Logger
-	dbh := postgres.NewDB(&cfg.ConfigCms)
+	dbh := postgres.NewDB(cfg.DbURL, cfg.Logger)
 	defer dbh.Close()
 
 	var st storage.ObjectStorage

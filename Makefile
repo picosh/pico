@@ -33,12 +33,16 @@ bp-caddy: bp-setup
 	$(DOCKER_BUILDX_BUILD) -t ghcr.io/picosh/pico/caddy:$(DOCKER_TAG) -f caddy/Dockerfile .
 .PHONY: bp-caddy
 
+bp-auth: bp-setup
+	$(DOCKER_BUILDX_BUILD) -t ghcr.io/picosh/pico/auth:$(DOCKER_TAG) -f auth/Dockerfile .
+.PHONY: bp-auth
+
 bp-%: bp-setup
 	$(DOCKER_BUILDX_BUILD) --build-arg "APP=$*" -t "ghcr.io/picosh/pico/$*-ssh:$(DOCKER_TAG)" --target release-ssh .
 	$(DOCKER_BUILDX_BUILD) --build-arg "APP=$*" -t "ghcr.io/picosh/pico/$*-web:$(DOCKER_TAG)" --target release-web .
 .PHONY: bp-%
 
-bp-all: bp-prose bp-lists bp-pastes bp-imgs bp-feeds bp-pgs
+bp-all: bp-prose bp-lists bp-pastes bp-imgs bp-feeds bp-pgs bp-auth
 .PHONY: bp-all
 
 bp-podman-%:
@@ -51,12 +55,16 @@ bp-podman-%:
 bp-podman-all: bp-podman-prose bp-podman-lists bp-podman-pastes bp-podman-imgs bp-podman-feeds bp-podman-pgs
 .PHONY: all
 
+build-auth:
+	go build -o "build/auth" "./cmd/auth"
+.PHONY: build-auth
+
 build-%:
 	go build -o "build/$*-web" "./cmd/$*/web"
 	go build -o "build/$*-ssh" "./cmd/$*/ssh"
 .PHONY: build-%
 
-build: build-prose build-lists build-pastes build-imgs build-feeds build-pgs
+build: build-prose build-lists build-pastes build-imgs build-feeds build-pgs build-auth
 .PHONY: build
 
 pgs-static:
@@ -105,11 +113,11 @@ migrate:
 	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20230310_add_aliases_table.sql
 	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20230326_add_feed_items.sql
 	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20230707_add_projects_table.sql
+	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20230921_add_tokens_table.sql
 .PHONY: migrate
 
 latest:
-	$(DOCKER_CMD) cp ./sql/migrations/20230707_add_projects_table.sql $(DB_CONTAINER):/tmp
-	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) -f /tmp/20230707_add_projects_table.sql
+	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20230921_add_tokens_table.sql
 .PHONY: latest
 
 psql:

@@ -66,7 +66,7 @@ func main() {
 	promPort := shared.GetEnv("IMGS_PROM_PORT", "9222")
 	cfg := imgs.NewConfigSite()
 	logger := cfg.Logger
-	dbh := postgres.NewDB(&cfg.ConfigCms)
+	dbh := postgres.NewDB(cfg.DbURL, cfg.Logger)
 	defer dbh.Close()
 
 	var st storage.ObjectStorage

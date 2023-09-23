@@ -139,6 +139,14 @@ type FeedItem struct {
 	CreatedAt *time.Time
 }
 
+type Token struct {
+	ID        string
+	UserID    string
+	Name      string
+	CreatedAt *time.Time
+	ExpiresAt *time.Time
+}
+
 type ErrMultiplePublicKeys struct{}
 
 func (m *ErrMultiplePublicKeys) Error() string {
@@ -176,6 +184,11 @@ type DB interface {
 	FindUser(userID string) (*User, error)
 	ValidateName(name string) (bool, error)
 	SetUserName(userID string, name string) error
+
+	FindUserForToken(token string) (*User, error)
+	FindTokensForUser(userID string) ([]*Token, error)
+	InsertToken(userID, name string) (string, error)
+	RemoveToken(tokenID string) error
 
 	FindPosts() ([]*Post, error)
 	FindPost(postID string) (*Post, error)
