@@ -178,6 +178,7 @@ func (h *UploadImgHandler) Validate(s ssh.Session) error {
 func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string, error) {
 	user, err := getUser(s)
 	if err != nil {
+		h.Cfg.Logger.Error(err)
 		return "", err
 	}
 
@@ -233,7 +234,7 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		h.Cfg.Space,
 	)
 	if err != nil {
-		h.Cfg.Logger.Infof("(%s) unable to find post (%s), continuing", nextPost.Filename, err)
+		h.Cfg.Logger.Infof("(%s) unable to find image (%s), continuing", nextPost.Filename, err)
 	}
 
 	metadata := PostMetaData{
@@ -250,11 +251,13 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 
 	err = h.writeImg(s, &metadata)
 	if err != nil {
+		h.Cfg.Logger.Error(err)
 		return "", err
 	}
 
 	totalFileSize, err := h.DBPool.FindTotalSizeForUser(user.ID)
 	if err != nil {
+		h.Cfg.Logger.Error(err)
 		return "", err
 	}
 

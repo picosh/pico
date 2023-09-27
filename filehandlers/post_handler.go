@@ -158,6 +158,7 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 	logger := h.Cfg.Logger
 	user, err := getUser(s)
 	if err != nil {
+		logger.Error(err)
 		return "", err
 	}
 
@@ -203,7 +204,7 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 
 	valid, err := h.Hooks.FileValidate(&metadata)
 	if !valid {
-		logger.Info(err)
+		logger.Error(err)
 		return "", err
 	}
 

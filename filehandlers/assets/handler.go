@@ -177,6 +177,7 @@ func (h *UploadAssetHandler) Validate(s ssh.Session) error {
 func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (string, error) {
 	user, err := getUser(s)
 	if err != nil {
+		h.Cfg.Logger.Error(err)
 		return "", err
 	}
 
@@ -191,6 +192,7 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 
 	bucket, err := getBucket(s)
 	if err != nil {
+		h.Cfg.Logger.Error(err)
 		return "", err
 	}
 
@@ -203,15 +205,18 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 		if err == nil {
 			err = h.DBPool.UpdateProject(user.ID, projectName)
 			if err != nil {
+				h.Cfg.Logger.Error(err)
 				return "", err
 			}
 		} else {
 			_, err = h.DBPool.InsertProject(user.ID, projectName, projectName)
 			if err != nil {
+				h.Cfg.Logger.Error(err)
 				return "", err
 			}
 			project, err = h.DBPool.FindProjectByName(user.ID, projectName)
 			if err != nil {
+				h.Cfg.Logger.Error(err)
 				return "", err
 			}
 		}
@@ -228,6 +233,7 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 	}
 	err = h.writeAsset(data)
 	if err != nil {
+		h.Cfg.Logger.Error(err)
 		return "", err
 	}
 

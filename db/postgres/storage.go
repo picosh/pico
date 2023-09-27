@@ -158,7 +158,7 @@ const (
 	sqlSelectUsersWithPost       = `SELECT count(app_users.id) FROM app_users WHERE EXISTS (SELECT 1 FROM posts WHERE user_id = app_users.id AND cur_space = $1);`
 
 	sqlSelectFeatureForUser = `SELECT id FROM feature_flags WHERE user_id = $1 AND name = $2`
-	sqlSelectSizeForUser    = `SELECT sum(file_size) FROM posts WHERE user_id = $1`
+	sqlSelectSizeForUser    = `SELECT COALESCE(sum(file_size), 0) FROM posts WHERE user_id = $1`
 
 	sqlSelectPostIdByAliasSlug = `SELECT post_id FROM post_aliases WHERE slug = $1`
 	sqlSelectTagPostCount      = `
