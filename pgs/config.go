@@ -70,6 +70,8 @@ func NewConfigSite() *shared.ConfigSite {
 				".rss",
 				".xml",
 				".atom",
+				".map",
+				".webmanifest",
 			},
 			MaxSize:       maxSize,
 			MaxAssetSize:  maxAssetSize,
