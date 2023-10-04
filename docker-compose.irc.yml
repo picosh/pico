@@ -1,0 +1,34 @@
+version "3.8"
+services:
+  auth-caddy:
+    image: ghcr.io/picosh/pico/caddy:latest
+    restart: always
+    env_file:
+      - .env.prod
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+      - ./data/auth-caddy/data:/data
+      - ./data/auth-caddy/config:/config
+    ports:
+      - "${AUTH_HTTPS_V4:-443}:443"
+      - "${AUTH_HTTP_V4:-80}:80"
+      - "${AUTH_HTTPS_V6:-[::1]:443}:443"
+      - "${AUTH_HTTP_V6:-[::1]:80}:80"
+  auth:
+    image: ghcr.io/picosh/pico/auth:latest
+    restart: always
+    env_file:
+      - .env.prod
+  soju:
+    image: ghcr.io/picosh/pico/bouncer:latest
+    restart: always
+    env_file:
+      - .env.prod
+    volumes:
+      - soju_data:/app/db
+      - certs:/certs
+    ports:
+      - "6697:6697"
+volumes:
+  soju_data:
+  certs:

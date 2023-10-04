@@ -13,13 +13,6 @@ services:
     profiles:
       - db
       - all
-  auth:
-    image: ghcr.io/picosh/pico/auth:latest
-    restart: always
-    profiles:
-      - auth
-      - services
-      - all
   lists-web:
     image: ghcr.io/picosh/pico/lists-web:latest
     restart: always

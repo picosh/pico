@@ -37,12 +37,16 @@ bp-auth: bp-setup
 	$(DOCKER_BUILDX_BUILD) -t ghcr.io/picosh/pico/auth:$(DOCKER_TAG) -f auth/Dockerfile .
 .PHONY: bp-auth
 
+bp-bouncer: bp-setup
+	$(DOCKER_BUILDX_BUILD) -t ghcr.io/picosh/pico/bouncer:$(DOCKER_TAG) -f bouncer/Dockerfile .
+.PHONY: bp-bouncer
+
 bp-%: bp-setup
 	$(DOCKER_BUILDX_BUILD) --build-arg "APP=$*" -t "ghcr.io/picosh/pico/$*-ssh:$(DOCKER_TAG)" --target release-ssh .
 	$(DOCKER_BUILDX_BUILD) --build-arg "APP=$*" -t "ghcr.io/picosh/pico/$*-web:$(DOCKER_TAG)" --target release-web .
 .PHONY: bp-%
 
-bp-all: bp-prose bp-lists bp-pastes bp-imgs bp-feeds bp-pgs bp-auth
+bp-all: bp-prose bp-lists bp-pastes bp-imgs bp-feeds bp-pgs bp-auth bp-bouncer
 .PHONY: bp-all
 
 bp-podman-%:

@@ -11,13 +11,6 @@ services:
     ports:
       - "9000:9000"
       - "9001:9001"
-  auth:
-    build:
-      dockerfile: ./auth/Dockerfile
-    env_file:
-      - .env.example
-    ports:
-      - "3006:3000"
   lists-web:
     build:
       args:
