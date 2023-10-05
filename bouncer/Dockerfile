@@ -18,7 +18,7 @@ FROM alpine
 
 WORKDIR /app
 
-ADD ./bouncer/soju.config .
+COPY soju.config .
 COPY --from=builder /app/soju/soju .
 COPY --from=builder /app/soju/sojuctl .
 

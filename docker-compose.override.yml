@@ -104,7 +104,7 @@ services:
     volumes:
       - ./data/pgs-storage/data:/app/.storage
     ports:
-      - "3003:3000"
+      - "3004:3000"
   pgs-ssh:
     build:
       args:
@@ -116,7 +116,7 @@ services:
       - ./data/pgs-storage/data:/app/.storage
       - ./data/pgs-ssh/data:/app/ssh_data
     ports:
-      - "2223:2222"
+      - "2224:2222"
   feeds-web:
     build:
       args:
@@ -125,7 +125,7 @@ services:
     env_file:
       - .env.example
     ports:
-      - "3004:3000"
+      - "3005:3000"
   feeds-ssh:
     build:
       args:
@@ -136,7 +136,7 @@ services:
     volumes:
       - ./data/feeds-ssh/data:/app/ssh_data
     ports:
-      - "2224:2222"
+      - "2225:2222"
   auth-web:
     build:
       args:
