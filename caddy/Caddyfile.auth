@@ -4,6 +4,9 @@
 		interval 1m
 		burst 10
 	}
+	servers {
+		metrics
+	}
 }
 
 *.{$APP_DOMAIN}, {$APP_DOMAIN} {

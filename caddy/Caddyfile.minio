@@ -1,3 +1,9 @@
+{
+	servers {
+		metrics
+	}
+}
+
 *.{$APP_DOMAIN}, {$APP_DOMAIN} {
 	reverse_proxy minio:9000
 	tls {$APP_EMAIL} {
