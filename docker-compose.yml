@@ -97,3 +97,17 @@ services:
       - feeds
       - services
       - all
+  auth-web:
+    image: ghcr.io/picosh/pico/auth:latest
+    restart: always
+    profiles:
+      - auth
+      - services
+      - all
+  bouncer:
+    image: ghcr.io/picosh/pico/bouncer:latest
+    restart: always
+    profiles:
+      - bouncer
+      - services
+      - all

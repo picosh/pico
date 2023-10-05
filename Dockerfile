@@ -14,7 +14,7 @@ COPY go.* ./
 
 RUN go mod download
 
-FROM builder-deps as builder
+FROM builder-deps as builder-web
 
 COPY . .
 
@@ -28,19 +28,11 @@ ENV CC=/app/scripts/gccwrap.sh
 
 ENV GOOS=${TARGETOS} GOARCH=${TARGETARCH}
 
-RUN go build -ldflags "$LDFLAGS" -tags "netgo osusergo" -o /go/bin/${APP}-ssh ./cmd/${APP}/ssh
 RUN go build -ldflags "$LDFLAGS" -tags "netgo osusergo" -o /go/bin/${APP}-web ./cmd/${APP}/web
 
-FROM scratch as release-ssh
+FROM builder-web as builder-ssh
 
-WORKDIR /app
-
-ARG APP=lists
-
-COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
-COPY --from=builder /go/bin/${APP}-ssh ./ssh
-
-ENTRYPOINT ["/app/ssh"]
+RUN go build -ldflags "$LDFLAGS" -tags "netgo osusergo" -o /go/bin/${APP}-ssh ./cmd/${APP}/ssh
 
 FROM scratch as release-web
 
@@ -48,9 +40,20 @@ WORKDIR /app
 
 ARG APP=lists
 
-COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
-COPY --from=builder /go/bin/${APP}-web ./web
-COPY --from=builder /app/${APP}/html ./${APP}/html
-COPY --from=builder /app/${APP}/public ./${APP}/public
+COPY --from=builder-web /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=builder-web /go/bin/${APP}-web ./web
+COPY --from=builder-web /app/${APP}/html ./${APP}/html
+COPY --from=builder-web /app/${APP}/public ./${APP}/public
 
 ENTRYPOINT ["/app/web"]
+
+FROM scratch as release-ssh
+
+WORKDIR /app
+
+ARG APP=lists
+
+COPY --from=builder-ssh /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=builder-ssh /go/bin/${APP}-ssh ./ssh
+
+ENTRYPOINT ["/app/ssh"]
