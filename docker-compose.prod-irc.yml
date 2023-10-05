@@ -1,0 +1,19 @@
+version: "3.8"
+services:
+  auth-web:
+    networks:
+      - ${AUTH_NETWORK}
+    env_file:
+      - .env.prod
+  bouncer:
+    networks:
+      - ${AUTH_NETWORK}
+    env_file:
+      - .env.prod
+    ports:
+      - "${AUTH_IRCS_V4:-6697}:6697"
+      - "${AUTH_IRCS_V6:-[::1]:6697}:6697"
+    volumes:
+      - ./data/bouncer:/app/db
+      - ./data/certs:/certs
+      - ${AUTH_REAL_CERT_MOUNT}

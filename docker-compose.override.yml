@@ -137,3 +137,23 @@ services:
       - ./data/feeds-ssh/data:/app/ssh_data
     ports:
       - "2224:2222"
+  auth-web:
+    build:
+      args:
+        APP: auth
+      target: release-web
+    env_file:
+      - .env.example
+    ports:
+      - "3006:3000"
+  bouncer:
+    build:
+      context: bouncer/
+    env_file:
+      - .env.example
+    volumes:
+      - ./data/bouncer:/app/db
+      - ./data/certs:/certs
+    ports:
+      - "6697:6697"
+      - "8080:8080"
