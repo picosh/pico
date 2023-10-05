@@ -26,7 +26,7 @@ func (h *UploadImgHandler) validateImg(data *PostMetaData) (bool, error) {
 		return false, fmt.Errorf("ERROR: user (%s) has exceeded (%d bytes) max (%d bytes)", data.User.Name, totalFileSize, maxSize)
 	}
 
-	if !shared.IsExtAllowed(data.Filename, h.Cfg.AllowedExt) {
+	if !shared.IsExtAllowed(data.Filepath, h.Cfg.AllowedExt) {
 		extStr := strings.Join(h.Cfg.AllowedExt, ",")
 		err := fmt.Errorf(
 			"ERROR: (%s) invalid file, format must be (%s), skipping",

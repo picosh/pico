@@ -34,11 +34,11 @@ func getUser(s ssh.Session) (*db.User, error) {
 
 type PostMetaData struct {
 	*db.Post
-	OrigText  []byte
-	Cur       *db.Post
-	Tags      []string
-	User      *db.User
-	FileEntry *utils.FileEntry
+	OrigText []byte
+	Cur      *db.Post
+	Tags     []string
+	User     *db.User
+	*utils.FileEntry
 }
 
 type UploadImgHandler struct {
@@ -120,7 +120,7 @@ func (h *UploadImgHandler) List(s ssh.Session, fpath string) ([]os.FileInfo, err
 	var post *db.Post
 	var posts []*db.Post
 
-	if cleanFilename == "" || cleanFilename == "." {
+	if cleanFilename == "" || cleanFilename == "." || cleanFilename == "/" {
 		name := cleanFilename
 		if name == "" {
 			name = "/"
