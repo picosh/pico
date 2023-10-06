@@ -1,0 +1,64 @@
+{{template "base" .}}
+
+{{define "title"}}auth redirect{{end}}
+
+{{define "meta"}}{{end}}
+
+{{define "attrs"}}{{end}}
+
+{{define "body"}}
+<header>
+    <h1 class="text-2xl">Auth Redirect</h1>
+    <hr />
+</header>
+<main>
+    <section>
+        <h2 class="text-xl">You are being redirected to {{.redirect_uri}}</h2>
+        <p>
+            Here is their auth request data:
+        </p>
+
+        <article>
+            <h2 class="text-lg">Client ID</h2>
+            <div>{{.client_id}}</div>
+        </article>
+
+        <br />
+
+        <article>
+            <h2 class="text-lg">Redirect URI</h2>
+            <div>{{.redirect_uri}}</div>
+        </article>
+
+        <br />
+
+        <article>
+            <h2 class="text-lg">Scope</h2>
+            <div>{{.scope}}</div>
+        </article>
+
+        <br />
+
+        <article>
+            <h2 class="text-lg">Response Type</h2>
+            <div>{{.response_type}}</div>
+        </article>
+
+        <br />
+
+        <article>
+            <h2 class="text-lg">If you would like to continue authenticating with this service, ssh into a pico service and generate a token. Then input it here and click submit.</h2>
+            <br />
+            <form action="/redirect" method="POST">
+                <label for="token">Auth Token:</label><br>
+                <input type="text" id="token" name="token"><br>
+                <br />
+                <input type="hidden" id="redirect_uri" name="redirect_uri" value="{{.redirect_uri}}">
+                <input type="hidden" id="response_type" name="response_type" value="{{.response_type}}">
+                <input type="submit" value="Submit">
+            </form>
+        </article>
+    </section>
+</main>
+{{template "marketing-footer" .}}
+{{end}}
