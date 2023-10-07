@@ -47,6 +47,8 @@ func NewConfigSite() *shared.ConfigSite {
 			Description: "A zero-dependency static site hosting service for hackers.",
 			IntroText:   intro,
 			Space:       "pgs",
+			// IMPORTANT: make sure `shared.GetMimeType` has the extensions being
+			// added here.
 			AllowedExt: []string{
 				".jpg",
 				".jpeg",

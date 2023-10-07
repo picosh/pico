@@ -167,6 +167,14 @@ func GetMimeType(fpath string) string {
 		return "font/ttf"
 	} else if ext == ".md" {
 		return "text/markdown; charset=UTF-8"
+	} else if ext == ".json" || ext == ".map" {
+		return "application/json"
+	} else if ext == ".rss" {
+		return "application/rss+xml"
+	} else if ext == ".atom" {
+		return "application/atom+xml"
+	} else if ext == ".webmanifest" {
+		return "application/manifest+json"
 	}
 
 	return "text/plain"
