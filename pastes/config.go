@@ -23,10 +23,8 @@ func NewConfigSite() *shared.ConfigSite {
 	minioPass := shared.GetEnv("MINIO_ROOT_PASSWORD", "")
 
 	intro := "To get started, enter a username.\n"
-	intro += "Then create a folder locally (e.g. ~/pastes).\n"
-	intro += "Then write your paste post (e.g. feature.patch).\n"
-	intro += "Finally, send your files to us:\n\n"
-	intro += fmt.Sprintf("scp ~/pastes/* %s:/", domain)
+	intro += "Then all you need to do is send your pastes to us:\n\n"
+	intro += fmt.Sprintf("scp my.patch %s:/", domain)
 
 	return &shared.ConfigSite{
 		Debug:                debug == "1",

@@ -63,6 +63,15 @@
     </section>
 
     <section>
+        <h2 class="text-lg font-bold">Pipe Support</h2>
+
+        <pre>echo "foobar" | ssh pastes.sh</pre>
+        <pre>echo "foobar" | ssh pastes.sh FILENAME</pre>
+        <pre># if the tty warning annoys you
+echo "foobar" | ssh -T pastes.sh</pre>
+    </section>
+
+    <section>
         <h2 class="text-lg font-bold">Terminal workflow without installation</h2>
         <p>
             Since we are leveraging tools you already have on your computer
@@ -76,7 +85,7 @@
     <section>
         <h2 class="text-lg font-bold">Features</h2>
         <ul>
-            <li>Pastes last 7 days</li>
+            <li>Pastes last 90 days</li>
             <li>Bring your own editor</li>
             <li>You control the source files</li>
             <li>Terminal workflow with no installation</li>

@@ -60,7 +60,7 @@ bp-podman-all: bp-podman-prose bp-podman-lists bp-podman-pastes bp-podman-imgs b
 .PHONY: all
 
 build-auth:
-	go build -o "build/auth" "./cmd/auth"
+	go build -o "build/auth" "./cmd/auth/web"
 .PHONY: build-auth
 
 build-%:

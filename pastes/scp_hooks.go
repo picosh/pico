@@ -9,6 +9,8 @@ import (
 	"github.com/picosh/pico/shared"
 )
 
+var DEFAULT_EXPIRES_AT = 90
+
 type FileHooks struct {
 	Cfg *shared.ConfigSite
 	Db  db.DB
@@ -31,8 +33,8 @@ func (p *FileHooks) FileMeta(data *filehandlers.PostMetaData) error {
 	// we want the slug to be the filename for pastes
 	data.Slug = data.Filename
 	if data.Post.ExpiresAt == nil || data.Post.ExpiresAt.IsZero() {
-		// mark posts for deletion a week after creation
-		expiresAt := time.Now().AddDate(0, 0, 7)
+		// mark posts for deletion a X days after creation
+		expiresAt := time.Now().AddDate(0, 0, DEFAULT_EXPIRES_AT)
 		data.ExpiresAt = &expiresAt
 	}
 	return nil
