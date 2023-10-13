@@ -38,7 +38,7 @@ bp-auth: bp-setup
 .PHONY: bp-auth
 
 bp-bouncer: bp-setup
-	$(DOCKER_BUILDX_BUILD) -t ghcr.io/picosh/pico/bouncer:$(DOCKER_TAG) -f bouncer/Dockerfile .
+	$(DOCKER_BUILDX_BUILD) -t ghcr.io/picosh/pico/bouncer:$(DOCKER_TAG) -f bouncer/Dockerfile ./bouncer
 .PHONY: bp-bouncer
 
 bp-%: bp-setup
