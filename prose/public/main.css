@@ -301,6 +301,10 @@ figure {
   align-items: center;
 }
 
+.gap {
+  gap: 0.5rem;
+}
+
 .m-0 {
   margin: 0;
 }
@@ -363,6 +367,15 @@ figure {
 
 #readme {
   display: none;
+}
+
+.banner {
+  display: flex;
+  align-items: center;
+  margin: 0.5rem 0;
+  padding: 0.5rem;
+  border: 1px solid var(--grey);
+  border-radius: 5px;
 }
 
 @media only screen and (max-width: 600px) {

@@ -13,6 +13,13 @@
 
         <link rel="stylesheet" href="/main.css" />
     </head>
-    <body {{template "attrs" .}}>{{template "body" .}}</body>
+    <body {{template "attrs" .}}>
+      <div class="banner font-bold justify-between">
+        <span>lists.sh will be shutdown on 2024-01-01</span>
+        <a href="https://hey.prose.sh/sunsetting-lists">Read our blog post</a>
+      </div>
+
+      {{template "body" .}}
+    </body>
 </html>
 {{end}}
