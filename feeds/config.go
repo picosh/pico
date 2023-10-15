@@ -24,9 +24,9 @@ func NewConfigSite() *shared.ConfigSite {
 	sendgridKey := shared.GetEnv("SENDGRID_API_KEY", "")
 
 	intro := "To get started, enter a username and email.\n"
-	intro += "Then upload a file containing a list of rss feeds (e.g. ~/feeds.txt)\n"
+	intro += "Then upload a file containing a list of rss feeds (e.g. daily.txt)\n"
 	intro += "Finally, send your file to us:\n\n"
-	intro += fmt.Sprintf("scp -P 2222 ~/feeds.txt %s:/", domain)
+	intro += fmt.Sprintf("scp daily.txt %s:/", domain)
 
 	return &shared.ConfigSite{
 		Debug:                debug == "1",
