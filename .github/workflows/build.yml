@@ -96,6 +96,7 @@ jobs:
         app: feeds
         platforms: ${{ env.PLATFORMS }}
         registry: ${{ env.REGISTRY }}
+        web: false
   build-caddy:
     runs-on: ubuntu-22.04
     needs: test
