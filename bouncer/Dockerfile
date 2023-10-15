@@ -6,7 +6,11 @@ RUN apk add --no-cache git sqlite-libs sqlite-dev build-base
 
 RUN git clone https://github.com/emersion/soju
 
+COPY subscriber-change.diff .
+
 WORKDIR /app/soju
+
+RUN git apply ../subscriber-change.diff
 
 ENV LDFLAGS="-linkmode external -extldflags -static"
 ENV GOFLAGS="-tags=moderncsqlite"
