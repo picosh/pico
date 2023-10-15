@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset='utf-8'>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>feeds.sh</title>
+
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+
+    <meta name="keywords" content="rss, email, notification, service" />
+    <meta name="description" content="an rss email notification service" />
+
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="feeds.sh">
+    <meta property="og:url" content="https://feeds.sh">
+    <meta property="og:title" content="feeds.sh">
+    <meta property="og:description" content="an rss email notification service">
+
+    <meta name="twitter:card" content="summary" />
+    <meta property="twitter:url" content="https://feeds.sh">
+    <meta property="twitter:title" content="feeds.sh">
+    <meta property="twitter:description" content="an rss email notification service">
+    <meta name="twitter:image" content="https://feeds.sh/card.png" />
+    <meta name="twitter:image:src" content="https://feeds.sh/card.png" />
+
+    <meta property="og:image:width" content="300" />
+    <meta property="og:image:height" content="300" />
+    <meta itemprop="image" content="https://feeds.sh/card.png" />
+    <meta property="og:image" content="https://feeds.sh/card.png" />
+
+    <link rel="stylesheet" href="/main.css" />
+  </head>
+  <body>
+    <header class="text-center">
+        <h1 class="text-2xl font-bold">feeds.sh [beta]</h1>
+        <p class="text-lg">An rss email notification service</p>
+        <hr />
+    </header>
+
+    <main>
+      <section>
+        <h2 class="text-lg font-bold">Features</h2>
+        <ul>
+          <li>Receive email digests for your RSS feeds</li>
+          <li>We try to render all content within the feed as HTML (<a href="/help#inline-content">with ability to disable it</a>)</li>
+          <li>Create 1-to-many email digests</li>
+          <li>Set digest interval from <a href="/help#digest-interval"><code>10min</code> to <code>30day</code></a></li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 class="text-lg font-bold">Create your account with Public-Key Cryptography</h2>
+        <p>To get started, simply ssh into our content management system:</p>
+        <pre>ssh new@feeds.sh</pre>
+        <div class="text-sm font-italic note">
+          note: <code>new</code> is a special username that will always send you to account
+          creation.
+        </div>
+        <p>
+          After that, set a username and email and then you're ready!
+        </p>
+      </section>
+
+      <section>
+        <h2 class="text-lg font-bold">Subscribe to feeds</h2>
+        <p>
+          Use <a href="https://lists.sh/spec">lists.sh/spec</a> to create a txt file
+          named <code>daily.txt</code> (as an example).
+        </p>
+        <p>
+          Then add your email, the digest interval, and the rss feeds for which you
+          want to receive email notifications.
+        </p>
+        <pre>=: email rss@myemail.com
+=: digest_interval 1day
+=> https://hey.prose.sh/rss
+=> https://hey.lists.sh/rss
+=> https://erock.prose.sh/rss
+</pre>
+        <p>
+          Then copy the file to our server
+        </p>
+        <pre>scp -P 2222 daily.txt feeds.sh:/</pre>
+        <p>Using this example, we will send a daily digest of new posts to the email specified.</p>
+      </section>
+
+      <section>
+        <h2 class="text-lg font-bold">Privacy</h2>
+        <p>
+          We don't do anything with your email besides send an email digest.
+          If you delete the post containing your email address, we no longer have you email address.
+        </p>
+        <p>
+          Posts are also not accessible by the public and we provide no endpoints to view these posts.
+        </p>
+      </section>
+
+      <section id="digest-interval">
+        <h2 class="text-lg font-bold">
+          <a href="#digest-interval" rel="nofollow noopener">#</a>
+          Digest interval options
+        </h2>
+        <ul>
+          <li><code>10min</code></li>
+          <li><code>1hour</code></li>
+          <li><code>6hour</code></li>
+          <li><code>12hour</code></li>
+          <li><code>1day</code></li>
+          <li><code>7day</code></li>
+          <li><code>30day</code></li>
+        </ul>
+      </section>
+
+      <section id="multiple-feeds">
+        <h2 class="text-lg font-bold">
+          <a href="#multiple-feeds" rel="nofollow noopener">#</a>
+          Can I create multiple email digests?
+        </h2>
+        <p>
+          You are free to upload as many email digests as you like,
+          referencing different rss feeds, emails, and digest intervals.
+        </p>
+      </section>
+
+      <section id="inline-content">
+        <h2 class="text-lg font-bold">
+          <a href="#inline-content" rel="nofollow noopener">#</a>
+          Inline content
+        </h2>
+        <p>
+          By default we attempt to render all content within a feed as HTML inside an email digest.
+          Sometimes users just want us to send them the links so they can click on it and read the content
+          on the original website.
+        </p>
+        <p>If you don't want to see all the content, simply add a variable to your post:</p>
+        <pre>=: inline_content false</pre>
+      </section>
+    </main>
+
+    <footer>
+      <hr />
+      <p class="font-italic">Built and maintained by <a href="https://pico.sh">pico.sh</a>.</p>
+      <div>
+        <a href="https://github.com/picosh/pico">source</a>
+      </div>
+    </footer>
+  </body>
+</html>

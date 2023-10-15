@@ -10,7 +10,7 @@ import (
 func NewConfigSite() *shared.ConfigSite {
 	debug := shared.GetEnv("FEEDS_DEBUG", "0")
 	domain := shared.GetEnv("FEEDS_DOMAIN", "feeds.sh")
-	email := shared.GetEnv("FEEDS_EMAIL", "hello@feeds.sh")
+	email := shared.GetEnv("FEEDS_EMAIL", "hello@pico.sh")
 	subdomains := shared.GetEnv("FEEDS_SUBDOMAINS", "0")
 	customdomains := shared.GetEnv("FEEDS_CUSTOMDOMAINS", "0")
 	port := shared.GetEnv("FEEDS_WEB_PORT", "3000")
@@ -26,7 +26,7 @@ func NewConfigSite() *shared.ConfigSite {
 	intro := "To get started, enter a username and email.\n"
 	intro += "Then upload a file containing a list of rss feeds (e.g. ~/feeds.txt)\n"
 	intro += "Finally, send your file to us:\n\n"
-	intro += fmt.Sprintf("scp ~/feeds.txt %s:/", domain)
+	intro += fmt.Sprintf("scp -P 2222 ~/feeds.txt %s:/", domain)
 
 	return &shared.ConfigSite{
 		Debug:                debug == "1",
@@ -47,7 +47,7 @@ func NewConfigSite() *shared.ConfigSite {
 			IntroText:     intro,
 			Space:         "feeds",
 			AllowedExt:    []string{".txt"},
-			HiddenPosts:   []string{"_header.txt", "_readme.txt"},
+			HiddenPosts:   []string{},
 			Logger:        shared.CreateLogger(),
 			AllowRegister: allowRegister == "1",
 		},

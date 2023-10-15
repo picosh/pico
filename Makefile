@@ -37,6 +37,10 @@ bp-auth: bp-setup
 	$(DOCKER_BUILDX_BUILD) -t ghcr.io/picosh/pico/auth:$(DOCKER_TAG) --build-arg APP=auth --target release-web .
 .PHONY: bp-auth
 
+bp-feeds: bp-setup
+	$(DOCKER_BUILDX_BUILD) --build-arg "APP=feeds" -t "ghcr.io/picosh/pico/feeds-ssh:$(DOCKER_TAG)" --target release-ssh .
+.PHONY: bp-feeds
+
 bp-bouncer: bp-setup
 	$(DOCKER_BUILDX_BUILD) -t ghcr.io/picosh/pico/bouncer:$(DOCKER_TAG) -f bouncer/Dockerfile ./bouncer
 .PHONY: bp-bouncer
@@ -63,6 +67,10 @@ build-auth:
 	go build -o "build/auth" "./cmd/auth/web"
 .PHONY: build-auth
 
+build-feeds:
+	go build -o "build/feeds" "./cmd/feeds/ssh"
+.PHONY: build-feeds
+
 build-%:
 	go build -o "build/$*-web" "./cmd/$*/web"
 	go build -o "build/$*-ssh" "./cmd/$*/ssh"
@@ -86,6 +94,10 @@ pgs-deploy: pgs-static pgs-site
 	scp -R ./public/* hey@pgs.sh:/pgs-local
 	ssh hey@pgs.sh link pgs-prod pgs-local --write
 .PHONY: pgs-site-deploy
+
+feeds-deploy:
+	scp -R ./feeds/public/* hey@pgs.sh:/feeds
+.PHONY: feeds-deploy
 
 fmt:
 	go fmt ./...

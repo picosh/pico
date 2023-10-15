@@ -117,15 +117,6 @@ services:
       - ./data/pgs-ssh/data:/app/ssh_data
     ports:
       - "2224:2222"
-  feeds-web:
-    build:
-      args:
-        APP: feeds
-      target: release-web
-    env_file:
-      - .env.example
-    ports:
-      - "3005:3000"
   feeds-ssh:
     build:
       args:
