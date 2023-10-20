@@ -137,49 +137,67 @@ func rssHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func calcPossibleRoutes(projectName, fp string, redirects []*RedirectRule) []string {
+type HttpReply struct {
+	Filepath string
+	Query    map[string]string
+	Status   int
+}
+
+func calcPossibleRoutes(projectName, fp string, redirects []*RedirectRule) []*HttpReply {
 	fname := filepath.Base(fp)
 	fdir := filepath.Dir(fp)
 	fext := filepath.Ext(fp)
 
+	dirRoute := shared.GetAssetFileName(&utils.FileEntry{
+		Filepath: filepath.Join(projectName, fp, "index.html"),
+	})
+
 	// hack: we need to accommodate routes that are just directories
 	// and point the user to the index.html of each root dir.
 	if fname == "." || fext == "" {
-		rts := []string{}
+		nameRoute := shared.GetAssetFileName(&utils.FileEntry{
+			Filepath: filepath.Join(
+				projectName,
+				fdir,
+				fmt.Sprintf("%s.html", fname),
+			),
+		})
+
+		rts := []*HttpReply{
+			{Filepath: dirRoute, Status: 200},
+			{Filepath: nameRoute, Status: 200},
+		}
+
 		for _, redirect := range redirects {
 			rr := regexp.MustCompile(redirect.From)
 			match := rr.FindStringSubmatch(fp)
 			if len(match) > 0 {
-				rts = append(rts, shared.GetAssetFileName(&utils.FileEntry{
+				ruleRoute := shared.GetAssetFileName(&utils.FileEntry{
 					Filepath: filepath.Join(projectName, redirect.To),
-				}))
+				})
+				rule := &HttpReply{
+					Filepath: ruleRoute,
+					Status:   redirect.Status,
+					Query:    redirect.Query,
+				}
+				if redirect.Force {
+					rts = append([]*HttpReply{rule}, rts...)
+				} else {
+					rts = append(rts, rule)
+				}
 			}
 		}
-
-		rts = append(
-			rts,
-			shared.GetAssetFileName(&utils.FileEntry{
-				Filepath: filepath.Join(projectName, fp, "index.html"),
-			}),
-			shared.GetAssetFileName(&utils.FileEntry{
-				Filepath: filepath.Join(
-					projectName,
-					fdir,
-					fmt.Sprintf("%s.html", fname),
-				),
-			}),
-		)
 
 		return rts
 	}
 
-	return []string{
-		shared.GetAssetFileName(&utils.FileEntry{
-			Filepath: filepath.Join(projectName, fdir, fname),
-		}),
-		shared.GetAssetFileName(&utils.FileEntry{
-			Filepath: filepath.Join(projectName, fp, "index.html"),
-		}),
+	defRoute := shared.GetAssetFileName(&utils.FileEntry{
+		Filepath: filepath.Join(projectName, fdir, fname),
+	})
+
+	return []*HttpReply{
+		{Filepath: defRoute, Status: 200},
+		{Filepath: dirRoute, Status: 200},
 	}
 }
 
@@ -191,9 +209,8 @@ func assetHandler(w http.ResponseWriter, h *AssetHandler) {
 		return
 	}
 
-	redirectFp, err := h.Storage.GetFile(bucket, filepath.Join(h.ProjectDir, "_redirect"))
-
 	var redirects []*RedirectRule
+	redirectFp, err := h.Storage.GetFile(bucket, filepath.Join(h.ProjectDir, "_redirects"))
 	if err == nil {
 		defer redirectFp.Close()
 		buf := new(strings.Builder)
@@ -210,15 +227,16 @@ func assetHandler(w http.ResponseWriter, h *AssetHandler) {
 		}
 	}
 
-	// TODO: do something with redirects
 	routes := calcPossibleRoutes(h.ProjectDir, h.Filepath, redirects)
 	var contents storage.ReaderAtCloser
 	assetFilepath := ""
+	status := 200
 	for _, fp := range routes {
-		c, err := h.Storage.GetFile(bucket, fp)
+		c, err := h.Storage.GetFile(bucket, fp.Filepath)
 		if err == nil {
 			contents = c
-			assetFilepath = fp
+			assetFilepath = fp.Filepath
+			status = fp.Status
 			break
 		}
 	}
@@ -236,6 +254,7 @@ func assetHandler(w http.ResponseWriter, h *AssetHandler) {
 
 	contentType := shared.GetMimeType(assetFilepath)
 	w.Header().Add("Content-Type", contentType)
+	w.WriteHeader(status)
 	_, err = io.Copy(w, contents)
 
 	if err != nil {

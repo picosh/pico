@@ -108,7 +108,6 @@ func parseRedirectText(text string) ([]*RedirectRule, error) {
 		} else {
 			toIndex := -1
 			for idx, part := range rest {
-				fmt.Println(part)
 				if isToPart(part) {
 					toIndex = idx
 				}
