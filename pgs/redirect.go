@@ -9,12 +9,12 @@ import (
 
 type RedirectRule struct {
 	From       string
-	Query      string
 	To         string
 	Status     int
+	Query      map[string]string
+	Conditions map[string]string
 	Force      bool
-	Conditions string
-	Signed     string
+	Signed     bool
 }
 
 var reSplitWhitespace = regexp.MustCompile(`\s+`)
@@ -41,6 +41,17 @@ func hasStatusCode(part string) (int, bool) {
 		return 0, forced
 	}
 	return status, forced
+}
+
+func parsePairs(pairs []string) map[string]string {
+	mapper := map[string]string{}
+	for _, pair := range pairs {
+		val := strings.SplitN(pair, "=", 1)
+		if len(val) > 1 {
+			mapper[val[0]] = val[1]
+		}
+	}
+	return mapper
 }
 
 /*
@@ -83,22 +94,24 @@ func parseRedirectText(text string) ([]*RedirectRule, error) {
 			continue
 		}
 
-		parts := reSplitWhitespace.FindAllString(trimmed, -1)
+		parts := reSplitWhitespace.Split(trimmed, -1)
 		if len(parts) < 2 {
 			return rules, fmt.Errorf("Missing destination path/URL")
 		}
 
-		first := parts[0]
-		status, forced := hasStatusCode(first)
+		from := parts[0]
+		rest := parts[0:]
+		status, forced := hasStatusCode(rest[0])
 		if status != 0 {
-			rule := &RedirectRule{
-				Query: "",
+			rules = append(rules, &RedirectRule{
+				Query:  map[string]string{},
 				Status: status,
-				Force: forced,
-			}
+				Force:  forced,
+			})
 		} else {
 			toIndex := -1
-			for idx, part := range parts {
+			for idx, part := range rest {
+				fmt.Println(part)
 				if isToPart(part) {
 					toIndex = idx
 				}
@@ -107,6 +120,20 @@ func parseRedirectText(text string) ([]*RedirectRule, error) {
 			if toIndex == -1 {
 				return rules, fmt.Errorf("The destination path/URL must start with '/', 'http:' or 'https:'")
 			}
+
+			queryParts := parts[:toIndex]
+			to := parts[toIndex]
+			lastParts := parts[toIndex+1:]
+			sts, frcd := hasStatusCode(lastParts[0])
+
+			rules = append(rules, &RedirectRule{
+				To:         to,
+				From:       from,
+				Status:     sts,
+				Force:      frcd,
+				Query:      parsePairs(queryParts),
+				Conditions: parsePairs(lastParts[1:]),
+			})
 		}
 	}
 
