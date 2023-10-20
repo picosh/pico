@@ -143,7 +143,7 @@ type HttpReply struct {
 	Status   int
 }
 
-func calcPossibleRoutes(projectName, fp string, redirects []*RedirectRule) []*HttpReply {
+func calcPossibleRoutes(projectName, fp string, userRedirects []*RedirectRule) []*HttpReply {
 	fname := filepath.Base(fp)
 	fdir := filepath.Dir(fp)
 	fext := filepath.Ext(fp)
@@ -168,7 +168,7 @@ func calcPossibleRoutes(projectName, fp string, redirects []*RedirectRule) []*Ht
 			{Filepath: nameRoute, Status: 200},
 		}
 
-		for _, redirect := range redirects {
+		for _, redirect := range userRedirects {
 			rr := regexp.MustCompile(redirect.From)
 			match := rr.FindStringSubmatch(fp)
 			if len(match) > 0 {
