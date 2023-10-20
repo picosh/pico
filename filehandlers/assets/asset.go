@@ -30,6 +30,20 @@ func (h *UploadAssetHandler) validateAsset(data *FileData) (bool, error) {
 		return false, fmt.Errorf("ERROR: file (%s) has exceeded maximum file size (%d bytes)", fname, h.Cfg.MaxAssetSize)
 	}
 
+	// ".well-known" is a special case
+	if strings.Contains(fname, "/.well-known/") {
+		if shared.IsTextFile(string(data.Text)) {
+			return true, nil
+		} else {
+			return false, fmt.Errorf("(%s) not a utf-8 text file", data.Filepath)
+		}
+	}
+
+	// special file we use for custom routing
+	if fname == "_redirects" {
+		return true, nil
+	}
+
 	if !shared.IsExtAllowed(fname, h.Cfg.AllowedExt) {
 		extStr := strings.Join(h.Cfg.AllowedExt, ",")
 		err := fmt.Errorf(
