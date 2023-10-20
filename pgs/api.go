@@ -176,6 +176,26 @@ func assetHandler(w http.ResponseWriter, h *AssetHandler) {
 		return
 	}
 
+	redirectFp, err := h.Storage.GetFile(bucket, filepath.Join(h.ProjectDir, "_redirect"))
+
+	var redirects []*RedirectRule
+	if err == nil {
+		defer redirectFp.Close()
+		buf := new(strings.Builder)
+		_, err := io.Copy(buf, redirectFp)
+		if err != nil {
+			h.Logger.Error(err)
+			http.Error(w, "cannot read _redirect file", http.StatusInternalServerError)
+			return
+		}
+
+		redirects, err = parseRedirectText(buf.String())
+		if err != nil {
+			h.Logger.Error(err)
+		}
+	}
+
+	// TODO: do something with redirects
 	routes := calcPossibleRoutes(h.ProjectDir, h.Filepath)
 	var contents storage.ReaderAtCloser
 	assetFilepath := ""

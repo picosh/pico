@@ -75,9 +75,6 @@ The parts are:
     "forced"
   - "conditions": a whitespace-separated list of "key=value"
   - "Sign" is a special condition
-
-Unlike "redirects" in "netlify.toml", the "headers" and "edge_handlers"
-cannot be specified.
 */
 func parseRedirectText(text string) ([]*RedirectRule, error) {
 	rules := []*RedirectRule{}
