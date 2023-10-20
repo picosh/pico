@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -136,7 +137,7 @@ func rssHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func calcPossibleRoutes(projectName, fp string) []string {
+func calcPossibleRoutes(projectName, fp string, redirects []*RedirectRule) []string {
 	fname := filepath.Base(fp)
 	fdir := filepath.Dir(fp)
 	fext := filepath.Ext(fp)
@@ -144,7 +145,19 @@ func calcPossibleRoutes(projectName, fp string) []string {
 	// hack: we need to accommodate routes that are just directories
 	// and point the user to the index.html of each root dir.
 	if fname == "." || fext == "" {
-		return []string{
+		rts := []string{}
+		for _, redirect := range redirects {
+			rr := regexp.MustCompile(redirect.From)
+			match := rr.FindStringSubmatch(fp)
+			if len(match) > 0 {
+				rts = append(rts, shared.GetAssetFileName(&utils.FileEntry{
+					Filepath: filepath.Join(projectName, redirect.To),
+				}))
+			}
+		}
+
+		rts = append(
+			rts,
 			shared.GetAssetFileName(&utils.FileEntry{
 				Filepath: filepath.Join(projectName, fp, "index.html"),
 			}),
@@ -155,7 +168,9 @@ func calcPossibleRoutes(projectName, fp string) []string {
 					fmt.Sprintf("%s.html", fname),
 				),
 			}),
-		}
+		)
+
+		return rts
 	}
 
 	return []string{
@@ -196,7 +211,7 @@ func assetHandler(w http.ResponseWriter, h *AssetHandler) {
 	}
 
 	// TODO: do something with redirects
-	routes := calcPossibleRoutes(h.ProjectDir, h.Filepath)
+	routes := calcPossibleRoutes(h.ProjectDir, h.Filepath, redirects)
 	var contents storage.ReaderAtCloser
 	assetFilepath := ""
 	for _, fp := range routes {
