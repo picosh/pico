@@ -72,6 +72,14 @@
 	}
 	respond @options 204
 
+	@caddymetrics {
+		path /_caddy/metrics
+	}
+
+	metrics @caddymetrics {
+		disable_openmetrics
+	}
+
 	reverse_proxy @auth auth-web:3000
 
 	reverse_proxy @irc https://bouncer:8080 {
