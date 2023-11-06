@@ -49,6 +49,7 @@
 
         <div class="md">{{.Contents}}</div>
 
+        {{if .ImgURL}}
         <dl>
             <dt>Hotlink</dt>
             <dd><a href="{{.ImgURL}}">{{.ImgURL}}</a></dd>
@@ -62,6 +63,7 @@
             <dt>Resize width and height</dt>
             <dd><a href="{{.ImgURL}}/300x300">{{.ImgURL}}/300x300</a></dd>
         </dl>
+        {{end}}
     </article>
 </main>
 {{template "footer" .}}

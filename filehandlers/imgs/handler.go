@@ -62,8 +62,8 @@ func (h *UploadImgHandler) removePost(data *PostMetaData) error {
 		return nil
 	}
 
-	err := h.DBPool.RemovePosts([]string{data.Post.ID})
-	h.Cfg.Logger.Infof("(%s) is empty, removing record", data.Filename)
+	h.Cfg.Logger.Infof("(%s) is empty, removing record (%s)", data.Filename, data.Cur.ID)
+	err := h.DBPool.RemovePosts([]string{data.Cur.ID})
 	if err != nil {
 		h.Cfg.Logger.Errorf("error for %s: %v", data.Filename, err)
 		return fmt.Errorf("error for %s: %v", data.Filename, err)

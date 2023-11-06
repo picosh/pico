@@ -255,8 +255,9 @@ func imgHandler(w http.ResponseWriter, h *ImgHandler) {
 
 	post, err := h.Dbpool.FindPostWithSlug(h.Slug, user.ID, h.Cfg.Space)
 	if err != nil {
-		h.Logger.Infof("image not found %s/%s", h.Username, h.Slug)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		errMsg := fmt.Sprintf("image not found %s/%s", h.Username, h.Slug)
+		h.Logger.Infof(errMsg)
+		http.Error(w, errMsg, http.StatusNotFound)
 		return
 	}
 
