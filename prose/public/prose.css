@@ -8,28 +8,30 @@ table {
   border-collapse: separate;
 }
 
-.md h1 {
-  font-size: 1.55rem;
-  line-height: 1.15;
+.md h1,
+.md h2,
+.md h3,
+.md h4 {
+  margin: 1.5rem 0;
   font-weight: bold;
-  padding: 0.6rem 0 0 0;
+  border-bottom: 2px solid var(--grey);
+  padding-bottom: 15px;
+}
+
+.md h1 {
+  font-size: 1.88rem;
+  line-height: 1.15;
 }
 
 .md h2 {
-  font-size: 1.35rem;
+  font-size: 1.5rem;
   line-height: 1.15;
-  font-weight: bold;
-  padding: 0.6rem 0 0 0;
 }
 
 .md h3 {
-  font-size: 1.10rem;
-  font-weight: bold;
-  padding: 0.6rem 0 0 0;
+  font-size: 1.13rem;
 }
 
 .md h4 {
   font-size: 1rem;
-  font-weight: bold;
-  padding: 0.6rem 0 0 0;
 }

@@ -52,16 +52,16 @@
 html {
   background-color: var(--bg-color);
   color: var(--text-color);
-  line-height: 1.5;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
     Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", Arial,
     sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
   -webkit-text-size-adjust: 100%;
-  -moz-tab-size: 4;
   tab-size: 4;
 }
 
 body {
+  font-size: 16px;
+  line-height: 1.5;
   margin: 0 auto;
   max-width: 720px;
 }
@@ -121,13 +121,39 @@ summary {
 
 h1,
 h2,
-h3 {
-  margin: 0;
-  padding: 0.6rem 0 0 0;
+h3,
+h4 {
   border: 0;
   font-style: normal;
   font-weight: inherit;
   font-size: inherit;
+  margin: 0;
+}
+
+h2,
+h3,
+h4 {
+  border-bottom: 2px solid var(--grey);
+  padding-bottom: 15px;
+}
+
+h1 a:visited,
+h2 a:visited,
+h3 a:visited,
+h4 a:visited {
+  color: var(--grey);
+}
+
+h1 a,
+h2 a,
+h3 a,
+h4 a {
+  color: var(--grey);
+}
+
+.no-underline {
+  border-bottom: 0px;
+  padding-bottom: 0;
 }
 
 h1 > code {
@@ -254,22 +280,22 @@ figure {
 }
 
 .text-2xl {
-  font-size: 1.85rem;
+  font-size: 2.25rem;
   line-height: 1.15;
 }
 
 .text-xl {
-  font-size: 1.55rem;
+  font-size: 1.88rem;
   line-height: 1.15;
 }
 
 .text-lg {
-  font-size: 1.35rem;
+  font-size: 1.5rem;
   line-height: 1.15;
 }
 
 .text-md {
-  font-size: 1.15rem;
+  font-size: 1.13rem;
   line-height: 1.15;
 }
 
