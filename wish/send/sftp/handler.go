@@ -1,6 +1,7 @@
 package sftp
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"os"
@@ -31,7 +32,16 @@ type handler struct {
 }
 
 func (f *handler) Filecmd(r *sftp.Request) error {
-	return nil
+	switch r.Method {
+	case "Remove":
+		entry := toFileEntry(r)
+		entry.Reader = bytes.NewReader(nil)
+
+		_, err := f.writeHandler.Write(f.session, entry)
+
+		return err
+	}
+	return errors.New("unsupported")
 }
 
 func (f *handler) Filelist(r *sftp.Request) (sftp.ListerAt, error) {
