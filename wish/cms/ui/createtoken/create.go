@@ -92,8 +92,8 @@ func (m *Model) indexBackward() {
 func NewModel(cfg *config.ConfigCms, dbpool db.DB, user *db.User) Model {
 	st := common.DefaultStyles()
 
-	im := input.NewModel()
-	im.CursorStyle = st.Cursor
+	im := input.New()
+	im.Cursor.Style = st.Cursor
 	im.Placeholder = "A name used for your reference"
 	im.Prompt = st.FocusedPrompt.String()
 	im.CharLimit = 256
@@ -176,7 +176,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 					return m, tea.Batch(
 						addToken(m), // fire off the command, too
-						spinner.Tick,
+						m.spinner.Tick,
 					)
 				case cancelButton: // Exit this mini-app
 					m.Done = true

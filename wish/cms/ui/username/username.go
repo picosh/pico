@@ -94,8 +94,8 @@ func (m *Model) indexBackward() {
 func NewModel(dbpool db.DB, user *db.User, sshUser string) Model {
 	st := common.DefaultStyles()
 
-	im := input.NewModel()
-	im.CursorStyle = st.Cursor
+	im := input.New()
+	im.Cursor.Style = st.Cursor
 	im.Placeholder = sshUser
 	im.Prompt = st.FocusedPrompt.String()
 	im.CharLimit = 50
@@ -178,7 +178,7 @@ func Update(msg tea.Msg, m Model) (Model, tea.Cmd) {
 
 					return m, tea.Batch(
 						setName(m), // fire off the command, too
-						spinner.Tick,
+						m.spinner.Tick,
 					)
 				case cancelButton: // Exit this mini-app
 					m.Done = true

@@ -88,7 +88,7 @@ func NewModel(cfg *config.ConfigCms, urls config.ConfigURL, dbpool db.DB, user *
 	logger := cfg.Logger
 	st := common.DefaultStyles()
 
-	p := pager.NewModel()
+	p := pager.New()
 	p.PerPage = keysPerPage
 	p.Type = pager.Dots
 	p.InactiveDot = st.InactivePagination.Render("•")
@@ -115,7 +115,7 @@ func NewModel(cfg *config.ConfigCms, urls config.ConfigURL, dbpool db.DB, user *
 // Init is the Tea initialization function.
 func (m Model) Init() tea.Cmd {
 	return tea.Batch(
-		spinner.Tick,
+		m.spinner.Tick,
 	)
 }
 
@@ -315,7 +315,7 @@ func LoadPosts(m Model) tea.Cmd {
 
 	return tea.Batch(
 		m.fetchPosts(m.user.ID),
-		spinner.Tick,
+		m.spinner.Tick,
 	)
 }
 

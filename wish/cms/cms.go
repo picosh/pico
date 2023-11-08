@@ -79,7 +79,7 @@ var (
 )
 
 func NewSpinner() spinner.Model {
-	s := spinner.NewModel()
+	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = spinnerStyle
 	return s
@@ -165,7 +165,7 @@ type model struct {
 }
 
 func (m model) Init() tea.Cmd {
-	return spinner.Tick
+	return m.spinner.Tick
 }
 
 func (m model) findUser() (*db.User, error) {
