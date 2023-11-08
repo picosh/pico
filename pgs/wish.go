@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
-	"github.com/gliderlabs/ssh"
 	"github.com/picosh/pico/db"
 	uploadassets "github.com/picosh/pico/filehandlers/assets"
 	"github.com/picosh/pico/wish/cms/util"

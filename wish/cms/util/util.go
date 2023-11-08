@@ -4,7 +4,7 @@ import (
 	"encoding/base64"
 	"fmt"
 
-	"github.com/gliderlabs/ssh"
+	"github.com/charmbracelet/ssh"
 )
 
 func KeyText(s ssh.Session) (string, error) {

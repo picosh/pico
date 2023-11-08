@@ -5,9 +5,10 @@ import (
 	"io"
 	"os"
 
-	"github.com/gliderlabs/ssh"
+	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/wish/send/utils"
 	"github.com/pkg/sftp"
+	"golang.org/x/exp/slices"
 )
 
 type listerat []os.FileInfo
@@ -42,6 +43,10 @@ func (f *handler) Filelist(r *sftp.Request) (sftp.ListerAt, error) {
 		if err != nil {
 			return nil, err
 		}
+
+		listData = slices.DeleteFunc(listData, func(f os.FileInfo) bool {
+			return f.Name() == "/"
+		})
 
 		return listerat(listData), nil
 	}

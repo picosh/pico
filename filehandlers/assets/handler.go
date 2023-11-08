@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gliderlabs/ssh"
+	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
@@ -82,7 +82,7 @@ func (h *UploadAssetHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.Fil
 	fileInfo := &utils.VirtualFile{
 		FName:    filepath.Base(entry.Filepath),
 		FIsDir:   false,
-		FSize:    int64(entry.Size),
+		FSize:    entry.Size,
 		FModTime: time.Unix(entry.Mtime, 0),
 	}
 
@@ -97,7 +97,9 @@ func (h *UploadAssetHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.Fil
 		return nil, nil, err
 	}
 
-	return fileInfo, contents, nil
+	reader := utils.NewAllReaderAt(contents)
+
+	return fileInfo, reader, nil
 }
 
 func (h *UploadAssetHandler) List(s ssh.Session, fpath string) ([]os.FileInfo, error) {

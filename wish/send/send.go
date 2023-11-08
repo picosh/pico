@@ -1,8 +1,8 @@
 package send
 
 import (
+	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
-	"github.com/gliderlabs/ssh"
 	"github.com/picosh/pico/wish/pipe"
 	"github.com/picosh/pico/wish/send/auth"
 	"github.com/picosh/pico/wish/send/rsync"

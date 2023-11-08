@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/gliderlabs/ssh"
+	"github.com/charmbracelet/ssh"
 	exifremove "github.com/neurosnap/go-exif-remove"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared"
@@ -106,7 +106,9 @@ func (h *UploadImgHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileI
 		return nil, nil, err
 	}
 
-	return fileInfo, contents, nil
+	reader := utils.NewAllReaderAt(contents)
+
+	return fileInfo, reader, nil
 }
 
 func (h *UploadImgHandler) List(s ssh.Session, fpath string) ([]os.FileInfo, error) {

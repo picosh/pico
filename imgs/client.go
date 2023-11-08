@@ -1,7 +1,7 @@
 package imgs
 
 import (
-	"github.com/gliderlabs/ssh"
+	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
 	uploadimgs "github.com/picosh/pico/filehandlers/imgs"
 	"github.com/picosh/pico/shared"

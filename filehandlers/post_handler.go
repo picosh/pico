@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gliderlabs/ssh"
+	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/imgs"
 	"github.com/picosh/pico/shared"
@@ -84,7 +84,9 @@ func (h *ScpUploadHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileI
 		FModTime: *post.UpdatedAt,
 	}
 
-	return fileInfo, strings.NewReader(post.Text), nil
+	reader := strings.NewReader(post.Text)
+
+	return fileInfo, reader, nil
 }
 
 func (h *ScpUploadHandler) List(s ssh.Session, fpath string) ([]os.FileInfo, error) {

@@ -5,7 +5,7 @@ import (
 	"io"
 	"log"
 
-	"github.com/gliderlabs/ssh"
+	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/wish/send/utils"
 	"github.com/pkg/sftp"
 )

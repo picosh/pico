@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/gliderlabs/ssh"
+	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
@@ -42,7 +42,7 @@ type Cmd struct {
 }
 
 func (c *Cmd) output(out string) {
-	_, _ = c.session.Write([]byte(out + "\n"))
+	_, _ = c.session.Write([]byte(out + "\r\n"))
 }
 
 func (c *Cmd) bail(err error) {

@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/gliderlabs/ssh"
+	"github.com/charmbracelet/ssh"
 )
 
 // NULL is an array with a single NULL byte.
@@ -71,7 +71,7 @@ func KeyText(session ssh.Session) (string, error) {
 }
 
 func ErrorHandler(session ssh.Session, err error) {
-	_, _ = fmt.Fprintln(session.Stderr(), err)
+	_, _ = fmt.Fprint(session.Stderr(), err, "\r\n")
 	_ = session.Exit(1)
 	_ = session.Close()
 }
@@ -81,7 +81,7 @@ func PrintMsg(session ssh.Session, stdout []string, stderr []error) {
 	if len(stdout) > 0 {
 		for _, msg := range stdout {
 			if msg != "" {
-				output += fmt.Sprintf("%s\n", msg)
+				output += fmt.Sprintf("%s\r\n", msg)
 			}
 		}
 		_, _ = fmt.Fprintln(session.Stderr(), output)
@@ -90,7 +90,7 @@ func PrintMsg(session ssh.Session, stdout []string, stderr []error) {
 	outputErr := ""
 	if len(stderr) > 0 {
 		for _, err := range stderr {
-			outputErr += fmt.Sprintf("%v\n", err)
+			outputErr += fmt.Sprintf("%v\r\n", err)
 		}
 		_, _ = fmt.Fprintln(session.Stderr(), outputErr)
 	}
