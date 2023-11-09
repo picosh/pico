@@ -85,18 +85,26 @@ jobs:
     steps:
     - name: Checkout repo
       uses: actions/checkout@v3
+    - name: Get changed files
+      id: changed-files
+      uses: tj-actions/changed-files@v40
+      with:
+        files: bouncer/**
     - name: Setup docker
+      if: steps.changed-files.outputs.any_changed == 'true'
       uses: ./.github/actions/setup
       with:
         registry: ${{ env.REGISTRY }}
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
     - name: Collect bouncer image metadata
+      if: steps.changed-files.outputs.any_changed == 'true'
       id: bouncermeta
       uses: docker/metadata-action@v4
       with:
         images: ${{ env.REGISTRY }}/${{ github.repository }}/bouncer
     - name: Build and push
+      if: steps.changed-files.outputs.any_changed == 'true'
       uses: docker/build-push-action@v3
       with:
         context: ./bouncer
@@ -112,18 +120,26 @@ jobs:
     steps:
     - name: Checkout repo
       uses: actions/checkout@v3
+    - name: Get changed files
+      id: changed-files
+      uses: tj-actions/changed-files@v40
+      with:
+        files: caddy/**
     - name: Setup docker
+      if: steps.changed-files.outputs.any_changed == 'true'
       uses: ./.github/actions/setup
       with:
         registry: ${{ env.REGISTRY }}
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
     - name: Collect caddy image metadata
+      if: steps.changed-files.outputs.any_changed == 'true'
       id: caddymeta
       uses: docker/metadata-action@v4
       with:
         images: ${{ env.REGISTRY }}/${{ github.repository }}/caddy
     - name: Build and push
+      if: steps.changed-files.outputs.any_changed == 'true'
       uses: docker/build-push-action@v3
       with:
         context: ./caddy
