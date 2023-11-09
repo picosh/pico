@@ -41,7 +41,7 @@ runs:
       with:
         images: ${{ inputs.REGISTRY }}/${{ github.repository }}/${{ inputs.app }}-ssh
     - name: Build and push web
-      if: inputs.web == true
+      if: ${{ inputs.web }}
       uses: docker/build-push-action@v3
       with:
         context: .
@@ -55,7 +55,7 @@ runs:
         build-args: |
           APP=${{ inputs.app }}
     - name: Build and push ssh
-      if: inputs.ssh == true
+      if: ${{ inputs.ssh }}
       uses: docker/build-push-action@v3
       with:
         context: .
