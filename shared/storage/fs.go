@@ -3,8 +3,8 @@ package storage
 import (
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -123,26 +123,46 @@ func (s *StorageFS) DeleteFile(bucket Bucket, fpath string) error {
 
 func (s *StorageFS) ListFiles(bucket Bucket, dir string, recursive bool) ([]os.FileInfo, error) {
 	var fileList []os.FileInfo
-	fpath := filepath.Join(bucket.Path, dir)
-	err := filepath.WalkDir(fpath, func(s string, d fs.DirEntry, err error) error {
+
+	fpath := path.Join(bucket.Path, dir)
+
+	info, err := os.Stat(fpath)
+	if err != nil {
+		return fileList, err
+	}
+
+	if info.IsDir() && !strings.HasSuffix(dir, "/") {
+		fileList = append(fileList, &utils.VirtualFile{
+			FName:    "",
+			FIsDir:   info.IsDir(),
+			FSize:    info.Size(),
+			FModTime: info.ModTime(),
+		})
+
+		return fileList, err
+	}
+
+	files, err := os.ReadDir(fpath)
+	if err != nil {
+		fileList = append(fileList, info)
+		return fileList, nil
+	}
+
+	for _, f := range files {
+		info, err := f.Info()
 		if err != nil {
-			return err
+			return fileList, err
 		}
-		if !d.IsDir() {
-			fileInfo, err := os.Stat(s)
-			if err != nil {
-				return err
-			}
-			info := &utils.VirtualFile{
-				FName:    strings.Replace(s, bucket.Path, "", 1),
-				FIsDir:   d.IsDir(),
-				FSize:    fileInfo.Size(),
-				FModTime: fileInfo.ModTime(),
-			}
-			fileList = append(fileList, info)
+
+		i := &utils.VirtualFile{
+			FName:    f.Name(),
+			FIsDir:   f.IsDir(),
+			FSize:    info.Size(),
+			FModTime: info.ModTime(),
 		}
-		return nil
-	})
+
+		fileList = append(fileList, i)
+	}
 
 	return fileList, err
 }

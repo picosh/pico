@@ -26,7 +26,7 @@ func (h *handler) Skip(file *rsyncutils.ReceiverFile) bool {
 }
 
 func (h *handler) List(path string) ([]fs.FileInfo, error) {
-	list, err := h.writeHandler.List(h.session, path)
+	list, err := h.writeHandler.List(h.session, path, true)
 	if err != nil {
 		return nil, err
 	}

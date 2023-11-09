@@ -58,7 +58,7 @@ type CopyFromClientHandler interface {
 	// Write should write the given file.
 	Write(ssh.Session, *FileEntry) (string, error)
 	Read(ssh.Session, *FileEntry) (os.FileInfo, io.ReaderAt, error)
-	List(ssh.Session, string) ([]os.FileInfo, error)
+	List(ssh.Session, string, bool) ([]os.FileInfo, error)
 	Validate(ssh.Session) error
 }
 

@@ -89,7 +89,7 @@ func (h *ScpUploadHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileI
 	return fileInfo, reader, nil
 }
 
-func (h *ScpUploadHandler) List(s ssh.Session, fpath string) ([]os.FileInfo, error) {
+func (h *ScpUploadHandler) List(s ssh.Session, fpath string, isDir bool) ([]os.FileInfo, error) {
 	var fileList []os.FileInfo
 	user, err := getUser(s)
 	if err != nil {

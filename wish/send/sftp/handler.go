@@ -40,7 +40,7 @@ func (f *handler) Filecmd(r *sftp.Request) error {
 		_, err := f.writeHandler.Write(f.session, entry)
 
 		return err
-	case "Setstat":
+	case "Setstat", "Mkdir":
 		return nil
 	}
 	return errors.New("unsupported")
@@ -48,15 +48,15 @@ func (f *handler) Filecmd(r *sftp.Request) error {
 
 func (f *handler) Filelist(r *sftp.Request) (sftp.ListerAt, error) {
 	switch r.Method {
-	case "List":
-		fallthrough
-	case "Stat":
-		listData, err := f.writeHandler.List(f.session, r.Filepath)
+	case "List", "Stat":
+		list := r.Method == "List"
+
+		listData, err := f.writeHandler.List(f.session, r.Filepath, list)
 		if err != nil {
 			return nil, err
 		}
 
-		if r.Filepath != "/" {
+		if list {
 			listData = slices.DeleteFunc(listData, func(f os.FileInfo) bool {
 				return f.Name() == "/"
 			})

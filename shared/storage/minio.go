@@ -99,6 +99,7 @@ func (s *StorageMinio) ListFiles(bucket Bucket, dir string, recursive bool) ([]o
 	var fileList []os.FileInfo
 
 	resolved := strings.TrimPrefix(dir, "/")
+
 	opts := minio.ListObjectsOptions{Prefix: resolved, Recursive: recursive}
 	for obj := range s.Client.ListObjects(context.Background(), bucket.Name, opts) {
 		if obj.Err != nil {
@@ -108,8 +109,9 @@ func (s *StorageMinio) ListFiles(bucket Bucket, dir string, recursive bool) ([]o
 		if obj.Size == 0 {
 			isDir = true
 		}
+
 		info := &utils.VirtualFile{
-			FName:    strings.TrimSuffix(obj.Key, "/"),
+			FName:    strings.TrimSuffix(strings.TrimPrefix(obj.Key, resolved), "/"),
 			FIsDir:   isDir,
 			FSize:    obj.Size,
 			FModTime: obj.LastModified,

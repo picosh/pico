@@ -102,13 +102,16 @@ func (h *UploadAssetHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.Fil
 	return fileInfo, reader, nil
 }
 
-func (h *UploadAssetHandler) List(s ssh.Session, fpath string) ([]os.FileInfo, error) {
+func (h *UploadAssetHandler) List(s ssh.Session, fpath string, isDir bool) ([]os.FileInfo, error) {
 	var fileList []os.FileInfo
+
 	user, err := getUser(s)
 	if err != nil {
 		return fileList, err
 	}
-	cleanFilename := filepath.Base(fpath)
+
+	cleanFilename := fpath
+
 	bucketName := shared.GetAssetBucketName(user.ID)
 	bucket, err := h.Storage.GetBucket(bucketName)
 	if err != nil {
@@ -125,12 +128,19 @@ func (h *UploadAssetHandler) List(s ssh.Session, fpath string) ([]os.FileInfo, e
 			FName:  name,
 			FIsDir: true,
 		}
+
 		fileList = append(fileList, info)
 	} else {
-		fileList, err = h.Storage.ListFiles(bucket, fpath, false)
+		if cleanFilename != "/" && isDir {
+			cleanFilename += "/"
+		}
+
+		foundList, err := h.Storage.ListFiles(bucket, cleanFilename, false)
 		if err != nil {
 			return fileList, err
 		}
+
+		fileList = append(fileList, foundList...)
 	}
 
 	return fileList, nil

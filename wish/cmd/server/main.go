@@ -42,7 +42,7 @@ func (h *handler) Read(session ssh.Session, entry *utils.FileEntry) (os.FileInfo
 	}, data, nil
 }
 
-func (h *handler) List(session ssh.Session, fpath string) ([]os.FileInfo, error) {
+func (h *handler) List(session ssh.Session, fpath string, isDir bool) ([]os.FileInfo, error) {
 	return nil, nil
 }
 
