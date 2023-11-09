@@ -8,21 +8,21 @@ inputs:
     required: true
   platforms:
     description: The docker platforms to build for
-    required: false
+    required: true
     default: |
       linux/amd64
       linux/arm64
   registry:
     description: The docker registry to use
-    required: false
+    required: true
     default: ghcr.io
   web:
     description: Whether or not to build the web image
-    required: false
+    required: true
     default: true
   ssh:
     description: Whether or not to build the ssh image
-    required: false
+    required: true
     default: true
 
 runs:
@@ -39,7 +39,7 @@ runs:
       with:
         images: ${{ inputs.REGISTRY }}/${{ github.repository }}/${{ inputs.app }}-ssh
     - name: Build and push web
-      if: inputs.web
+      if: inputs.web == true
       uses: docker/build-push-action@v3
       with:
         context: .
@@ -53,7 +53,7 @@ runs:
         build-args: |
           APP=${{ inputs.app }}
     - name: Build and push ssh
-      if: inputs.ssh
+      if: inputs.ssh == true
       uses: docker/build-push-action@v3
       with:
         context: .
