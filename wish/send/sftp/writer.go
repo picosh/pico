@@ -58,11 +58,11 @@ func (f fakeWrite) WriteAt(p []byte, off int64) (int, error) {
 func (f fakeWrite) Close() error {
 	msg, err := f.handler.writeHandler.Write(f.handler.session, f.fileEntry)
 	if err != nil {
-		errMsg := fmt.Sprintf("%s\n", err.Error())
+		errMsg := fmt.Sprintf("%s\r\n", err.Error())
 		_, err = f.handler.session.Stderr().Write([]byte(errMsg))
 	}
 	if msg != "" {
-		nMsg := fmt.Sprintf("%s\n", msg)
+		nMsg := fmt.Sprintf("%s\r\n", msg)
 		_, err = f.handler.session.Stderr().Write([]byte(nMsg))
 	}
 	return err

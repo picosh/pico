@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
-	"github.com/gliderlabs/ssh"
 	"github.com/picosh/pico/wish/send/utils"
 )
 
@@ -43,7 +43,7 @@ func Middleware(writeHandler utils.CopyFromClientHandler, ext string) wish.Middl
 			}
 
 			if result != "" {
-				_, err = session.Write([]byte(fmt.Sprintf("%s\n", result)))
+				_, err = session.Write([]byte(fmt.Sprintf("%s\r\n", result)))
 				if err != nil {
 					utils.ErrorHandler(session, err)
 				}

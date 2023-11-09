@@ -11,8 +11,8 @@ import (
 	"github.com/antoniomika/go-rsync-receiver/rsyncreceiver"
 	"github.com/antoniomika/go-rsync-receiver/rsyncsender"
 	rsyncutils "github.com/antoniomika/go-rsync-receiver/utils"
+	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
-	"github.com/gliderlabs/ssh"
 	"github.com/picosh/pico/wish/send/utils"
 )
 
@@ -57,11 +57,11 @@ func (h *handler) Put(fileName string, content io.Reader, fileSize int64, mTime 
 
 	msg, err := h.writeHandler.Write(h.session, fileEntry)
 	if err != nil {
-		errMsg := fmt.Sprintf("%s\n", err.Error())
+		errMsg := fmt.Sprintf("%s\r\n", err.Error())
 		_, err = h.session.Stderr().Write([]byte(errMsg))
 	}
 	if msg != "" {
-		nMsg := fmt.Sprintf("%s\n", msg)
+		nMsg := fmt.Sprintf("%s\r\n", msg)
 		_, err = h.session.Stderr().Write([]byte(nMsg))
 	}
 	return 0, err

@@ -1,8 +1,8 @@
 package proxy
 
 import (
+	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
-	"github.com/gliderlabs/ssh"
 )
 
 type Router func(sh ssh.Handler, s ssh.Session) []wish.Middleware

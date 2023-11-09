@@ -1,13 +1,15 @@
 package sftp
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"os"
 
-	"github.com/gliderlabs/ssh"
+	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/wish/send/utils"
 	"github.com/pkg/sftp"
+	"golang.org/x/exp/slices"
 )
 
 type listerat []os.FileInfo
@@ -30,7 +32,16 @@ type handler struct {
 }
 
 func (f *handler) Filecmd(r *sftp.Request) error {
-	return nil
+	switch r.Method {
+	case "Remove":
+		entry := toFileEntry(r)
+		entry.Reader = bytes.NewReader(nil)
+
+		_, err := f.writeHandler.Write(f.session, entry)
+
+		return err
+	}
+	return errors.New("unsupported")
 }
 
 func (f *handler) Filelist(r *sftp.Request) (sftp.ListerAt, error) {
@@ -42,6 +53,10 @@ func (f *handler) Filelist(r *sftp.Request) (sftp.ListerAt, error) {
 		if err != nil {
 			return nil, err
 		}
+
+		listData = slices.DeleteFunc(listData, func(f os.FileInfo) bool {
+			return f.Name() == "/"
+		})
 
 		return listerat(listData), nil
 	}

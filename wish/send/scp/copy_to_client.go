@@ -3,7 +3,7 @@ package scp
 import (
 	"errors"
 
-	"github.com/gliderlabs/ssh"
+	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/wish/send/utils"
 )
 

@@ -94,8 +94,8 @@ func (m *CreateModel) indexBackward() {
 func NewCreateModel(cfg *config.ConfigCms, dbpool db.DB, publicKey string) CreateModel {
 	st := common.DefaultStyles()
 
-	im := input.NewModel()
-	im.CursorStyle = st.Cursor
+	im := input.New()
+	im.Cursor.Style = st.Cursor
 	im.Placeholder = "erock"
 	im.Prompt = st.FocusedPrompt.String()
 	im.CharLimit = 50
@@ -176,7 +176,7 @@ func Update(msg tea.Msg, m CreateModel) (CreateModel, tea.Cmd) {
 
 					return m, tea.Batch(
 						createAccount(m), // fire off the command, too
-						spinner.Tick,
+						m.spinner.Tick,
 					)
 				case cancelButton: // Exit
 					m.Quit = true

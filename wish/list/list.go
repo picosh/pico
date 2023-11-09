@@ -4,8 +4,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
-	"github.com/gliderlabs/ssh"
 	"github.com/picosh/pico/wish/send/utils"
 )
 
@@ -36,7 +36,7 @@ func Middleware(writeHandler utils.CopyFromClientHandler) wish.Middleware {
 
 			sort.Strings(data)
 
-			_, err = session.Write([]byte(strings.Join(data, "\n")))
+			_, err = session.Write([]byte(strings.Join(data, "\r\n")))
 			if err != nil {
 				utils.ErrorHandler(session, err)
 			}
