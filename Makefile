@@ -34,7 +34,7 @@ bp-caddy: bp-setup
 .PHONY: bp-caddy
 
 bp-auth: bp-setup
-	$(DOCKER_BUILDX_BUILD) -t ghcr.io/picosh/pico/auth:$(DOCKER_TAG) --build-arg APP=auth --target release-web .
+	$(DOCKER_BUILDX_BUILD) -t ghcr.io/picosh/pico/auth-web:$(DOCKER_TAG) --build-arg APP=auth --target release-web .
 .PHONY: bp-auth
 
 bp-bouncer: bp-setup

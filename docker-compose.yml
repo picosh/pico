@@ -98,7 +98,7 @@ services:
       - services
       - all
   auth-web:
-    image: ghcr.io/picosh/pico/auth:latest
+    image: ghcr.io/picosh/pico/auth-web:latest
     restart: always
     profiles:
       - auth
