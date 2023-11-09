@@ -20,10 +20,12 @@ inputs:
     description: Whether or not to build the web image
     required: true
     default: true
+    type: boolean
   ssh:
     description: Whether or not to build the ssh image
     required: true
     default: true
+    type: boolean
 
 runs:
   using: composite
