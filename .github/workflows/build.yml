@@ -46,6 +46,8 @@ jobs:
       matrix:
         APP: [lists, prose, pastes, imgs, pgs, feeds]
     steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
     - name: Setup docker
       uses: ./.github/actions/setup
       with:
@@ -62,6 +64,8 @@ jobs:
     runs-on: ubuntu-22.04
     needs: test
     steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
     - name: Setup docker
       uses: ./.github/actions/setup
       with:
@@ -79,6 +83,8 @@ jobs:
     runs-on: ubuntu-22.04
     needs: test
     steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
     - name: Setup docker
       uses: ./.github/actions/setup
       with:
@@ -104,6 +110,8 @@ jobs:
     runs-on: ubuntu-22.04
     needs: test
     steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
     - name: Setup docker
       uses: ./.github/actions/setup
       with:
