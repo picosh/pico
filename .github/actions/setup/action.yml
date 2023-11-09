@@ -1,0 +1,36 @@
+name: Setup main action
+
+description: Runs the setup required for docker building
+
+inputs:
+  registry:
+    description: The docker registry to use
+    required: true
+    default: ghcr.io
+  username:
+    description: The docker registry to use
+    required: true
+  password:
+    description: The docker registry to use
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v2
+      with:
+        platforms: all
+    - name: Set up Docker Buildx
+      id: buildx
+      uses: docker/setup-buildx-action@v2
+      with:
+        version: latest
+    - name: Login to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        registry: ${{ inputs.registry }}
+        username: ${{ inputs.username }}
+        password: ${{ inputs.password }}
