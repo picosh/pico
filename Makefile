@@ -30,7 +30,7 @@ bp-setup:
 .PHONY: bp-setup
 
 bp-caddy: bp-setup
-	$(DOCKER_BUILDX_BUILD) -t ghcr.io/picosh/pico/caddy:$(DOCKER_TAG) -f caddy/Dockerfile .
+	$(DOCKER_BUILDX_BUILD) -t ghcr.io/picosh/pico/caddy:$(DOCKER_TAG) ./caddy
 .PHONY: bp-caddy
 
 bp-auth: bp-setup
@@ -38,7 +38,7 @@ bp-auth: bp-setup
 .PHONY: bp-auth
 
 bp-bouncer: bp-setup
-	$(DOCKER_BUILDX_BUILD) -t ghcr.io/picosh/pico/bouncer:$(DOCKER_TAG) -f bouncer/Dockerfile ./bouncer
+	$(DOCKER_BUILDX_BUILD) -t ghcr.io/picosh/pico/bouncer:$(DOCKER_TAG) ./bouncer
 .PHONY: bp-bouncer
 
 bp-%: bp-setup
