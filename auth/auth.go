@@ -189,6 +189,36 @@ func tokenHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+type sishData struct {
+	PublicKey     string `json:"auth_key"`
+	Username      string `json:"user"`
+	RemoteAddress string `json:"remote_addr"`
+}
+
+func keyHandler(w http.ResponseWriter, r *http.Request) {
+	client := getClient(r)
+
+	var data sishData
+
+	err := json.NewDecoder(r.Body).Decode(&data)
+	if err != nil {
+		client.Logger.Error(err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	client.Logger.Infof("handle key (%s, %s, %s)", data.RemoteAddress, data.Username, data.PublicKey)
+
+	_, err = client.Dbpool.FindUserForKey(data.Username, data.PublicKey)
+	if err != nil {
+		client.Logger.Error(err)
+		http.Error(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
 func createMainRoutes() []shared.Route {
 	fileServer := http.FileServer(http.Dir("auth/public"))
 
@@ -197,6 +227,7 @@ func createMainRoutes() []shared.Route {
 		shared.NewRoute("POST", "/introspect", introspectHandler),
 		shared.NewRoute("GET", "/authorize", authorizeHandler),
 		shared.NewRoute("POST", "/token", tokenHandler),
+		shared.NewRoute("POST", "/key", keyHandler),
 		shared.NewRoute("POST", "/redirect", redirectHandler),
 		shared.NewRoute("GET", "/main.css", fileServer.ServeHTTP),
 		shared.NewRoute("GET", "/card.png", fileServer.ServeHTTP),
