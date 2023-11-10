@@ -194,14 +194,14 @@ func (h *UploadImgHandler) writeImg(s ssh.Session, data *PostMetaData) error {
 			}
 		}
 	} else {
-		if data.Shasum == data.Cur.Shasum {
+		modTime := time.Unix(data.Mtime, 0)
+
+		if data.Shasum == data.Cur.Shasum && modTime.Equal(*data.Cur.UpdatedAt) {
 			h.Cfg.Logger.Infof("(%s) found, but image is identical, skipping", data.Filename)
 			return nil
 		}
 
 		h.Cfg.Logger.Infof("(%s) found, updating record", data.Filename)
-
-		modTime := time.Unix(data.Mtime, 0)
 
 		updatePost := db.Post{
 			ID: data.Cur.ID,

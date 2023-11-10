@@ -295,15 +295,15 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 			}
 		}
 	} else {
-		if metadata.Text == post.Text {
+		modTime := time.Unix(entry.Mtime, 0)
+
+		if metadata.Text == post.Text && modTime.Equal(*post.UpdatedAt) {
 			logger.Infof("(%s) found, but text is identical, skipping", filename)
 			curl := shared.NewCreateURL(h.Cfg)
 			return h.Cfg.FullPostURL(curl, user.Name, metadata.Slug), nil
 		}
 
 		logger.Infof("(%s) found, updating record", filename)
-
-		modTime := time.Unix(entry.Mtime, 0)
 
 		updatePost := db.Post{
 			ID: post.ID,
