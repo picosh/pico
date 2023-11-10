@@ -209,10 +209,15 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 
 	client.Logger.Infof("handle key (%s, %s, %s)", data.RemoteAddress, data.Username, data.PublicKey)
 
-	_, err = client.Dbpool.FindUserForKey(data.Username, data.PublicKey)
+	user, err := client.Dbpool.FindUserForKey(data.Username, data.PublicKey)
 	if err != nil {
 		client.Logger.Error(err)
 		http.Error(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+
+	if !client.Dbpool.HasFeatureForUser(user.ID, "tuns") {
+		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
