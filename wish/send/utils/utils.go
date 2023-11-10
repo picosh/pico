@@ -10,6 +10,7 @@ import (
 	"strconv"
 
 	"github.com/charmbracelet/ssh"
+	"go.uber.org/zap"
 )
 
 // NULL is an array with a single NULL byte.
@@ -59,6 +60,7 @@ type CopyFromClientHandler interface {
 	Write(ssh.Session, *FileEntry) (string, error)
 	Read(ssh.Session, *FileEntry) (os.FileInfo, ReaderAtCloser, error)
 	List(ssh ssh.Session, path string, isDir bool, recursive bool) ([]os.FileInfo, error)
+	GetLogger() *zap.SugaredLogger
 	Validate(ssh.Session) error
 }
 

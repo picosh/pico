@@ -18,6 +18,7 @@ import (
 	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pico/wish/cms/util"
 	"github.com/picosh/pico/wish/send/utils"
+	"go.uber.org/zap"
 )
 
 var maxSize = 1 * shared.GB
@@ -73,6 +74,10 @@ func (h *UploadImgHandler) removePost(data *PostMetaData) error {
 	return nil
 }
 
+func (h *UploadImgHandler) GetLogger() *zap.SugaredLogger {
+	return h.Cfg.Logger
+}
+
 func (h *UploadImgHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileInfo, utils.ReaderAtCloser, error) {
 	user, err := getUser(s)
 	if err != nil {
@@ -102,7 +107,7 @@ func (h *UploadImgHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileI
 		return nil, nil, err
 	}
 
-	contents, _, err := h.Storage.GetFile(bucket, post.Filename)
+	contents, _, _, err := h.Storage.GetFile(bucket, post.Filename)
 	if err != nil {
 		return nil, nil, err
 	}

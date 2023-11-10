@@ -17,6 +17,7 @@ import (
 	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pico/wish/cms/util"
 	"github.com/picosh/pico/wish/send/utils"
+	"go.uber.org/zap"
 )
 
 type ctxUserKey struct{}
@@ -59,6 +60,10 @@ func NewScpPostHandler(dbpool db.DB, cfg *shared.ConfigSite, hooks ScpFileHooks,
 		Hooks:     hooks,
 		ImgClient: client,
 	}
+}
+
+func (h *ScpUploadHandler) GetLogger() *zap.SugaredLogger {
+	return h.Cfg.Logger
 }
 
 func (h *ScpUploadHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileInfo, utils.ReaderAtCloser, error) {

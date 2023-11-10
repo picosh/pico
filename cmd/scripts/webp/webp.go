@@ -43,7 +43,7 @@ func main() {
 			continue
 		}
 
-		reader, _, err := st.GetFile(bucket, post.Filename)
+		reader, _, _, err := st.GetFile(bucket, post.Filename)
 		if err != nil {
 			cfg.Logger.Infof("file not found %s/%s", post.UserID, post.Filename)
 			continue
@@ -69,6 +69,7 @@ func main() {
 			bucket,
 			fmt.Sprintf("%s.webp", shared.SanitizeFileExt(post.Filename)),
 			utils.NopReaderAtCloser(webpReader),
+			&utils.FileEntry{},
 		)
 		if err != nil {
 			cfg.Logger.Error(err)

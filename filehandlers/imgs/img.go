@@ -60,6 +60,7 @@ func (h *UploadImgHandler) metaImg(data *PostMetaData) error {
 		bucket,
 		data.Filename,
 		utils.NopReaderAtCloser(reader),
+		&utils.FileEntry{},
 	)
 	if err != nil {
 		return err
@@ -106,6 +107,7 @@ func (h *UploadImgHandler) metaImg(data *PostMetaData) error {
 		bucket,
 		finalName,
 		utils.NopReaderAtCloser(webpReader),
+		&utils.FileEntry{},
 	)
 	if err != nil {
 		return err

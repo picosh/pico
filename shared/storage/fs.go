@@ -8,6 +8,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/picosh/pico/wish/send/utils"
 )
@@ -83,21 +84,21 @@ func (s *StorageFS) DeleteBucket(bucket Bucket) error {
 	return os.RemoveAll(bucket.Path)
 }
 
-func (s *StorageFS) GetFile(bucket Bucket, fpath string) (utils.ReaderAtCloser, int64, error) {
+func (s *StorageFS) GetFile(bucket Bucket, fpath string) (utils.ReaderAtCloser, int64, time.Time, error) {
 	dat, err := os.Open(filepath.Join(bucket.Path, fpath))
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, time.Time{}, err
 	}
 
 	info, err := dat.Stat()
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, time.Time{}, err
 	}
 
-	return dat, info.Size(), nil
+	return dat, info.Size(), info.ModTime(), nil
 }
 
-func (s *StorageFS) PutFile(bucket Bucket, fpath string, contents utils.ReaderAtCloser) (string, error) {
+func (s *StorageFS) PutFile(bucket Bucket, fpath string, contents utils.ReaderAtCloser, entry *utils.FileEntry) (string, error) {
 	loc := filepath.Join(bucket.Path, fpath)
 	err := os.MkdirAll(filepath.Dir(loc), os.ModePerm)
 	if err != nil {
@@ -107,11 +108,17 @@ func (s *StorageFS) PutFile(bucket Bucket, fpath string, contents utils.ReaderAt
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
 
 	_, err = io.Copy(f, contents)
 	if err != nil {
 		return "", err
+	}
+
+	f.Close()
+
+	if entry.Mtime > 0 {
+		uTime := time.Unix(entry.Mtime, 0)
+		os.Chtimes(loc, uTime, uTime)
 	}
 
 	return loc, nil

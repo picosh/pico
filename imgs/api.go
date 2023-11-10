@@ -284,7 +284,7 @@ func imgHandler(w http.ResponseWriter, h *ImgHandler) {
 		fname = fmt.Sprintf("%s.webp", shared.SanitizeFileExt(post.Filename))
 	}
 
-	contents, _, err := h.Storage.GetFile(bucket, fname)
+	contents, _, _, err := h.Storage.GetFile(bucket, fname)
 	if err != nil {
 		h.Logger.Infof(
 			"file not found %s/%s in storage (bucket: %s, name: %s)",

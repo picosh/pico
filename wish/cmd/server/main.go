@@ -11,9 +11,14 @@ import (
 	"github.com/charmbracelet/wish"
 	"github.com/picosh/pico/wish/send"
 	"github.com/picosh/pico/wish/send/utils"
+	"go.uber.org/zap"
 )
 
 type handler struct {
+}
+
+func (h *handler) GetLogger() *zap.SugaredLogger {
+	return zap.NewNop().Sugar()
 }
 
 func (h *handler) Write(session ssh.Session, file *utils.FileEntry) (string, error) {

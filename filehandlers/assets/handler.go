@@ -15,6 +15,7 @@ import (
 	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pico/wish/cms/util"
 	"github.com/picosh/pico/wish/send/utils"
+	"go.uber.org/zap"
 )
 
 type ctxUserKey struct{}
@@ -73,6 +74,10 @@ func NewUploadAssetHandler(dbpool db.DB, cfg *shared.ConfigSite, storage storage
 	}
 }
 
+func (h *UploadAssetHandler) GetLogger() *zap.SugaredLogger {
+	return h.Cfg.Logger
+}
+
 func (h *UploadAssetHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileInfo, utils.ReaderAtCloser, error) {
 	user, err := getUser(s)
 	if err != nil {
@@ -92,12 +97,13 @@ func (h *UploadAssetHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.Fil
 	}
 
 	fname := shared.GetAssetFileName(entry)
-	contents, size, err := h.Storage.GetFile(bucket, fname)
+	contents, size, modTime, err := h.Storage.GetFile(bucket, fname)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	fileInfo.FSize = size
+	fileInfo.FModTime = modTime
 
 	reader := utils.NewAllReaderAt(contents)
 

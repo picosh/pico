@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/minio/madmin-go/v3"
 	"github.com/minio/minio-go/v7"
@@ -110,11 +112,20 @@ func (s *StorageMinio) ListFiles(bucket Bucket, dir string, recursive bool) ([]o
 			isDir = true
 		}
 
+		modTime := time.Time{}
+
+		if mtime, ok := obj.UserMetadata["Mtime"]; ok {
+			mtimeUnix, err := strconv.Atoi(mtime)
+			if err == nil {
+				modTime = time.Unix(int64(mtimeUnix), 0)
+			}
+		}
+
 		info := &utils.VirtualFile{
 			FName:    strings.TrimSuffix(strings.TrimPrefix(obj.Key, resolved), "/"),
 			FIsDir:   isDir,
 			FSize:    obj.Size,
-			FModTime: obj.LastModified,
+			FModTime: modTime,
 		}
 		fileList = append(fileList, info)
 	}
@@ -126,24 +137,40 @@ func (s *StorageMinio) DeleteBucket(bucket Bucket) error {
 	return s.Client.RemoveBucket(context.TODO(), bucket.Name)
 }
 
-func (s *StorageMinio) GetFile(bucket Bucket, fpath string) (utils.ReaderAtCloser, int64, error) {
-	// we have to stat the object first to see if it exists
-	// https://github.com/minio/minio-go/issues/654
+func (s *StorageMinio) GetFile(bucket Bucket, fpath string) (utils.ReaderAtCloser, int64, time.Time, error) {
+	modTime := time.Time{}
+
 	info, err := s.Client.StatObject(context.Background(), bucket.Name, fpath, minio.StatObjectOptions{})
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, modTime, err
 	}
 
 	obj, err := s.Client.GetObject(context.Background(), bucket.Name, fpath, minio.GetObjectOptions{})
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, modTime, err
 	}
 
-	return obj, info.Size, nil
+	if mtime, ok := info.UserMetadata["Mtime"]; ok {
+		mtimeUnix, err := strconv.Atoi(mtime)
+		if err == nil {
+			modTime = time.Unix(int64(mtimeUnix), 0)
+		}
+	}
+
+	return obj, info.Size, modTime, nil
 }
 
-func (s *StorageMinio) PutFile(bucket Bucket, fpath string, contents utils.ReaderAtCloser) (string, error) {
-	info, err := s.Client.PutObject(context.TODO(), bucket.Name, fpath, contents, -1, minio.PutObjectOptions{})
+func (s *StorageMinio) PutFile(bucket Bucket, fpath string, contents utils.ReaderAtCloser, entry *utils.FileEntry) (string, error) {
+	opts := minio.PutObjectOptions{}
+
+	if entry.Mtime > 0 {
+		opts.UserMetadata = map[string]string{
+			"Mtime": fmt.Sprint(entry.Mtime),
+		}
+	}
+
+	info, err := s.Client.PutObject(context.TODO(), bucket.Name, fpath, contents, -1, opts)
+
 	if err != nil {
 		return "", err
 	}

@@ -5,10 +5,9 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"log"
 	"os"
 	"path"
-	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/antoniomika/go-rsync-receiver/rsyncreceiver"
@@ -23,28 +22,32 @@ type handler struct {
 	session      ssh.Session
 	writeHandler utils.CopyFromClientHandler
 	root         string
+	recursive    bool
 }
 
 func (h *handler) Skip(file *rsyncutils.ReceiverFile) bool {
-	log.Printf("SKIP %+v", file)
-	return file.FileMode().IsDir()
+	if file.FileMode().IsDir() {
+		return true
+	}
+
+	fI, _, err := h.writeHandler.Read(h.session, &utils.FileEntry{Filepath: path.Join("/", h.root, file.Name)})
+	if err == nil && fI.ModTime().Equal(file.ModTime) && file.Length == fI.Size() {
+		return true
+	}
+
+	return false
 }
 
 func (h *handler) List(rPath string) ([]fs.FileInfo, error) {
-	log.Println("LIST", rPath)
 	isDir := false
 	if rPath == "." {
 		rPath = "/"
 		isDir = true
 	}
 
-	list, err := h.writeHandler.List(h.session, rPath, isDir, true)
+	list, err := h.writeHandler.List(h.session, rPath, isDir, h.recursive)
 	if err != nil {
 		return nil, err
-	}
-
-	for _, f := range list {
-		log.Printf("first %+v", f)
 	}
 
 	var dirs []string
@@ -91,20 +94,23 @@ func (h *handler) List(rPath string) ([]fs.FileInfo, error) {
 		})
 	}
 
+	slices.Reverse(newList)
+
+	onlyEmpty := true
 	for _, f := range newList {
-		log.Printf("%+v", f)
+		if f.Name() != "" {
+			onlyEmpty = false
+		}
 	}
 
-	if len(newList) == 0 {
-		return nil, errors.New("no files to process")
+	if len(newList) == 0 || onlyEmpty {
+		return nil, errors.New("no files to send, the directory may not exist or could be empty")
 	}
 
 	return newList, nil
 }
 
 func (h *handler) Read(file *rsyncutils.SenderFile) (os.FileInfo, io.ReaderAt, error) {
-	log.Printf("READ %+v %s", file, h.root)
-
 	filePath := file.WPath
 
 	if strings.HasSuffix(h.root, file.WPath) {
@@ -113,22 +119,17 @@ func (h *handler) Read(file *rsyncutils.SenderFile) (os.FileInfo, io.ReaderAt, e
 		filePath = path.Join(h.root, file.Path, file.WPath)
 	}
 
-	log.Printf("READ %+v %s", file, filePath)
-
 	return h.writeHandler.Read(h.session, &utils.FileEntry{Filepath: filePath})
 }
 
 func (h *handler) Put(file *rsyncutils.ReceiverFile) (int64, error) {
-	log.Printf("PUT %+v", file)
-	fpath := path.Join("/", h.root)
 	fileEntry := &utils.FileEntry{
-		Filepath: filepath.Join(fpath, file.Name),
+		Filepath: path.Join("/", h.root, file.Name),
 		Mode:     fs.FileMode(0600),
 		Size:     file.Length,
 		Mtime:    file.ModTime.Unix(),
 		Atime:    file.ModTime.Unix(),
 	}
-	log.Printf("%+v", fileEntry)
 	fileEntry.Reader = file.Buf
 
 	msg, err := h.writeHandler.Write(h.session, fileEntry)
@@ -165,8 +166,10 @@ func Middleware(writeHandler utils.CopyFromClientHandler) wish.Middleware {
 					opts, parser := rsyncsender.NewGetOpt()
 					_, _ = parser.Parse(cmdFlags)
 
+					fileHandler.recursive = opts.Recurse
+
 					if err := rsyncsender.ClientRun(opts, session, fileHandler, fileHandler.root, true); err != nil {
-						log.Println("error running rsync sender:", err)
+						writeHandler.GetLogger().Error("error running rsync sender:", err)
 					}
 					return
 				}
@@ -175,8 +178,10 @@ func Middleware(writeHandler utils.CopyFromClientHandler) wish.Middleware {
 			opts, parser := rsyncreceiver.NewGetOpt()
 			_, _ = parser.Parse(cmdFlags)
 
+			fileHandler.recursive = opts.Recurse
+
 			if _, err := rsyncreceiver.ClientRun(opts, session, fileHandler, true); err != nil {
-				log.Println("error running rsync receiver:", err)
+				writeHandler.GetLogger().Error("error running rsync receiver:", err)
 			}
 		}
 	}
