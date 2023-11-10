@@ -302,6 +302,7 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		}
 
 		logger.Infof("(%s) found, updating record", filename)
+		now := time.Now()
 		updatePost := db.Post{
 			ID: post.ID,
 
@@ -314,6 +315,7 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 			Text:        metadata.Text,
 			Title:       metadata.Title,
 			Hidden:      metadata.Hidden,
+			UpdatedAt:   &now,
 		}
 		_, err = h.DBPool.UpdatePost(&updatePost)
 		if err != nil {

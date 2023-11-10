@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
@@ -199,6 +200,7 @@ func (h *UploadImgHandler) writeImg(s ssh.Session, data *PostMetaData) error {
 		}
 
 		h.Cfg.Logger.Infof("(%s) found, updating record", data.Filename)
+		now := time.Now()
 		updatePost := db.Post{
 			ID: data.Cur.ID,
 
@@ -211,6 +213,7 @@ func (h *UploadImgHandler) writeImg(s ssh.Session, data *PostMetaData) error {
 			Text:        data.Text,
 			Title:       data.Title,
 			Hidden:      data.Hidden,
+			UpdatedAt:   &now,
 		}
 		_, err = h.DBPool.UpdatePost(&updatePost)
 		if err != nil {
