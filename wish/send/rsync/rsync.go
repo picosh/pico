@@ -174,17 +174,17 @@ func Middleware(writeHandler utils.CopyFromClientHandler) wish.Middleware {
 					fileHandler.ignoreTimes = opts.IgnoreTimes
 
 					if *compress {
-						session.Stderr().Write([]byte("compression is currently unsupported\r\n"))
+						_, _ = session.Stderr().Write([]byte("compression is currently unsupported\r\n"))
 						return
 					}
 
 					if opts.PreserveUid {
-						session.Stderr().Write([]byte("uid preservation will not work as we don't retain user information\r\n"))
+						_, _ = session.Stderr().Write([]byte("uid preservation will not work as we don't retain user information\r\n"))
 						return
 					}
 
 					if opts.PreserveGid {
-						session.Stderr().Write([]byte("gid preservation will not work as we don't retain user information\r\n"))
+						_, _ = session.Stderr().Write([]byte("gid preservation will not work as we don't retain user information\r\n"))
 						return
 					}
 
