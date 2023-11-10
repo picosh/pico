@@ -200,10 +200,28 @@ func Middleware(writeHandler utils.CopyFromClientHandler) wish.Middleware {
 			}
 
 			opts, parser := rsyncreceiver.NewGetOpt()
+
+			compress := parser.Bool("z", false)
+
 			_, _ = parser.Parse(cmdFlags[1:])
 
 			fileHandler.recursive = opts.Recurse
 			fileHandler.ignoreTimes = opts.IgnoreTimes
+
+			if *compress {
+				_, _ = session.Stderr().Write([]byte("compression is currently unsupported\r\n"))
+				return
+			}
+
+			if opts.PreserveUid {
+				_, _ = session.Stderr().Write([]byte("uid preservation will not work as we don't retain user information\r\n"))
+				return
+			}
+
+			if opts.PreserveGid {
+				_, _ = session.Stderr().Write([]byte("gid preservation will not work as we don't retain user information\r\n"))
+				return
+			}
 
 			if _, err := rsyncreceiver.ClientRun(opts, session, fileHandler, true); err != nil {
 				writeHandler.GetLogger().Error("error running rsync receiver:", err)
