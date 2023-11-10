@@ -118,7 +118,7 @@ func (s *StorageFS) PutFile(bucket Bucket, fpath string, contents utils.ReaderAt
 
 	if entry.Mtime > 0 {
 		uTime := time.Unix(entry.Mtime, 0)
-		os.Chtimes(loc, uTime, uTime)
+		_ = os.Chtimes(loc, uTime, uTime)
 	}
 
 	return loc, nil
