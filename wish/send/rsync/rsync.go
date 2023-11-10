@@ -56,6 +56,10 @@ func (h *handler) List(rPath string) ([]fs.FileInfo, error) {
 	var newList []fs.FileInfo
 
 	for _, f := range list {
+		if !f.IsDir() && f.Size() == 0 {
+			continue
+		}
+
 		fname := f.Name()
 		if strings.HasPrefix(f.Name(), "/") {
 			fname = path.Join(rPath, f.Name())
