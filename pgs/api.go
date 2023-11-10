@@ -210,7 +210,7 @@ func assetHandler(w http.ResponseWriter, h *AssetHandler) {
 	}
 
 	var redirects []*RedirectRule
-	redirectFp, err := h.Storage.GetFile(bucket, filepath.Join(h.ProjectDir, "_redirects"))
+	redirectFp, _, err := h.Storage.GetFile(bucket, filepath.Join(h.ProjectDir, "_redirects"))
 	if err == nil {
 		defer redirectFp.Close()
 		buf := new(strings.Builder)
@@ -228,11 +228,11 @@ func assetHandler(w http.ResponseWriter, h *AssetHandler) {
 	}
 
 	routes := calcPossibleRoutes(h.ProjectDir, h.Filepath, redirects)
-	var contents storage.ReaderAtCloser
+	var contents utils.ReaderAtCloser
 	assetFilepath := ""
 	status := 200
 	for _, fp := range routes {
-		c, err := h.Storage.GetFile(bucket, fp.Filepath)
+		c, _, err := h.Storage.GetFile(bucket, fp.Filepath)
 		if err == nil {
 			contents = c
 			assetFilepath = fp.Filepath

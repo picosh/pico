@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"time"
 
+	"slices"
+
 	"github.com/gorilla/feeds"
 	gocache "github.com/patrickmn/go-cache"
 	"github.com/picosh/pico/db"
@@ -17,7 +19,6 @@ import (
 	"github.com/picosh/pico/imgs"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
-	"golang.org/x/exp/slices"
 )
 
 type PageData struct {

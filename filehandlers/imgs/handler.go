@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"slices"
+
 	"github.com/charmbracelet/ssh"
 	exifremove "github.com/neurosnap/go-exif-remove"
 	"github.com/picosh/pico/db"
@@ -16,7 +18,6 @@ import (
 	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pico/wish/cms/util"
 	"github.com/picosh/pico/wish/send/utils"
-	"golang.org/x/exp/slices"
 )
 
 var maxSize = 1 * shared.GB
@@ -72,7 +73,7 @@ func (h *UploadImgHandler) removePost(data *PostMetaData) error {
 	return nil
 }
 
-func (h *UploadImgHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileInfo, io.ReaderAt, error) {
+func (h *UploadImgHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileInfo, utils.ReaderAtCloser, error) {
 	user, err := getUser(s)
 	if err != nil {
 		return nil, nil, err
@@ -101,7 +102,7 @@ func (h *UploadImgHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileI
 		return nil, nil, err
 	}
 
-	contents, err := h.Storage.GetFile(bucket, post.Filename)
+	contents, _, err := h.Storage.GetFile(bucket, post.Filename)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -111,7 +112,7 @@ func (h *UploadImgHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileI
 	return fileInfo, reader, nil
 }
 
-func (h *UploadImgHandler) List(s ssh.Session, fpath string, isDir bool) ([]os.FileInfo, error) {
+func (h *UploadImgHandler) List(s ssh.Session, fpath string, isDir bool, recursive bool) ([]os.FileInfo, error) {
 	var fileList []os.FileInfo
 	user, err := getUser(s)
 	if err != nil {

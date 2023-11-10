@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"strings"
 
+	"slices"
+
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/filehandlers"
 	"github.com/picosh/pico/imgs"
 	"github.com/picosh/pico/shared"
-	"golang.org/x/exp/slices"
 )
 
 type MarkdownHooks struct {

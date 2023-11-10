@@ -9,7 +9,7 @@ import (
 	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared"
-	"github.com/picosh/pico/shared/storage"
+	"github.com/picosh/pico/wish/send/utils"
 )
 
 func (h *UploadImgHandler) validateImg(data *PostMetaData) (bool, error) {
@@ -59,7 +59,7 @@ func (h *UploadImgHandler) metaImg(data *PostMetaData) error {
 	fname, err := h.Storage.PutFile(
 		bucket,
 		data.Filename,
-		storage.NopReaderAtCloser(reader),
+		utils.NopReaderAtCloser(reader),
 	)
 	if err != nil {
 		return err
@@ -105,7 +105,7 @@ func (h *UploadImgHandler) metaImg(data *PostMetaData) error {
 	_, err = h.Storage.PutFile(
 		bucket,
 		finalName,
-		storage.NopReaderAtCloser(webpReader),
+		utils.NopReaderAtCloser(webpReader),
 	)
 	if err != nil {
 		return err

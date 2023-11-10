@@ -126,23 +126,23 @@ func (s *StorageMinio) DeleteBucket(bucket Bucket) error {
 	return s.Client.RemoveBucket(context.TODO(), bucket.Name)
 }
 
-func (s *StorageMinio) GetFile(bucket Bucket, fpath string) (ReaderAtCloser, error) {
+func (s *StorageMinio) GetFile(bucket Bucket, fpath string) (utils.ReaderAtCloser, int64, error) {
 	// we have to stat the object first to see if it exists
 	// https://github.com/minio/minio-go/issues/654
-	_, err := s.Client.StatObject(context.Background(), bucket.Name, fpath, minio.StatObjectOptions{})
+	info, err := s.Client.StatObject(context.Background(), bucket.Name, fpath, minio.StatObjectOptions{})
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	obj, err := s.Client.GetObject(context.Background(), bucket.Name, fpath, minio.GetObjectOptions{})
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	return obj, nil
+	return obj, info.Size, nil
 }
 
-func (s *StorageMinio) PutFile(bucket Bucket, fpath string, contents ReaderAtCloser) (string, error) {
+func (s *StorageMinio) PutFile(bucket Bucket, fpath string, contents utils.ReaderAtCloser) (string, error) {
 	info, err := s.Client.PutObject(context.TODO(), bucket.Name, fpath, contents, -1, minio.PutObjectOptions{})
 	if err != nil {
 		return "", err

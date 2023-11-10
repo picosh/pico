@@ -1,12 +1,15 @@
 package rsync
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
 	"log"
 	"os"
+	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/antoniomika/go-rsync-receiver/rsyncreceiver"
 	"github.com/antoniomika/go-rsync-receiver/rsyncsender"
@@ -19,41 +22,114 @@ import (
 type handler struct {
 	session      ssh.Session
 	writeHandler utils.CopyFromClientHandler
+	root         string
 }
 
 func (h *handler) Skip(file *rsyncutils.ReceiverFile) bool {
-	return false
+	log.Printf("SKIP %+v", file)
+	return file.FileMode().IsDir()
 }
 
-func (h *handler) List(path string) ([]fs.FileInfo, error) {
-	list, err := h.writeHandler.List(h.session, path, true)
+func (h *handler) List(rPath string) ([]fs.FileInfo, error) {
+	log.Println("LIST", rPath)
+	isDir := false
+	if rPath == "." {
+		rPath = "/"
+		isDir = true
+	}
+
+	list, err := h.writeHandler.List(h.session, rPath, isDir, true)
 	if err != nil {
 		return nil, err
 	}
 
-	newList := list
-	if list[0].IsDir() {
-		newList = list[1:]
+	for _, f := range list {
+		log.Printf("first %+v", f)
+	}
+
+	var dirs []string
+
+	var newList []fs.FileInfo
+
+	for _, f := range list {
+		fname := f.Name()
+		if strings.HasPrefix(f.Name(), "/") {
+			fname = path.Join(rPath, f.Name())
+		}
+
+		if fname == "" && !f.IsDir() {
+			fname = path.Base(rPath)
+		}
+
+		newFile := &utils.VirtualFile{
+			FName:    fname,
+			FIsDir:   f.IsDir(),
+			FSize:    f.Size(),
+			FModTime: f.ModTime(),
+			FSys:     f.Sys(),
+		}
+
+		newList = append(newList, newFile)
+
+		parts := strings.Split(newFile.Name(), string(os.PathSeparator))
+		lastDir := newFile.Name()
+		for i := 0; i < len(parts); i++ {
+			lastDir, _ = path.Split(lastDir)
+			if lastDir == "" {
+				continue
+			}
+
+			lastDir = lastDir[:len(lastDir)-1]
+			dirs = append(dirs, lastDir)
+		}
+	}
+
+	for _, dir := range dirs {
+		newList = append(newList, &utils.VirtualFile{
+			FName:  dir,
+			FIsDir: true,
+		})
+	}
+
+	for _, f := range newList {
+		log.Printf("%+v", f)
+	}
+
+	if len(newList) == 0 {
+		return nil, errors.New("no files to process")
 	}
 
 	return newList, nil
 }
 
-func (h *handler) Read(path string) (os.FileInfo, io.ReaderAt, error) {
-	return h.writeHandler.Read(h.session, &utils.FileEntry{Filepath: path})
+func (h *handler) Read(file *rsyncutils.SenderFile) (os.FileInfo, io.ReaderAt, error) {
+	log.Printf("READ %+v %s", file, h.root)
+
+	filePath := file.WPath
+
+	if strings.HasSuffix(h.root, file.WPath) {
+		filePath = h.root
+	} else if !strings.HasPrefix(filePath, h.root) {
+		filePath = path.Join(h.root, file.Path, file.WPath)
+	}
+
+	log.Printf("READ %+v %s", file, filePath)
+
+	return h.writeHandler.Read(h.session, &utils.FileEntry{Filepath: filePath})
 }
 
-func (h *handler) Put(fileName string, content io.Reader, fileSize int64, mTime int64, aTime int64) (int64, error) {
-	cleanName := filepath.Base(fileName)
-	fpath := "/"
+func (h *handler) Put(file *rsyncutils.ReceiverFile) (int64, error) {
+	log.Printf("PUT %+v", file)
+	fpath := path.Join("/", h.root)
 	fileEntry := &utils.FileEntry{
-		Filepath: filepath.Join(fpath, cleanName),
+		Filepath: filepath.Join(fpath, file.Name),
 		Mode:     fs.FileMode(0600),
-		Size:     fileSize,
-		Mtime:    mTime,
-		Atime:    aTime,
+		Size:     file.Length,
+		Mtime:    file.ModTime.Unix(),
+		Atime:    file.ModTime.Unix(),
 	}
-	fileEntry.Reader = content
+	log.Printf("%+v", fileEntry)
+	fileEntry.Reader = file.Buf
 
 	msg, err := h.writeHandler.Write(h.session, fileEntry)
 	if err != nil {
@@ -79,19 +155,28 @@ func Middleware(writeHandler utils.CopyFromClientHandler) wish.Middleware {
 			fileHandler := &handler{
 				session:      session,
 				writeHandler: writeHandler,
+				root:         strings.TrimPrefix(cmd[len(cmd)-1], "/"),
 			}
+
+			cmdFlags := session.Command()
 
 			for _, arg := range cmd {
 				if arg == "--sender" {
-					if err := rsyncsender.ClientRun(nil, session, fileHandler, cmd[len(cmd)-1], true); err != nil {
-						log.Println("error running rsync:", err)
+					opts, parser := rsyncsender.NewGetOpt()
+					_, _ = parser.Parse(cmdFlags)
+
+					if err := rsyncsender.ClientRun(opts, session, fileHandler, fileHandler.root, true); err != nil {
+						log.Println("error running rsync sender:", err)
 					}
 					return
 				}
 			}
 
-			if _, err := rsyncreceiver.ClientRun(nil, session, fileHandler, true); err != nil {
-				log.Println("error running rsync:", err)
+			opts, parser := rsyncreceiver.NewGetOpt()
+			_, _ = parser.Parse(cmdFlags)
+
+			if _, err := rsyncreceiver.ClientRun(opts, session, fileHandler, true); err != nil {
+				log.Println("error running rsync receiver:", err)
 			}
 		}
 	}

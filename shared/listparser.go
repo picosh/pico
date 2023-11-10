@@ -9,8 +9,9 @@ import (
 	"strings"
 	"time"
 
+	"slices"
+
 	"github.com/araddon/dateparse"
-	"golang.org/x/exp/slices"
 )
 
 var reIndent = regexp.MustCompile(`^[[:blank:]]+`)

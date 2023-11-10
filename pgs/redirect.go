@@ -93,7 +93,7 @@ func parseRedirectText(text string) ([]*RedirectRule, error) {
 
 		parts := reSplitWhitespace.Split(trimmed, -1)
 		if len(parts) < 2 {
-			return rules, fmt.Errorf("Missing destination path/URL")
+			return rules, fmt.Errorf("missing destination path/URL")
 		}
 
 		from := parts[0]
@@ -114,7 +114,7 @@ func parseRedirectText(text string) ([]*RedirectRule, error) {
 			}
 
 			if toIndex == -1 {
-				return rules, fmt.Errorf("The destination path/URL must start with '/', 'http:' or 'https:'")
+				return rules, fmt.Errorf("the destination path/URL must start with '/', 'http:' or 'https:'")
 			}
 
 			queryParts := parts[:toIndex]

@@ -2,6 +2,8 @@ module github.com/picosh/pico
 
 go 1.21
 
+replace github.com/antoniomika/go-rsync-receiver => /workspaces/go-rsync-receiver
+
 require (
 	github.com/alecthomas/chroma v0.10.0
 	github.com/antoniomika/go-rsync-receiver v0.0.0-20220901010427-e6494124f0c8
