@@ -232,6 +232,8 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		return "", err
 	}
 
+	modTime := time.Unix(entry.Mtime, 0)
+
 	// if the file is empty we remove it from our database
 	if len(origText) == 0 {
 		// skip empty files from being added to db
@@ -264,6 +266,7 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 			Text:        metadata.Text,
 			Title:       metadata.Title,
 			ExpiresAt:   metadata.ExpiresAt,
+			UpdatedAt:   &modTime,
 		}
 		post, err = h.DBPool.InsertPost(&insertPost)
 		if err != nil {
@@ -295,8 +298,6 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 			}
 		}
 	} else {
-		modTime := time.Unix(entry.Mtime, 0)
-
 		if metadata.Text == post.Text && modTime.Equal(*post.UpdatedAt) {
 			logger.Infof("(%s) found, but text is identical, skipping", filename)
 			curl := shared.NewCreateURL(h.Cfg)

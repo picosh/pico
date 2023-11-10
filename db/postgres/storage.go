@@ -231,8 +231,8 @@ const (
 	sqlInsertPost      = `
 	INSERT INTO posts
 		(user_id, filename, slug, title, text, description, publish_at, hidden, cur_space,
-		file_size, mime_type, shasum, data, expires_at)
-	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+		file_size, mime_type, shasum, data, expires_at, updated_at)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 	RETURNING id`
 	sqlInsertUser      = `INSERT INTO app_users DEFAULT VALUES returning id`
 	sqlInsertTag       = `INSERT INTO post_tags (post_id, name) VALUES($1, $2) RETURNING id;`
@@ -730,6 +730,7 @@ func (me *PsqlDB) InsertPost(post *db.Post) (*db.Post, error) {
 		post.Shasum,
 		post.Data,
 		post.ExpiresAt,
+		post.UpdatedAt,
 	).Scan(&id)
 	if err != nil {
 		return nil, err

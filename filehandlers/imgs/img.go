@@ -139,6 +139,8 @@ func (h *UploadImgHandler) writeImg(s ssh.Session, data *PostMetaData) error {
 		return err
 	}
 
+	modTime := time.Unix(data.Mtime, 0)
+
 	if len(data.OrigText) == 0 {
 		err = h.removePost(data)
 		if err != nil {
@@ -175,6 +177,7 @@ func (h *UploadImgHandler) writeImg(s ssh.Session, data *PostMetaData) error {
 			Slug:        data.Slug,
 			Text:        data.Text,
 			Title:       data.Title,
+			UpdatedAt:   &modTime,
 		}
 		_, err := h.DBPool.InsertPost(&insertPost)
 		if err != nil {
@@ -194,8 +197,6 @@ func (h *UploadImgHandler) writeImg(s ssh.Session, data *PostMetaData) error {
 			}
 		}
 	} else {
-		modTime := time.Unix(data.Mtime, 0)
-
 		if data.Shasum == data.Cur.Shasum && modTime.Equal(*data.Cur.UpdatedAt) {
 			h.Cfg.Logger.Infof("(%s) found, but image is identical, skipping", data.Filename)
 			return nil
