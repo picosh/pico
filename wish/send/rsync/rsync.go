@@ -23,6 +23,7 @@ type handler struct {
 	writeHandler utils.CopyFromClientHandler
 	root         string
 	recursive    bool
+	ignoreTimes  bool
 }
 
 func (h *handler) Skip(file *rsyncutils.ReceiverFile) bool {
@@ -164,9 +165,28 @@ func Middleware(writeHandler utils.CopyFromClientHandler) wish.Middleware {
 			for _, arg := range cmd {
 				if arg == "--sender" {
 					opts, parser := rsyncsender.NewGetOpt()
-					_, _ = parser.Parse(cmdFlags)
+
+					compress := parser.Bool("z", false)
+
+					_, _ = parser.Parse(cmdFlags[1:])
 
 					fileHandler.recursive = opts.Recurse
+					fileHandler.ignoreTimes = opts.IgnoreTimes
+
+					if *compress {
+						session.Stderr().Write([]byte("compression is currently unsupported\r\n"))
+						return
+					}
+
+					if opts.PreserveUid {
+						session.Stderr().Write([]byte("uid preservation will not work as we don't retain user information\r\n"))
+						return
+					}
+
+					if opts.PreserveGid {
+						session.Stderr().Write([]byte("gid preservation will not work as we don't retain user information\r\n"))
+						return
+					}
 
 					if err := rsyncsender.ClientRun(opts, session, fileHandler, fileHandler.root, true); err != nil {
 						writeHandler.GetLogger().Error("error running rsync sender:", err)
@@ -176,9 +196,10 @@ func Middleware(writeHandler utils.CopyFromClientHandler) wish.Middleware {
 			}
 
 			opts, parser := rsyncreceiver.NewGetOpt()
-			_, _ = parser.Parse(cmdFlags)
+			_, _ = parser.Parse(cmdFlags[1:])
 
 			fileHandler.recursive = opts.Recurse
+			fileHandler.ignoreTimes = opts.IgnoreTimes
 
 			if _, err := rsyncreceiver.ClientRun(opts, session, fileHandler, true); err != nil {
 				writeHandler.GetLogger().Error("error running rsync receiver:", err)
