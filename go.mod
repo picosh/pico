@@ -2,11 +2,9 @@ module github.com/picosh/pico
 
 go 1.21
 
-replace github.com/antoniomika/go-rsync-receiver => /workspaces/go-rsync-receiver
-
 require (
 	github.com/alecthomas/chroma v0.10.0
-	github.com/antoniomika/go-rsync-receiver v0.0.0-20220901010427-e6494124f0c8
+	github.com/antoniomika/go-rsync-receiver v0.0.0-20231110145728-c94949e1ab7d
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
 	github.com/charmbracelet/bubbles v0.16.1
 	github.com/charmbracelet/bubbletea v0.24.2
@@ -35,7 +33,7 @@ require (
 	go.abhg.dev/goldmark/anchor v0.1.1
 	go.uber.org/zap v1.26.0
 	golang.org/x/crypto v0.15.0
-	golang.org/x/exp v0.0.0-20231006140011-7918f672742d
+	golang.org/x/exp v0.0.0-20231108232855-2478ac86f678
 	gopkg.in/yaml.v2 v2.4.0
 )
 
