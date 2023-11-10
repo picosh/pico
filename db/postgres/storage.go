@@ -745,7 +745,7 @@ func (me *PsqlDB) UpdatePost(post *db.Post) (*db.Post, error) {
 		post.Title,
 		post.Text,
 		post.Description,
-		time.Now(),
+		post.UpdatedAt,
 		post.PublishAt,
 		post.FileSize,
 		post.Shasum,
