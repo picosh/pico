@@ -17,6 +17,7 @@ import (
 	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pico/wish/cms/util"
 	"github.com/picosh/pico/wish/send/utils"
+	"go.uber.org/zap"
 )
 
 type ctxUserKey struct{}
@@ -61,7 +62,11 @@ func NewScpPostHandler(dbpool db.DB, cfg *shared.ConfigSite, hooks ScpFileHooks,
 	}
 }
 
-func (h *ScpUploadHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileInfo, io.ReaderAt, error) {
+func (h *ScpUploadHandler) GetLogger() *zap.SugaredLogger {
+	return h.Cfg.Logger
+}
+
+func (h *ScpUploadHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileInfo, utils.ReaderAtCloser, error) {
 	user, err := getUser(s)
 	if err != nil {
 		return nil, nil, err
@@ -84,12 +89,12 @@ func (h *ScpUploadHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileI
 		FModTime: *post.UpdatedAt,
 	}
 
-	reader := strings.NewReader(post.Text)
+	reader := utils.NopReaderAtCloser(strings.NewReader(post.Text))
 
 	return fileInfo, reader, nil
 }
 
-func (h *ScpUploadHandler) List(s ssh.Session, fpath string, isDir bool) ([]os.FileInfo, error) {
+func (h *ScpUploadHandler) List(s ssh.Session, fpath string, isDir bool, recursive bool) ([]os.FileInfo, error) {
 	var fileList []os.FileInfo
 	user, err := getUser(s)
 	if err != nil {

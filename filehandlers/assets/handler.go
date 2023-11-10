@@ -15,6 +15,7 @@ import (
 	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pico/wish/cms/util"
 	"github.com/picosh/pico/wish/send/utils"
+	"go.uber.org/zap"
 )
 
 type ctxUserKey struct{}
@@ -73,7 +74,11 @@ func NewUploadAssetHandler(dbpool db.DB, cfg *shared.ConfigSite, storage storage
 	}
 }
 
-func (h *UploadAssetHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileInfo, io.ReaderAt, error) {
+func (h *UploadAssetHandler) GetLogger() *zap.SugaredLogger {
+	return h.Cfg.Logger
+}
+
+func (h *UploadAssetHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileInfo, utils.ReaderAtCloser, error) {
 	user, err := getUser(s)
 	if err != nil {
 		return nil, nil, err
@@ -92,17 +97,20 @@ func (h *UploadAssetHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.Fil
 	}
 
 	fname := shared.GetAssetFileName(entry)
-	contents, err := h.Storage.GetFile(bucket, fname)
+	contents, size, modTime, err := h.Storage.GetFile(bucket, fname)
 	if err != nil {
 		return nil, nil, err
 	}
+
+	fileInfo.FSize = size
+	fileInfo.FModTime = modTime
 
 	reader := utils.NewAllReaderAt(contents)
 
 	return fileInfo, reader, nil
 }
 
-func (h *UploadAssetHandler) List(s ssh.Session, fpath string, isDir bool) ([]os.FileInfo, error) {
+func (h *UploadAssetHandler) List(s ssh.Session, fpath string, isDir bool, recursive bool) ([]os.FileInfo, error) {
 	var fileList []os.FileInfo
 
 	user, err := getUser(s)
@@ -135,7 +143,7 @@ func (h *UploadAssetHandler) List(s ssh.Session, fpath string, isDir bool) ([]os
 			cleanFilename += "/"
 		}
 
-		foundList, err := h.Storage.ListFiles(bucket, cleanFilename, false)
+		foundList, err := h.Storage.ListFiles(bucket, cleanFilename, recursive)
 		if err != nil {
 			return fileList, err
 		}

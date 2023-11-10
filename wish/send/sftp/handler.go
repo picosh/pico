@@ -6,10 +6,11 @@ import (
 	"io"
 	"os"
 
+	"slices"
+
 	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/wish/send/utils"
 	"github.com/pkg/sftp"
-	"golang.org/x/exp/slices"
 )
 
 type listerat []os.FileInfo
@@ -51,7 +52,7 @@ func (f *handler) Filelist(r *sftp.Request) (sftp.ListerAt, error) {
 	case "List", "Stat":
 		list := r.Method == "List"
 
-		listData, err := f.writeHandler.List(f.session, r.Filepath, list)
+		listData, err := f.writeHandler.List(f.session, r.Filepath, list, false)
 		if err != nil {
 			return nil, err
 		}

@@ -18,7 +18,7 @@ func Middleware(writeHandler utils.CopyFromClientHandler) wish.Middleware {
 				return
 			}
 
-			fileList, err := writeHandler.List(session, "/", true)
+			fileList, err := writeHandler.List(session, "/", true, false)
 			if err != nil {
 				utils.ErrorHandler(session, err)
 				return

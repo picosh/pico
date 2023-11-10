@@ -3,7 +3,6 @@ package sftp
 import (
 	"errors"
 	"io"
-	"log"
 
 	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/wish/send/utils"
@@ -45,7 +44,7 @@ func SubsystemHandler(writeHandler utils.CopyFromClientHandler) ssh.SubsystemHan
 
 		err = requestServer.Serve()
 		if err != nil && !errors.Is(err, io.EOF) {
-			log.Println("Error serving sftp subsystem:", err)
+			writeHandler.GetLogger().Error("Error serving sftp subsystem:", err)
 		}
 	}
 }

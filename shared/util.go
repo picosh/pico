@@ -15,8 +15,9 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"slices"
+
 	"github.com/charmbracelet/ssh"
-	"golang.org/x/exp/slices"
 )
 
 var fnameRe = regexp.MustCompile(`[-_]+`)

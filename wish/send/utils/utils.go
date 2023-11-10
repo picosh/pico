@@ -10,6 +10,7 @@ import (
 	"strconv"
 
 	"github.com/charmbracelet/ssh"
+	"go.uber.org/zap"
 )
 
 // NULL is an array with a single NULL byte.
@@ -57,8 +58,9 @@ func octalPerms(info fs.FileMode) string {
 type CopyFromClientHandler interface {
 	// Write should write the given file.
 	Write(ssh.Session, *FileEntry) (string, error)
-	Read(ssh.Session, *FileEntry) (os.FileInfo, io.ReaderAt, error)
-	List(ssh.Session, string, bool) ([]os.FileInfo, error)
+	Read(ssh.Session, *FileEntry) (os.FileInfo, ReaderAtCloser, error)
+	List(ssh ssh.Session, path string, isDir bool, recursive bool) ([]os.FileInfo, error)
+	GetLogger() *zap.SugaredLogger
 	Validate(ssh.Session) error
 }
 

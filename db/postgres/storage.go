@@ -9,11 +9,12 @@ import (
 	"strings"
 	"time"
 
+	"slices"
+
 	_ "github.com/lib/pq"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared"
 	"go.uber.org/zap"
-	"golang.org/x/exp/slices"
 )
 
 var PAGER_SIZE = 15

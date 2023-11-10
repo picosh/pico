@@ -11,14 +11,16 @@ import (
 
 	_ "net/http/pprof"
 
+	"slices"
+
 	"github.com/gorilla/feeds"
 	gocache "github.com/patrickmn/go-cache"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
+	"github.com/picosh/pico/wish/send/utils"
 	"go.uber.org/zap"
-	"golang.org/x/exp/slices"
 )
 
 type PageData struct {
@@ -199,7 +201,7 @@ type ImgHandler struct {
 
 type ImgResizer struct {
 	Key      string
-	contents storage.ReaderAtCloser
+	contents utils.ReaderAtCloser
 	writer   io.Writer
 	Img      *shared.ImgOptimizer
 	Cache    *gocache.Cache
@@ -282,7 +284,7 @@ func imgHandler(w http.ResponseWriter, h *ImgHandler) {
 		fname = fmt.Sprintf("%s.webp", shared.SanitizeFileExt(post.Filename))
 	}
 
-	contents, err := h.Storage.GetFile(bucket, fname)
+	contents, _, _, err := h.Storage.GetFile(bucket, fname)
 	if err != nil {
 		h.Logger.Infof(
 			"file not found %s/%s in storage (bucket: %s, name: %s)",

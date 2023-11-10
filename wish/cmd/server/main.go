@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"strings"
@@ -12,9 +11,14 @@ import (
 	"github.com/charmbracelet/wish"
 	"github.com/picosh/pico/wish/send"
 	"github.com/picosh/pico/wish/send/utils"
+	"go.uber.org/zap"
 )
 
 type handler struct {
+}
+
+func (h *handler) GetLogger() *zap.SugaredLogger {
+	return zap.NewNop().Sugar()
 }
 
 func (h *handler) Write(session ssh.Session, file *utils.FileEntry) (string, error) {
@@ -29,7 +33,7 @@ func (h *handler) Validate(session ssh.Session) error {
 	return nil
 }
 
-func (h *handler) Read(session ssh.Session, entry *utils.FileEntry) (os.FileInfo, io.ReaderAt, error) {
+func (h *handler) Read(session ssh.Session, entry *utils.FileEntry) (os.FileInfo, utils.ReaderAtCloser, error) {
 	log.Printf("Received validate from session: %+v", session)
 
 	data := strings.NewReader("lorem ipsum dolor")
@@ -39,10 +43,10 @@ func (h *handler) Read(session ssh.Session, entry *utils.FileEntry) (os.FileInfo
 		FIsDir:   false,
 		FSize:    data.Size(),
 		FModTime: time.Now(),
-	}, data, nil
+	}, utils.NopReaderAtCloser(data), nil
 }
 
-func (h *handler) List(session ssh.Session, fpath string, isDir bool) ([]os.FileInfo, error) {
+func (h *handler) List(session ssh.Session, fpath string, isDir bool, recursive bool) ([]os.FileInfo, error) {
 	return nil, nil
 }
 

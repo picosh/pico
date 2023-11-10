@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/picosh/pico/shared"
-	"github.com/picosh/pico/shared/storage"
+	"github.com/picosh/pico/wish/send/utils"
 )
 
 func (h *UploadAssetHandler) validateAsset(data *FileData) (bool, error) {
@@ -72,16 +72,19 @@ func (h *UploadAssetHandler) writeAsset(data *FileData) error {
 		}
 	} else {
 		reader := bytes.NewReader(data.Text)
+
 		h.Cfg.Logger.Infof(
 			"(%s) uploading to (bucket: %s) (%s)",
 			data.User.Name,
 			data.Bucket.Name,
 			assetFilename,
 		)
+
 		_, err := h.Storage.PutFile(
 			data.Bucket,
 			assetFilename,
-			storage.NopReaderAtCloser(reader),
+			utils.NopReaderAtCloser(reader),
+			data.FileEntry,
 		)
 		if err != nil {
 			return err

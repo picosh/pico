@@ -9,6 +9,7 @@ import (
 	"github.com/picosh/pico/imgs"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
+	"github.com/picosh/pico/wish/send/utils"
 )
 
 func main() {
@@ -42,7 +43,7 @@ func main() {
 			continue
 		}
 
-		reader, err := st.GetFile(bucket, post.Filename)
+		reader, _, _, err := st.GetFile(bucket, post.Filename)
 		if err != nil {
 			cfg.Logger.Infof("file not found %s/%s", post.UserID, post.Filename)
 			continue
@@ -67,7 +68,8 @@ func main() {
 		_, err = st.PutFile(
 			bucket,
 			fmt.Sprintf("%s.webp", shared.SanitizeFileExt(post.Filename)),
-			storage.NopReaderAtCloser(webpReader),
+			utils.NopReaderAtCloser(webpReader),
+			&utils.FileEntry{},
 		)
 		if err != nil {
 			cfg.Logger.Error(err)

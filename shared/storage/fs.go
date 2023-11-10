@@ -3,10 +3,12 @@ package storage
 import (
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/picosh/pico/wish/send/utils"
 )
@@ -82,16 +84,21 @@ func (s *StorageFS) DeleteBucket(bucket Bucket) error {
 	return os.RemoveAll(bucket.Path)
 }
 
-func (s *StorageFS) GetFile(bucket Bucket, fpath string) (ReaderAtCloser, error) {
+func (s *StorageFS) GetFile(bucket Bucket, fpath string) (utils.ReaderAtCloser, int64, time.Time, error) {
 	dat, err := os.Open(filepath.Join(bucket.Path, fpath))
 	if err != nil {
-		return nil, err
+		return nil, 0, time.Time{}, err
 	}
 
-	return dat, nil
+	info, err := dat.Stat()
+	if err != nil {
+		return nil, 0, time.Time{}, err
+	}
+
+	return dat, info.Size(), info.ModTime(), nil
 }
 
-func (s *StorageFS) PutFile(bucket Bucket, fpath string, contents ReaderAtCloser) (string, error) {
+func (s *StorageFS) PutFile(bucket Bucket, fpath string, contents utils.ReaderAtCloser, entry *utils.FileEntry) (string, error) {
 	loc := filepath.Join(bucket.Path, fpath)
 	err := os.MkdirAll(filepath.Dir(loc), os.ModePerm)
 	if err != nil {
@@ -101,11 +108,17 @@ func (s *StorageFS) PutFile(bucket Bucket, fpath string, contents ReaderAtCloser
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
 
 	_, err = io.Copy(f, contents)
 	if err != nil {
 		return "", err
+	}
+
+	f.Close()
+
+	if entry.Mtime > 0 {
+		uTime := time.Unix(entry.Mtime, 0)
+		_ = os.Chtimes(loc, uTime, uTime)
 	}
 
 	return loc, nil
@@ -142,10 +155,26 @@ func (s *StorageFS) ListFiles(bucket Bucket, dir string, recursive bool) ([]os.F
 		return fileList, err
 	}
 
-	files, err := os.ReadDir(fpath)
-	if err != nil {
-		fileList = append(fileList, info)
-		return fileList, nil
+	var files []fs.DirEntry
+
+	if recursive {
+		err = filepath.WalkDir(fpath, func(s string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			files = append(files, d)
+			return nil
+		})
+		if err != nil {
+			fileList = append(fileList, info)
+			return fileList, nil
+		}
+	} else {
+		files, err = os.ReadDir(fpath)
+		if err != nil {
+			fileList = append(fileList, info)
+			return fileList, nil
+		}
 	}
 
 	for _, f := range files {
