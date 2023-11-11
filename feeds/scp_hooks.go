@@ -7,6 +7,7 @@ import (
 
 	"slices"
 
+	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/filehandlers"
 	"github.com/picosh/pico/imgs"
@@ -18,7 +19,7 @@ type FeedHooks struct {
 	Db  db.DB
 }
 
-func (p *FeedHooks) FileValidate(data *filehandlers.PostMetaData) (bool, error) {
+func (p *FeedHooks) FileValidate(s ssh.Session, data *filehandlers.PostMetaData) (bool, error) {
 	if !shared.IsTextFile(string(data.Text)) {
 		err := fmt.Errorf(
 			"WARNING: (%s) invalid file must be plain text (utf-8), skipping",
@@ -40,7 +41,7 @@ func (p *FeedHooks) FileValidate(data *filehandlers.PostMetaData) (bool, error) 
 	return true, nil
 }
 
-func (p *FeedHooks) FileMeta(data *filehandlers.PostMetaData) error {
+func (p *FeedHooks) FileMeta(s ssh.Session, data *filehandlers.PostMetaData) error {
 	linkify := imgs.NewImgsLinkify(data.Username)
 	parsedText := shared.ListParseText(string(data.Text), linkify)
 

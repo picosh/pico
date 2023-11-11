@@ -34,6 +34,6 @@ func CronDeleteExpiredPosts(cfg *shared.ConfigSite, dbpool db.DB) {
 		if err != nil {
 			cfg.Logger.Error(err)
 		}
-		time.Sleep(1 * time.Hour)
+		time.Sleep(1 * time.Minute)
 	}
 }

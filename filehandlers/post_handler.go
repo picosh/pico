@@ -40,8 +40,8 @@ type PostMetaData struct {
 }
 
 type ScpFileHooks interface {
-	FileValidate(data *PostMetaData) (bool, error)
-	FileMeta(data *PostMetaData) error
+	FileValidate(s ssh.Session, data *PostMetaData) (bool, error)
+	FileMeta(s ssh.Session, data *PostMetaData) error
 }
 
 type ScpUploadHandler struct {
@@ -209,7 +209,7 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		FileEntry: entry,
 	}
 
-	valid, err := h.Hooks.FileValidate(&metadata)
+	valid, err := h.Hooks.FileValidate(s, &metadata)
 	if !valid {
 		logger.Error(err)
 		return "", err
@@ -226,7 +226,7 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		metadata.Post.PublishAt = post.PublishAt
 	}
 
-	err = h.Hooks.FileMeta(&metadata)
+	err = h.Hooks.FileMeta(s, &metadata)
 	if err != nil {
 		logger.Error(err)
 		return "", err
@@ -318,6 +318,7 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 			Text:        metadata.Text,
 			Title:       metadata.Title,
 			Hidden:      metadata.Hidden,
+			ExpiresAt:   metadata.ExpiresAt,
 			UpdatedAt:   &modTime,
 		}
 		_, err = h.DBPool.UpdatePost(&updatePost)

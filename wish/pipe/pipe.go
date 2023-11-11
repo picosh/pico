@@ -22,7 +22,16 @@ func Middleware(writeHandler utils.CopyFromClientHandler, ext string) wish.Middl
 				return
 			}
 
-			name := strings.TrimSpace(strings.Join(session.Command(), " "))
+			cmd := session.Command()
+
+			name := ""
+			if len(cmd) > 0 {
+				name = strings.TrimSpace(cmd[0])
+				if strings.Contains(name, "=") {
+					name = ""
+				}
+			}
+
 			postTime := time.Now()
 
 			if name == "" {
