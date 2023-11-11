@@ -83,7 +83,8 @@ pgs-site:
 .PHONY: pgs-site
 
 pgs-deploy: pgs-static pgs-site
-	scp -R ./public/* hey@pgs.sh:/pgs-local
+	# rsync -rv -e "ssh -p 2222" ./public/ erock@localhost:/pgs-local
+	rsync -rv ./public/ hey@pgs.sh:/pgs-local
 	ssh hey@pgs.sh link pgs-prod pgs-local --write
 .PHONY: pgs-site-deploy
 

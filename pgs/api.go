@@ -231,7 +231,9 @@ func assetHandler(w http.ResponseWriter, h *AssetHandler) {
 	var contents utils.ReaderAtCloser
 	assetFilepath := ""
 	status := 200
+	attempts := []string{}
 	for _, fp := range routes {
+		attempts = append(attempts, fp.Filepath)
 		c, _, _, err := h.Storage.GetFile(bucket, fp.Filepath)
 		if err == nil {
 			contents = c
@@ -243,9 +245,9 @@ func assetHandler(w http.ResponseWriter, h *AssetHandler) {
 
 	if assetFilepath == "" {
 		h.Logger.Infof(
-			"asset not found in bucket: bucket:[%s], file:[%s]",
+			"asset not found in bucket: bucket:[%s], routes:[%s]",
 			bucket.Name,
-			h.Filepath,
+			strings.Join(attempts, ", "),
 		)
 		http.Error(w, "404 not found", http.StatusNotFound)
 		return
