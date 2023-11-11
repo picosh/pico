@@ -40,8 +40,8 @@ type Ratio struct {
 	Height int
 }
 
-var AlreadyWebPError = errors.New("image is already webp")
-var IsSvgError = errors.New("image is an svg")
+var ErrAlreadyWebPError = errors.New("image is already webp")
+var ErrIsSvgError = errors.New("image is an svg")
 
 func GetImageForOptimization(r io.Reader, mimeType string) (image.Image, error) {
 	switch mimeType {
@@ -54,7 +54,7 @@ func GetImageForOptimization(r io.Reader, mimeType string) (image.Image, error) 
 	case "image/gif":
 		return gif.Decode(r)
 	case "image/webp":
-		return nil, AlreadyWebPError
+		return nil, ErrAlreadyWebPError
 	}
 
 	return nil, fmt.Errorf("(%s) not supported for optimization", mimeType)

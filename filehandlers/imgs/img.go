@@ -83,7 +83,7 @@ func (h *UploadImgHandler) metaImg(data *PostMetaData) error {
 
 	img, err := shared.GetImageForOptimization(tee, data.MimeType)
 	finalName := shared.SanitizeFileExt(data.Filename)
-	if errors.Is(err, shared.AlreadyWebPError) {
+	if errors.Is(err, shared.ErrAlreadyWebPError) {
 		h.Cfg.Logger.Infof("(%s) is already webp, skipping encoding", data.Filename)
 		finalName = fmt.Sprintf("%s.webp", finalName)
 		webpReader = tee
