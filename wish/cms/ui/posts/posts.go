@@ -15,7 +15,7 @@ import (
 	"go.uber.org/zap"
 )
 
-const keysPerPage = 4
+const keysPerPage = 1
 
 type state int
 
@@ -84,7 +84,7 @@ func (m *Model) UpdatePaging(msg tea.Msg) {
 }
 
 // NewModel creates a new model with defaults.
-func NewModel(cfg *config.ConfigCms, urls config.ConfigURL, dbpool db.DB, user *db.User, stor storage.ObjectStorage) Model {
+func NewModel(cfg *config.ConfigCms, urls config.ConfigURL, dbpool db.DB, user *db.User, stor storage.ObjectStorage, perPage int) Model {
 	logger := cfg.Logger
 	st := common.DefaultStyles()
 
@@ -92,6 +92,10 @@ func NewModel(cfg *config.ConfigCms, urls config.ConfigURL, dbpool db.DB, user *
 	p.PerPage = keysPerPage
 	p.Type = pager.Dots
 	p.InactiveDot = st.InactivePagination.Render("•")
+
+	if perPage > 0 {
+		p.PerPage = perPage
+	}
 
 	return Model{
 		cfg:     cfg,
@@ -275,7 +279,7 @@ func postsView(m Model) string {
 	// If there aren't enough keys to fill the view, fill the missing parts
 	// with whitespace
 	if len(slice) < m.pager.PerPage {
-		for i := len(slice); i < keysPerPage; i++ {
+		for i := len(slice); i < m.pager.PerPage; i++ {
 			s += "\n\n\n"
 		}
 	}
