@@ -24,6 +24,10 @@ lint:
 	$(DOCKER_CMD) run --rm -v $(shell pwd):/app -w /app golangci/golangci-lint:latest bash -c 'apt-get update > /dev/null 2>&1 && apt-get install -y libwebp-dev > /dev/null 2>&1; golangci-lint run -E goimports -E godot --timeout 10m'
 .PHONY: lint
 
+lint-dev:
+	golangci-lint run -E goimports -E godot --timeout 10m
+.PHONY: lint-dev
+
 bp-setup:
 	$(DOCKER_CMD) buildx ls | grep pico || $(DOCKER_CMD) buildx create --name pico
 	$(DOCKER_CMD) buildx use pico

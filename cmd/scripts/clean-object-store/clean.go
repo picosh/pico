@@ -34,7 +34,7 @@ type RmProject struct {
 }
 
 // this script will find any objects stored within Store that does not
-// have a corresponding project inside our database
+// have a corresponding project inside our database.
 func main() {
 	// to actually commit changes, set to true
 	write := false
