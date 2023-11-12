@@ -263,9 +263,9 @@ const (
 	LEFT JOIN app_users ON app_users.id = projects.user_id
 	ORDER BY created_at ASC
 	LIMIT $1 OFFSET $2`
-	sqlFindProjectsByUser   = `SELECT id, user_id, name, project_dir FROM projects WHERE user_id = $1 ORDER BY name ASC;`
-	sqlFindProjectsByPrefix = `SELECT id, user_id, name, project_dir FROM projects WHERE user_id = $1 AND name = project_dir AND name ILIKE $2 ORDER BY updated_at ASC, name ASC;`
-	sqlFindProjectLinks     = `SELECT id, user_id, name, project_dir FROM projects WHERE user_id = $1 AND name != project_dir AND project_dir = $2 ORDER BY name ASC;`
+	sqlFindProjectsByUser   = `SELECT id, user_id, name, project_dir, created_at, updated_at FROM projects WHERE user_id = $1 ORDER BY updated_at DESC;`
+	sqlFindProjectsByPrefix = `SELECT id, user_id, name, project_dir, created_at, updated_at FROM projects WHERE user_id = $1 AND name = project_dir AND name ILIKE $2 ORDER BY updated_at ASC, name ASC;`
+	sqlFindProjectLinks     = `SELECT id, user_id, name, project_dir, created_at, updated_at FROM projects WHERE user_id = $1 AND name != project_dir AND project_dir = $2 ORDER BY name ASC;`
 	sqlLinkToProject        = `UPDATE projects SET project_dir = $1, updated_at = $2 WHERE id = $3;`
 	sqlRemoveProject        = `DELETE FROM projects WHERE id = $1;`
 )
@@ -1365,6 +1365,8 @@ func (me *PsqlDB) FindProjectsByUser(userID string) ([]*db.Project, error) {
 			&project.UserID,
 			&project.Name,
 			&project.ProjectDir,
+			&project.CreatedAt,
+			&project.UpdatedAt,
 		)
 		if err != nil {
 			return nil, err

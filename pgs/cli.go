@@ -3,6 +3,7 @@ package pgs
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 
 	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
@@ -80,8 +81,17 @@ func (c *Cmd) rmProjectAssets(projectName string) error {
 
 	for _, file := range fileList {
 		intent := fmt.Sprintf("deleted (%s)", file.Name())
+		c.log.Infof(
+			"(%s) attempting to delete (bucket: %s) (%s)",
+			c.user.Name,
+			bucket.Name,
+			file.Name(),
+		)
 		if c.write {
-			err = c.store.DeleteFile(bucket, file.Name())
+			err = c.store.DeleteFile(
+				bucket,
+				filepath.Join(projectName, file.Name()),
+			)
 			if err == nil {
 				c.output(intent)
 			} else {
@@ -142,7 +152,7 @@ func (c *Cmd) ls() error {
 	for _, project := range projects {
 		out := fmt.Sprintf("%s (links to: %s)", project.Name, project.ProjectDir)
 		if project.Name == project.ProjectDir {
-			out = project.Name
+			out = fmt.Sprintf("%s\t(last updated: %s)", project.Name, project.UpdatedAt)
 		}
 		c.output(out)
 	}

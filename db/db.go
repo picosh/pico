@@ -38,6 +38,7 @@ type Project struct {
 	ProjectDir string     `json:"project_dir"`
 	Username   string     `json:"username"`
 	CreatedAt  *time.Time `json:"created_at"`
+	UpdatedAt  *time.Time `json:"updated_at"`
 }
 
 // Make the Attrs struct implement the driver.Valuer interface. This method

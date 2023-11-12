@@ -180,9 +180,5 @@ func (s *StorageMinio) PutFile(bucket Bucket, fpath string, contents utils.Reade
 
 func (s *StorageMinio) DeleteFile(bucket Bucket, fpath string) error {
 	err := s.Client.RemoveObject(context.TODO(), bucket.Name, fpath, minio.RemoveObjectOptions{})
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }

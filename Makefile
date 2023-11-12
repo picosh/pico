@@ -82,8 +82,11 @@ pgs-site:
 	cp ./pgs/public/* ./public
 .PHONY: pgs-site
 
+pgs-dev: pgs-static pgs-site
+	rsync -rv -e "ssh -p 2222" ./public/ erock@localhost:/pgs-local
+.PHONY: pgs-dev
+
 pgs-deploy: pgs-static pgs-site
-	# rsync -rv -e "ssh -p 2222" ./public/ erock@localhost:/pgs-local
 	rsync -rv ./public/ hey@pgs.sh:/pgs-local
 	ssh hey@pgs.sh link pgs-prod pgs-local --write
 .PHONY: pgs-site-deploy
