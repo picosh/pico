@@ -15,6 +15,7 @@ type Bucket struct {
 type ObjectStorage interface {
 	GetBucket(name string) (Bucket, error)
 	UpsertBucket(name string) (Bucket, error)
+	ListBuckets() ([]string, error)
 
 	DeleteBucket(bucket Bucket) error
 	GetBucketQuota(bucket Bucket) (uint64, error)

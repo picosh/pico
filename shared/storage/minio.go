@@ -97,6 +97,19 @@ func (s *StorageMinio) GetBucketQuota(bucket Bucket) (uint64, error) {
 	return 0, fmt.Errorf("%s bucket not found in account info", bucket.Name)
 }
 
+func (s *StorageMinio) ListBuckets() ([]string, error) {
+	bcks := []string{}
+	buckets, err := s.Client.ListBuckets(context.Background())
+	if err != nil {
+		return bcks, err
+	}
+	for _, bucket := range buckets {
+		bcks = append(bcks, bucket.Name)
+	}
+
+	return bcks, nil
+}
+
 func (s *StorageMinio) ListFiles(bucket Bucket, dir string, recursive bool) ([]os.FileInfo, error) {
 	var fileList []os.FileInfo
 

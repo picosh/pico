@@ -3,13 +3,13 @@ package pgs
 import (
 	"errors"
 	"fmt"
+	"io"
+	"os"
 	"path/filepath"
 
-	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
-	"github.com/picosh/pico/wish/send/utils"
 	"go.uber.org/zap"
 )
 
@@ -33,42 +33,77 @@ func getHelpText(userName, projectName string) string {
 	return helpStr
 }
 
+type CmdSessionLogger struct {
+	Log *zap.SugaredLogger
+}
+
+func (c *CmdSessionLogger) Write(out []byte) (int, error) {
+	c.Log.Info(string(out))
+	return 0, nil
+}
+
+func (c *CmdSessionLogger) Exit(code int) error {
+	os.Exit(code)
+	return fmt.Errorf("panic %d", code)
+}
+
+func (c *CmdSessionLogger) Close() error {
+	return fmt.Errorf("closing")
+}
+
+func (c *CmdSessionLogger) Stderr() io.ReadWriter {
+	return nil
+}
+
+type CmdSession interface {
+	Write([]byte) (int, error)
+	Exit(code int) error
+	Close() error
+	Stderr() io.ReadWriter
+}
+
 type Cmd struct {
-	user    *db.User
-	session ssh.Session
-	log     *zap.SugaredLogger
-	store   storage.ObjectStorage
-	dbpool  db.DB
-	write   bool
+	User    *db.User
+	Session CmdSession
+	Log     *zap.SugaredLogger
+	Store   storage.ObjectStorage
+	Dbpool  db.DB
+	Write   bool
 }
 
 func (c *Cmd) output(out string) {
-	_, _ = c.session.Write([]byte(out + "\r\n"))
+	_, _ = c.Session.Write([]byte(out + "\r\n"))
+}
+
+func (c *Cmd) error(err error) {
+	_, _ = fmt.Fprint(c.Session.Stderr(), err, "\r\n")
+	_ = c.Session.Exit(1)
+	_ = c.Session.Close()
 }
 
 func (c *Cmd) bail(err error) {
 	if err == nil {
 		return
 	}
-	c.log.Error(err)
-	utils.ErrorHandler(c.session, err)
+	c.Log.Error(err)
+	c.error(err)
 }
 
 func (c *Cmd) notice() {
-	if !c.write {
+	if !c.Write {
 		c.output("\nNOTICE: changes not commited, use `--write` to save operation")
 	}
 }
 
-func (c *Cmd) rmProjectAssets(projectName string) error {
-	bucketName := shared.GetAssetBucketName(c.user.ID)
-	bucket, err := c.store.GetBucket(bucketName)
+func (c *Cmd) RmProjectAssets(projectName string) error {
+	bucketName := shared.GetAssetBucketName(c.User.ID)
+	bucket, err := c.Store.GetBucket(bucketName)
 	if err != nil {
 		return err
 	}
 	c.output(fmt.Sprintf("removing project assets (%s)", projectName))
 
-	fileList, err := c.store.ListFiles(bucket, projectName+"/", true)
+	fileList, err := c.Store.ListFiles(bucket, projectName+"/", true)
 	if err != nil {
 		return err
 	}
@@ -81,14 +116,14 @@ func (c *Cmd) rmProjectAssets(projectName string) error {
 
 	for _, file := range fileList {
 		intent := fmt.Sprintf("deleted (%s)", file.Name())
-		c.log.Infof(
+		c.Log.Infof(
 			"(%s) attempting to delete (bucket: %s) (%s)",
-			c.user.Name,
+			c.User.Name,
 			bucket.Name,
 			file.Name(),
 		)
-		if c.write {
-			err = c.store.DeleteFile(
+		if c.Write {
+			err = c.Store.DeleteFile(
 				bucket,
 				filepath.Join(projectName, file.Name()),
 			)
@@ -105,22 +140,22 @@ func (c *Cmd) rmProjectAssets(projectName string) error {
 }
 
 func (c *Cmd) help() {
-	c.output(getHelpText(c.user.Name, "project-a"))
+	c.output(getHelpText(c.User.Name, "project-a"))
 }
 
 func (c *Cmd) stats(maxSize int) error {
-	bucketName := shared.GetAssetBucketName(c.user.ID)
-	bucket, err := c.store.UpsertBucket(bucketName)
+	bucketName := shared.GetAssetBucketName(c.User.ID)
+	bucket, err := c.Store.UpsertBucket(bucketName)
 	if err != nil {
 		return err
 	}
 
-	totalFileSize, err := c.store.GetBucketQuota(bucket)
+	totalFileSize, err := c.Store.GetBucketQuota(bucket)
 	if err != nil {
 		return err
 	}
 
-	projects, err := c.dbpool.FindProjectsByUser(c.user.ID)
+	projects, err := c.Dbpool.FindProjectsByUser(c.User.ID)
 	if err != nil {
 		return err
 	}
@@ -140,7 +175,7 @@ func (c *Cmd) stats(maxSize int) error {
 }
 
 func (c *Cmd) ls() error {
-	projects, err := c.dbpool.FindProjectsByUser(c.user.ID)
+	projects, err := c.Dbpool.FindProjectsByUser(c.User.ID)
 	if err != nil {
 		return err
 	}
@@ -161,13 +196,13 @@ func (c *Cmd) ls() error {
 }
 
 func (c *Cmd) unlink(projectName string) error {
-	c.log.Infof("user (%s) running `unlink` command with (%s)", c.user.Name, projectName)
-	project, err := c.dbpool.FindProjectByName(c.user.ID, projectName)
+	c.Log.Infof("user (%s) running `unlink` command with (%s)", c.User.Name, projectName)
+	project, err := c.Dbpool.FindProjectByName(c.User.ID, projectName)
 	if err != nil {
 		return errors.Join(err, fmt.Errorf("project (%s) does not exit", projectName))
 	}
 
-	err = c.dbpool.LinkToProject(c.user.ID, project.ID, project.Name, c.write)
+	err = c.Dbpool.LinkToProject(c.User.ID, project.ID, project.Name, c.Write)
 	if err != nil {
 		return err
 	}
@@ -177,40 +212,40 @@ func (c *Cmd) unlink(projectName string) error {
 }
 
 func (c *Cmd) link(projectName, linkTo string) error {
-	c.log.Infof("user (%s) running `link` command with (%s) (%s)", c.user.Name, projectName, linkTo)
+	c.Log.Infof("user (%s) running `link` command with (%s) (%s)", c.User.Name, projectName, linkTo)
 
 	projectDir := linkTo
-	_, err := c.dbpool.FindProjectByName(c.user.ID, linkTo)
+	_, err := c.Dbpool.FindProjectByName(c.User.ID, linkTo)
 	if err != nil {
 		e := fmt.Errorf("(%s) project doesn't exist", linkTo)
 		return e
 	}
 
-	project, err := c.dbpool.FindProjectByName(c.user.ID, projectName)
+	project, err := c.Dbpool.FindProjectByName(c.User.ID, projectName)
 	projectID := ""
 	if err == nil {
 		projectID = project.ID
-		c.log.Infof("user (%s) already has project (%s), updating", c.user.Name, projectName)
-		err = c.dbpool.LinkToProject(c.user.ID, project.ID, projectDir, c.write)
+		c.Log.Infof("user (%s) already has project (%s), updating", c.User.Name, projectName)
+		err = c.Dbpool.LinkToProject(c.User.ID, project.ID, projectDir, c.Write)
 		if err != nil {
 			return err
 		}
 	} else {
-		c.log.Infof("user (%s) has no project record (%s), creating", c.user.Name, projectName)
-		if !c.write {
+		c.Log.Infof("user (%s) has no project record (%s), creating", c.User.Name, projectName)
+		if !c.Write {
 			out := fmt.Sprintf("(%s) cannot create a new project without `--write` permission, aborting", projectName)
 			c.output(out)
 			return nil
 		}
-		id, err := c.dbpool.InsertProject(c.user.ID, projectName, projectName)
+		id, err := c.Dbpool.InsertProject(c.User.ID, projectName, projectName)
 		if err != nil {
 			return err
 		}
 		projectID = id
 	}
 
-	c.log.Infof("user (%s) linking (%s) to (%s)", c.user.Name, projectName, projectDir)
-	err = c.dbpool.LinkToProject(c.user.ID, projectID, projectDir, c.write)
+	c.Log.Infof("user (%s) linking (%s) to (%s)", c.User.Name, projectName, projectDir)
+	err = c.Dbpool.LinkToProject(c.User.ID, projectID, projectDir, c.Write)
 	if err != nil {
 		return err
 	}
@@ -218,7 +253,7 @@ func (c *Cmd) link(projectName, linkTo string) error {
 	out := fmt.Sprintf("(%s) might have orphaned assets, removing", projectName)
 	c.output(out)
 
-	err = c.rmProjectAssets(projectName)
+	err = c.RmProjectAssets(projectName)
 	if err != nil {
 		return err
 	}
@@ -229,7 +264,7 @@ func (c *Cmd) link(projectName, linkTo string) error {
 }
 
 func (c *Cmd) depends(projectName string) error {
-	projects, err := c.dbpool.FindProjectLinks(c.user.ID, projectName)
+	projects, err := c.Dbpool.FindProjectLinks(c.User.ID, projectName)
 	if err != nil {
 		return err
 	}
@@ -254,7 +289,7 @@ func (c *Cmd) depends(projectName string) error {
 // delete all the projects and associated assets matching prefix
 // but keep the latest N records.
 func (c *Cmd) prune(prefix string, keepNumLatest int) error {
-	c.log.Infof("user (%s) running `clean` command for (%s)", c.user.Name, prefix)
+	c.Log.Infof("user (%s) running `clean` command for (%s)", c.User.Name, prefix)
 	c.output(fmt.Sprintf("searching for projects that match prefix (%s) and are not linked to other projects", prefix))
 
 	if prefix == "" || prefix == "*" {
@@ -262,7 +297,7 @@ func (c *Cmd) prune(prefix string, keepNumLatest int) error {
 		return e
 	}
 
-	projects, err := c.dbpool.FindProjectsByPrefix(c.user.ID, prefix)
+	projects, err := c.Dbpool.FindProjectsByPrefix(c.User.ID, prefix)
 	if err != nil {
 		return err
 	}
@@ -274,7 +309,7 @@ func (c *Cmd) prune(prefix string, keepNumLatest int) error {
 
 	rmProjects := []*db.Project{}
 	for _, project := range projects {
-		links, err := c.dbpool.FindProjectLinks(c.user.ID, project.Name)
+		links, err := c.Dbpool.FindProjectLinks(c.User.ID, project.Name)
 		if err != nil {
 			return err
 		}
@@ -305,7 +340,7 @@ func (c *Cmd) prune(prefix string, keepNumLatest int) error {
 	for _, project := range goodbye {
 		out := fmt.Sprintf("project (%s) is available to be pruned", project.Name)
 		c.output(out)
-		err = c.rmProjectAssets(project.Name)
+		err = c.RmProjectAssets(project.Name)
 		if err != nil {
 			return err
 		}
@@ -313,9 +348,9 @@ func (c *Cmd) prune(prefix string, keepNumLatest int) error {
 		out = fmt.Sprintf("(%s) removing", project.Name)
 		c.output(out)
 
-		if c.write {
-			c.log.Infof("(%s) removing", project.Name)
-			err = c.dbpool.RemoveProject(project.ID)
+		if c.Write {
+			c.Log.Infof("(%s) removing", project.Name)
+			err = c.Dbpool.RemoveProject(project.ID)
 			if err != nil {
 				return err
 			}
@@ -332,12 +367,12 @@ func (c *Cmd) prune(prefix string, keepNumLatest int) error {
 }
 
 func (c *Cmd) rm(projectName string) error {
-	c.log.Infof("user (%s) running `rm` command for (%s)", c.user.Name, projectName)
-	project, err := c.dbpool.FindProjectByName(c.user.ID, projectName)
+	c.Log.Infof("user (%s) running `rm` command for (%s)", c.User.Name, projectName)
+	project, err := c.Dbpool.FindProjectByName(c.User.ID, projectName)
 	if err == nil {
-		c.log.Infof("found project (%s) (%s), checking dependencies", projectName, project.ID)
+		c.Log.Infof("found project (%s) (%s), checking dependencies", projectName, project.ID)
 
-		links, err := c.dbpool.FindProjectLinks(c.user.ID, projectName)
+		links, err := c.Dbpool.FindProjectLinks(c.User.ID, projectName)
 		if err != nil {
 			return err
 		}
@@ -349,18 +384,18 @@ func (c *Cmd) rm(projectName string) error {
 
 		out := fmt.Sprintf("(%s) removing", project.Name)
 		c.output(out)
-		if c.write {
-			c.log.Infof("(%s) removing", project.Name)
-			err = c.dbpool.RemoveProject(project.ID)
+		if c.Write {
+			c.Log.Infof("(%s) removing", project.Name)
+			err = c.Dbpool.RemoveProject(project.ID)
 			if err != nil {
 				return err
 			}
 		}
 	} else {
-		e := fmt.Errorf("(%s) project not found for user (%s)", projectName, c.user.Name)
+		e := fmt.Errorf("(%s) project not found for user (%s)", projectName, c.User.Name)
 		return e
 	}
 
-	err = c.rmProjectAssets(project.Name)
+	err = c.RmProjectAssets(project.Name)
 	return err
 }

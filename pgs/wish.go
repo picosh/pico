@@ -55,12 +55,12 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 			args := session.Command()
 
 			opts := Cmd{
-				session: session,
-				user:    user,
-				store:   store,
-				log:     log,
-				dbpool:  dbpool,
-				write:   false,
+				Session: session,
+				User:    user,
+				Store:   store,
+				Log:     log,
+				Dbpool:  dbpool,
+				Write:   false,
 			}
 
 			cmd := strings.TrimSpace(args[0])
@@ -98,7 +98,7 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 				}
 				linkTo := strings.TrimSpace(args[2])
 				if len(args) >= 4 && strings.TrimSpace(args[3]) == "--write" {
-					opts.write = true
+					opts.Write = true
 				}
 
 				err := opts.link(projectName, linkTo)
@@ -110,7 +110,7 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 			}
 
 			if len(args) >= 3 && strings.TrimSpace(args[2]) == "--write" {
-				opts.write = true
+				opts.Write = true
 			}
 
 			if cmd == "unlink" {

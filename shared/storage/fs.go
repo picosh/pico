@@ -134,6 +134,10 @@ func (s *StorageFS) DeleteFile(bucket Bucket, fpath string) error {
 	return nil
 }
 
+func (s *StorageFS) ListBuckets() ([]string, error) {
+	return []string{}, fmt.Errorf("not implemented")
+}
+
 func (s *StorageFS) ListFiles(bucket Bucket, dir string, recursive bool) ([]os.FileInfo, error) {
 	var fileList []os.FileInfo
 
