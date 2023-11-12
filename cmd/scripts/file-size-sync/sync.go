@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/binary"
 	"log"
 	"os"
 
@@ -30,15 +31,12 @@ func main() {
 	picoCfg := config.NewConfigCms()
 	picoCfg.Logger = logger
 	picoCfg.DbURL = os.Getenv("DATABASE_URL")
-	picoCfg.MinioURL = os.Getenv("MINIO_URL")
-	picoCfg.MinioUser = os.Getenv("MINIO_ROOT_USER")
-	picoCfg.MinioPass = os.Getenv("MINIO_ROOT_PASSWORD")
 	picoDb := postgres.NewDB(picoCfg.DbURL, picoCfg.Logger)
 
 	posts, err := picoDb.FindPosts()
 	bail(err)
 	for _, post := range posts {
-		post.FileSize = len(post.Text)
+		post.FileSize = binary.Size([]byte(post.Text))
 		_, err := picoDb.UpdatePost(post)
 		bail(err)
 	}
