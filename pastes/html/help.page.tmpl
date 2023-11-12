@@ -109,8 +109,8 @@ scp ./delete.txt {{.Site.Domain}}:/</pre>
 
     <section id="pipe">
         <h2 class="text-xl">
-            <a href="#pipe" rel="nofollow noopener">#</a>
-            Can I pipe my paste?
+          <a href="#pipe" rel="nofollow noopener">#</a>
+          Can I pipe my paste?
         </h2>
         <p>
            Yes!
@@ -119,6 +119,35 @@ scp ./delete.txt {{.Site.Domain}}:/</pre>
         <pre>echo "foobar" | ssh pastes.sh FILENAME</pre>
         <pre># if the tty warning annoys you
 echo "foobar" | ssh -T pastes.sh</pre>
+    </section>
+
+    <section id="expires">
+        <h2 class="text-xl">
+          <a href="#expires" rel="nofollow noopener">#</a>
+          Can I set the expiration date to a paste?
+        </h2>
+        <p>
+          Yes.  The default expiration date for a paste is 90 days.
+          We do allow the user to set the paste to never expire.
+          We also allow custom <a href="https://pkg.go.dev/time#ParseDuration">duration</a>
+          or <a href="https://pkg.go.dev/github.com/araddon/dateparse#ParseStrict">timestamp</a>.
+        </p>
+        <pre>echo "foobar" | ssh pastes.sh FILENAME expires=false</pre>
+        <pre>echo "foobar" | ssh pastes.sh FILENAME expires=2023-12-12</pre>
+        <pre>echo "foobar" | ssh pastes.sh FILENAME expires=1h</pre>
+    </section>
+
+    <section id="unlisted">
+        <h2 class="text-xl">
+          <a href="#unlisted" rel="nofollow noopener">#</a>
+          Can I have my pastes from my user page?
+        </h2>
+        <p>
+          Yes.  Unlisted in this context means it does not show up on
+          your user landing page where we should all of your pastes.
+          In this case, yes, you can "hide" it using a pipe command.
+        </p>
+        <pre>echo "foobar" | ssh pastes.sh FILENAME hidden=true</pre>
     </section>
 </main>
 {{template "marketing-footer" .}}
