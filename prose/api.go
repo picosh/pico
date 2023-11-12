@@ -82,6 +82,7 @@ type PostPageData struct {
 	ImageCard    string
 	Footer       template.HTML
 	Favicon      template.URL
+	Unlisted     bool
 }
 
 type TransparencyPageData struct {
@@ -405,6 +406,11 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
+		unlisted := false
+		if post.Hidden || post.PublishAt.After(time.Now()) {
+			unlisted = true
+		}
+
 		data = PostPageData{
 			Site:         *cfg.GetSiteData(),
 			PageTitle:    GetPostTitle(post),
@@ -425,6 +431,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			ImageCard:    ogImageCard,
 			Favicon:      template.URL(favicon),
 			Footer:       footerHTML,
+			Unlisted:     unlisted,
 		}
 	} else {
 		data = PostPageData{
@@ -438,6 +445,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			Username:     username,
 			BlogName:     blogName,
 			Contents:     "Oops!  we can't seem to find this post.",
+			Unlisted:     true,
 		}
 		logger.Infof("post not found %s/%s", username, slug)
 	}
