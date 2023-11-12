@@ -7,6 +7,7 @@ DOCKER_TAG?=$(shell git log --format="%H" -n 1)
 DOCKER_PLATFORM?=linux/amd64,linux/arm64
 DOCKER_CMD?=docker
 DOCKER_BUILDX_BUILD?=$(DOCKER_CMD) buildx build --push --platform $(DOCKER_PLATFORM)
+WRITE?=0
 
 css:
 	cp ./smol.css lists/public/main.css
@@ -94,6 +95,10 @@ pgs-deploy: pgs-static pgs-site
 	rsync -rv ./public/ hey@pgs.sh:/pgs-local
 	ssh hey@pgs.sh link pgs-prod pgs-local --write
 .PHONY: pgs-site-deploy
+
+store-clean:
+	WRITE=$(WRITE) go run ./cmd/scripts/clean-object-store/clean.go
+.PHONY: store-clean
 
 fmt:
 	go fmt ./...

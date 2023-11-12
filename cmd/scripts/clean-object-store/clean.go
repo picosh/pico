@@ -8,6 +8,7 @@ import (
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/pgs"
+	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pico/wish/cms/config"
 	"go.uber.org/zap"
@@ -37,7 +38,11 @@ type RmProject struct {
 // have a corresponding project inside our database.
 func main() {
 	// to actually commit changes, set to true
+	writeEnv := shared.GetEnv("WRITE", "0")
 	write := false
+	if writeEnv == "1" {
+		write = true
+	}
 	logger := createLogger()
 
 	picoCfg := config.NewConfigCms()
@@ -50,7 +55,6 @@ func main() {
 
 	var st storage.ObjectStorage
 	var err error
-	logger.Info(picoCfg)
 	st, err = storage.NewStorageMinio(picoCfg.MinioURL, picoCfg.MinioUser, picoCfg.MinioPass)
 	bail(err)
 
@@ -131,6 +135,6 @@ func main() {
 		logger.Infof("(user: %s) (project: %s)", project.user.Name, project.name)
 	}
 	if !write {
-		logger.Info("WARNING: changes not committed, please go into binary and change `write` var")
+		logger.Info("WARNING: changes not committed, need env var WRITE=1")
 	}
 }
