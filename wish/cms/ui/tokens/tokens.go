@@ -319,7 +319,7 @@ func keysView(m Model) string {
 	// If there aren't enough keys to fill the view, fill the missing parts
 	// with whitespace
 	if len(slice) < m.pager.PerPage {
-		for i := len(slice); i < keysPerPage; i++ {
+		for i := len(slice); i < m.pager.PerPage; i++ {
 			s += "\n\n\n"
 		}
 	}

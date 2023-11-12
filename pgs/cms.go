@@ -118,6 +118,10 @@ func CmsMiddleware(cfg *config.ConfigCms, urls config.ConfigURL) bm.Handler {
 			menuChoice: unsetChoice,
 			styles:     common.DefaultStyles(),
 			spinner:    common.NewSpinner(),
+			terminalSize: tea.WindowSizeMsg{
+				Width:  80,
+				Height: 24,
+			},
 		}
 
 		user, err := m.findUser()
@@ -144,13 +148,13 @@ type model struct {
 	status        status
 	menuIndex     int
 	menuChoice    menuChoice
-	terminalWidth int
 	styles        common.Styles
 	info          info.Model
 	spinner       spinner.Model
 	username      username.Model
 	keys          keys.Model
 	createAccount account.CreateModel
+	terminalSize  tea.WindowSizeMsg
 }
 
 func (m model) Init() tea.Cmd {
@@ -188,7 +192,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.terminalWidth = msg.Width
+		m.terminalSize = msg
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyCtrlC:
@@ -353,7 +357,7 @@ func (m model) errorView(err error) string {
 }
 
 func (m model) View() string {
-	w := m.terminalWidth - m.styles.App.GetHorizontalFrameSize()
+	w := m.terminalSize.Width - m.styles.App.GetHorizontalFrameSize()
 	s := m.styles.Logo.SetString(m.cfg.Domain).String() + "\n\n"
 	switch m.status {
 	case statusNoAccount:

@@ -3,6 +3,7 @@ package cms
 import (
 	"errors"
 	"fmt"
+	"math"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
@@ -127,6 +128,10 @@ func Middleware(cfg *config.ConfigCms, urls config.ConfigURL) bm.Handler {
 			menuChoice: unsetChoice,
 			styles:     common.DefaultStyles(),
 			spinner:    common.NewSpinner(),
+			terminalSize: tea.WindowSizeMsg{
+				Width:  80,
+				Height: 24,
+			},
 		}
 
 		user, err := m.findUser()
@@ -153,7 +158,7 @@ type model struct {
 	status        status
 	menuIndex     int
 	menuChoice    menuChoice
-	terminalWidth int
+	terminalSize  tea.WindowSizeMsg
 	styles        common.Styles
 	info          info.Model
 	spinner       spinner.Model
@@ -199,7 +204,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.terminalWidth = msg.Width
+		m.terminalSize = msg
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyCtrlC:
@@ -245,17 +250,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.user = msg
 		m.username = username.NewModel(m.dbpool, m.user, m.sshUser)
 		m.info = info.NewModel(m.cfg, m.urls, m.user)
-		m.posts = posts.NewModel(m.cfg, m.urls, m.dbpool, m.user, m.st)
 		m.keys = keys.NewModel(m.cfg, m.dbpool, m.user)
 		m.tokens = tokens.NewModel(m.cfg, m.dbpool, m.user)
 		m.createAccount = account.NewCreateModel(m.cfg, m.dbpool, m.publicKey)
+
+		perPage := math.Floor(float64(m.terminalSize.Height) / 10.0)
+		m.posts = posts.NewModel(m.cfg, m.urls, m.dbpool, m.user, m.st, int(perPage))
 	}
 
 	switch m.status {
 	case statusInit:
 		m.username = username.NewModel(m.dbpool, m.user, m.sshUser)
 		m.info = info.NewModel(m.cfg, m.urls, m.user)
-		m.posts = posts.NewModel(m.cfg, m.urls, m.dbpool, m.user, m.st)
 		m.keys = keys.NewModel(m.cfg, m.dbpool, m.user)
 		m.tokens = tokens.NewModel(m.cfg, m.dbpool, m.user)
 		m.createAccount = account.NewCreateModel(m.cfg, m.dbpool, m.publicKey)
@@ -264,6 +270,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.status = statusReady
 		}
+
+		perPage := math.Floor(float64(m.terminalSize.Height) / 10.0)
+		m.posts = posts.NewModel(m.cfg, m.urls, m.dbpool, m.user, m.st, int(perPage))
 	}
 
 	m, cmd = updateChildren(msg, m)
@@ -288,7 +297,10 @@ func updateChildren(msg tea.Msg, m model) (model, tea.Cmd) {
 		cmd = newCmd
 
 		if m.posts.Exit {
-			m.posts = posts.NewModel(m.cfg, m.urls, m.dbpool, m.user, m.st)
+			perPage := math.Floor(float64(m.terminalSize.Height) / 10.0)
+			m.posts = posts.NewModel(m.cfg, m.urls, m.dbpool, m.user, m.st, int(perPage))
+
+			m.posts = posts.NewModel(m.cfg, m.urls, m.dbpool, m.user, m.st, int(perPage))
 			m.status = statusReady
 		} else if m.posts.Quit {
 			m.status = statusQuitting
@@ -408,7 +420,7 @@ func (m model) errorView(err error) string {
 }
 
 func (m model) View() string {
-	w := m.terminalWidth - m.styles.App.GetHorizontalFrameSize()
+	w := m.terminalSize.Width - m.styles.App.GetHorizontalFrameSize()
 	s := m.styles.Logo.SetString(m.cfg.Domain).String() + "\n\n"
 	switch m.status {
 	case statusNoAccount:
