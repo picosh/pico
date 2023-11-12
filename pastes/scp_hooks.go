@@ -43,57 +43,55 @@ func (p *FileHooks) FileMeta(s ssh.Session, data *filehandlers.PostMetaData) err
 		data.ExpiresAt = &expiresAt
 	}
 
-	if p.Db.HasFeatureForUser(data.User.ID, "pastes-advanced") {
-		var hidden bool
-		var expiresFound bool
-		var expires *time.Time
+	var hidden bool
+	var expiresFound bool
+	var expires *time.Time
 
-		cmd := s.Command()
+	cmd := s.Command()
 
-		for _, arg := range cmd {
-			if strings.Contains(arg, "=") {
-				splitArg := strings.Split(arg, "=")
-				if len(splitArg) != 2 {
+	for _, arg := range cmd {
+		if strings.Contains(arg, "=") {
+			splitArg := strings.Split(arg, "=")
+			if len(splitArg) != 2 {
+				continue
+			}
+
+			switch splitArg[0] {
+			case "hidden":
+				val, err := strconv.ParseBool(splitArg[1])
+				if err != nil {
 					continue
 				}
 
-				switch splitArg[0] {
-				case "hidden":
-					val, err := strconv.ParseBool(splitArg[1])
-					if err != nil {
-						continue
-					}
+				hidden = val
+			case "expires":
+				val, err := strconv.ParseBool(splitArg[1])
+				if err == nil {
+					expiresFound = !val
+					continue
+				}
 
-					hidden = val
-				case "expires":
-					val, err := strconv.ParseBool(splitArg[1])
-					if err == nil {
-						expiresFound = !val
-						continue
-					}
+				duration, err := time.ParseDuration(splitArg[1])
+				if err == nil {
+					expiresFound = true
+					expireTime := time.Now().Add(duration)
+					expires = &expireTime
+					continue
+				}
 
-					duration, err := time.ParseDuration(splitArg[1])
-					if err == nil {
-						expiresFound = true
-						expireTime := time.Now().Add(duration)
-						expires = &expireTime
-						continue
-					}
-
-					expireTime, err := dateparse.ParseStrict(splitArg[1])
-					if err == nil {
-						expiresFound = true
-						expires = &expireTime
-					}
+				expireTime, err := dateparse.ParseStrict(splitArg[1])
+				if err == nil {
+					expiresFound = true
+					expires = &expireTime
 				}
 			}
 		}
+	}
 
-		data.Hidden = hidden
+	data.Hidden = hidden
 
-		if expiresFound {
-			data.ExpiresAt = expires
-		}
+	if expiresFound {
+		data.ExpiresAt = expires
 	}
 
 	return nil
