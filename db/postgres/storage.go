@@ -255,10 +255,10 @@ const (
 
 	sqlInsertProject      = `INSERT INTO projects (user_id, name, project_dir) VALUES ($1, $2, $3) RETURNING id;`
 	sqlUpdateProject      = `UPDATE projects SET updated_at = $3 WHERE user_id = $1 AND name = $2;`
-	sqlFindProjectByName  = `SELECT id, user_id, name, project_dir FROM projects WHERE user_id = $1 AND name = $2;`
+	sqlFindProjectByName  = `SELECT id, user_id, name, project_dir, created_at, updated_at FROM projects WHERE user_id = $1 AND name = $2;`
 	sqlSelectProjectCount = `SELECT count(id) FROM projects`
 	sqlFindAllProjects    = `
-	SELECT projects.id, user_id, app_users.name as username, projects.name, project_dir, projects.created_at
+	SELECT projects.id, user_id, app_users.name as username, projects.name, project_dir, projects.created_at, projects.updated_at
 	FROM projects
 	LEFT JOIN app_users ON app_users.id = projects.user_id
 	ORDER BY created_at ASC
@@ -1288,6 +1288,8 @@ func (me *PsqlDB) FindProjectByName(userID, name string) (*db.Project, error) {
 		&project.UserID,
 		&project.Name,
 		&project.ProjectDir,
+		&project.CreatedAt,
+		&project.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -1309,6 +1311,8 @@ func (me *PsqlDB) FindProjectLinks(userID, name string) ([]*db.Project, error) {
 			&project.UserID,
 			&project.Name,
 			&project.ProjectDir,
+			&project.CreatedAt,
+			&project.UpdatedAt,
 		)
 		if err != nil {
 			return nil, err
@@ -1337,6 +1341,8 @@ func (me *PsqlDB) FindProjectsByPrefix(userID, prefix string) ([]*db.Project, er
 			&project.UserID,
 			&project.Name,
 			&project.ProjectDir,
+			&project.CreatedAt,
+			&project.UpdatedAt,
 		)
 		if err != nil {
 			return nil, err
@@ -1397,6 +1403,7 @@ func (me *PsqlDB) FindAllProjects(page *db.Pager) (*db.Paginate[*db.Project], er
 			&project.Name,
 			&project.ProjectDir,
 			&project.CreatedAt,
+			&project.UpdatedAt,
 		)
 		if err != nil {
 			return nil, err
