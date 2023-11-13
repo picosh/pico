@@ -58,6 +58,15 @@
 		reverse_proxy imgproxy:8081
 	}
 
+	@imgproxy_root {
+		host imgproxy.{$APP_DOMAIN}
+		path /
+	}
+
+	handle @imgproxy_root {
+		redir https://pico.sh
+	}
+
 	@imgproxy {
 		host imgproxy.{$APP_DOMAIN}
 	}
