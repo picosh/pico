@@ -14,7 +14,7 @@ services:
     env_file:
       - .env.prod
     environment:
-      APP_DOMAIN: ${MINIO_DOMAIN:-minio.pico.sh}
+      APP_DOMAIN: pico.sh
       APP_EMAIL: ${MINIO_EMAIL:-hello@pico.sh}
     volumes:
       - ${MINIO_CADDYFILE}:/etc/caddy/Caddyfile

@@ -4,8 +4,7 @@
 	}
 }
 
-*.{$APP_DOMAIN}, {$APP_DOMAIN} {
-	reverse_proxy minio:9000
+*.minio.{$APP_DOMAIN}, *.{$APP_DOMAIN}, {$APP_DOMAIN} {
 	tls {$APP_EMAIL} {
 		dns cloudflare {$CF_API_TOKEN}
 		resolvers 1.1.1.1
@@ -43,10 +42,26 @@
 	}
 
 	@console {
-		host console.{$APP_DOMAIN}
+		host console.minio.{$APP_DOMAIN}
 	}
 
 	handle @console {
 		reverse_proxy minio:9001
+	}
+
+	@minio {
+		host minio.{$APP_DOMAIN}
+	}
+
+	handle @minio {
+		reverse_proxy minio:9000
+	}
+
+	@imgproxy {
+		host imgproxy.{$APP_DOMAIN}
+	}
+
+	handle @imgproxy {
+		reverse_proxy imgproxy:8080
 	}
 }
