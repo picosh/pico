@@ -22,6 +22,7 @@ func NewConfigSite() *shared.ConfigSite {
 	minioPass := shared.GetEnv("MINIO_ROOT_PASSWORD", "")
 	dbURL := shared.GetEnv("DATABASE_URL", "")
 	sendgridKey := shared.GetEnv("SENDGRID_API_KEY", "")
+	useImgProxy := shared.GetEnv("USE_IMGPROXY", "1")
 
 	intro := "To get started, enter a username and email.\n"
 	intro += "Then upload a file containing a list of rss feeds (e.g. ~/feeds.txt)\n"
@@ -32,6 +33,7 @@ func NewConfigSite() *shared.ConfigSite {
 		Debug:                debug == "1",
 		SubdomainsEnabled:    subdomains == "1",
 		CustomdomainsEnabled: customdomains == "1",
+		UseImgProxy:          useImgProxy == "1",
 		SendgridKey:          sendgridKey,
 		ConfigCms: config.ConfigCms{
 			Domain:        domain,

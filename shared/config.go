@@ -31,6 +31,7 @@ type ConfigSite struct {
 	SubdomainsEnabled    bool
 	CustomdomainsEnabled bool
 	SendgridKey          string
+	UseImgProxy          bool
 }
 
 type CreateURL struct {

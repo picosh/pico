@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"io"
 	"os"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 type Bucket struct {
 	Name string
 	Path string
+	Root string
 }
 
 type ObjectStorage interface {
@@ -20,6 +22,7 @@ type ObjectStorage interface {
 	DeleteBucket(bucket Bucket) error
 	GetBucketQuota(bucket Bucket) (uint64, error)
 	GetFile(bucket Bucket, fpath string) (utils.ReaderAtCloser, int64, time.Time, error)
+	ServeFile(bucket Bucket, fpath string, ratio *Ratio, original bool, useProxy bool) (io.ReadCloser, string, error)
 	PutFile(bucket Bucket, fpath string, contents utils.ReaderAtCloser, entry *utils.FileEntry) (string, error)
 	DeleteFile(bucket Bucket, fpath string) error
 	ListFiles(bucket Bucket, dir string, recursive bool) ([]os.FileInfo, error)

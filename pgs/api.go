@@ -254,7 +254,7 @@ func assetHandler(w http.ResponseWriter, h *AssetHandler) {
 	}
 	defer contents.Close()
 
-	contentType := shared.GetMimeType(assetFilepath)
+	contentType := storage.GetMimeType(assetFilepath)
 	w.Header().Add("Content-Type", contentType)
 	w.WriteHeader(status)
 	_, err = io.Copy(w, contents)

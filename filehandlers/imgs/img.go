@@ -2,14 +2,12 @@ package uploadimgs
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
-	"github.com/picosh/pico/imgs"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/wish/send/utils"
 )
@@ -54,61 +52,11 @@ func (h *UploadImgHandler) metaImg(data *PostMetaData) error {
 	}
 
 	reader := bytes.NewReader([]byte(data.Text))
-	tee := bytes.NewReader([]byte(data.Text))
 
-	// we want to keep the original file so people can use that
-	// if our webp optimizer doesn't work properly
 	fname, err := h.Storage.PutFile(
 		bucket,
 		data.Filename,
 		utils.NopReaderAtCloser(reader),
-		&utils.FileEntry{},
-	)
-	if err != nil {
-		return err
-	}
-
-	opt := imgs.NewImgOptimizer(h.Cfg.Logger, "")
-	// for small images we want to preserve quality
-	// since it can have a dramatic effect
-	if data.FileSize < 3*shared.MB {
-		opt.Quality = 100
-		opt.Lossless = true
-	} else {
-		opt.Quality = 80
-		opt.Lossless = false
-	}
-
-	var webpReader *bytes.Reader
-	contents := &bytes.Buffer{}
-
-	img, err := imgs.GetImageForOptimization(tee, data.MimeType)
-	finalName := shared.SanitizeFileExt(data.Filename)
-	if errors.Is(err, imgs.ErrAlreadyWebPError) {
-		h.Cfg.Logger.Infof("(%s) is already webp, skipping encoding", data.Filename)
-		finalName = fmt.Sprintf("%s.webp", finalName)
-		webpReader = tee
-	} else if err != nil {
-		h.Cfg.Logger.Infof("(%s) is a file format (%s) that we cannot convert to webp, skipping encoding", data.Filename, data.MimeType)
-		webpReader = tee
-	} else {
-		err = opt.EncodeWebp(contents, img)
-		if err != nil {
-			return err
-		}
-
-		finalName = fmt.Sprintf("%s.webp", finalName)
-		webpReader = bytes.NewReader(contents.Bytes())
-	}
-
-	if webpReader == nil {
-		return fmt.Errorf("contents of webp file is nil")
-	}
-
-	_, err = h.Storage.PutFile(
-		bucket,
-		finalName,
-		utils.NopReaderAtCloser(webpReader),
 		&utils.FileEntry{},
 	)
 	if err != nil {
@@ -153,11 +101,6 @@ func (h *UploadImgHandler) writeImg(s ssh.Session, data *PostMetaData) error {
 			return err
 		}
 		err = h.Storage.DeleteFile(bucket, data.Filename)
-		if err != nil {
-			return err
-		}
-		webp := fmt.Sprintf("%s.webp", shared.SanitizeFileExt(data.Filename))
-		err = h.Storage.DeleteFile(bucket, webp)
 		if err != nil {
 			return err
 		}

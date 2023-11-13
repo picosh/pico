@@ -22,7 +22,7 @@ css:
 .PHONY: css
 
 lint:
-	$(DOCKER_CMD) run --rm -v $(shell pwd):/app -w /app golangci/golangci-lint:latest bash -c 'apt-get update > /dev/null 2>&1 && apt-get install -y libwebp-dev > /dev/null 2>&1; golangci-lint run -E goimports -E godot --timeout 10m'
+	$(DOCKER_CMD) run --rm -v $(shell pwd):/app -w /app golangci/golangci-lint:latest run -E goimports -E godot --timeout 10m
 .PHONY: lint
 
 lint-dev:
