@@ -33,7 +33,7 @@
 	}
 
 	@caddymetrics {
-		host {$APP_DOMAIN}
+		host minio.{$APP_DOMAIN}
 		path /_caddy/metrics
 	}
 
