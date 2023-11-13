@@ -50,9 +50,9 @@ func main() {
 		}
 		defer reader.Close()
 
-		opt := shared.NewImgOptimizer(cfg.Logger, "")
+		opt := imgs.NewImgOptimizer(cfg.Logger, "")
 		contents := &bytes.Buffer{}
-		img, err := shared.GetImageForOptimization(reader, post.MimeType)
+		img, err := imgs.GetImageForOptimization(reader, post.MimeType)
 		if err != nil {
 			cfg.Logger.Error(err)
 			continue

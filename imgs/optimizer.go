@@ -1,7 +1,6 @@
-package shared
+package imgs
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"image"
@@ -67,21 +66,6 @@ func IsWebOptimized(mimeType string) bool {
 	}
 
 	return false
-}
-
-func CreateImgURL(linkify Linkify) func([]byte) []byte {
-	return func(url []byte) []byte {
-		if url[0] == '/' {
-			name := SanitizeFileExt(string(url))
-			nextURL := linkify.Create(name)
-			return []byte(nextURL)
-		} else if bytes.HasPrefix(url, []byte{'.', '/'}) {
-			name := SanitizeFileExt(string(url[1:]))
-			nextURL := linkify.Create(name)
-			return []byte(nextURL)
-		}
-		return url
-	}
 }
 
 func GetRatio(dimes string) (*Ratio, error) {

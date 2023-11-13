@@ -12,7 +12,7 @@ import (
 
 	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
-	"github.com/picosh/pico/imgs"
+	uploadimgs "github.com/picosh/pico/filehandlers/imgs"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pico/wish/cms/util"
@@ -48,11 +48,11 @@ type ScpUploadHandler struct {
 	DBPool    db.DB
 	Cfg       *shared.ConfigSite
 	Hooks     ScpFileHooks
-	ImgClient *imgs.ImgsAPI
+	ImgClient *uploadimgs.ImgsAPI
 }
 
 func NewScpPostHandler(dbpool db.DB, cfg *shared.ConfigSite, hooks ScpFileHooks, st storage.ObjectStorage) *ScpUploadHandler {
-	client := imgs.NewImgsAPI(dbpool, st)
+	client := uploadimgs.NewImgsAPI(dbpool, st)
 
 	return &ScpUploadHandler{
 		DBPool:    dbpool,

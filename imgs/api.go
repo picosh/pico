@@ -192,7 +192,7 @@ type ImgHandler struct {
 	Storage   storage.ObjectStorage
 	Logger    *zap.SugaredLogger
 	Cache     *gocache.Cache
-	Img       *shared.ImgOptimizer
+	Img       *ImgOptimizer
 	// We should try to use the optimized image if it's available
 	// not all images are optimized so this flag isn't enough
 	// because we also need to check the mime type
@@ -203,7 +203,7 @@ type ImgResizer struct {
 	Key      string
 	contents utils.ReaderAtCloser
 	writer   io.Writer
-	Img      *shared.ImgOptimizer
+	Img      *ImgOptimizer
 	Cache    *gocache.Cache
 }
 
@@ -277,7 +277,7 @@ func imgHandler(w http.ResponseWriter, h *ImgHandler) {
 
 	contentType := post.MimeType
 	fname := post.Filename
-	isWebOptimized := shared.IsWebOptimized(contentType)
+	isWebOptimized := IsWebOptimized(contentType)
 
 	if h.UseOptimized && isWebOptimized {
 		contentType = "image/webp"
@@ -357,7 +357,7 @@ func imgRequestOriginal(w http.ResponseWriter, r *http.Request) {
 		Storage:      st,
 		Logger:       logger,
 		Cache:        cache,
-		Img:          shared.NewImgOptimizer(logger, ""),
+		Img:          NewImgOptimizer(logger, ""),
 		UseOptimized: false,
 	})
 }
@@ -395,7 +395,7 @@ func imgRequest(w http.ResponseWriter, r *http.Request) {
 		Storage:      st,
 		Logger:       logger,
 		Cache:        cache,
-		Img:          shared.NewImgOptimizer(logger, dimes),
+		Img:          NewImgOptimizer(logger, dimes),
 		UseOptimized: true,
 	})
 }
