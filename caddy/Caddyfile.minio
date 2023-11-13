@@ -49,14 +49,6 @@
 		reverse_proxy minio:9001
 	}
 
-	@minio {
-		host minio.{$APP_DOMAIN}
-	}
-
-	handle @minio {
-		reverse_proxy minio:9000
-	}
-
 	@imgproxy {
 		host imgproxy.{$APP_DOMAIN}
 	}
@@ -64,4 +56,6 @@
 	handle @imgproxy {
 		reverse_proxy imgproxy:8080
 	}
+
+	reverse_proxy minio:9000
 }
