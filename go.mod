@@ -12,10 +12,8 @@ require (
 	github.com/charmbracelet/promwish v0.7.0
 	github.com/charmbracelet/ssh v0.0.0-20230822194956-1a051f898e09
 	github.com/charmbracelet/wish v1.2.0
-	github.com/disintegration/imaging v1.6.2
 	github.com/google/go-cmp v0.6.0
 	github.com/gorilla/feeds v1.1.2
-	github.com/kolesa-team/go-webp v1.0.4
 	github.com/lib/pq v1.10.9
 	github.com/matryer/is v1.4.1
 	github.com/microcosm-cc/bluemonday v1.0.26
@@ -110,7 +108,6 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.3 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/exp v0.0.0-20231108232855-2478ac86f678 // indirect
-	golang.org/x/image v0.14.0 // indirect
 	golang.org/x/net v0.18.0 // indirect
 	golang.org/x/sync v0.5.0 // indirect
 	golang.org/x/sys v0.14.0 // indirect

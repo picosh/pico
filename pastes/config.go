@@ -21,6 +21,7 @@ func NewConfigSite() *shared.ConfigSite {
 	minioURL := shared.GetEnv("MINIO_URL", "")
 	minioUser := shared.GetEnv("MINIO_ROOT_USER", "")
 	minioPass := shared.GetEnv("MINIO_ROOT_PASSWORD", "")
+	useImgProxy := shared.GetEnv("USE_IMGPROXY", "1")
 
 	intro := "To get started, enter a username.\n"
 	intro += "Then all you need to do is send your pastes to us:\n\n"
@@ -30,6 +31,7 @@ func NewConfigSite() *shared.ConfigSite {
 		Debug:                debug == "1",
 		SubdomainsEnabled:    subdomains == "1",
 		CustomdomainsEnabled: customdomains == "1",
+		UseImgProxy:          useImgProxy == "1",
 		ConfigCms: config.ConfigCms{
 			Domain:        domain,
 			Port:          port,

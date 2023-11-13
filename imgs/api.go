@@ -19,7 +19,6 @@ import (
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
-	"github.com/picosh/pico/wish/send/utils"
 	"go.uber.org/zap"
 )
 
@@ -192,59 +191,8 @@ type ImgHandler struct {
 	Storage   storage.ObjectStorage
 	Logger    *zap.SugaredLogger
 	Cache     *gocache.Cache
-	Img       *ImgOptimizer
-	// We should try to use the optimized image if it's available
-	// not all images are optimized so this flag isn't enough
-	// because we also need to check the mime type
-	UseOptimized bool
-}
-
-type ImgResizer struct {
-	Key      string
-	contents utils.ReaderAtCloser
-	writer   io.Writer
-	Img      *ImgOptimizer
-	Cache    *gocache.Cache
-}
-
-func (r *ImgResizer) Resize() error {
-	cached, found := r.Cache.Get(r.Key)
-	if found {
-		reader := bytes.NewReader(cached.([]byte))
-		_, err := io.Copy(r.writer, reader)
-		if err != nil {
-			return err
-		}
-		return nil
-	}
-
-	// when resizing an image we don't want to mess with quality
-	// since that was already applied when converting to webp
-	r.Img.Quality = 100
-	r.Img.Lossless = false
-	img, err := r.Img.DecodeWebp(r.contents)
-	if err != nil {
-		return err
-	}
-
-	buf := new(bytes.Buffer)
-	err = r.Img.EncodeWebp(buf, img)
-	if err != nil {
-		return err
-	}
-
-	r.Cache.Set(
-		r.Key,
-		buf.Bytes(),
-		gocache.DefaultExpiration,
-	)
-
-	err = r.Img.EncodeWebp(r.writer, img)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	Ratio     *storage.Ratio
+	Original  bool
 }
 
 func imgHandler(w http.ResponseWriter, h *ImgHandler) {
@@ -275,23 +223,14 @@ func imgHandler(w http.ResponseWriter, h *ImgHandler) {
 		return
 	}
 
-	contentType := post.MimeType
-	fname := post.Filename
-	isWebOptimized := IsWebOptimized(contentType)
-
-	if h.UseOptimized && isWebOptimized {
-		contentType = "image/webp"
-		fname = fmt.Sprintf("%s.webp", shared.SanitizeFileExt(post.Filename))
-	}
-
-	contents, _, _, err := h.Storage.GetFile(bucket, fname)
+	contents, contentType, err := h.Storage.ServeFile(bucket, post.Filename, h.Ratio, h.Original, h.Cfg.UseImgProxy)
 	if err != nil {
 		h.Logger.Infof(
 			"file not found %s/%s in storage (bucket: %s, name: %s)",
 			h.Username,
 			post.Filename,
 			bucket.Name,
-			fname,
+			post.Filename,
 		)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -300,27 +239,7 @@ func imgHandler(w http.ResponseWriter, h *ImgHandler) {
 
 	w.Header().Add("Content-Type", contentType)
 
-	resizeImg := h.Img.Width != 0 || h.Img.Height != 0
-
-	if h.UseOptimized && resizeImg && isWebOptimized {
-		cacheKey := fmt.Sprintf(
-			"%s/%s (%d:%d)",
-			bucket.Name,
-			fname,
-			h.Img.Width,
-			h.Img.Height,
-		)
-		resizer := ImgResizer{
-			Img:      h.Img,
-			Cache:    h.Cache,
-			Key:      cacheKey,
-			contents: contents,
-			writer:   w,
-		}
-		err = resizer.Resize()
-	} else {
-		_, err = io.Copy(w, contents)
-	}
+	_, err = io.Copy(w, contents)
 
 	if err != nil {
 		h.Logger.Error(err)
@@ -349,16 +268,15 @@ func imgRequestOriginal(w http.ResponseWriter, r *http.Request) {
 	cache := shared.GetCache(r)
 
 	imgHandler(w, &ImgHandler{
-		Username:     username,
-		Subdomain:    subdomain,
-		Slug:         slug,
-		Cfg:          cfg,
-		Dbpool:       dbpool,
-		Storage:      st,
-		Logger:       logger,
-		Cache:        cache,
-		Img:          NewImgOptimizer(logger, ""),
-		UseOptimized: false,
+		Username:  username,
+		Subdomain: subdomain,
+		Slug:      slug,
+		Cfg:       cfg,
+		Dbpool:    dbpool,
+		Storage:   st,
+		Logger:    logger,
+		Cache:     cache,
+		Original:  true,
 	})
 }
 
@@ -377,6 +295,8 @@ func imgRequest(w http.ResponseWriter, r *http.Request) {
 		dimes, _ = url.PathUnescape(shared.GetField(r, 1))
 	}
 
+	ratio, _ := storage.GetRatio(dimes)
+
 	// users might add the file extension when requesting an image
 	// but we want to remove that
 	slug = shared.SanitizeFileExt(slug)
@@ -387,16 +307,15 @@ func imgRequest(w http.ResponseWriter, r *http.Request) {
 	cache := shared.GetCache(r)
 
 	imgHandler(w, &ImgHandler{
-		Username:     username,
-		Subdomain:    subdomain,
-		Slug:         slug,
-		Cfg:          cfg,
-		Dbpool:       dbpool,
-		Storage:      st,
-		Logger:       logger,
-		Cache:        cache,
-		Img:          NewImgOptimizer(logger, dimes),
-		UseOptimized: true,
+		Username:  username,
+		Subdomain: subdomain,
+		Slug:      slug,
+		Cfg:       cfg,
+		Dbpool:    dbpool,
+		Storage:   st,
+		Logger:    logger,
+		Cache:     cache,
+		Ratio:     ratio,
 	})
 }
 

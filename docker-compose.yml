@@ -16,14 +16,9 @@ services:
   imgproxy:
     image: darthsim/imgproxy:latest
     restart: always
-    environment:
-      IMGPROXY_USE_S3: true
-      IMGPROXY_S3_ENDPOINT: https://${MINIO_DOMAIN:-minio.pico.sh}
-      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
-      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
     profiles:
+      - db
       - all
-      - pgs
   lists-web:
     image: ghcr.io/picosh/pico/lists-web:latest
     restart: always

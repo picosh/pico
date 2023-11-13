@@ -3,12 +3,8 @@ LABEL maintainer="Pico Maintainers <hello@pico.sh>"
 
 WORKDIR /app
 
-RUN dpkg --add-architecture arm64 && dpkg --add-architecture amd64
 RUN apt-get update
-RUN apt-get install -y git ca-certificates \
-    libwebp-dev:amd64 libwebp-dev:arm64 \
-    crossbuild-essential-amd64 crossbuild-essential-arm64 \
-    libc-dev:amd64 libc-dev:arm64
+RUN apt-get install -y git ca-certificates
 
 COPY go.* ./
 
@@ -22,17 +18,16 @@ ARG APP=lists
 ARG TARGETOS
 ARG TARGETARCH
 
-ENV CGO_ENABLED=1
-ENV LDFLAGS="-s -w -linkmode external -extldflags '-static -lm -pthread'"
-ENV CC=/app/scripts/gccwrap.sh
+ENV CGO_ENABLED=0
+ENV LDFLAGS="-s -w"
 
 ENV GOOS=${TARGETOS} GOARCH=${TARGETARCH}
 
-RUN go build -ldflags "$LDFLAGS" -tags "netgo osusergo" -o /go/bin/${APP}-web ./cmd/${APP}/web
+RUN go build -ldflags "$LDFLAGS" -o /go/bin/${APP}-web ./cmd/${APP}/web
 
 FROM builder-web as builder-ssh
 
-RUN go build -ldflags "$LDFLAGS" -tags "netgo osusergo" -o /go/bin/${APP}-ssh ./cmd/${APP}/ssh
+RUN go build -ldflags "$LDFLAGS" -o /go/bin/${APP}-ssh ./cmd/${APP}/ssh
 
 FROM scratch as release-web
 

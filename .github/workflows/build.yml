@@ -21,9 +21,6 @@ jobs:
   test:
     runs-on: ubuntu-22.04
     steps:
-    - name: Install package
-      run: |
-        sudo apt-get -y install libwebp-dev
     - name: Set up Go
       uses: actions/setup-go@v3
       with:

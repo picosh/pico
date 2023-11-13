@@ -11,6 +11,13 @@ services:
     ports:
       - "9000:9000"
       - "9001:9001"
+  imgproxy:
+    env_file:
+      - .env.example
+    volumes:
+      - ./data/storage/data:/storage
+    ports:
+      - "8080:8080"
   lists-web:
     build:
       args:
@@ -79,7 +86,7 @@ services:
     env_file:
       - .env.example
     volumes:
-      - ./data/imgs-storage/data:/app/.storage
+      - ./data/storage/data:/app/.storage
     ports:
       - "3003:3000"
   imgs-ssh:
@@ -90,7 +97,7 @@ services:
     env_file:
       - .env.example
     volumes:
-      - ./data/imgs-storage/data:/app/.storage
+      - ./data/storage/data:/app/.storage
       - ./data/imgs-ssh/data:/app/ssh_data
     ports:
       - "2223:2222"
@@ -102,7 +109,7 @@ services:
     env_file:
       - .env.example
     volumes:
-      - ./data/pgs-storage/data:/app/.storage
+      - ./data/storage/data:/app/.storage
     ports:
       - "3004:3000"
   pgs-ssh:
@@ -113,7 +120,7 @@ services:
     env_file:
       - .env.example
     volumes:
-      - ./data/pgs-storage/data:/app/.storage
+      - ./data/storage/data:/app/.storage
       - ./data/pgs-ssh/data:/app/ssh_data
     ports:
       - "2224:2222"
@@ -156,4 +163,4 @@ services:
       - ./data/certs:/certs
     ports:
       - "6697:6697"
-      - "8080:8080"
+      - "8081:8080"

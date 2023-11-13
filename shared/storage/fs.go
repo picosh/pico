@@ -98,6 +98,19 @@ func (s *StorageFS) GetFile(bucket Bucket, fpath string) (utils.ReaderAtCloser, 
 	return dat, info.Size(), info.ModTime(), nil
 }
 
+func (s *StorageFS) ServeFile(bucket Bucket, fpath string, ratio *Ratio, original bool, useProxy bool) (io.ReadCloser, string, error) {
+	if !useProxy || original || os.Getenv("IMGPROXY_URL") == "" {
+		contentType := GetMimeType(fpath)
+		rc, _, _, err := s.GetFile(bucket, fpath)
+		return rc, contentType, err
+	}
+
+	filePath := filepath.Join(bucket.Path, fpath)
+	dataURL := fmt.Sprintf("local://%s", filePath)
+
+	return HandleProxy(dataURL, ratio, original, useProxy)
+}
+
 func (s *StorageFS) PutFile(bucket Bucket, fpath string, contents utils.ReaderAtCloser, entry *utils.FileEntry) (string, error) {
 	loc := filepath.Join(bucket.Path, fpath)
 	err := os.MkdirAll(filepath.Dir(loc), os.ModePerm)

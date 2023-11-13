@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -171,6 +173,19 @@ func (s *StorageMinio) GetFile(bucket Bucket, fpath string) (utils.ReaderAtClose
 	}
 
 	return obj, info.Size, modTime, nil
+}
+
+func (s *StorageMinio) ServeFile(bucket Bucket, fpath string, ratio *Ratio, original bool, useProxy bool) (io.ReadCloser, string, error) {
+	if !useProxy || original || os.Getenv("IMGPROXY_URL") == "" {
+		contentType := GetMimeType(fpath)
+		rc, _, _, err := s.GetFile(bucket, fpath)
+		return rc, contentType, err
+	}
+
+	filePath := filepath.Join(bucket.Name, fpath)
+	dataURL := fmt.Sprintf("s3://%s", filePath)
+
+	return HandleProxy(dataURL, ratio, original, useProxy)
 }
 
 func (s *StorageMinio) PutFile(bucket Bucket, fpath string, contents utils.ReaderAtCloser, entry *utils.FileEntry) (string, error) {
