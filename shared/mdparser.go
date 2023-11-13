@@ -205,6 +205,21 @@ func (r *ImgRender) renderImage(w util.BufWriter, source []byte, node ast.Node, 
 	return ast.WalkSkipChildren, nil
 }
 
+func CreateImgURL(linkify Linkify) func([]byte) []byte {
+	return func(url []byte) []byte {
+		if url[0] == '/' {
+			name := SanitizeFileExt(string(url))
+			nextURL := linkify.Create(name)
+			return []byte(nextURL)
+		} else if bytes.HasPrefix(url, []byte{'.', '/'}) {
+			name := SanitizeFileExt(string(url[1:]))
+			nextURL := linkify.Create(name)
+			return []byte(nextURL)
+		}
+		return url
+	}
+}
+
 func ParseText(text string, linkify Linkify) (*ParsedText, error) {
 	parsed := ParsedText{
 		MetaData: &MetaData{

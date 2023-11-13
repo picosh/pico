@@ -9,6 +9,7 @@ import (
 
 	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
+	"github.com/picosh/pico/imgs"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/wish/send/utils"
 )
@@ -67,7 +68,7 @@ func (h *UploadImgHandler) metaImg(data *PostMetaData) error {
 		return err
 	}
 
-	opt := shared.NewImgOptimizer(h.Cfg.Logger, "")
+	opt := imgs.NewImgOptimizer(h.Cfg.Logger, "")
 	// for small images we want to preserve quality
 	// since it can have a dramatic effect
 	if data.FileSize < 3*shared.MB {
@@ -81,9 +82,9 @@ func (h *UploadImgHandler) metaImg(data *PostMetaData) error {
 	var webpReader *bytes.Reader
 	contents := &bytes.Buffer{}
 
-	img, err := shared.GetImageForOptimization(tee, data.MimeType)
+	img, err := imgs.GetImageForOptimization(tee, data.MimeType)
 	finalName := shared.SanitizeFileExt(data.Filename)
-	if errors.Is(err, shared.ErrAlreadyWebPError) {
+	if errors.Is(err, imgs.ErrAlreadyWebPError) {
 		h.Cfg.Logger.Infof("(%s) is already webp, skipping encoding", data.Filename)
 		finalName = fmt.Sprintf("%s.webp", finalName)
 		webpReader = tee
