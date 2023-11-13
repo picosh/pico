@@ -60,7 +60,7 @@ func GetMimeType(fpath string) string {
 func HandleProxy(dataURL string, ratio *Ratio, original bool, useProxy bool) (io.ReadCloser, string, error) {
 	imgProxyURL := os.Getenv("IMGPROXY_URL")
 	imgProxySalt := os.Getenv("IMGPROXY_SALT")
-	imgProxyKey := os.Getenv("IMGPROXY_SALT")
+	imgProxyKey := os.Getenv("IMGPROXY_KEY")
 
 	signature := "_"
 	processOpts := "q:80"
