@@ -49,6 +49,15 @@
 		reverse_proxy minio:9001
 	}
 
+	@imgproxy_prometheus {
+		host imgproxy.{$APP_DOMAIN}
+		path /metrics
+	}
+
+	handle @imgproxy_prometheus {
+		reverse_proxy imgproxy:8081
+	}
+
 	@imgproxy {
 		host imgproxy.{$APP_DOMAIN}
 	}
