@@ -251,8 +251,18 @@ func (c *ConfigSite) AssetURL(username, projectName, fpath string) string {
 	)
 }
 
-func CreateLogger() *zap.SugaredLogger {
-	logger, err := zap.NewProduction()
+func CreateLogger(debug bool) *zap.SugaredLogger {
+	var (
+		err    error
+		logger *zap.Logger
+	)
+
+	if debug {
+		logger, err = zap.NewDevelopment()
+	} else {
+		logger, err = zap.NewProduction()
+	}
+
 	if err != nil {
 		log.Fatal(err)
 	}

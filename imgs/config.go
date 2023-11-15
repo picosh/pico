@@ -66,7 +66,7 @@ func NewConfigSite() *shared.ConfigSite {
 			IntroText:     intro,
 			Space:         "imgs",
 			AllowedExt:    []string{".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"},
-			Logger:        shared.CreateLogger(),
+			Logger:        shared.CreateLogger(debug == "1"),
 			AllowRegister: allowRegister == "1",
 		},
 	}

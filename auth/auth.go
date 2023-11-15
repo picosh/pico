@@ -289,7 +289,7 @@ func StartApiServer() {
 		Port:   shared.GetEnv("AUTH_WEB_PORT", "3000"),
 	}
 
-	logger := shared.CreateLogger()
+	logger := shared.CreateLogger(true)
 	db := postgres.NewDB(cfg.DbURL, logger)
 	defer db.Close()
 

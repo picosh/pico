@@ -152,6 +152,13 @@ func (h *handler) Put(file *rsyncutils.ReceiverFile) (int64, error) {
 func Middleware(writeHandler utils.CopyFromClientHandler) wish.Middleware {
 	return func(sshHandler ssh.Handler) ssh.Handler {
 		return func(session ssh.Session) {
+			defer func() {
+				if r := recover(); r != nil {
+					writeHandler.GetLogger().Error("error running rsync middleware: ", r)
+					_, _ = session.Stderr().Write([]byte("error running rsync middleware, check the flags you are using\r\n"))
+				}
+			}()
+
 			cmd := session.Command()
 			if len(cmd) == 0 || cmd[0] != "rsync" {
 				sshHandler(session)
@@ -193,7 +200,7 @@ func Middleware(writeHandler utils.CopyFromClientHandler) wish.Middleware {
 					}
 
 					if err := rsyncsender.ClientRun(opts, session, fileHandler, fileHandler.root, true); err != nil {
-						writeHandler.GetLogger().Error("error running rsync sender:", err)
+						writeHandler.GetLogger().Error("error running rsync sender: ", err)
 					}
 					return
 				}
@@ -224,7 +231,7 @@ func Middleware(writeHandler utils.CopyFromClientHandler) wish.Middleware {
 			}
 
 			if _, err := rsyncreceiver.ClientRun(opts, session, fileHandler, true); err != nil {
-				writeHandler.GetLogger().Error("error running rsync receiver:", err)
+				writeHandler.GetLogger().Error("error running rsync receiver: ", err)
 			}
 		}
 	}

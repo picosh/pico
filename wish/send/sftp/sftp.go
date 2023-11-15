@@ -22,6 +22,13 @@ func SSHOption(writeHandler utils.CopyFromClientHandler) ssh.Option {
 
 func SubsystemHandler(writeHandler utils.CopyFromClientHandler) ssh.SubsystemHandler {
 	return func(session ssh.Session) {
+		defer func() {
+			if r := recover(); r != nil {
+				writeHandler.GetLogger().Error("error running sftp middleware: ", r)
+				_, _ = session.Stderr().Write([]byte("error running sftp middleware, check the flags you are using\r\n"))
+			}
+		}()
+
 		err := writeHandler.Validate(session)
 		if err != nil {
 			utils.ErrorHandler(session, err)
@@ -44,7 +51,7 @@ func SubsystemHandler(writeHandler utils.CopyFromClientHandler) ssh.SubsystemHan
 
 		err = requestServer.Serve()
 		if err != nil && !errors.Is(err, io.EOF) {
-			writeHandler.GetLogger().Error("Error serving sftp subsystem:", err)
+			writeHandler.GetLogger().Error("Error serving sftp subsystem: ", err)
 		}
 	}
 }

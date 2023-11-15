@@ -79,7 +79,7 @@ func NewConfigSite() *shared.ConfigSite {
 			},
 			MaxSize:       maxSize,
 			MaxAssetSize:  maxAssetSize,
-			Logger:        shared.CreateLogger(),
+			Logger:        shared.CreateLogger(debug == "1"),
 			AllowRegister: allowRegister == "1",
 		},
 	}

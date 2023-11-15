@@ -49,7 +49,7 @@ func NewConfigSite() *shared.ConfigSite {
 			Space:         "lists",
 			AllowedExt:    []string{".txt"},
 			HiddenPosts:   []string{"_header.txt", "_readme.txt"},
-			Logger:        shared.CreateLogger(),
+			Logger:        shared.CreateLogger(debug == "1"),
 			AllowRegister: allowRegister == "1",
 		},
 	}

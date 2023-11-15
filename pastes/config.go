@@ -45,7 +45,7 @@ func NewConfigSite() *shared.ConfigSite {
 			Description:   "a pastebin for hackers.",
 			IntroText:     intro,
 			Space:         "pastes",
-			Logger:        shared.CreateLogger(),
+			Logger:        shared.CreateLogger(debug == "1"),
 			AllowRegister: allowRegister == "1",
 		},
 	}

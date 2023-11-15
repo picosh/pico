@@ -49,7 +49,7 @@ func NewConfigSite() *shared.ConfigSite {
 			Space:         "prose",
 			AllowedExt:    []string{".md"},
 			HiddenPosts:   []string{"_readme.md", "_styles.css", "_footer.md"},
-			Logger:        shared.CreateLogger(),
+			Logger:        shared.CreateLogger(debug == "1"),
 			AllowRegister: allowRegister == "1",
 		},
 	}
