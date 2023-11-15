@@ -1,5 +1,19 @@
+diff --git a/downstream.go b/downstream.go
+index f383212..b59dc29 100644
+--- a/downstream.go
++++ b/downstream.go
+@@ -2947,6 +2947,9 @@ func (dc *downstreamConn) handleMessageRegistered(ctx context.Context, msg *irc.
+ 				network.pushTargets.Del(target)
+ 			}
+ 			go network.broadcastWebPush(&irc.Message{
++				Tags: irc.Tags{
++					"bouncerNetwork": strconv.FormatInt(dc.network.ID, 10),
++				},
+ 				Command: "MARKREAD",
+ 				Params:  []string{target, timestampStr},
+ 			})
 diff --git a/server.go b/server.go
-index 00d7560..98f0424 100644
+index 552104e..498d827 100644
 --- a/server.go
 +++ b/server.go
 @@ -339,7 +339,7 @@ func (s *Server) sendWebPush(ctx context.Context, sub *webpush.Subscription, vap
@@ -11,3 +25,24 @@ index 00d7560..98f0424 100644
  		TTL:             7 * 24 * 60 * 60, // seconds
  		Urgency:         urgency,
  		RecordSize:      2048,
+diff --git a/upstream.go b/upstream.go
+index ca56a82..a7c5dbb 100644
+--- a/upstream.go
++++ b/upstream.go
+@@ -682,6 +682,8 @@ func (uc *upstreamConn) handleMessage(ctx context.Context, msg *irc.Message) err
+ 		}
+ 
+ 		if highlight || directMessage {
++			msg.Tags["bouncerNetwork"] = strconv.FormatInt(uc.network.ID, 10)
++
+ 			go uc.network.broadcastWebPush(msg)
+ 			if timestamp, err := time.Parse(xirc.ServerTimeLayout, string(msg.Tags["time"])); err == nil {
+ 				uc.network.pushTargets.Set(bufferName, timestamp)
+@@ -1611,6 +1613,7 @@ func (uc *upstreamConn) handleMessage(ctx context.Context, msg *irc.Message) err
+ 		})
+ 
+ 		if weAreInvited {
++			msg.Tags["bouncerNetwork"] = strconv.FormatInt(uc.network.ID, 10)
+ 			go uc.network.broadcastWebPush(msg)
+ 		}
+ 	case irc.RPL_INVITING:
