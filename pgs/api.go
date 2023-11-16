@@ -146,6 +146,8 @@ type HttpReply struct {
 func calcPossibleRoutes(projectName, fp string, userRedirects []*RedirectRule) []*HttpReply {
 	fname := filepath.Base(fp)
 	fdir := filepath.Dir(fp)
+	fext := filepath.Ext(fp)
+	mimeType := storage.GetMimeType(fp)
 	rts := []*HttpReply{}
 
 	for _, redirect := range userRedirects {
@@ -168,27 +170,37 @@ func calcPossibleRoutes(projectName, fp string, userRedirects []*RedirectRule) [
 		}
 	}
 
-	dirRoute := shared.GetAssetFileName(&utils.FileEntry{
-		Filepath: filepath.Join(projectName, fp, "index.html"),
-	})
+	// user routes take precedence
+	if len(rts) > 0 {
+		return rts
+	}
 
-	// hack: we need to accommodate routes that are just directories
-	// and point the user to the index.html of each root dir.
-	nameRoute := shared.GetAssetFileName(&utils.FileEntry{
-		Filepath: filepath.Join(
-			projectName,
-			fdir,
-			fmt.Sprintf("%s.html", fname),
-		),
-	})
+	// file extension is unknown
+	if mimeType == "text/plain" && fext != ".txt" {
+		dirRoute := shared.GetAssetFileName(&utils.FileEntry{
+			Filepath: filepath.Join(projectName, fp, "index.html"),
+		})
+		// we need to accommodate routes that are just directories
+		// and point the user to the index.html of each root dir.
+		nameRoute := shared.GetAssetFileName(&utils.FileEntry{
+			Filepath: filepath.Join(
+				projectName,
+				fdir,
+				fmt.Sprintf("%s.html", fname),
+			),
+		})
+		rts = append(rts,
+			&HttpReply{Filepath: nameRoute, Status: 200},
+			&HttpReply{Filepath: dirRoute, Status: 200},
+		)
+		return rts
+	}
 
 	defRoute := shared.GetAssetFileName(&utils.FileEntry{
 		Filepath: filepath.Join(projectName, fdir, fname),
 	})
 
 	rts = append(rts,
-		&HttpReply{Filepath: dirRoute, Status: 200},
-		&HttpReply{Filepath: nameRoute, Status: 200},
 		&HttpReply{
 			Filepath: defRoute, Status: 200,
 		})

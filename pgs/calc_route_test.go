@@ -1,6 +1,7 @@
 package pgs
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -19,7 +20,13 @@ func TestCalcPossibleRoutes(t *testing.T) {
 			Actual: calcPossibleRoutes("test", "index.html", []*RedirectRule{}),
 			Expected: []*HttpReply{
 				{Filepath: "test/index.html", Status: 200},
-				{Filepath: "test/index.html/index.html", Status: 200},
+			},
+		},
+		{
+			Name:   "basic-txt",
+			Actual: calcPossibleRoutes("test", "index.txt", []*RedirectRule{}),
+			Expected: []*HttpReply{
+				{Filepath: "test/index.txt", Status: 200},
 			},
 		},
 		{
@@ -27,7 +34,6 @@ func TestCalcPossibleRoutes(t *testing.T) {
 			Actual: calcPossibleRoutes("test", "wow.html", []*RedirectRule{}),
 			Expected: []*HttpReply{
 				{Filepath: "test/wow.html", Status: 200},
-				{Filepath: "test/wow.html/index.html", Status: 200},
 			},
 		},
 		{
@@ -35,7 +41,6 @@ func TestCalcPossibleRoutes(t *testing.T) {
 			Actual: calcPossibleRoutes("test", "nice/index.html", []*RedirectRule{}),
 			Expected: []*HttpReply{
 				{Filepath: "test/nice/index.html", Status: 200},
-				{Filepath: "test/nice/index.html/index.html", Status: 200},
 			},
 		},
 		{
@@ -43,15 +48,14 @@ func TestCalcPossibleRoutes(t *testing.T) {
 			Actual: calcPossibleRoutes("test", "nice/wow.html", []*RedirectRule{}),
 			Expected: []*HttpReply{
 				{Filepath: "test/nice/wow.html", Status: 200},
-				{Filepath: "test/nice/wow.html/index.html", Status: 200},
 			},
 		},
 		{
 			Name:   "subdirectory-bare",
 			Actual: calcPossibleRoutes("test", "nice", []*RedirectRule{}),
 			Expected: []*HttpReply{
-				{Filepath: "test/nice/index.html", Status: 200},
 				{Filepath: "test/nice.html", Status: 200},
+				{Filepath: "test/nice/index.html", Status: 200},
 			},
 		},
 		{
@@ -64,8 +68,6 @@ func TestCalcPossibleRoutes(t *testing.T) {
 				},
 			}),
 			Expected: []*HttpReply{
-				{Filepath: "test/nice/index.html", Status: 200},
-				{Filepath: "test/nice.html", Status: 200},
 				{Filepath: "test/index.html", Status: 200},
 			},
 		},
@@ -73,6 +75,7 @@ func TestCalcPossibleRoutes(t *testing.T) {
 
 	for _, fixture := range fixtures {
 		t.Run(fixture.Name, func(t *testing.T) {
+			fmt.Println(fixture.Actual[0].Filepath)
 			if cmp.Equal(fixture.Actual, fixture.Expected) == false {
 				t.Fatalf(cmp.Diff(fixture.Expected, fixture.Actual))
 			}
