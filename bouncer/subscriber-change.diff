@@ -1,5 +1,5 @@
 diff --git a/downstream.go b/downstream.go
-index f383212..b59dc29 100644
+index f383212..35082d4 100644
 --- a/downstream.go
 +++ b/downstream.go
 @@ -2947,6 +2947,9 @@ func (dc *downstreamConn) handleMessageRegistered(ctx context.Context, msg *irc.
@@ -12,11 +12,46 @@ index f383212..b59dc29 100644
  				Command: "MARKREAD",
  				Params:  []string{target, timestampStr},
  			})
+@@ -3198,6 +3201,10 @@ func (dc *downstreamConn) handleMessageRegistered(ctx context.Context, msg *irc.
+ 				}}
+ 			}
+ 
++			if filterCommands, filterCommandExists := rawKeys["filterCommands"]; filterCommandExists {
++				endpoint = fmt.Sprintf("%s;%s", endpoint, filterCommands)
++			}
++
+ 			newSub := database.WebPushSubscription{
+ 				Endpoint: endpoint,
+ 			}
 diff --git a/server.go b/server.go
-index 552104e..498d827 100644
+index 552104e..251635c 100644
 --- a/server.go
 +++ b/server.go
-@@ -339,7 +339,7 @@ func (s *Server) sendWebPush(ctx context.Context, sub *webpush.Subscription, vap
+@@ -10,6 +10,7 @@ import (
+ 	"net"
+ 	"net/http"
+ 	"runtime/debug"
++	"strings"
+ 	"sync"
+ 	"sync/atomic"
+ 	"time"
+@@ -325,6 +326,15 @@ func (s *Server) sendWebPush(ctx context.Context, sub *webpush.Subscription, vap
+ 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+ 	defer cancel()
+ 
++	if strings.Contains(";", sub.Endpoint) {
++		parts := strings.Split(sub.Endpoint, ";")
++		sub.Endpoint = parts[0]
++
++		if !strings.Contains(parts[1], msg.Command) {
++			return nil
++		}
++	}
++
+ 	var urgency webpush.Urgency
+ 	switch msg.Command {
+ 	case "PRIVMSG", "NOTICE", "INVITE":
+@@ -339,7 +349,7 @@ func (s *Server) sendWebPush(ctx context.Context, sub *webpush.Subscription, vap
  		},
  		VAPIDPublicKey:  s.webPush.VAPIDKeys.Public,
  		VAPIDPrivateKey: s.webPush.VAPIDKeys.Private,
@@ -26,19 +61,18 @@ index 552104e..498d827 100644
  		Urgency:         urgency,
  		RecordSize:      2048,
 diff --git a/upstream.go b/upstream.go
-index ca56a82..a7c5dbb 100644
+index ca56a82..8ff0a55 100644
 --- a/upstream.go
 +++ b/upstream.go
-@@ -682,6 +682,8 @@ func (uc *upstreamConn) handleMessage(ctx context.Context, msg *irc.Message) err
+@@ -682,6 +682,7 @@ func (uc *upstreamConn) handleMessage(ctx context.Context, msg *irc.Message) err
  		}
  
  		if highlight || directMessage {
 +			msg.Tags["bouncerNetwork"] = strconv.FormatInt(uc.network.ID, 10)
-+
  			go uc.network.broadcastWebPush(msg)
  			if timestamp, err := time.Parse(xirc.ServerTimeLayout, string(msg.Tags["time"])); err == nil {
  				uc.network.pushTargets.Set(bufferName, timestamp)
-@@ -1611,6 +1613,7 @@ func (uc *upstreamConn) handleMessage(ctx context.Context, msg *irc.Message) err
+@@ -1611,6 +1612,7 @@ func (uc *upstreamConn) handleMessage(ctx context.Context, msg *irc.Message) err
  		})
  
  		if weAreInvited {
