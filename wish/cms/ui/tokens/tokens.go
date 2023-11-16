@@ -271,10 +271,7 @@ func (m Model) View() string {
 		s = m.createKey.View()
 	default:
 		s = "Here are the tokens linked to your account.\n\n"
-		s += "A token can be used for connecting to our IRC bouncer from your client.\n"
-		s += "Authenticating to our bouncer is simple:\n"
-		s += "  `username` is your pico user, and \n"
-		s += "  `password` are the tokens listed here.\n\n"
+		s += "A token can be used for connecting to our IRC bouncer from your client.\n\n"
 
 		// Keys
 		s += keysView(m)

@@ -122,7 +122,6 @@ func (m Model) Init() tea.Cmd {
 
 // Update is the Bubble Tea update loop.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	fmt.Println(msg)
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.Type {
@@ -197,7 +196,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case TokenSetMsg:
-		fmt.Println("TOKEN SET")
 		m.state = submitted
 		m.token = msg.token
 		return m, nil
