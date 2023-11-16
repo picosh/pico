@@ -149,6 +149,10 @@ func calcPossibleRoutes(projectName, fp string, userRedirects []*RedirectRule) [
 	fext := filepath.Ext(fp)
 	mimeType := storage.GetMimeType(fp)
 	rts := []*HttpReply{}
+	notFound := &HttpReply{
+		Filepath: filepath.Join(projectName, "404.html"),
+		Status:   404,
+	}
 
 	for _, redirect := range userRedirects {
 		rr := regexp.MustCompile(redirect.From)
@@ -172,6 +176,7 @@ func calcPossibleRoutes(projectName, fp string, userRedirects []*RedirectRule) [
 
 	// user routes take precedence
 	if len(rts) > 0 {
+		rts = append(rts, notFound)
 		return rts
 	}
 
@@ -192,6 +197,7 @@ func calcPossibleRoutes(projectName, fp string, userRedirects []*RedirectRule) [
 		rts = append(rts,
 			&HttpReply{Filepath: nameRoute, Status: 200},
 			&HttpReply{Filepath: dirRoute, Status: 200},
+			notFound,
 		)
 		return rts
 	}
@@ -203,7 +209,9 @@ func calcPossibleRoutes(projectName, fp string, userRedirects []*RedirectRule) [
 	rts = append(rts,
 		&HttpReply{
 			Filepath: defRoute, Status: 200,
-		})
+		},
+		notFound,
+	)
 
 	return rts
 }
