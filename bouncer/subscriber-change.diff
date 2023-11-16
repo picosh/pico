@@ -24,7 +24,7 @@ index f383212..35082d4 100644
  				Endpoint: endpoint,
  			}
 diff --git a/server.go b/server.go
-index 552104e..251635c 100644
+index 552104e..4b2ffe6 100644
 --- a/server.go
 +++ b/server.go
 @@ -10,6 +10,7 @@ import (
@@ -39,7 +39,7 @@ index 552104e..251635c 100644
  	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
  	defer cancel()
  
-+	if strings.Contains(";", sub.Endpoint) {
++	if strings.Contains(sub.Endpoint, ";") {
 +		parts := strings.Split(sub.Endpoint, ";")
 +		sub.Endpoint = parts[0]
 +
