@@ -146,7 +146,27 @@ type HttpReply struct {
 func calcPossibleRoutes(projectName, fp string, userRedirects []*RedirectRule) []*HttpReply {
 	fname := filepath.Base(fp)
 	fdir := filepath.Dir(fp)
-	fext := filepath.Ext(fp)
+	rts := []*HttpReply{}
+
+	for _, redirect := range userRedirects {
+		rr := regexp.MustCompile(redirect.From)
+		match := rr.FindStringSubmatch(fp)
+		if len(match) > 0 {
+			ruleRoute := shared.GetAssetFileName(&utils.FileEntry{
+				Filepath: filepath.Join(projectName, redirect.To),
+			})
+			rule := &HttpReply{
+				Filepath: ruleRoute,
+				Status:   redirect.Status,
+				Query:    redirect.Query,
+			}
+			if redirect.Force {
+				rts = append([]*HttpReply{rule}, rts...)
+			} else {
+				rts = append(rts, rule)
+			}
+		}
+	}
 
 	dirRoute := shared.GetAssetFileName(&utils.FileEntry{
 		Filepath: filepath.Join(projectName, fp, "index.html"),
@@ -154,51 +174,26 @@ func calcPossibleRoutes(projectName, fp string, userRedirects []*RedirectRule) [
 
 	// hack: we need to accommodate routes that are just directories
 	// and point the user to the index.html of each root dir.
-	if fname == "." || fext == "" {
-		nameRoute := shared.GetAssetFileName(&utils.FileEntry{
-			Filepath: filepath.Join(
-				projectName,
-				fdir,
-				fmt.Sprintf("%s.html", fname),
-			),
-		})
-
-		rts := []*HttpReply{
-			{Filepath: dirRoute, Status: 200},
-			{Filepath: nameRoute, Status: 200},
-		}
-
-		for _, redirect := range userRedirects {
-			rr := regexp.MustCompile(redirect.From)
-			match := rr.FindStringSubmatch(fp)
-			if len(match) > 0 {
-				ruleRoute := shared.GetAssetFileName(&utils.FileEntry{
-					Filepath: filepath.Join(projectName, redirect.To),
-				})
-				rule := &HttpReply{
-					Filepath: ruleRoute,
-					Status:   redirect.Status,
-					Query:    redirect.Query,
-				}
-				if redirect.Force {
-					rts = append([]*HttpReply{rule}, rts...)
-				} else {
-					rts = append(rts, rule)
-				}
-			}
-		}
-
-		return rts
-	}
+	nameRoute := shared.GetAssetFileName(&utils.FileEntry{
+		Filepath: filepath.Join(
+			projectName,
+			fdir,
+			fmt.Sprintf("%s.html", fname),
+		),
+	})
 
 	defRoute := shared.GetAssetFileName(&utils.FileEntry{
 		Filepath: filepath.Join(projectName, fdir, fname),
 	})
 
-	return []*HttpReply{
-		{Filepath: defRoute, Status: 200},
-		{Filepath: dirRoute, Status: 200},
-	}
+	rts = append(rts,
+		&HttpReply{Filepath: dirRoute, Status: 200},
+		&HttpReply{Filepath: nameRoute, Status: 200},
+		&HttpReply{
+			Filepath: defRoute, Status: 200,
+		})
+
+	return rts
 }
 
 func assetHandler(w http.ResponseWriter, h *AssetHandler) {
