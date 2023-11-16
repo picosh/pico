@@ -147,14 +147,46 @@ func calcPossibleRoutes(projectName, fp string, userRedirects []*RedirectRule) [
 	fname := filepath.Base(fp)
 	fdir := filepath.Dir(fp)
 	fext := filepath.Ext(fp)
+	mimeType := storage.GetMimeType(fp)
+	rts := []*HttpReply{}
+	notFound := &HttpReply{
+		Filepath: filepath.Join(projectName, "404.html"),
+		Status:   404,
+	}
 
-	dirRoute := shared.GetAssetFileName(&utils.FileEntry{
-		Filepath: filepath.Join(projectName, fp, "index.html"),
-	})
+	for _, redirect := range userRedirects {
+		rr := regexp.MustCompile(redirect.From)
+		match := rr.FindStringSubmatch(fp)
+		if len(match) > 0 {
+			ruleRoute := shared.GetAssetFileName(&utils.FileEntry{
+				Filepath: filepath.Join(projectName, redirect.To),
+			})
+			rule := &HttpReply{
+				Filepath: ruleRoute,
+				Status:   redirect.Status,
+				Query:    redirect.Query,
+			}
+			if redirect.Force {
+				rts = append([]*HttpReply{rule}, rts...)
+			} else {
+				rts = append(rts, rule)
+			}
+		}
+	}
 
-	// hack: we need to accommodate routes that are just directories
-	// and point the user to the index.html of each root dir.
-	if fname == "." || fext == "" {
+	// user routes take precedence
+	if len(rts) > 0 {
+		rts = append(rts, notFound)
+		return rts
+	}
+
+	// file extension is unknown
+	if mimeType == "text/plain" && fext != ".txt" {
+		dirRoute := shared.GetAssetFileName(&utils.FileEntry{
+			Filepath: filepath.Join(projectName, fp, "index.html"),
+		})
+		// we need to accommodate routes that are just directories
+		// and point the user to the index.html of each root dir.
 		nameRoute := shared.GetAssetFileName(&utils.FileEntry{
 			Filepath: filepath.Join(
 				projectName,
@@ -162,32 +194,11 @@ func calcPossibleRoutes(projectName, fp string, userRedirects []*RedirectRule) [
 				fmt.Sprintf("%s.html", fname),
 			),
 		})
-
-		rts := []*HttpReply{
-			{Filepath: dirRoute, Status: 200},
-			{Filepath: nameRoute, Status: 200},
-		}
-
-		for _, redirect := range userRedirects {
-			rr := regexp.MustCompile(redirect.From)
-			match := rr.FindStringSubmatch(fp)
-			if len(match) > 0 {
-				ruleRoute := shared.GetAssetFileName(&utils.FileEntry{
-					Filepath: filepath.Join(projectName, redirect.To),
-				})
-				rule := &HttpReply{
-					Filepath: ruleRoute,
-					Status:   redirect.Status,
-					Query:    redirect.Query,
-				}
-				if redirect.Force {
-					rts = append([]*HttpReply{rule}, rts...)
-				} else {
-					rts = append(rts, rule)
-				}
-			}
-		}
-
+		rts = append(rts,
+			&HttpReply{Filepath: nameRoute, Status: 200},
+			&HttpReply{Filepath: dirRoute, Status: 200},
+			notFound,
+		)
 		return rts
 	}
 
@@ -195,10 +206,14 @@ func calcPossibleRoutes(projectName, fp string, userRedirects []*RedirectRule) [
 		Filepath: filepath.Join(projectName, fdir, fname),
 	})
 
-	return []*HttpReply{
-		{Filepath: defRoute, Status: 200},
-		{Filepath: dirRoute, Status: 200},
-	}
+	rts = append(rts,
+		&HttpReply{
+			Filepath: defRoute, Status: 200,
+		},
+		notFound,
+	)
+
+	return rts
 }
 
 func assetHandler(w http.ResponseWriter, h *AssetHandler) {

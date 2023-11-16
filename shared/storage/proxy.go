@@ -52,6 +52,8 @@ func GetMimeType(fpath string) string {
 		return "application/atom+xml"
 	} else if ext == ".webmanifest" {
 		return "application/manifest+json"
+	} else if ext == ".txt" {
+		return "text/plain"
 	}
 
 	return "text/plain"
