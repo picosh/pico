@@ -61,13 +61,13 @@ index 552104e..4b2ffe6 100644
  		Urgency:         urgency,
  		RecordSize:      2048,
 diff --git a/upstream.go b/upstream.go
-index ca56a82..8ff0a55 100644
+index 95bad3a..afbe314 100644
 --- a/upstream.go
 +++ b/upstream.go
 @@ -682,6 +682,7 @@ func (uc *upstreamConn) handleMessage(ctx context.Context, msg *irc.Message) err
  		}
  
- 		if highlight || directMessage {
+ 		if !self && (highlight || directMessage) {
 +			msg.Tags["bouncerNetwork"] = strconv.FormatInt(uc.network.ID, 10)
  			go uc.network.broadcastWebPush(msg)
  			if timestamp, err := time.Parse(xirc.ServerTimeLayout, string(msg.Tags["time"])); err == nil {
