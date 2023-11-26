@@ -105,7 +105,7 @@ func (h *UploadAssetHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.Fil
 	fileInfo.FSize = size
 	fileInfo.FModTime = modTime
 
-	reader := utils.NewAllReaderAt(contents)
+	reader := shared.NewAllReaderAt(contents)
 
 	return fileInfo, reader, nil
 }

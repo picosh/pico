@@ -1,10 +1,9 @@
 module github.com/picosh/pico
 
-go 1.21
+go 1.21.4
 
 require (
 	github.com/alecthomas/chroma v0.10.0
-	github.com/antoniomika/go-rsync-receiver v0.0.0-20231110145728-c94949e1ab7d
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
 	github.com/charmbracelet/bubbles v0.16.1
 	github.com/charmbracelet/bubbletea v0.24.2
@@ -15,7 +14,6 @@ require (
 	github.com/google/go-cmp v0.6.0
 	github.com/gorilla/feeds v1.1.2
 	github.com/lib/pq v1.10.9
-	github.com/matryer/is v1.4.1
 	github.com/microcosm-cc/bluemonday v1.0.26
 	github.com/minio/madmin-go/v3 v3.0.29
 	github.com/minio/minio-go/v7 v7.0.63
@@ -23,7 +21,7 @@ require (
 	github.com/muesli/reflow v0.3.0
 	github.com/neurosnap/go-exif-remove v0.0.0-20221010134343-50d1e3c35577
 	github.com/patrickmn/go-cache v2.1.0+incompatible
-	github.com/pkg/sftp v1.13.6
+	github.com/picosh/send v0.0.0-20231126163457-97725d2b2be1
 	github.com/sendgrid/sendgrid-go v3.13.0+incompatible
 	github.com/yuin/goldmark v1.6.0
 	github.com/yuin/goldmark-highlighting v0.0.0-20220208100518-594be1970594
@@ -39,6 +37,7 @@ require (
 	github.com/PuerkitoBio/goquery v1.8.1 // indirect
 	github.com/andybalholm/cascadia v1.3.2 // indirect
 	github.com/anmitsu/go-shlex v0.0.0-20200514113438-38f4b401e2be // indirect
+	github.com/antoniomika/go-rsync-receiver v0.0.0-20231110145728-c94949e1ab7d // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
@@ -88,6 +87,7 @@ require (
 	github.com/muesli/termenv v0.15.2 // indirect
 	github.com/neurosnap/go-jpeg-image-structure v0.0.0-20221010133817-70b1c1ff679e // indirect
 	github.com/philhofer/fwd v1.1.2 // indirect
+	github.com/pkg/sftp v1.13.6 // indirect
 	github.com/power-devops/perfstat v0.0.0-20221212215047-62379fc7944b // indirect
 	github.com/prometheus/client_golang v1.17.0 // indirect
 	github.com/prometheus/client_model v0.5.0 // indirect

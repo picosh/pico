@@ -112,7 +112,7 @@ func (h *UploadImgHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileI
 		return nil, nil, err
 	}
 
-	reader := utils.NewAllReaderAt(contents)
+	reader := shared.NewAllReaderAt(contents)
 
 	return fileInfo, reader, nil
 }
