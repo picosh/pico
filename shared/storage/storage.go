@@ -5,7 +5,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/picosh/pico/wish/send/utils"
+	"github.com/picosh/send/send/utils"
 )
 
 type Bucket struct {
