@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/picosh/pico/wish/send/utils"
+	"github.com/picosh/send/send/utils"
 )
 
 func GetAssetBucketName(userID string) string {

@@ -9,7 +9,7 @@ import (
 	"github.com/picosh/pico/db"
 	uploadassets "github.com/picosh/pico/filehandlers/assets"
 	"github.com/picosh/pico/wish/cms/util"
-	"github.com/picosh/pico/wish/send/utils"
+	"github.com/picosh/send/send/utils"
 )
 
 func getUser(s ssh.Session, dbpool db.DB) (*db.User, error) {

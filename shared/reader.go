@@ -1,4 +1,4 @@
-package utils
+package shared
 
 import (
 	"errors"
@@ -6,33 +6,14 @@ import (
 	"net/http"
 
 	"github.com/minio/minio-go/v7"
+	"github.com/picosh/send/send/utils"
 )
 
-type ReadAndReaderAt interface {
-	io.ReaderAt
-	io.Reader
-}
-
-type ReaderAtCloser interface {
-	io.ReaderAt
-	io.ReadCloser
-}
-
-func NopReaderAtCloser(r ReadAndReaderAt) ReaderAtCloser {
-	return nopReaderAtCloser{r}
-}
-
-type nopReaderAtCloser struct {
-	ReadAndReaderAt
-}
-
-func (nopReaderAtCloser) Close() error { return nil }
-
 type AllReaderAt struct {
-	Reader ReaderAtCloser
+	Reader utils.ReaderAtCloser
 }
 
-func NewAllReaderAt(reader ReaderAtCloser) *AllReaderAt {
+func NewAllReaderAt(reader utils.ReaderAtCloser) *AllReaderAt {
 	return &AllReaderAt{reader}
 }
 

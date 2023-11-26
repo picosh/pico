@@ -19,7 +19,7 @@ import (
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
-	"github.com/picosh/pico/wish/send/utils"
+	"github.com/picosh/send/send/utils"
 	"go.uber.org/zap"
 )
 

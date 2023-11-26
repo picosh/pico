@@ -1,7 +1,7 @@
 package imgs
 
 import (
-	"github.com/picosh/pico/wish/send/utils"
+	"github.com/picosh/send/send/utils"
 )
 
 type IImgsAPI interface {

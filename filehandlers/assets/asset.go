@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/picosh/pico/shared"
-	"github.com/picosh/pico/wish/send/utils"
+	"github.com/picosh/send/send/utils"
 )
 
 func (h *UploadAssetHandler) validateAsset(data *FileData) (bool, error) {

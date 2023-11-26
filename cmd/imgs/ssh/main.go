@@ -19,14 +19,14 @@ import (
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pico/wish/cms"
-	"github.com/picosh/pico/wish/list"
-	"github.com/picosh/pico/wish/pipe"
-	"github.com/picosh/pico/wish/proxy"
-	"github.com/picosh/pico/wish/send/auth"
-	wishrsync "github.com/picosh/pico/wish/send/rsync"
-	"github.com/picosh/pico/wish/send/scp"
-	"github.com/picosh/pico/wish/send/sftp"
-	"github.com/picosh/pico/wish/send/utils"
+	"github.com/picosh/send/list"
+	"github.com/picosh/send/pipe"
+	"github.com/picosh/send/proxy"
+	"github.com/picosh/send/send/auth"
+	wishrsync "github.com/picosh/send/send/rsync"
+	"github.com/picosh/send/send/scp"
+	"github.com/picosh/send/send/sftp"
+	"github.com/picosh/send/send/utils"
 )
 
 type SSHServer struct{}
