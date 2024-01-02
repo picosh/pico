@@ -83,7 +83,7 @@ title: hello world!
 ---
 
         ![profile pic](/profile.jpg)</pre>
-        <pre>scp ~/blog/hello-world.md ~/blog/profile.jpg {{.Site.Domain}}:/</pre>
+        <pre>rsync ~/blog/hello-world.md ~/blog/profile.jpg {{.Site.Domain}}:/</pre>
         <p>Read more about image uploading at [imgs.sh](https://imgs.sh) and our [help page](/help)</p>
     </section>
 
@@ -93,7 +93,7 @@ title: hello world!
             When your post is ready to be published, copy the file to our server with a familiar
             command:
         </p>
-        <pre>scp ~/blog/*.md {{.Site.Domain}}:/</pre>
+        <pre>rsync ~/blog/*.md {{.Site.Domain}}:/</pre>
         <p>We'll either create or update the posts for you.</p>
     </section>
 
@@ -101,11 +101,28 @@ title: hello world!
         <h2 class="text-lg font-bold">Terminal workflow without installation</h2>
         <p>
             Since we are leveraging tools you already have on your computer
-            (<code>ssh</code> and <code>scp</code>), there is nothing to install.
+            (<code>ssh</code> and <code>rsync</code>), there is nothing to install.
         </p>
         <p>
             This provides the convenience of a web app, but from inside your terminal!
+            Furthermore, you can manage your blog posts via <code>sftp</code>.
         </p>
+        <pre>sftp {{.Site.Domain}}
+sftp> ls
+hello-world.md
+sftp> rm hello-world.md</pre>
+    </section>
+
+    <section>
+        <h2 class="text-lg font-bold">Use <code>sftp</code> to manage your posts</h2>
+        <p>
+          FTP is back in style.  List, upload, and delete posts via <code>sftp</code>:
+        </p>
+        <pre>sftp {{.Site.Domain}}
+sftp> ls
+hello-world.md
+sftp> rm hello-world.md
+sftp> put hello-world.md</pre>
     </section>
 
     <section>
@@ -118,6 +135,7 @@ title: hello world!
             <li>You control the source files</li>
             <li>Terminal workflow with no installation</li>
             <li>Public-key based authentication</li>
+            <li>Use sftp to manage blog</li>
             <li>No ads, zero browser-based tracking</li>
             <li>No attempt to identify users</li>
             <li>No platform lock-in</li>

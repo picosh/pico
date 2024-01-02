@@ -141,8 +141,24 @@ date: 2022-06-28
             <a href="#post-delete" rel="nofollow noopener">#</a>
             How do I delete a post?
         </h2>
+
+        <h3 class="text-lg">
+          <a href="#post-delete-sftp" rel="nofollow noopener">#</a>
+          sftp
+        </h3>
+
+        <p>There are three ways to delete posts: <code>sftp</code>, upload a 0-byte file, or use our CMS.</p>
+
+        <pre>sftp {{.Site.Domain}}
+sftp> rm delete.md</pre>
+
+        <h3 class="text-lg">
+          <a href="#post-delete-0-byte-file" rel="nofollow noopener">#</a>
+          0-byte file
+        </h3>
+
         <p>
-            Because <code>scp</code> does not natively support deleting files, I didn't want to bake
+            Because <code>scp</code> does not natively support deleting files, we didn't want to bake
             that behavior into my ssh server.
         </p>
 
@@ -155,6 +171,11 @@ date: 2022-06-28
         <pre>
 cp /dev/null delete.md
 scp ./delete.md {{.Site.Domain}}:/</pre>
+
+        <h3 class="text-lg">
+          <a href="#post-delete-cms" rel="nofollow noopener">#</a>
+          CMS
+        </h3>
 
         <p>
             Alternatively, you can go to <code>ssh {{.Site.Domain}}</code> and select "Manage posts."
