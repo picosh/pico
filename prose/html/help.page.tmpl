@@ -131,7 +131,7 @@ date: 2022-06-28
             How do I update a post?
         </h2>
         <p>
-            Updating a post requires that you update the source document and then run the <code>scp</code>
+            Updating a post requires that you update the source document and then run the <code>rsync</code>
             command again.  If the filename remains the same, then the post will be updated.
         </p>
     </section>
@@ -190,10 +190,10 @@ scp ./delete.md {{.Site.Domain}}:/</pre>
             When I want to publish a new post, do I have to upload all posts everytime?
         </h2>
         <p>
-            Nope!  Just <code>scp</code> the file you want to publish.  For example, if you created
+            Nope!  Just <code>rsync</code> the file you want to publish.  For example, if you created
             a new post called <code>taco-tuesday.md</code> then you would publish it like this:
         </p>
-        <pre>scp ./taco-tuesday.md {{.Site.Domain}}:</pre>
+        <pre>rsync ./taco-tuesday.md {{.Site.Domain}}:</pre>
     </section>
 
     <section id="blog-readme">
@@ -251,7 +251,7 @@ This will show up on the blog landing page.
     color: tomato;
 }</pre>
         <p>Then just upload the file:</p>
-        <pre>scp _styles.css <username>@prose.sh:/</pre>
+        <pre>sync _styles.css <username>@prose.sh:/</pre>
     </section>
 
     <section id="blog-layout">
@@ -280,7 +280,7 @@ This will show up on the blog landing page.
             For example, if you want to upload images for prose.sh all you have to do is include
             your images in the <code>rsync</code> or <code>scp</code> command.
         </p>
-        <pre>scp profile.jpg user@prose.sh:/</pre>
+        <pre>rsync profile.jpg user@prose.sh:/</pre>
         <p>Then when you want to reference the file, you can reference it like so:</p>
         <pre>![profile pic](/profile.jpg)</pre>
     </section>
