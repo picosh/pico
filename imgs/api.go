@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"time"
 
 	_ "net/http/pprof"
@@ -297,9 +298,18 @@ func imgRequest(w http.ResponseWriter, r *http.Request) {
 
 	ratio, _ := storage.GetRatio(dimes)
 
-	// users might add the file extension when requesting an image
-	// but we want to remove that
-	slug = shared.SanitizeFileExt(slug)
+	ext := filepath.Ext(slug)
+	// Files can contain periods.  `filepath.Ext` is greedy and will clip the last period in the slug
+	// and call that a file extension so we want to be explicit about what
+	// file extensions we clip here
+	for _, fext := range cfg.AllowedExt {
+		if ext == fext {
+			// users might add the file extension when requesting an image
+			// but we want to remove that
+			slug = shared.SanitizeFileExt(slug)
+			break
+		}
+	}
 
 	dbpool := shared.GetDB(r)
 	st := shared.GetStorage(r)
