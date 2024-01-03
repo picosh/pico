@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"slices"
@@ -331,6 +332,8 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		slug, _ = url.PathUnescape(shared.GetField(r, 0))
 	}
+
+	slug = strings.TrimSuffix(slug, "/")
 
 	dbpool := shared.GetDB(r)
 	logger := shared.GetLogger(r)
