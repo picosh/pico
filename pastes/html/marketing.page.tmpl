@@ -83,6 +83,18 @@ echo "foobar" | ssh -T pastes.sh</pre>
     </section>
 
     <section>
+        <h2 class="text-lg font-bold">Use <code>sftp</code> to manage your pastes</h2>
+        <p>
+          FTP is back in style.  List, upload, and delete pastes via <code>sftp</code>:
+        </p>
+        <pre>sftp {{.Site.Domain}}
+sftp> ls
+hello-world.diff
+sftp> rm hello-world.diff
+sftp> put hello-world.diff</pre>
+    </section>
+
+    <section>
         <h2 class="text-lg font-bold">Features</h2>
         <ul>
             <li>Pastes last <strong>90 days</strong> by default</li>
@@ -90,6 +102,7 @@ echo "foobar" | ssh -T pastes.sh</pre>
             <li><a href="/help#unlisted">Ability to "hide" pastes</a></li>
             <li>Bring your own editor</li>
             <li>Terminal workflow with no installation</li>
+            <li>Use sftp to manage pastes</li>
             <li>Public-key based authentication</li>
             <li>No ads, zero tracking</li>
             <li>No javascript</li>
