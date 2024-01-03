@@ -75,11 +75,16 @@ echo "foobar" | ssh -T pastes.sh</pre>
         <h2 class="text-lg font-bold">Terminal workflow without installation</h2>
         <p>
             Since we are leveraging tools you already have on your computer
-            (<code>ssh</code> and <code>scp</code>), there is nothing to install.
+            (<code>ssh</code>, <code>scp</code>, and <code>rsync</code>), there is nothing to install.
         </p>
         <p>
             This provides the convenience of a web app, but from inside your terminal!
         </p>
+    </section>
+
+    <section>
+        <h2 class="text-lg font-bold">Upload using <code>rsync</code></h2>
+        <pre>rsync hello-world.diff {{.Site.Domain}}:/</pre>
     </section>
 
     <section>
