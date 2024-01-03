@@ -294,6 +294,7 @@ func postRawHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		slug, _ = url.PathUnescape(shared.GetField(r, 0))
 	}
+	slug = strings.TrimSuffix(slug, "/")
 
 	dbpool := shared.GetDB(r)
 	logger := shared.GetLogger(r)
@@ -332,7 +333,6 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		slug, _ = url.PathUnescape(shared.GetField(r, 0))
 	}
-
 	slug = strings.TrimSuffix(slug, "/")
 
 	dbpool := shared.GetDB(r)
