@@ -136,6 +136,13 @@
       pgs supports SPAs!  Upload a <code>_redirects</code> file your project:
     </p>
     <pre>/*  /index.html  200</pre>
+
+    <p>
+      Note that the Content Security Policy (CSP) for pages in the pgs.sh domain
+      prohibits javascript from connecting to other origins.
+      Pages served by custom domains do not have this restriction.
+    </p>
+
   </section>
 
   <section id="custom-domain">
@@ -154,10 +161,11 @@
     <pre>CNAME subdomain.yourcustomdomain.com -> {{.Site.Domain}}</pre>
     <p>Resulting in:</p>
     <pre>subdomain.yourcustomdomain.com.         300     IN      CNAME   {{.Site.Domain}}.</pre>
-    <p>And a TXT record to tell Prose what blog is hosted on that domain at the subdomain entry _pgs</p>
-    <pre>TXT _pgs.subdomain.yourcustomdomain.com -> yourusername</pre>
+    <p>And a TXT record to tell Prose what project is hosted on that domain at the subdomain entry _pgs</p>
+    <pre>TXT _pgs.subdomain.yourcustomdomain.com -> username-myproject</pre>
+    <p>E.g. for user 'erock' and project 'kittens' the result would be:</p>
     <p>Resulting in:</p>
-    <pre>_pgs.subdomain.yourcustomdomain.com.         300     IN      TXT     "hey"</pre>
+    <pre>_pgs.subdomain.yourcustomdomain.com.         300     IN      TXT     "erock-kittens"</pre>
   </section>
 </main>
 {{template "marketing-footer" .}}
