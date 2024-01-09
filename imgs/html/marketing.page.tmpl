@@ -30,80 +30,10 @@
 <header class="text-center">
     <h1 class="text-2xl font-bold">{{.Site.Domain}}</h1>
     <p class="text-lg">image hosting for hackers</p>
-    <hr />
+    <div>
+      <a href="https://pico.sh/getting-started" class="btn-link mt inline-block">GET STARTED</a>
+    </div>
 </header>
-
-<main>
-    <section>
-        <h2 class="text-lg font-bold">Examples</h2>
-        <p><a href="https://erock.imgs.sh">feed</a></p>
-    </section>
-
-    <section>
-        <h2 class="text-lg font-bold">Features</h2>
-        <ul>
-            <li>Delightful terminal workflow</li>
-            <li>Share public images from the terminal</li>
-            <li>Seamless integration with other pico services (e.g. <a href="https://prose.sh">prose</a>)</li>
-            <li>Images are web optimized by default</li>
-            <li>API to modify images on-the-fly (e.g. dimensions)</li>
-            <li>Hotlinking encouraged!</li>
-            <li>No javascript</li>
-            <li>No ads</li>
-            <li>10MB max image size</li>
-            <li>1GB max storage</li>
-        </ul>
-    </section>
-
-    <section>
-        <h2 class="text-lg font-bold">Create your account with Public-Key Cryptography</h2>
-        <p>We don't want your email address.</p>
-        <p>To get started, simply ssh into our content management system:</p>
-        <pre>ssh new@{{.Site.Domain}}</pre>
-        <div class="text-sm font-italic note">
-            note: <code>new</code> is a special username that will always send you to account
-            creation, even with multiple accounts associated with your key-pair.
-        </div>
-        <div class="text-sm font-italic note">
-            note: getting permission denied? <a href="/help#permission-denied">read this</a>
-        </div>
-        <p>
-            After that, just set a username and you're ready to start writing! When you SSH
-            again, use your username that you set in the CMS.
-        </p>
-    </section>
-
-    <section>
-        <h2 class="text-lg font-bold">Publish your images with one command</h2>
-        <p>
-            When your image is ready to be published, copy the file to our server with a familiar
-            command:
-        </p>
-        <pre>rsync my-image.jpg {{.Site.Domain}}:/</pre>
-        <p>We'll either create or update the images for you.</p>
-    </section>
-
-    <section>
-        <h2 class="text-lg font-bold">Philosophy</h2>
-        <p>
-            Sharing photos is such an important part of the web.  From writing a blog to creating
-            memes, we want to enable hackers to quickly share images while never leaving the terminal.
-        </p>
-        <p>
-            We built imgs out of necessity, it's something we really wanted as part of the pico
-            ecosystem and are excited to share it with you.
-        </p>
-        <p>Read more about team pico's philosophy <a href="https://pico.sh">here</a>.</p>
-    </section>
-
-    <section>
-        <h2 class="text-lg font-bold">Roadmap</h2>
-        <ol>
-            <li>Ability to create albums</li>
-            <li>Device optimized images</li>
-        </ol>
-    </section>
-</main>
 
 {{template "marketing-footer" .}}
 {{end}}

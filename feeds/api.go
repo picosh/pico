@@ -26,10 +26,6 @@ func createStaticRoutes() []shared.Route {
 func createMainRoutes(staticRoutes []shared.Route) []shared.Route {
 	routes := []shared.Route{
 		shared.NewRoute("GET", "/", shared.CreatePageHandler("html/marketing.page.tmpl")),
-		shared.NewRoute("GET", "/ops", shared.CreatePageHandler("html/ops.page.tmpl")),
-		shared.NewRoute("GET", "/privacy", shared.CreatePageHandler("html/privacy.page.tmpl")),
-		shared.NewRoute("GET", "/help", shared.CreatePageHandler("html/help.page.tmpl")),
-		shared.NewRoute("GET", "/check", shared.CheckHandler),
 	}
 
 	routes = append(

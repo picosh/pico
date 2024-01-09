@@ -17,6 +17,7 @@
 
 @media (prefers-color-scheme: light) {
   :root {
+    --main-hue: 250;
     --white: #6a737d;
     --code: #fff8d3;
     --code-border: #f0d547;
@@ -34,6 +35,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
+    --main-hue: 250;
     --white: #f2f2f2;
     --code: #414558;
     --code-border: #252525;
@@ -271,6 +273,23 @@ figure {
   margin: 0;
 }
 
+.btn-link {
+  border: 3px solid hsl(var(--main-hue), 92%, 66%);
+  background-color: hsl(var(--main-hue), 92%, 66%);
+  padding: 0.5rem 1rem;
+  border-radius: 0.25rem;
+  box-shadow: 0px 1px 2px 0px black;
+  color: var(--white);
+  text-decoration: none;
+  font-weight: bold;
+}
+
+.btn-link:visited,
+.btn-link:visited:hover,
+.btn-link:hover {
+  color: var(--white);
+}
+
 .post-date {
   width: 130px;
 }
@@ -317,6 +336,10 @@ figure {
 
 .inline {
   display: inline;
+}
+
+.inline-block {
+  display: inline-block;
 }
 
 .flex {
