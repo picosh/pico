@@ -76,26 +76,6 @@ build-%:
 build: build-prose build-lists build-pastes build-imgs build-feeds build-pgs build-auth
 .PHONY: build
 
-pgs-static:
-	go build -o "build/pgs-static" "./cmd/pgs/static"
-.PHONY: pgs-static
-
-pgs-site:
-	rm -rf public
-	mkdir public
-	PGS_EMAIL=hello@pico.sh PGS_DOMAIN=pgs.sh PGS_PROTOCOL=https ./build/pgs-static -out ./public
-	cp ./pgs/public/* ./public
-.PHONY: pgs-site
-
-pgs-dev: pgs-static pgs-site
-	rsync -rv -e "ssh -p 2222" ./public/ erock@localhost:/pgs-local
-.PHONY: pgs-dev
-
-pgs-deploy: pgs-static pgs-site
-	rsync -rv ./public/ hey@pgs.sh:/pgs-local
-	ssh hey@pgs.sh link pgs-prod pgs-local --write
-.PHONY: pgs-site-deploy
-
 store-clean:
 	WRITE=$(WRITE) go run ./cmd/scripts/clean-object-store/clean.go
 .PHONY: store-clean
