@@ -31,32 +31,11 @@
   <h1 class="text-2xl font-bold">{{.Site.Domain}} [closed beta]</h1>
   <p class="text-lg">{{.Site.Description}}</p>
   <div>
-    <a href="https://pico.sh/getting-started" class="btn-link mt inline-block">Get Started</a>
+    <a href="https://pico.sh/pgs" class="btn-link mt inline-block">
+      LEARN MORE
+    </a>
   </div>
-  <hr />
 </header>
-
-<main>
-  <section>
-    <h2 class="text-lg font-bold">Features</h2>
-    <ul>
-      <li>Terminal workflow</li>
-      <li>No client-side installation required to fully manage static sites</li>
-      <li>Distinct static sites as <code>projects</code></li>
-      <li>Unlimited projects created on-the-fly (no need to create a project first)</li>
-      <li>Deploy via <code>scp -r ./public/* erock@{{.Site.Domain}}:/myproject</code></li>
-      <li>Promotion/rollback support (via symbolic linking from one project to another)</li>
-      <li>Managed HTTPS for all projects (e.g. https://erock-myproject.{{.Site.Domain}})</li>
-      <li><a href="/help#custom-domain">Custom domains</a> for projects (managed simply by `TXT` records)</li>
-      <li><a href="/help#redirects">User-defined redirects</a></li>
-      <li><a href="/help#spa">SPA support</a></li>
-      <li>1GB max storage</li>
-      <li>50MB max file size</li>
-      <li>All assets are public-only</li>
-      <li>Only web assets are supported</li>
-    </ul>
-  </section>
-</main>
 
 {{template "marketing-footer" .}}
 {{end}}
