@@ -1,21 +1,6 @@
 # pico services
 
-This repo hosts the following pico services:
-
-- [prose.sh](https://prose.sh)
-- [lists.sh](https://lists.sh)
-- [pastes.sh](https://pastes.sh)
-- [imgs.sh](https://imgs.sh)
-- [feeds.sh](https://feeds.sh)
-- [pgs.sh](https://pgs.sh)
-
-## comms
-
-- [website](https://pico.sh)
-- [irc #pico.sh](irc://irc.libera.chat/#pico.sh)
-- [mailing list](https://lists.sr.ht/~erock/pico.sh)
-- [ticket tracker](https://github.com/picosh/pico/issues)
-- [email](mailto:hello@pico.sh)
+Read our docs at [pico.sh](https://pico.sh).
 
 ## development
 
