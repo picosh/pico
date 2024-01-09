@@ -339,11 +339,6 @@ func serveAsset(subdomain string, w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func marketingRequest(w http.ResponseWriter, r *http.Request) {
-	subdomain := "hey-pgs-prod"
-	serveAsset(subdomain, w, r)
-}
-
 func assetRequest(w http.ResponseWriter, r *http.Request) {
 	subdomain := shared.GetSubdomain(r)
 	serveAsset(subdomain, w, r)
@@ -374,10 +369,17 @@ func StartApiServer() {
 	}
 
 	mainRoutes := []shared.Route{
-		shared.NewRoute("GET", "/", marketingRequest),
+		shared.NewRoute("GET", "/main.css", shared.ServeFile("main.css", "text/css")),
+		shared.NewRoute("GET", "/card.png", shared.ServeFile("card.png", "image/png")),
+		shared.NewRoute("GET", "/favicon-16x16.png", shared.ServeFile("favicon-16x16.png", "image/png")),
+		shared.NewRoute("GET", "/apple-touch-icon.png", shared.ServeFile("apple-touch-icon.png", "image/png")),
+		shared.NewRoute("GET", "/favicon.ico", shared.ServeFile("favicon.ico", "image/x-icon")),
+		shared.NewRoute("GET", "/robots.txt", shared.ServeFile("robots.txt", "text/plain")),
+
+		shared.NewRoute("GET", "/", shared.CreatePageHandler("html/marketing.page.tmpl")),
 		shared.NewRoute("GET", "/check", checkHandler),
 		shared.NewRoute("GET", "/rss", rssHandler),
-		shared.NewRoute("GET", "/(.+)", marketingRequest),
+		shared.NewRoute("GET", "/(.+)", shared.CreatePageHandler("html/marketing.page.tmpl")),
 	}
 	subdomainRoutes := []shared.Route{
 		shared.NewRoute("GET", "/", assetRequest),
