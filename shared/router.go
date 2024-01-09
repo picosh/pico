@@ -142,7 +142,7 @@ func GetCustomDomain(logger *zap.SugaredLogger, host string, space string) strin
 	txt := fmt.Sprintf("_%s.%s", space, host)
 	records, err := net.LookupTXT(txt)
 	if err != nil {
-		logger.Error(err)
+		logger.Info(err)
 		return ""
 	}
 

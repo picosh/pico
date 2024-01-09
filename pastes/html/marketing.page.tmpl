@@ -30,106 +30,10 @@
 <header class="text-center">
     <h1 class="text-2xl font-bold">{{.Site.Domain}}</h1>
     <p class="text-lg">a pastebin for hackers</p>
-    <hr />
+    <div>
+      <a href="https://pico.sh/getting-started" class="btn-link mt inline-block">GET STARTED</a>
+    </div>
 </header>
-
-<main>
-    <section>
-        <h2 class="text-lg font-bold">Create your account with Public-Key Cryptography</h2>
-        <p>We don't want your email address.</p>
-        <p>To get started, simply ssh into our content management system:</p>
-        <pre>ssh new@{{.Site.Domain}}</pre>
-        <div class="text-sm font-italic note">
-            note: <code>new</code> is a special username that will always send you to account
-            creation, even with multiple accounts associated with your key-pair.
-        </div>
-        <div class="text-sm font-italic note">
-            note: getting permission denied? <a href="/help#permission-denied">read this</a>
-        </div>
-        <p>
-            After that, just set a username and you're ready to start writing! When you SSH
-            again, use your username that you set in the CMS.
-        </p>
-    </section>
-
-    <section>
-        <h2 class="text-lg font-bold">Publish your pastes with one command</h2>
-        <p>
-            When your paste is ready to be published, copy the file to our server with a familiar
-            command:
-        </p>
-        <pre>scp ./changes.patch {{.Site.Domain}}:/</pre>
-        <p>We'll return the URL back to you so you never have to leave the terminal!</p>
-    </section>
-
-    <section>
-        <h2 class="text-lg font-bold">Pipe Support</h2>
-
-        <pre>echo "foobar" | ssh pastes.sh</pre>
-        <pre>echo "foobar" | ssh pastes.sh FILENAME</pre>
-        <pre># if the tty warning annoys you
-echo "foobar" | ssh -T pastes.sh</pre>
-    </section>
-
-    <section>
-        <h2 class="text-lg font-bold">Terminal workflow without installation</h2>
-        <p>
-            Since we are leveraging tools you already have on your computer
-            (<code>ssh</code>, <code>scp</code>, and <code>rsync</code>), there is nothing to install.
-        </p>
-        <p>
-            This provides the convenience of a web app, but from inside your terminal!
-        </p>
-    </section>
-
-    <section>
-        <h2 class="text-lg font-bold">Upload using <code>rsync</code></h2>
-        <pre>rsync hello-world.diff {{.Site.Domain}}:/</pre>
-    </section>
-
-    <section>
-        <h2 class="text-lg font-bold">Use <code>sftp</code> to manage your pastes</h2>
-        <p>
-          FTP is back in style.  List, upload, and delete pastes via <code>sftp</code>:
-        </p>
-        <pre>sftp {{.Site.Domain}}
-sftp> ls
-hello-world.diff
-sftp> rm hello-world.diff
-sftp> put hello-world.diff</pre>
-    </section>
-
-    <section>
-        <h2 class="text-lg font-bold">Features</h2>
-        <ul>
-            <li>Pastes last <strong>90 days</strong> by default</li>
-            <li><a href="/help#expires">Ability to set custom expiration</a></li>
-            <li><a href="/help#unlisted">Ability to "hide" pastes</a></li>
-            <li>Bring your own editor</li>
-            <li>Terminal workflow with no installation</li>
-            <li>Use sftp to manage pastes</li>
-            <li>Public-key based authentication</li>
-            <li>No ads, zero tracking</li>
-            <li>No javascript</li>
-            <li>Minimalist design</li>
-            <li>100% open source</li>
-        </ul>
-    </section>
-
-    <section>
-        <h2 class="text-lg font-bold">Read the docs</h2>
-        <p>
-            <a href="/help">docs</a>
-        </p>
-    </section>
-
-    <section>
-        <h2 class="text-lg font-bold">Roadmap</h2>
-        <ol>
-          <li>Mobile support?</li>
-        </ol>
-    </section>
-</main>
 
 {{template "marketing-footer" .}}
 {{end}}
