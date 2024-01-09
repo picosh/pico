@@ -383,40 +383,6 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func transparencyHandler(w http.ResponseWriter, r *http.Request) {
-	dbpool := shared.GetDB(r)
-	logger := shared.GetLogger(r)
-	cfg := shared.GetCfg(r)
-
-	analytics, err := dbpool.FindSiteAnalytics(cfg.Space)
-	if err != nil {
-		logger.Error(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	ts, err := template.ParseFiles(
-		cfg.StaticPath("html/transparency.page.tmpl"),
-		cfg.StaticPath("html/footer.partial.tmpl"),
-		cfg.StaticPath("html/marketing-footer.partial.tmpl"),
-		cfg.StaticPath("html/base.layout.tmpl"),
-	)
-
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-
-	data := TransparencyPageData{
-		Site:      *cfg.GetSiteData(),
-		Analytics: analytics,
-	}
-	err = ts.Execute(w, data)
-	if err != nil {
-		logger.Error(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-}
-
 func readHandler(w http.ResponseWriter, r *http.Request) {
 	dbpool := shared.GetDB(r)
 	logger := shared.GetLogger(r)
@@ -689,12 +655,7 @@ func createStaticRoutes() []shared.Route {
 
 func createMainRoutes(staticRoutes []shared.Route) []shared.Route {
 	routes := []shared.Route{
-		shared.NewRoute("GET", "/", shared.CreatePageHandler("html/marketing.page.tmpl")),
-		shared.NewRoute("GET", "/spec", shared.CreatePageHandler("html/spec.page.tmpl")),
-		shared.NewRoute("GET", "/ops", shared.CreatePageHandler("html/ops.page.tmpl")),
-		shared.NewRoute("GET", "/privacy", shared.CreatePageHandler("html/privacy.page.tmpl")),
-		shared.NewRoute("GET", "/help", shared.CreatePageHandler("html/help.page.tmpl")),
-		shared.NewRoute("GET", "/transparency", transparencyHandler),
+		shared.NewRoute("GET", "/", readHandler),
 		shared.NewRoute("GET", "/read", readHandler),
 		shared.NewRoute("GET", "/check", shared.CheckHandler),
 	}
