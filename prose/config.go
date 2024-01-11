@@ -1,8 +1,6 @@
 package prose
 
 import (
-	"fmt"
-
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/wish/cms/config"
 )
@@ -24,10 +22,7 @@ func NewConfigSite() *shared.ConfigSite {
 	useImgProxy := shared.GetEnv("USE_IMGPROXY", "1")
 
 	intro := "To get started, enter a username.\n"
-	intro += "Then create a folder locally (e.g. ~/blog).\n"
-	intro += "Then write your post in markdown files (e.g. hello-world.md).\n"
-	intro += "Finally, send your files to us:\n\n"
-	intro += fmt.Sprintf("scp ~/blog/*.md %s:/", domain)
+	intro += "To learn next steps go to our docs at https://pico.sh/prose\n"
 
 	return &shared.ConfigSite{
 		Debug:                debug == "1",
@@ -44,7 +39,7 @@ func NewConfigSite() *shared.ConfigSite {
 			MinioURL:      minioURL,
 			MinioUser:     minioUser,
 			MinioPass:     minioPass,
-			Description:   "a blog platform for hackers.",
+			Description:   "A blog platform for hackers.",
 			IntroText:     intro,
 			Space:         "prose",
 			AllowedExt:    []string{".md"},

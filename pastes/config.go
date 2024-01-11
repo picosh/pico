@@ -1,8 +1,6 @@
 package pastes
 
 import (
-	"fmt"
-
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/wish/cms/config"
 )
@@ -24,8 +22,7 @@ func NewConfigSite() *shared.ConfigSite {
 	useImgProxy := shared.GetEnv("USE_IMGPROXY", "1")
 
 	intro := "To get started, enter a username.\n"
-	intro += "Then all you need to do is send your pastes to us:\n\n"
-	intro += fmt.Sprintf("scp my.patch %s:/", domain)
+	intro += "To learn next steps go to our docs at https://pico.sh/pastes\n"
 
 	return &shared.ConfigSite{
 		Debug:                debug == "1",
@@ -42,7 +39,7 @@ func NewConfigSite() *shared.ConfigSite {
 			MinioURL:      minioURL,
 			MinioUser:     minioUser,
 			MinioPass:     minioPass,
-			Description:   "a pastebin for hackers.",
+			Description:   "A pastebin for hackers.",
 			IntroText:     intro,
 			Space:         "pastes",
 			Logger:        shared.CreateLogger(debug == "1"),

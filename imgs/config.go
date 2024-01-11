@@ -1,8 +1,6 @@
 package imgs
 
 import (
-	"fmt"
-
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/wish/cms/config"
 )
@@ -43,9 +41,7 @@ func NewConfigSite() *shared.ConfigSite {
 	useImgProxy := shared.GetEnv("USE_IMGPROXY", "1")
 
 	intro := "To get started, enter a username.\n"
-	intro += "Then create a folder locally (e.g. ~/imgs).\n"
-	intro += "Finally, send your images to us:\n\n"
-	intro += fmt.Sprintf("scp ~/imgs/*.jpg %s:/", domain)
+	intro += "To learn next steps go to our docs at https://pico.sh/imgs\n"
 
 	cfg := shared.ConfigSite{
 		Debug:                debug == "1",
@@ -62,7 +58,7 @@ func NewConfigSite() *shared.ConfigSite {
 			MinioURL:      minioURL,
 			MinioUser:     minioUser,
 			MinioPass:     minioPass,
-			Description:   "a premium image hosting service for hackers.",
+			Description:   "An image hosting service for hackers.",
 			IntroText:     intro,
 			Space:         "imgs",
 			AllowedExt:    []string{".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"},

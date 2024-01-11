@@ -1,8 +1,6 @@
 package feeds
 
 import (
-	"fmt"
-
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/wish/cms/config"
 )
@@ -24,10 +22,8 @@ func NewConfigSite() *shared.ConfigSite {
 	sendgridKey := shared.GetEnv("SENDGRID_API_KEY", "")
 	useImgProxy := shared.GetEnv("USE_IMGPROXY", "1")
 
-	intro := "To get started, enter a username and email.\n"
-	intro += "Then upload a file containing a list of rss feeds (e.g. ~/feeds.txt)\n"
-	intro += "Finally, send your file to us:\n\n"
-	intro += fmt.Sprintf("scp ~/feeds.txt %s:/", domain)
+	intro := "To get started, enter a username.\n"
+	intro += "To learn next steps go to our docs at https://pico.sh/feeds\n"
 
 	return &shared.ConfigSite{
 		Debug:                debug == "1",
@@ -45,7 +41,7 @@ func NewConfigSite() *shared.ConfigSite {
 			MinioURL:      minioURL,
 			MinioUser:     minioUser,
 			MinioPass:     minioPass,
-			Description:   "an rss-to-email digest service for hackers",
+			Description:   "An rss-to-email digest service for hackers",
 			IntroText:     intro,
 			Space:         "feeds",
 			AllowedExt:    []string{".txt"},
