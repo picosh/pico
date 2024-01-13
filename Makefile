@@ -10,13 +10,6 @@ DOCKER_BUILDX_BUILD?=$(DOCKER_CMD) buildx build --push --platform $(DOCKER_PLATF
 WRITE?=0
 
 css:
-	cp ./smol.css lists/public/main.css
-	cp ./smol.css prose/public/main.css
-	cp ./smol.css pastes/public/main.css
-	cp ./smol.css imgs/public/main.css
-	cp ./smol.css feeds/public/main.css
-	cp ./smol.css pgs/public/main.css
-
 	cp ./syntax.css pastes/public/syntax.css
 	cp ./syntax.css prose/public/syntax.css
 .PHONY: css

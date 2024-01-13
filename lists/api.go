@@ -644,6 +644,7 @@ func rssHandler(w http.ResponseWriter, r *http.Request) {
 func createStaticRoutes() []shared.Route {
 	return []shared.Route{
 		shared.NewRoute("GET", "/main.css", shared.ServeFile("main.css", "text/css")),
+		shared.NewRoute("GET", "/lists.css", shared.ServeFile("lists.css", "text/css")),
 		shared.NewRoute("GET", "/card.png", shared.ServeFile("card.png", "image/png")),
 		shared.NewRoute("GET", "/favicon-16x16.png", shared.ServeFile("favicon-16x16.png", "image/png")),
 		shared.NewRoute("GET", "/favicon-32x32.png", shared.ServeFile("favicon-32x32.png", "image/png")),
