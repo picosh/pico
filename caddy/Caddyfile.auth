@@ -67,6 +67,11 @@
 		host irc.pico.sh
 	}
 
+	@ircmetrics {
+		host irc.pico.sh
+		path /_app/metrics
+	}
+
 	@options {
 		method OPTIONS
 	}
@@ -86,6 +91,11 @@
 		transport http {
 			tls_insecure_skip_verify
 		}
+	}
+
+	handle @ircmetrics {
+		rewrite * /metrics
+		reverse_proxy bouncer:9000
 	}
 
 	tls {$APP_EMAIL} {

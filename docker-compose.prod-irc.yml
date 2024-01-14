@@ -13,6 +13,8 @@ services:
     ports:
       - "${AUTH_IRCS_V4:-6697}:6697"
       - "${AUTH_IRCS_V6:-[::1]:6697}:6697"
+      - "${AUTH_IDENTD_V4:-113}:113"
+      - "${AUTH_IDENTD_V6:-[::1]:113}:113"
     volumes:
       - ./data/bouncer:/app/db
       - ./data/certs:/certs
