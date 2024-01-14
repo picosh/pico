@@ -1,8 +1,8 @@
 diff --git a/downstream.go b/downstream.go
-index f383212..35082d4 100644
+index f28b40f..caef2e2 100644
 --- a/downstream.go
 +++ b/downstream.go
-@@ -2947,6 +2947,9 @@ func (dc *downstreamConn) handleMessageRegistered(ctx context.Context, msg *irc.
+@@ -2952,6 +2952,9 @@ func (dc *downstreamConn) handleMessageRegistered(ctx context.Context, msg *irc.
  				network.pushTargets.Del(target)
  			}
  			go network.broadcastWebPush(&irc.Message{
@@ -12,7 +12,7 @@ index f383212..35082d4 100644
  				Command: "MARKREAD",
  				Params:  []string{target, timestampStr},
  			})
-@@ -3198,6 +3201,10 @@ func (dc *downstreamConn) handleMessageRegistered(ctx context.Context, msg *irc.
+@@ -3203,6 +3206,10 @@ func (dc *downstreamConn) handleMessageRegistered(ctx context.Context, msg *irc.
  				}}
  			}
  
@@ -24,7 +24,7 @@ index f383212..35082d4 100644
  				Endpoint: endpoint,
  			}
 diff --git a/server.go b/server.go
-index 552104e..4b2ffe6 100644
+index d26e873..407355f 100644
 --- a/server.go
 +++ b/server.go
 @@ -10,6 +10,7 @@ import (
@@ -51,20 +51,28 @@ index 552104e..4b2ffe6 100644
  	var urgency webpush.Urgency
  	switch msg.Command {
  	case "PRIVMSG", "NOTICE", "INVITE":
-@@ -339,7 +349,7 @@ func (s *Server) sendWebPush(ctx context.Context, sub *webpush.Subscription, vap
+@@ -339,12 +349,10 @@ func (s *Server) sendWebPush(ctx context.Context, sub *webpush.Subscription, vap
  		},
  		VAPIDPublicKey:  s.webPush.VAPIDKeys.Public,
  		VAPIDPrivateKey: s.webPush.VAPIDKeys.Private,
--		Subscriber:      "https://soju.im",
+-		// TODO: switch back to an HTTP URL once this is merged:
+-		// https://github.com/SherClockHolmes/webpush-go/pull/57
+-		Subscriber: "webpush@soju.im",
+-		TTL:        7 * 24 * 60 * 60, // seconds
+-		Urgency:    urgency,
+-		RecordSize: 2048,
 +		Subscriber:      "hello@pico.sh",
- 		TTL:             7 * 24 * 60 * 60, // seconds
- 		Urgency:         urgency,
- 		RecordSize:      2048,
++		TTL:             7 * 24 * 60 * 60, // seconds
++		Urgency:         urgency,
++		RecordSize:      2048,
+ 	}
+ 
+ 	if vapidPubKey != options.VAPIDPublicKey {
 diff --git a/upstream.go b/upstream.go
-index 95bad3a..afbe314 100644
+index e3bdf4e..38ed883 100644
 --- a/upstream.go
 +++ b/upstream.go
-@@ -682,6 +682,7 @@ func (uc *upstreamConn) handleMessage(ctx context.Context, msg *irc.Message) err
+@@ -683,6 +683,7 @@ func (uc *upstreamConn) handleMessage(ctx context.Context, msg *irc.Message) err
  		}
  
  		if !self && (highlight || directMessage) {
@@ -72,7 +80,7 @@ index 95bad3a..afbe314 100644
  			go uc.network.broadcastWebPush(msg)
  			if timestamp, err := time.Parse(xirc.ServerTimeLayout, string(msg.Tags["time"])); err == nil {
  				uc.network.pushTargets.Set(bufferName, timestamp)
-@@ -1611,6 +1612,7 @@ func (uc *upstreamConn) handleMessage(ctx context.Context, msg *irc.Message) err
+@@ -1612,6 +1613,7 @@ func (uc *upstreamConn) handleMessage(ctx context.Context, msg *irc.Message) err
  		})
  
  		if weAreInvited {
