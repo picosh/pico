@@ -1,3 +1,7 @@
 body {
   max-width: 1025px;
 }
+
+.post-date {
+  width: 130px;
+}
