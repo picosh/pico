@@ -84,6 +84,10 @@ func StartSshServer() {
 		logger.Fatal(err)
 	}
 
+	// cron daily digest
+	fetcher := NewFetcher(dbh, cfg)
+	go fetcher.Loop()
+
 	handler := filehandlers.NewScpPostHandler(dbh, cfg, hooks, st)
 
 	sshServer := &SSHServer{}
