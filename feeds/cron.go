@@ -137,10 +137,10 @@ func (f *Fetcher) RunPost(user *db.User, post *db.Post) error {
 
 	parsed := shared.ListParseText(post.Text, shared.NewNullLinkify())
 
-	f.cfg.Logger.Infof("Last digest at (%s)", post.Data.LastDigest)
+	f.cfg.Logger.Infof("(%s) Last digest at (%s)", user.Name, post.Data.LastDigest)
 	err := f.Validate(post.Data.LastDigest, parsed)
 	if err != nil {
-		f.cfg.Logger.Info(err.Error())
+		f.cfg.Logger.Infof("(%s) %s", user.Name, err.Error())
 		return nil
 	}
 
@@ -160,7 +160,7 @@ func (f *Fetcher) RunPost(user *db.User, post *db.Post) error {
 		urls = append(urls, url)
 	}
 
-	msgBody, err := f.FetchAll(urls, parsed.InlineContent, post.ID)
+	msgBody, err := f.FetchAll(urls, parsed.InlineContent, post.ID, user.Name)
 	if err != nil {
 		return err
 	}
@@ -190,7 +190,7 @@ func (f *Fetcher) RunUser(user *db.User) error {
 	for _, post := range posts.Data {
 		err = f.RunPost(user, post)
 		if err != nil {
-			f.cfg.Logger.Infof(err.Error())
+			f.cfg.Logger.Infof("(%s) %s", user.Name, err.Error())
 		}
 	}
 
@@ -231,8 +231,8 @@ func (f *Fetcher) ParseURL(fp *gofeed.Parser, url string) (*gofeed.Feed, error) 
 	return feed, nil
 }
 
-func (f *Fetcher) Fetch(fp *gofeed.Parser, url string, feedItems []*db.FeedItem) (*Feed, error) {
-	f.cfg.Logger.Infof("(%s) fetching feed", url)
+func (f *Fetcher) Fetch(fp *gofeed.Parser, url string, username string, feedItems []*db.FeedItem) (*Feed, error) {
+	f.cfg.Logger.Infof("(%s) %s fetching feed", username, url)
 
 	feed, err := f.ParseURL(fp, url)
 	if err != nil {
@@ -262,7 +262,12 @@ func (f *Fetcher) Fetch(fp *gofeed.Parser, url string, feedItems []*db.FeedItem)
 	}
 
 	if len(items) == 0 {
-		return nil, fmt.Errorf("(%s) %w, skipping", url, ErrNoRecentArticles)
+		return nil, fmt.Errorf(
+			"(%s) %s %w, skipping",
+			username,
+			url,
+			ErrNoRecentArticles,
+		)
 	}
 
 	feedTmpl.FeedItems = gofeedItems
@@ -311,7 +316,7 @@ type MsgBody struct {
 	Text string
 }
 
-func (f *Fetcher) FetchAll(urls []string, inlineContent bool, postID string) (*MsgBody, error) {
+func (f *Fetcher) FetchAll(urls []string, inlineContent bool, postID string, username string) (*MsgBody, error) {
 	fp := gofeed.NewParser()
 	feeds := &DigestFeed{Options: DigestOptions{InlineContent: inlineContent}}
 	feedItems, err := f.db.FindFeedItemsByPostID(postID)
@@ -320,7 +325,7 @@ func (f *Fetcher) FetchAll(urls []string, inlineContent bool, postID string) (*M
 	}
 
 	for _, url := range urls {
-		feedTmpl, err := f.Fetch(fp, url, feedItems)
+		feedTmpl, err := f.Fetch(fp, url, username, feedItems)
 		if err != nil {
 			if errors.Is(err, ErrNoRecentArticles) {
 				f.cfg.Logger.Info(err)
@@ -333,7 +338,7 @@ func (f *Fetcher) FetchAll(urls []string, inlineContent bool, postID string) (*M
 	}
 
 	if len(feeds.Feeds) == 0 {
-		return nil, fmt.Errorf("%w, skipping", ErrNoRecentArticles)
+		return nil, fmt.Errorf("(%s) %w, skipping email", username, ErrNoRecentArticles)
 	}
 
 	fdi := []*db.FeedItem{}

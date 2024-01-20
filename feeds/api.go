@@ -56,6 +56,10 @@ func StartApiServer() {
 		logger.Fatal(err)
 	}
 
+	// cron daily digest
+	fetcher := NewFetcher(db, cfg)
+	go fetcher.Loop()
+
 	staticRoutes := createStaticRoutes()
 
 	if cfg.Debug {
