@@ -157,6 +157,17 @@ type FeatureFlag struct {
 	Data             FeatureFlagData
 }
 
+func NewFeatureFlag(userID, name string, storageMax, fileMax uint64) *FeatureFlag {
+	return &FeatureFlag{
+		UserID: userID,
+		Name:   name,
+		Data: FeatureFlagData{
+			StorageMax: storageMax,
+			FileMax:    fileMax,
+		},
+	}
+}
+
 func (ff *FeatureFlag) IsValid() bool {
 	if ff.ExpiresAt.IsZero() {
 		return false

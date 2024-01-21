@@ -1140,10 +1140,13 @@ func (me *PsqlDB) FindTagsForPost(postID string) ([]string, error) {
 
 func (me *PsqlDB) FindFeatureForUser(userID string, feature string) (*db.FeatureFlag, error) {
 	ff := &db.FeatureFlag{}
+	// payment history is allowed to be null
+	// https://devtidbits.com/2020/08/03/go-sql-error-converting-null-to-string-is-unsupported/
+	var paymentHistoryID sql.NullString
 	err := me.Db.QueryRow(sqlSelectFeatureForUser, userID, feature).Scan(
 		&ff.ID,
 		&ff.UserID,
-		&ff.PaymentHistoryID,
+		&paymentHistoryID,
 		&ff.Name,
 		&ff.Data,
 		&ff.CreatedAt,
@@ -1152,6 +1155,8 @@ func (me *PsqlDB) FindFeatureForUser(userID string, feature string) (*db.Feature
 	if err != nil {
 		return nil, err
 	}
+
+	ff.PaymentHistoryID = paymentHistoryID.String
 
 	return ff, nil
 }

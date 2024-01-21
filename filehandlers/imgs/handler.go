@@ -186,12 +186,15 @@ func (h *UploadImgHandler) Validate(s ssh.Session) error {
 	}
 
 	ff, _ := h.DBPool.FindFeatureForUser(user.ID, "imgs")
-	// imgs.sh is a free service so users might not have a feature flag
+	// imgs.sh has a free tier so users might not have a feature flag
 	// in which case we set sane defaults
 	if ff == nil {
-		ff = &db.FeatureFlag{
-			Data: db.FeatureFlagData{},
-		}
+		ff = db.NewFeatureFlag(
+			user.ID,
+			"imgs",
+			h.Cfg.MaxSize,
+			h.Cfg.MaxAssetSize,
+		)
 	}
 	s.Context().SetValue(ctxFeatureFlagKey{}, ff)
 
@@ -297,7 +300,7 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		user.Name,
 		metadata.Slug,
 	)
-	maxSize := int(h.calcStorageMax(featureFlag))
+	maxSize := int(featureFlag.Data.StorageMax)
 	str := fmt.Sprintf(
 		"%s (space: %.2f/%.2fGB, %.2f%%)",
 		url,

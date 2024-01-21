@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS payment_history (
   user_id uuid,
   amount bigint NOT NULL,
   payment_type character varying(50),
-  data jsonb NOT NULL DEFAULT '{}'::jsonb,
+  data jsonb NOT NULL DEFAULT '{"notes": ""}'::jsonb,
   created_at timestamp without time zone NOT NULL DEFAULT NOW(),
   CONSTRAINT payment_history_aliases_pkey PRIMARY KEY (id),
   CONSTRAINT fk_payment_history_users

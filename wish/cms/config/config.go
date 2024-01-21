@@ -26,8 +26,8 @@ type ConfigCms struct {
 	HiddenPosts   []string
 	Logger        *zap.SugaredLogger
 	AllowRegister bool
-	MaxSize       int
-	MaxAssetSize  int
+	MaxSize       uint64
+	MaxAssetSize  uint64
 }
 
 func NewConfigCms() *ConfigCms {

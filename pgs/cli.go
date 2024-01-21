@@ -143,7 +143,18 @@ func (c *Cmd) help() {
 	c.output(getHelpText(c.User.Name, "project-a"))
 }
 
-func (c *Cmd) stats(maxSize int) error {
+func (c *Cmd) stats(cfgMaxSize uint64) error {
+	ff, err := c.Dbpool.FindFeatureForUser(c.User.ID, "pgs")
+	if err != nil {
+		ff = &db.FeatureFlag{
+			Data: db.FeatureFlagData{},
+		}
+	}
+	maxSize := cfgMaxSize
+	if ff.Data.StorageMax > 0 {
+		maxSize = ff.Data.StorageMax
+	}
+
 	bucketName := shared.GetAssetBucketName(c.User.ID)
 	bucket, err := c.Store.UpsertBucket(bucketName)
 	if err != nil {
@@ -165,7 +176,7 @@ func (c *Cmd) stats(maxSize int) error {
 	str += fmt.Sprintf(
 		"space:\t\t%.4f/%.4fGB, %.4f%%\n",
 		shared.BytesToGB(int(totalFileSize)),
-		shared.BytesToGB(maxSize),
+		shared.BytesToGB(int(maxSize)),
 		(float32(totalFileSize)/float32(maxSize))*100,
 	)
 	str += fmt.Sprintf("projects:\t%d", len(projects))
