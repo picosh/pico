@@ -24,7 +24,7 @@ func (i *ImgsLinkify) Create(fname string) string {
 	return i.Cfg.ImgFullURL(i.Username, fname)
 }
 
-var maxSize = uint64(1 * shared.GB)
+var maxSize = uint64(250 * shared.MB)
 var maxImgSize = uint64(10 * shared.MB)
 
 func NewConfigSite() *shared.ConfigSite {
