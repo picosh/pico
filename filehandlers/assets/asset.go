@@ -6,12 +6,27 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/send/send/utils"
 )
 
+func (h *UploadAssetHandler) calcStorageMax(ff *db.FeatureFlag) uint64 {
+	if ff.Data.StorageMax == 0 {
+		return uint64(h.Cfg.MaxAssetSize)
+	}
+	return ff.Data.StorageMax
+}
+
+func (h *UploadAssetHandler) calcFileMax(ff *db.FeatureFlag) uint64 {
+	if ff.Data.FileMax == 0 {
+		return uint64(h.Cfg.MaxSize)
+	}
+	return ff.Data.FileMax
+}
+
 func (h *UploadAssetHandler) validateAsset(data *FileData) (bool, error) {
-	if data.BucketQuota >= uint64(h.Cfg.MaxSize) {
+	if data.BucketQuota >= h.calcStorageMax(data.FeatureFlag) {
 		return false, fmt.Errorf(
 			"ERROR: user (%s) has exceeded (%d bytes) max (%d bytes)",
 			data.User.Name,
@@ -26,7 +41,7 @@ func (h *UploadAssetHandler) validateAsset(data *FileData) (bool, error) {
 	}
 
 	fname := filepath.Base(data.Filepath)
-	if int(data.Size) > h.Cfg.MaxAssetSize {
+	if uint64(data.Size) > h.calcFileMax(data.FeatureFlag) {
 		return false, fmt.Errorf("ERROR: file (%s) has exceeded maximum file size (%d bytes)", fname, h.Cfg.MaxAssetSize)
 	}
 

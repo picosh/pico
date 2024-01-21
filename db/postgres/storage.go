@@ -158,7 +158,7 @@ const (
 	sqlSelectTotalPostsAfterDate = `SELECT count(id) FROM posts WHERE created_at >= $1 AND cur_space = $2`
 	sqlSelectUsersWithPost       = `SELECT count(app_users.id) FROM app_users WHERE EXISTS (SELECT 1 FROM posts WHERE user_id = app_users.id AND cur_space = $1);`
 
-	sqlSelectFeatureForUser = `SELECT id FROM feature_flags WHERE user_id = $1 AND name = $2`
+	sqlSelectFeatureForUser = `SELECT id, user_id, payment_history_id, name, data, created_at, expires_at FROM feature_flags WHERE user_id = $1 AND name = $2 ORDER BY expires_at DESC LIMIT 1`
 	sqlSelectSizeForUser    = `SELECT COALESCE(sum(file_size), 0) FROM posts WHERE user_id = $1`
 
 	sqlSelectPostIdByAliasSlug = `SELECT post_id FROM post_aliases WHERE slug = $1`
@@ -1138,13 +1138,30 @@ func (me *PsqlDB) FindTagsForPost(postID string) ([]string, error) {
 	return tags, nil
 }
 
+func (me *PsqlDB) FindFeatureForUser(userID string, feature string) (*db.FeatureFlag, error) {
+	ff := &db.FeatureFlag{}
+	err := me.Db.QueryRow(sqlSelectFeatureForUser, userID, feature).Scan(
+		&ff.ID,
+		&ff.UserID,
+		&ff.PaymentHistoryID,
+		&ff.Name,
+		&ff.Data,
+		&ff.CreatedAt,
+		&ff.ExpiresAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return ff, nil
+}
+
 func (me *PsqlDB) HasFeatureForUser(userID string, feature string) bool {
-	var id string
-	err := me.Db.QueryRow(sqlSelectFeatureForUser, userID, feature).Scan(&id)
+	ff, err := me.FindFeatureForUser(userID, feature)
 	if err != nil {
 		return false
 	}
-	return id != ""
+	return ff.IsValid()
 }
 
 func (me *PsqlDB) FindTotalSizeForUser(userID string) (int, error) {

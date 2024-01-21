@@ -19,6 +19,7 @@ import (
 )
 
 type ctxUserKey struct{}
+type ctxFeatureFlagKey struct{}
 type ctxBucketKey struct{}
 type ctxBucketQuotaKey struct{}
 type ctxProjectKey struct{}
@@ -40,6 +41,14 @@ func getBucket(s ssh.Session) (storage.Bucket, error) {
 	return bucket, nil
 }
 
+func getFeatureFlag(s ssh.Session) (*db.FeatureFlag, error) {
+	ff := s.Context().Value(ctxFeatureFlagKey{}).(*db.FeatureFlag)
+	if ff.Name == "" {
+		return ff, fmt.Errorf("feature flag not set on `ssh.Context()` for connection")
+	}
+	return ff, nil
+}
+
 func getBucketQuota(s ssh.Session) uint64 {
 	return s.Context().Value(ctxBucketQuotaKey{}).(uint64)
 }
@@ -58,6 +67,7 @@ type FileData struct {
 	User        *db.User
 	Bucket      storage.Bucket
 	BucketQuota uint64
+	FeatureFlag *db.FeatureFlag
 }
 
 type UploadAssetHandler struct {
@@ -170,9 +180,14 @@ func (h *UploadAssetHandler) Validate(s ssh.Session) error {
 		return fmt.Errorf("must have username set")
 	}
 
-	if !h.DBPool.HasFeatureForUser(user.ID, "pgs") {
+	ff, err := h.DBPool.FindFeatureForUser(user.ID, "pgs")
+	if err != nil {
+		return err
+	}
+	if !ff.IsValid() {
 		return fmt.Errorf("you do not have access to this service")
 	}
+	s.Context().SetValue(ctxFeatureFlagKey{}, ff)
 
 	assetBucket := shared.GetAssetBucketName(user.ID)
 	bucket, err := h.Storage.UpsertBucket(assetBucket)
@@ -244,12 +259,17 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 	}
 
 	bucketQuota := getBucketQuota(s)
+	featureFlag, err := getFeatureFlag(s)
+	if err != nil {
+		return "", err
+	}
 	data := &FileData{
 		FileEntry:   entry,
 		User:        user,
 		Text:        origText,
 		Bucket:      bucket,
 		BucketQuota: bucketQuota,
+		FeatureFlag: featureFlag,
 	}
 	err = h.writeAsset(data)
 	if err != nil {

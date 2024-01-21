@@ -12,17 +12,33 @@ import (
 	"github.com/picosh/send/send/utils"
 )
 
+func (h *UploadImgHandler) calcStorageMax(ff *db.FeatureFlag) uint64 {
+	if ff.Data.StorageMax == 0 {
+		return uint64(h.Cfg.MaxAssetSize)
+	}
+	return ff.Data.StorageMax
+}
+
+func (h *UploadImgHandler) calcFileMax(ff *db.FeatureFlag) uint64 {
+	if ff.Data.FileMax == 0 {
+		return uint64(h.Cfg.MaxSize)
+	}
+	return ff.Data.FileMax
+}
+
 func (h *UploadImgHandler) validateImg(data *PostMetaData) (bool, error) {
 	totalFileSize, err := h.DBPool.FindTotalSizeForUser(data.User.ID)
 	if err != nil {
 		return false, err
 	}
 
-	if data.FileSize > maxImgSize {
+	maxImgSize := h.calcFileMax(data.FeatureFlag)
+	if uint64(data.FileSize) > maxImgSize {
 		return false, fmt.Errorf("ERROR: file (%s) has exceeded maximum file size (%d bytes)", data.Filename, maxImgSize)
 	}
 
-	if totalFileSize+data.FileSize > maxSize {
+	maxSize := h.calcStorageMax(data.FeatureFlag)
+	if uint64(totalFileSize+data.FileSize) > maxSize {
 		return false, fmt.Errorf("ERROR: user (%s) has exceeded (%d bytes) max (%d bytes)", data.User.Name, totalFileSize, maxSize)
 	}
 

@@ -79,7 +79,6 @@ func (p *FeedItemData) Scan(value interface{}) error {
 	if !ok {
 		return errors.New("type assertion to []byte failed")
 	}
-
 	return json.Unmarshal(b, &p)
 }
 
@@ -146,6 +145,44 @@ type Token struct {
 	Name      string
 	CreatedAt *time.Time
 	ExpiresAt *time.Time
+}
+
+type FeatureFlag struct {
+	ID               string
+	UserID           string
+	PaymentHistoryID string
+	Name             string
+	CreatedAt        *time.Time
+	ExpiresAt        *time.Time
+	Data             FeatureFlagData
+}
+
+func (ff *FeatureFlag) IsValid() bool {
+	if ff.ExpiresAt.IsZero() {
+		return false
+	}
+	return ff.ExpiresAt.After(time.Now())
+}
+
+type FeatureFlagData struct {
+	StorageMax uint64 `json:"storage_max"`
+	FileMax    uint64 `json:"file_max"`
+}
+
+// Make the Attrs struct implement the driver.Valuer interface. This method
+// simply returns the JSON-encoded representation of the struct.
+func (p FeatureFlagData) Value() (driver.Value, error) {
+	return json.Marshal(p)
+}
+
+// Make the Attrs struct implement the sql.Scanner interface. This method
+// simply decodes a JSON-encoded value into the struct fields.
+func (p *FeatureFlagData) Scan(value interface{}) error {
+	b, ok := value.([]byte)
+	if !ok {
+		return errors.New("type assertion to []byte failed")
+	}
+	return json.Unmarshal(b, &p)
 }
 
 type ErrMultiplePublicKeys struct{}
@@ -216,6 +253,7 @@ type DB interface {
 
 	AddViewCount(postID string) (int, error)
 
+	FindFeatureForUser(userID string, feature string) (*FeatureFlag, error)
 	HasFeatureForUser(userID string, feature string) bool
 	FindTotalSizeForUser(userID string) (int, error)
 

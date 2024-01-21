@@ -24,6 +24,9 @@ func (i *ImgsLinkify) Create(fname string) string {
 	return i.Cfg.ImgFullURL(i.Username, fname)
 }
 
+var maxSize = 1 * shared.GB
+var maxImgSize = 10 * shared.MB
+
 func NewConfigSite() *shared.ConfigSite {
 	debug := shared.GetEnv("IMGS_DEBUG", "0")
 	domain := shared.GetEnv("IMGS_DOMAIN", "prose.sh")
@@ -64,6 +67,8 @@ func NewConfigSite() *shared.ConfigSite {
 			AllowedExt:    []string{".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"},
 			Logger:        shared.CreateLogger(debug == "1"),
 			AllowRegister: allowRegister == "1",
+			MaxSize:       maxSize,
+			MaxAssetSize:  maxImgSize,
 		},
 	}
 
