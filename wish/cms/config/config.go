@@ -27,7 +27,7 @@ type ConfigCms struct {
 	Logger        *zap.SugaredLogger
 	AllowRegister bool
 	MaxSize       uint64
-	MaxAssetSize  uint64
+	MaxAssetSize  int64
 }
 
 func NewConfigCms() *ConfigCms {

@@ -54,9 +54,9 @@ func getStorageSize(s ssh.Session) uint64 {
 	return s.Context().Value(ctxStorageSizeKey{}).(uint64)
 }
 
-func incrementStorageSize(s ssh.Session, fileSize uint64) uint64 {
+func incrementStorageSize(s ssh.Session, fileSize int64) uint64 {
 	curSize := getStorageSize(s)
-	nextStorageSize := curSize + fileSize
+	nextStorageSize := curSize + uint64(fileSize)
 	s.Context().SetValue(ctxStorageSizeKey{}, nextStorageSize)
 	return nextStorageSize
 }
@@ -76,7 +76,7 @@ type FileData struct {
 	Bucket        storage.Bucket
 	StorageSize   uint64
 	FeatureFlag   *db.FeatureFlag
-	DeltaFileSize uint64
+	DeltaFileSize int64
 }
 
 type UploadAssetHandler struct {
@@ -289,14 +289,14 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 		Bucket:        bucket,
 		StorageSize:   storageSize,
 		FeatureFlag:   featureFlag,
-		DeltaFileSize: uint64(deltaFileSize),
+		DeltaFileSize: deltaFileSize,
 	}
 	err = h.writeAsset(data)
 	if err != nil {
 		h.Cfg.Logger.Error(err)
 		return "", err
 	}
-	nextStorageSize := incrementStorageSize(s, uint64(deltaFileSize))
+	nextStorageSize := incrementStorageSize(s, deltaFileSize)
 
 	url := h.Cfg.AssetURL(
 		user.Name,
@@ -318,7 +318,7 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 
 func (h *UploadAssetHandler) validateAsset(data *FileData) (bool, error) {
 	storageMax := data.FeatureFlag.Data.StorageMax
-	if data.StorageSize+data.DeltaFileSize >= storageMax {
+	if data.StorageSize+uint64(data.DeltaFileSize) >= storageMax {
 		return false, fmt.Errorf(
 			"ERROR: user (%s) has exceeded (%d bytes) max (%d bytes)",
 			data.User.Name,
@@ -332,7 +332,7 @@ func (h *UploadAssetHandler) validateAsset(data *FileData) (bool, error) {
 		return false, fmt.Errorf("ERROR: invalid project name, you must copy files to a non-root folder (e.g. pgs.sh:/project-name)")
 	}
 
-	fileSize := uint64(data.Size)
+	fileSize := data.Size
 	fname := filepath.Base(data.Filepath)
 	fileMax := data.FeatureFlag.Data.FileMax
 	if fileSize > fileMax {

@@ -19,7 +19,7 @@ func (h *UploadImgHandler) validateImg(data *PostMetaData) (bool, error) {
 	}
 
 	fileMax := data.FeatureFlag.Data.FileMax
-	if uint64(data.FileSize) > fileMax {
+	if int64(data.FileSize) > fileMax {
 		return false, fmt.Errorf("ERROR: file (%s) has exceeded maximum file size (%d bytes)", data.Filename, fileMax)
 	}
 
