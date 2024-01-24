@@ -1,6 +1,7 @@
 package uploadassets
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -21,7 +22,7 @@ import (
 type ctxUserKey struct{}
 type ctxFeatureFlagKey struct{}
 type ctxBucketKey struct{}
-type ctxBucketQuotaKey struct{}
+type ctxStorageSizeKey struct{}
 type ctxProjectKey struct{}
 
 func getProject(s ssh.Session) *db.Project {
@@ -49,8 +50,15 @@ func getFeatureFlag(s ssh.Session) (*db.FeatureFlag, error) {
 	return ff, nil
 }
 
-func getBucketQuota(s ssh.Session) uint64 {
-	return s.Context().Value(ctxBucketQuotaKey{}).(uint64)
+func getStorageSize(s ssh.Session) uint64 {
+	return s.Context().Value(ctxStorageSizeKey{}).(uint64)
+}
+
+func incrementStorageSize(s ssh.Session, fileSize uint64) uint64 {
+	curSize := getStorageSize(s)
+	nextStorageSize := curSize + fileSize
+	s.Context().SetValue(ctxStorageSizeKey{}, nextStorageSize)
+	return nextStorageSize
 }
 
 func getUser(s ssh.Session) (*db.User, error) {
@@ -63,11 +71,12 @@ func getUser(s ssh.Session) (*db.User, error) {
 
 type FileData struct {
 	*utils.FileEntry
-	Text        []byte
-	User        *db.User
-	Bucket      storage.Bucket
-	BucketQuota uint64
-	FeatureFlag *db.FeatureFlag
+	Text          []byte
+	User          *db.User
+	Bucket        storage.Bucket
+	StorageSize   uint64
+	FeatureFlag   *db.FeatureFlag
+	DeltaFileSize uint64
 }
 
 type UploadAssetHandler struct {
@@ -200,12 +209,12 @@ func (h *UploadAssetHandler) Validate(s ssh.Session) error {
 	}
 	s.Context().SetValue(ctxBucketKey{}, bucket)
 
-	totalFileSize, err := h.Storage.GetBucketQuota(bucket)
+	totalStorageSize, err := h.Storage.GetBucketQuota(bucket)
 	if err != nil {
 		return err
 	}
-	s.Context().SetValue(ctxBucketQuotaKey{}, totalFileSize)
-	h.Cfg.Logger.Infof("(%s) bucket size is current (%d bytes)", user.Name, totalFileSize)
+	s.Context().SetValue(ctxStorageSizeKey{}, totalStorageSize)
+	h.Cfg.Logger.Infof("(%s) bucket size is current (%d bytes)", user.Name, totalStorageSize)
 
 	s.Context().SetValue(ctxUserKey{}, user)
 	h.Cfg.Logger.Infof("(%s) attempting to upload files to (%s)", user.Name, h.Cfg.Space)
@@ -262,24 +271,32 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 		s.Context().SetValue(ctxProjectKey{}, project)
 	}
 
-	bucketQuota := getBucketQuota(s)
+	storageSize := getStorageSize(s)
 	featureFlag, err := getFeatureFlag(s)
 	if err != nil {
 		return "", err
 	}
+	// calculate the filsize difference between the same file already
+	// stored and the updated file being uploaded
+	assetFilename := shared.GetAssetFileName(entry)
+	curFileSize, _ := h.Storage.GetFileSize(bucket, assetFilename)
+	deltaFileSize := curFileSize - entry.Size
+
 	data := &FileData{
-		FileEntry:   entry,
-		User:        user,
-		Text:        origText,
-		Bucket:      bucket,
-		BucketQuota: bucketQuota,
-		FeatureFlag: featureFlag,
+		FileEntry:     entry,
+		User:          user,
+		Text:          origText,
+		Bucket:        bucket,
+		StorageSize:   storageSize,
+		FeatureFlag:   featureFlag,
+		DeltaFileSize: uint64(deltaFileSize),
 	}
 	err = h.writeAsset(data)
 	if err != nil {
 		h.Cfg.Logger.Error(err)
 		return "", err
 	}
+	nextStorageSize := incrementStorageSize(s, uint64(deltaFileSize))
 
 	url := h.Cfg.AssetURL(
 		user.Name,
@@ -287,15 +304,101 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 		strings.Replace(data.Filepath, "/"+projectName+"/", "", 1),
 	)
 
-	totalFileSize := bucketQuota
 	maxSize := int(featureFlag.Data.StorageMax)
 	str := fmt.Sprintf(
 		"%s (space: %.2f/%.2fGB, %.2f%%)",
 		url,
-		shared.BytesToGB(int(totalFileSize)),
+		shared.BytesToGB(int(nextStorageSize)),
 		shared.BytesToGB(maxSize),
-		(float32(totalFileSize)/float32(maxSize))*100,
+		(float32(nextStorageSize)/float32(maxSize))*100,
 	)
 
 	return str, nil
+}
+
+func (h *UploadAssetHandler) validateAsset(data *FileData) (bool, error) {
+	storageMax := data.FeatureFlag.Data.StorageMax
+	if data.StorageSize+data.DeltaFileSize >= storageMax {
+		return false, fmt.Errorf(
+			"ERROR: user (%s) has exceeded (%d bytes) max (%d bytes)",
+			data.User.Name,
+			data.StorageSize,
+			storageMax,
+		)
+	}
+
+	projectName := shared.GetProjectName(data.FileEntry)
+	if projectName == "" || projectName == "/" || projectName == "." {
+		return false, fmt.Errorf("ERROR: invalid project name, you must copy files to a non-root folder (e.g. pgs.sh:/project-name)")
+	}
+
+	fileSize := uint64(data.Size)
+	fname := filepath.Base(data.Filepath)
+	fileMax := data.FeatureFlag.Data.FileMax
+	if fileSize > fileMax {
+		return false, fmt.Errorf("ERROR: file (%s) has exceeded maximum file size (%d bytes)", fname, fileMax)
+	}
+
+	// ".well-known" is a special case
+	if strings.Contains(fname, "/.well-known/") {
+		if shared.IsTextFile(string(data.Text)) {
+			return true, nil
+		} else {
+			return false, fmt.Errorf("(%s) not a utf-8 text file", data.Filepath)
+		}
+	}
+
+	// special file we use for custom routing
+	if fname == "_redirects" {
+		return true, nil
+	}
+
+	if !shared.IsExtAllowed(fname, h.Cfg.AllowedExt) {
+		extStr := strings.Join(h.Cfg.AllowedExt, ",")
+		err := fmt.Errorf(
+			"ERROR: (%s) invalid file, format must be (%s), skipping",
+			fname,
+			extStr,
+		)
+		return false, err
+	}
+
+	return true, nil
+}
+
+func (h *UploadAssetHandler) writeAsset(data *FileData) error {
+	valid, err := h.validateAsset(data)
+	if !valid {
+		return err
+	}
+
+	assetFilename := shared.GetAssetFileName(data.FileEntry)
+
+	if data.Size == 0 {
+		err = h.Storage.DeleteFile(data.Bucket, assetFilename)
+		if err != nil {
+			return err
+		}
+	} else {
+		reader := bytes.NewReader(data.Text)
+
+		h.Cfg.Logger.Infof(
+			"(%s) uploading to (bucket: %s) (%s)",
+			data.User.Name,
+			data.Bucket.Name,
+			assetFilename,
+		)
+
+		_, err := h.Storage.PutFile(
+			data.Bucket,
+			assetFilename,
+			utils.NopReaderAtCloser(reader),
+			data.FileEntry,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

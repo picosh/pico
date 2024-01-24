@@ -152,6 +152,14 @@ func (s *StorageMinio) DeleteBucket(bucket Bucket) error {
 	return s.Client.RemoveBucket(context.TODO(), bucket.Name)
 }
 
+func (s *StorageMinio) GetFileSize(bucket Bucket, fpath string) (int64, error) {
+	info, err := s.Client.StatObject(context.Background(), bucket.Name, fpath, minio.StatObjectOptions{})
+	if err != nil {
+		return 0, err
+	}
+	return info.Size, nil
+}
+
 func (s *StorageMinio) GetFile(bucket Bucket, fpath string) (utils.ReaderAtCloser, int64, time.Time, error) {
 	modTime := time.Time{}
 
