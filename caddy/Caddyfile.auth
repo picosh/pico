@@ -95,7 +95,7 @@
 
 	handle @ircmetrics {
 		rewrite * /metrics
-		reverse_proxy bouncer:9000
+		reverse_proxy bouncer:80
 	}
 
 	tls {$APP_EMAIL} {

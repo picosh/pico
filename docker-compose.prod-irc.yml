@@ -5,6 +5,11 @@ services:
       - ${AUTH_NETWORK}
     env_file:
       - .env.prod
+  bouncer-prom-proxy:
+    network_mode: service:bouncer
+    environment:
+      - PROXY_URL=http://localhost:9000
+    image: schmailzl/simple-reverse-proxy
   bouncer:
     networks:
       - ${AUTH_NETWORK}
@@ -16,6 +21,7 @@ services:
       - "${AUTH_IDENTD_V4:-113}:113"
       - "${AUTH_IDENTD_V6:-[::1]:113}:113"
     volumes:
+      - ./data/run:/run/soju
       - ./data/bouncer:/app/db
       - ./data/certs:/certs
       - ${AUTH_REAL_CERT_MOUNT}
