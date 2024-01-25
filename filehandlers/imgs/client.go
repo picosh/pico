@@ -24,10 +24,6 @@ func NewImgsAPI(dbpool db.DB, st storage.ObjectStorage) *ImgsAPI {
 	}
 }
 
-func (img *ImgsAPI) HasAccess(userID string) bool {
-	return img.Db.HasFeatureForUser(userID, "imgs")
-}
-
 func (img *ImgsAPI) Upload(s ssh.Session, file *utils.FileEntry) (string, error) {
 	handler := NewUploadImgHandler(img.Db, img.Cfg, img.St)
 	err := handler.Validate(s)

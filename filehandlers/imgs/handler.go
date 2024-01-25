@@ -21,10 +21,8 @@ import (
 	"go.uber.org/zap"
 )
 
-var maxSize = 1 * shared.GB
-var maxImgSize = 10 * shared.MB
-
 type ctxUserKey struct{}
+type ctxFeatureFlagKey struct{}
 
 func getUser(s ssh.Session) (*db.User, error) {
 	user := s.Context().Value(ctxUserKey{}).(*db.User)
@@ -34,6 +32,14 @@ func getUser(s ssh.Session) (*db.User, error) {
 	return user, nil
 }
 
+func getFeatureFlag(s ssh.Session) (*db.FeatureFlag, error) {
+	ff := s.Context().Value(ctxFeatureFlagKey{}).(*db.FeatureFlag)
+	if ff.Name == "" {
+		return ff, fmt.Errorf("feature flag not set on `ssh.Context()` for connection")
+	}
+	return ff, nil
+}
+
 type PostMetaData struct {
 	*db.Post
 	OrigText []byte
@@ -41,6 +47,7 @@ type PostMetaData struct {
 	Tags     []string
 	User     *db.User
 	*utils.FileEntry
+	FeatureFlag *db.FeatureFlag
 }
 
 type UploadImgHandler struct {
@@ -178,6 +185,19 @@ func (h *UploadImgHandler) Validate(s ssh.Session) error {
 		return fmt.Errorf("must have username set")
 	}
 
+	ff, _ := h.DBPool.FindFeatureForUser(user.ID, "imgs")
+	// imgs.sh has a free tier so users might not have a feature flag
+	// in which case we set sane defaults
+	if ff == nil {
+		ff = db.NewFeatureFlag(
+			user.ID,
+			"imgs",
+			h.Cfg.MaxSize,
+			h.Cfg.MaxAssetSize,
+		)
+	}
+	s.Context().SetValue(ctxFeatureFlagKey{}, ff)
+
 	s.Context().SetValue(ctxUserKey{}, user)
 	h.Cfg.Logger.Infof("(%s) attempting to upload files to (%s)", user.Name, h.Cfg.Space)
 	return nil
@@ -245,12 +265,17 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		h.Cfg.Logger.Infof("(%s) unable to find image (%s), continuing", nextPost.Filename, err)
 	}
 
+	featureFlag, err := getFeatureFlag(s)
+	if err != nil {
+		return "", err
+	}
 	metadata := PostMetaData{
-		OrigText:  text,
-		Post:      &nextPost,
-		User:      user,
-		FileEntry: entry,
-		Cur:       post,
+		OrigText:    text,
+		Post:        &nextPost,
+		User:        user,
+		FileEntry:   entry,
+		Cur:         post,
+		FeatureFlag: featureFlag,
 	}
 
 	if post != nil {
@@ -275,6 +300,7 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		user.Name,
 		metadata.Slug,
 	)
+	maxSize := int(featureFlag.Data.StorageMax)
 	str := fmt.Sprintf(
 		"%s (space: %.2f/%.2fGB, %.2f%%)",
 		url,

@@ -5,8 +5,8 @@ import (
 	"github.com/picosh/pico/wish/cms/config"
 )
 
-var maxSize = 1 * shared.GB
-var maxAssetSize = 50 * shared.MB
+var maxSize = uint64(15 * shared.MB)
+var maxAssetSize = int64(5 * shared.MB)
 
 func NewConfigSite() *shared.ConfigSite {
 	debug := shared.GetEnv("PGS_DEBUG", "0")

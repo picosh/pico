@@ -18,12 +18,14 @@ func (h *UploadImgHandler) validateImg(data *PostMetaData) (bool, error) {
 		return false, err
 	}
 
-	if data.FileSize > maxImgSize {
-		return false, fmt.Errorf("ERROR: file (%s) has exceeded maximum file size (%d bytes)", data.Filename, maxImgSize)
+	fileMax := data.FeatureFlag.Data.FileMax
+	if int64(data.FileSize) > fileMax {
+		return false, fmt.Errorf("ERROR: file (%s) has exceeded maximum file size (%d bytes)", data.Filename, fileMax)
 	}
 
-	if totalFileSize+data.FileSize > maxSize {
-		return false, fmt.Errorf("ERROR: user (%s) has exceeded (%d bytes) max (%d bytes)", data.User.Name, totalFileSize, maxSize)
+	storageMax := data.FeatureFlag.Data.StorageMax
+	if uint64(totalFileSize+data.FileSize) > storageMax {
+		return false, fmt.Errorf("ERROR: user (%s) has exceeded (%d bytes) max (%d bytes)", data.User.Name, totalFileSize, storageMax)
 	}
 
 	if !shared.IsExtAllowed(data.Filepath, h.Cfg.AllowedExt) {
