@@ -5,7 +5,7 @@ import (
 	"github.com/picosh/pico/wish/cms/config"
 )
 
-var maxSize = uint64(15 * shared.MB)
+var maxSize = uint64(25 * shared.MB)
 var maxAssetSize = int64(5 * shared.MB)
 
 func NewConfigSite() *shared.ConfigSite {
