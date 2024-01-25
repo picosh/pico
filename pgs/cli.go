@@ -148,6 +148,8 @@ func (c *Cmd) stats(cfgMaxSize uint64) error {
 	if err != nil {
 		ff = db.NewFeatureFlag(c.User.ID, "pgs", cfgMaxSize, 0)
 	}
+	// this is jank
+	ff.Data.StorageMax = ff.FindStorageMax(cfgMaxSize)
 	storageMax := ff.Data.StorageMax
 
 	bucketName := shared.GetAssetBucketName(c.User.ID)

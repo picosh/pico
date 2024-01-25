@@ -200,6 +200,10 @@ func (h *UploadAssetHandler) Validate(s ssh.Session) error {
 			h.Cfg.MaxAssetSize,
 		)
 	}
+	// this is jank
+	ff.Data.StorageMax = ff.FindStorageMax(h.Cfg.MaxSize)
+	ff.Data.FileMax = ff.FindFileMax(h.Cfg.MaxAssetSize)
+
 	s.Context().SetValue(ctxFeatureFlagKey{}, ff)
 
 	assetBucket := shared.GetAssetBucketName(user.ID)

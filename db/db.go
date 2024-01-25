@@ -168,6 +168,20 @@ func NewFeatureFlag(userID, name string, storageMax uint64, fileMax int64) *Feat
 	}
 }
 
+func (ff *FeatureFlag) FindStorageMax(defaultSize uint64) uint64 {
+	if ff.Data.StorageMax == 0 {
+		return defaultSize
+	}
+	return ff.Data.StorageMax
+}
+
+func (ff *FeatureFlag) FindFileMax(defaultSize int64) int64 {
+	if ff.Data.FileMax == 0 {
+		return defaultSize
+	}
+	return ff.Data.FileMax
+}
+
 func (ff *FeatureFlag) IsValid() bool {
 	if ff.ExpiresAt.IsZero() {
 		return false
