@@ -150,7 +150,7 @@ func KeyAsValue(token *SplitToken) string {
 	return token.Value
 }
 
-func parseItem(meta *ListMetaData, li *ListItem, prevItem *ListItem, pre bool, mod int, linkify Linkify) (bool, bool, int) {
+func parseItem(meta *ListMetaData, li *ListItem, prevItem *ListItem, pre bool, mod int) (bool, bool, int) {
 	skip := false
 
 	if strings.HasPrefix(li.Value, preToken) {
@@ -178,13 +178,6 @@ func parseItem(meta *ListMetaData, li *ListItem, prevItem *ListItem, pre bool, m
 		li.IsImg = true
 		split := TextToSplitToken(strings.Replace(li.Value, imgToken, "", 1))
 		key := split.Key
-		if strings.HasPrefix(key, "/") {
-			frag := SanitizeFileExt(key)
-			key = linkify.Create(frag)
-		} else if strings.HasPrefix(key, "./") {
-			name := SanitizeFileExt(key[1:])
-			key = linkify.Create(name)
-		}
 		li.URL = template.URL(key)
 		li.Value = KeyAsValue(split)
 	} else if strings.HasPrefix(li.Value, varToken) {
@@ -204,7 +197,7 @@ func parseItem(meta *ListMetaData, li *ListItem, prevItem *ListItem, pre bool, m
 		old := len(li.Value)
 		li.Value = trim
 
-		pre, skip, _ = parseItem(meta, li, prevItem, pre, mod, linkify)
+		pre, skip, _ = parseItem(meta, li, prevItem, pre, mod)
 		if prevItem != nil && prevItem.Indent == 0 {
 			mod = old - len(trim)
 			li.Indent = 1
@@ -223,7 +216,7 @@ func parseItem(meta *ListMetaData, li *ListItem, prevItem *ListItem, pre bool, m
 	return pre, skip, mod
 }
 
-func ListParseText(text string, linkify Linkify) *ListParsedText {
+func ListParseText(text string) *ListParsedText {
 	textItems := SplitByNewline(text)
 	items := []*ListItem{}
 	meta := ListMetaData{
@@ -245,7 +238,7 @@ func ListParseText(text string, linkify Linkify) *ListParsedText {
 			Value: t,
 		}
 
-		pre, skip, mod = parseItem(&meta, &li, prevItem, pre, mod, linkify)
+		pre, skip, mod = parseItem(&meta, &li, prevItem, pre, mod)
 
 		if li.IsText && li.Value == "" {
 			skip = true

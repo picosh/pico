@@ -12,12 +12,9 @@ import (
 	"github.com/yuin/goldmark"
 	highlighting "github.com/yuin/goldmark-highlighting"
 	meta "github.com/yuin/goldmark-meta"
-	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
-	"github.com/yuin/goldmark/renderer"
 	ghtml "github.com/yuin/goldmark/renderer/html"
-	"github.com/yuin/goldmark/util"
 	"go.abhg.dev/goldmark/anchor"
 	yaml "gopkg.in/yaml.v2"
 )
@@ -160,67 +157,7 @@ func toTags(obj interface{}) ([]string, error) {
 	return arr, nil
 }
 
-type ImgRender struct {
-	ghtml.Config
-	ImgURL func(url []byte) []byte
-}
-
-func NewImgsRenderer(url func([]byte) []byte) renderer.NodeRenderer {
-	return &ImgRender{
-		Config: ghtml.NewConfig(),
-		ImgURL: url,
-	}
-}
-
-func (r *ImgRender) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
-	reg.Register(ast.KindImage, r.renderImage)
-}
-
-func (r *ImgRender) renderImage(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
-	if !entering {
-		return ast.WalkContinue, nil
-	}
-	n := node.(*ast.Image)
-	_, _ = w.WriteString("<img src=\"")
-	if r.Unsafe || !ghtml.IsDangerousURL(n.Destination) {
-		dest := r.ImgURL(n.Destination)
-		_, _ = w.Write(util.EscapeHTML(util.URLEscape(dest, true)))
-	}
-	_, _ = w.WriteString(`" alt="`)
-	_, _ = w.Write(util.EscapeHTML(n.Text(source)))
-	_ = w.WriteByte('"')
-	if n.Title != nil {
-		_, _ = w.WriteString(` title="`)
-		r.Writer.Write(w, n.Title)
-		_ = w.WriteByte('"')
-	}
-	if n.Attributes() != nil {
-		ghtml.RenderAttributes(w, n, ghtml.ImageAttributeFilter)
-	}
-	if r.XHTML {
-		_, _ = w.WriteString(" />")
-	} else {
-		_, _ = w.WriteString(">")
-	}
-	return ast.WalkSkipChildren, nil
-}
-
-func CreateImgURL(linkify Linkify) func([]byte) []byte {
-	return func(url []byte) []byte {
-		if url[0] == '/' {
-			name := SanitizeFileExt(string(url))
-			nextURL := linkify.Create(name)
-			return []byte(nextURL)
-		} else if bytes.HasPrefix(url, []byte{'.', '/'}) {
-			name := SanitizeFileExt(string(url[1:]))
-			nextURL := linkify.Create(name)
-			return []byte(nextURL)
-		}
-		return url
-	}
-}
-
-func ParseText(text string, linkify Linkify) (*ParsedText, error) {
+func ParseText(text string) (*ParsedText, error) {
 	parsed := ParsedText{
 		MetaData: &MetaData{
 			Tags:    []string{},
@@ -250,9 +187,6 @@ func ParseText(text string, linkify Linkify) (*ParsedText, error) {
 		),
 		goldmark.WithRendererOptions(
 			ghtml.WithUnsafe(),
-			renderer.WithNodeRenderers(
-				util.Prioritized(NewImgsRenderer(CreateImgURL(linkify)), 0),
-			),
 		),
 	)
 	context := parser.NewContext()
@@ -266,21 +200,9 @@ func ParseText(text string, linkify Linkify) (*ParsedText, error) {
 	parsed.MetaData.Description = toString(metaData["description"])
 	parsed.MetaData.Layout = toString(metaData["layout"])
 	parsed.MetaData.Image = toString(metaData["image"])
-	if strings.HasPrefix(parsed.Image, "/") {
-		parsed.Image = linkify.Create(parsed.Image)
-	} else if strings.HasPrefix(parsed.Image, "./") {
-		parsed.Image = linkify.Create(parsed.Image[1:])
-	}
-
 	parsed.MetaData.ImageCard = toString(metaData["card"])
 	parsed.MetaData.Hidden = toBool(metaData["draft"])
-
 	parsed.MetaData.Favicon = toString(metaData["favicon"])
-	if strings.HasPrefix(parsed.Favicon, "/") {
-		parsed.Favicon = linkify.Create(parsed.Favicon)
-	} else if strings.HasPrefix(parsed.Favicon, "./") {
-		parsed.Favicon = linkify.Create(parsed.Favicon[1:])
-	}
 
 	var publishAt *time.Time = nil
 	var err error

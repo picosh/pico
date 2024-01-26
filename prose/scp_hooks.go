@@ -9,7 +9,6 @@ import (
 	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/filehandlers"
-	"github.com/picosh/pico/imgs"
 	"github.com/picosh/pico/shared"
 )
 
@@ -48,8 +47,7 @@ func (p *MarkdownHooks) FileValidate(s ssh.Session, data *filehandlers.PostMetaD
 }
 
 func (p *MarkdownHooks) FileMeta(s ssh.Session, data *filehandlers.PostMetaData) error {
-	linkify := imgs.NewImgsLinkify("")
-	parsedText, err := shared.ParseText(data.Text, linkify)
+	parsedText, err := shared.ParseText(data.Text)
 	// we return nil here because we don't want the file upload to fail
 	if err != nil {
 		return nil

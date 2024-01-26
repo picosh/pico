@@ -9,6 +9,10 @@ import (
 	"github.com/picosh/send/send/utils"
 )
 
+func GetImgsBucketName(userID string) string {
+	return userID
+}
+
 func GetAssetBucketName(userID string) string {
 	return fmt.Sprintf("static-%s", userID)
 }

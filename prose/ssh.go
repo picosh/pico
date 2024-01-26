@@ -15,6 +15,7 @@ import (
 	lm "github.com/charmbracelet/wish/logging"
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/filehandlers"
+	uploadimgs "github.com/picosh/pico/filehandlers/imgs"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pico/wish/cms"
@@ -33,7 +34,7 @@ func (me *SSHServer) authHandler(ctx ssh.Context, key ssh.PublicKey) bool {
 	return true
 }
 
-func createRouter(handler *filehandlers.ScpUploadHandler) proxy.Router {
+func createRouter(handler *filehandlers.FileHandlerRouter) proxy.Router {
 	return func(sh ssh.Handler, s ssh.Session) []wish.Middleware {
 		return []wish.Middleware{
 			pipe.Middleware(handler, ".md"),
@@ -47,7 +48,7 @@ func createRouter(handler *filehandlers.ScpUploadHandler) proxy.Router {
 	}
 }
 
-func withProxy(handler *filehandlers.ScpUploadHandler, otherMiddleware ...wish.Middleware) ssh.Option {
+func withProxy(handler *filehandlers.FileHandlerRouter, otherMiddleware ...wish.Middleware) ssh.Option {
 	return func(server *ssh.Server) error {
 		err := sftp.SSHOption(handler)(server)
 		if err != nil {
@@ -83,7 +84,12 @@ func StartSshServer() {
 		logger.Fatal(err)
 	}
 
-	handler := filehandlers.NewScpPostHandler(dbh, cfg, hooks, st)
+	fileMap := map[string]filehandlers.ReadWriteHandler{
+		".md":      filehandlers.NewScpPostHandler(dbh, cfg, hooks, st),
+		"fallback": uploadimgs.NewUploadImgHandler(dbh, cfg, st),
+	}
+	handler := filehandlers.NewFileHandlerRouter(cfg, dbh, fileMap)
+	handler.Spaces = []string{cfg.Space, "imgs"}
 
 	sshServer := &SSHServer{}
 	s, err := wish.NewServer(

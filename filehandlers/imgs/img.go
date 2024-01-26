@@ -8,6 +8,7 @@ import (
 
 	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
+	"github.com/picosh/pico/filehandlers/util"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/send/send/utils"
 )
@@ -79,7 +80,7 @@ func (h *UploadImgHandler) writeImg(s ssh.Session, data *PostMetaData) error {
 	if !valid {
 		return err
 	}
-	user, err := getUser(s)
+	user, err := util.GetUser(s)
 	if err != nil {
 		return err
 	}
@@ -110,7 +111,7 @@ func (h *UploadImgHandler) writeImg(s ssh.Session, data *PostMetaData) error {
 		h.Cfg.Logger.Infof("(%s) not found, adding record", data.Filename)
 		insertPost := db.Post{
 			UserID: user.ID,
-			Space:  h.Cfg.Space,
+			Space:  Space,
 
 			Data:        data.Data,
 			Description: data.Description,

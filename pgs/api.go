@@ -24,16 +24,18 @@ import (
 )
 
 type AssetHandler struct {
-	Username   string
-	Subdomain  string
-	Filepath   string
-	ProjectDir string
-	Cfg        *shared.ConfigSite
-	Dbpool     db.DB
-	Storage    storage.ObjectStorage
-	Logger     *zap.SugaredLogger
-	Cache      *gocache.Cache
-	UserID     string
+	Username       string
+	Subdomain      string
+	Filepath       string
+	ProjectDir     string
+	Cfg            *shared.ConfigSite
+	Dbpool         db.DB
+	Storage        storage.ObjectStorage
+	Logger         *zap.SugaredLogger
+	Cache          *gocache.Cache
+	UserID         string
+	Bucket         storage.Bucket
+	ImgProcessOpts *storage.ImgProcessOpts
 }
 
 func checkHandler(w http.ResponseWriter, r *http.Request) {
@@ -216,16 +218,9 @@ func calcPossibleRoutes(projectName, fp string, userRedirects []*RedirectRule) [
 	return rts
 }
 
-func assetHandler(w http.ResponseWriter, h *AssetHandler) {
-	bucket, err := h.Storage.GetBucket(shared.GetAssetBucketName(h.UserID))
-	if err != nil {
-		h.Logger.Infof("bucket not found for %s", h.Username)
-		http.Error(w, "bucket not found", http.StatusNotFound)
-		return
-	}
-
+func (h *AssetHandler) handle(w http.ResponseWriter) {
 	var redirects []*RedirectRule
-	redirectFp, _, _, err := h.Storage.GetFile(bucket, filepath.Join(h.ProjectDir, "_redirects"))
+	redirectFp, _, _, err := h.Storage.GetFile(h.Bucket, filepath.Join(h.ProjectDir, "_redirects"))
 	if err == nil {
 		defer redirectFp.Close()
 		buf := new(strings.Builder)
@@ -243,13 +238,24 @@ func assetHandler(w http.ResponseWriter, h *AssetHandler) {
 	}
 
 	routes := calcPossibleRoutes(h.ProjectDir, h.Filepath, redirects)
-	var contents utils.ReaderAtCloser
+	var contents io.ReadCloser
 	assetFilepath := ""
 	status := 200
 	attempts := []string{}
 	for _, fp := range routes {
 		attempts = append(attempts, fp.Filepath)
-		c, _, _, err := h.Storage.GetFile(bucket, fp.Filepath)
+		mimeType := storage.GetMimeType(fp.Filepath)
+		var c io.ReadCloser
+		var err error
+		if strings.HasPrefix(mimeType, "image/") {
+			c, _, err = h.Storage.ServeFile(
+				h.Bucket,
+				fp.Filepath,
+				h.ImgProcessOpts,
+			)
+		} else {
+			c, _, _, err = h.Storage.GetFile(h.Bucket, fp.Filepath)
+		}
 		if err == nil {
 			contents = c
 			assetFilepath = fp.Filepath
@@ -261,7 +267,7 @@ func assetHandler(w http.ResponseWriter, h *AssetHandler) {
 	if assetFilepath == "" {
 		h.Logger.Infof(
 			"asset not found in bucket: bucket:[%s], routes:[%s]",
-			bucket.Name,
+			h.Bucket.Name,
 			strings.Join(attempts, ", "),
 		)
 		http.Error(w, "404 not found", http.StatusNotFound)
@@ -298,14 +304,14 @@ func getProjectFromSubdomain(subdomain string) (*SubdomainProps, error) {
 	return props, nil
 }
 
-func serveAsset(subdomain string, w http.ResponseWriter, r *http.Request) {
+func ServeAsset(fname string, opts *storage.ImgProcessOpts, fromImgs bool, w http.ResponseWriter, r *http.Request) {
+	subdomain := shared.GetSubdomain(r)
 	cfg := shared.GetCfg(r)
 	dbpool := shared.GetDB(r)
 	st := shared.GetStorage(r)
 	logger := shared.GetLogger(r)
 	cache := shared.GetCache(r)
 
-	floc, _ := url.PathUnescape(shared.GetField(r, 0))
 	props, err := getProjectFromSubdomain(subdomain)
 	if err != nil {
 		logger.Info(err)
@@ -319,29 +325,50 @@ func serveAsset(subdomain string, w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "user not found", http.StatusNotFound)
 		return
 	}
-	projectDir := props.ProjectName
-	project, err := dbpool.FindProjectByName(user.ID, props.ProjectName)
-	if err == nil {
-		projectDir = project.ProjectDir
+
+	// TODO: this could probably be cleaned up more
+	// imgs wont have a project directory
+	projectDir := ""
+	var bucket storage.Bucket
+	// imgs has a different bucket directory
+	if fromImgs {
+		bucket, err = st.GetBucket(shared.GetImgsBucketName(user.ID))
+	} else {
+		bucket, err = st.GetBucket(shared.GetAssetBucketName(user.ID))
+		projectDir = props.ProjectName
+		project, err := dbpool.FindProjectByName(user.ID, props.ProjectName)
+		if err == nil {
+			projectDir = project.ProjectDir
+		}
 	}
 
-	assetHandler(w, &AssetHandler{
-		Username:   props.Username,
-		UserID:     user.ID,
-		Subdomain:  subdomain,
-		ProjectDir: projectDir,
-		Filepath:   floc,
-		Cfg:        cfg,
-		Dbpool:     dbpool,
-		Storage:    st,
-		Logger:     logger,
-		Cache:      cache,
-	})
+	if err != nil {
+		logger.Infof("bucket not found for %s", props.Username)
+		http.Error(w, "bucket not found", http.StatusNotFound)
+		return
+	}
+
+	asset := &AssetHandler{
+		Username:       props.Username,
+		UserID:         user.ID,
+		Subdomain:      subdomain,
+		ProjectDir:     projectDir,
+		Filepath:       fname,
+		Cfg:            cfg,
+		Dbpool:         dbpool,
+		Storage:        st,
+		Logger:         logger,
+		Cache:          cache,
+		Bucket:         bucket,
+		ImgProcessOpts: opts,
+	}
+
+	asset.handle(w)
 }
 
-func assetRequest(w http.ResponseWriter, r *http.Request) {
-	subdomain := shared.GetSubdomain(r)
-	serveAsset(subdomain, w, r)
+func AssetRequest(w http.ResponseWriter, r *http.Request) {
+	fname, _ := url.PathUnescape(shared.GetField(r, 0))
+	ServeAsset(fname, nil, false, w, r)
 }
 
 func StartApiServer() {
@@ -382,8 +409,8 @@ func StartApiServer() {
 		shared.NewRoute("GET", "/(.+)", shared.CreatePageHandler("html/marketing.page.tmpl")),
 	}
 	subdomainRoutes := []shared.Route{
-		shared.NewRoute("GET", "/", assetRequest),
-		shared.NewRoute("GET", "/(.+)", assetRequest),
+		shared.NewRoute("GET", "/", AssetRequest),
+		shared.NewRoute("GET", "/(.+)", AssetRequest),
 	}
 
 	handler := shared.CreateServe(mainRoutes, subdomainRoutes, cfg, db, st, logger, cache)

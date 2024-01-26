@@ -33,7 +33,7 @@ func (me *SSHServer) authHandler(ctx ssh.Context, key ssh.PublicKey) bool {
 	return true
 }
 
-func createRouter(handler *filehandlers.ScpUploadHandler) proxy.Router {
+func createRouter(handler *filehandlers.FileHandlerRouter) proxy.Router {
 	return func(sh ssh.Handler, s ssh.Session) []wish.Middleware {
 		return []wish.Middleware{
 			pipe.Middleware(handler, ".txt"),
@@ -47,7 +47,7 @@ func createRouter(handler *filehandlers.ScpUploadHandler) proxy.Router {
 	}
 }
 
-func withProxy(handler *filehandlers.ScpUploadHandler, otherMiddleware ...wish.Middleware) ssh.Option {
+func withProxy(handler *filehandlers.FileHandlerRouter, otherMiddleware ...wish.Middleware) ssh.Option {
 	return func(server *ssh.Server) error {
 		err := sftp.SSHOption(handler)(server)
 		if err != nil {
@@ -84,7 +84,10 @@ func StartSshServer() {
 		logger.Fatal(err)
 	}
 
-	handler := filehandlers.NewScpPostHandler(dbh, cfg, hooks, st)
+	fileMap := map[string]filehandlers.ReadWriteHandler{
+		"fallback": filehandlers.NewScpPostHandler(dbh, cfg, hooks, st),
+	}
+	handler := filehandlers.NewFileHandlerRouter(cfg, dbh, fileMap)
 
 	sshServer := &SSHServer{}
 	s, err := wish.NewServer(

@@ -7,7 +7,6 @@ import (
 
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
-	"github.com/picosh/pico/imgs"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/wish/cms/config"
 	"go.uber.org/zap"
@@ -76,8 +75,7 @@ func main() {
 
 	logger.Info("replacing tags")
 	for _, post := range posts {
-		linkify := imgs.NewImgsLinkify(post.Username)
-		parsed, err := shared.ParseText(post.Text, linkify)
+		parsed, err := shared.ParseText(post.Text)
 		if err != nil {
 			continue
 		}

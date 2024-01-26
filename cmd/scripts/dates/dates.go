@@ -9,7 +9,6 @@ import (
 
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
-	"github.com/picosh/pico/imgs"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/wish/cms/config"
 	"go.uber.org/zap"
@@ -96,9 +95,8 @@ func main() {
 	datesFixed := []string{}
 	logger.Info("updating dates")
 	for _, post := range posts {
-		linkify := imgs.NewImgsLinkify(post.Username)
 		if post.Space == "prose" {
-			parsed, err := shared.ParseText(post.Text, linkify)
+			parsed, err := shared.ParseText(post.Text)
 			if err != nil {
 				logger.Error(err)
 				continue
@@ -116,8 +114,7 @@ func main() {
 				}
 			}
 		} else if post.Space == "lists" {
-			linkify := imgs.NewImgsLinkify(post.Username)
-			parsed := shared.ListParseText(post.Text, linkify)
+			parsed := shared.ListParseText(post.Text)
 			if err != nil {
 				logger.Error(err)
 				continue

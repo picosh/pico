@@ -14,31 +14,13 @@ import (
 	"github.com/charmbracelet/ssh"
 	exifremove "github.com/neurosnap/go-exif-remove"
 	"github.com/picosh/pico/db"
+	"github.com/picosh/pico/filehandlers/util"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
-	"github.com/picosh/pico/wish/cms/util"
 	"github.com/picosh/send/send/utils"
-	"go.uber.org/zap"
 )
 
-type ctxUserKey struct{}
-type ctxFeatureFlagKey struct{}
-
-func getUser(s ssh.Session) (*db.User, error) {
-	user := s.Context().Value(ctxUserKey{}).(*db.User)
-	if user == nil {
-		return user, fmt.Errorf("user not set on `ssh.Context()` for connection")
-	}
-	return user, nil
-}
-
-func getFeatureFlag(s ssh.Session) (*db.FeatureFlag, error) {
-	ff := s.Context().Value(ctxFeatureFlagKey{}).(*db.FeatureFlag)
-	if ff.Name == "" {
-		return ff, fmt.Errorf("feature flag not set on `ssh.Context()` for connection")
-	}
-	return ff, nil
-}
+var Space = "imgs"
 
 type PostMetaData struct {
 	*db.Post
@@ -81,12 +63,8 @@ func (h *UploadImgHandler) removePost(data *PostMetaData) error {
 	return nil
 }
 
-func (h *UploadImgHandler) GetLogger() *zap.SugaredLogger {
-	return h.Cfg.Logger
-}
-
 func (h *UploadImgHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileInfo, utils.ReaderAtCloser, error) {
-	user, err := getUser(s)
+	user, err := util.GetUser(s)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -97,7 +75,7 @@ func (h *UploadImgHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileI
 		return nil, nil, os.ErrNotExist
 	}
 
-	post, err := h.DBPool.FindPostWithFilename(cleanFilename, user.ID, h.Cfg.Space)
+	post, err := h.DBPool.FindPostWithFilename(cleanFilename, user.ID, Space)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -124,91 +102,8 @@ func (h *UploadImgHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileI
 	return fileInfo, reader, nil
 }
 
-func (h *UploadImgHandler) List(s ssh.Session, fpath string, isDir bool, recursive bool) ([]os.FileInfo, error) {
-	var fileList []os.FileInfo
-	user, err := getUser(s)
-	if err != nil {
-		return fileList, err
-	}
-	cleanFilename := filepath.Base(fpath)
-
-	var post *db.Post
-	var posts []*db.Post
-
-	if cleanFilename == "" || cleanFilename == "." || cleanFilename == "/" {
-		name := cleanFilename
-		if name == "" {
-			name = "/"
-		}
-
-		fileList = append(fileList, &utils.VirtualFile{
-			FName:  name,
-			FIsDir: true,
-		})
-
-		posts, err = h.DBPool.FindAllPostsForUser(user.ID, h.Cfg.Space)
-	} else {
-		post, err = h.DBPool.FindPostWithFilename(cleanFilename, user.ID, h.Cfg.Space)
-
-		posts = append(posts, post)
-	}
-
-	if err != nil {
-		return nil, err
-	}
-
-	for _, post := range posts {
-		fileList = append(fileList, &utils.VirtualFile{
-			FName:    post.Filename,
-			FIsDir:   false,
-			FSize:    int64(post.FileSize),
-			FModTime: *post.UpdatedAt,
-		})
-	}
-
-	return fileList, nil
-}
-
-func (h *UploadImgHandler) Validate(s ssh.Session) error {
-	var err error
-	key, err := util.KeyText(s)
-	if err != nil {
-		return fmt.Errorf("key not found")
-	}
-
-	user, err := h.DBPool.FindUserForKey(s.User(), key)
-	if err != nil {
-		return err
-	}
-
-	if user.Name == "" {
-		return fmt.Errorf("must have username set")
-	}
-
-	ff, _ := h.DBPool.FindFeatureForUser(user.ID, "imgs")
-	// imgs.sh has a free tier so users might not have a feature flag
-	// in which case we set sane defaults
-	if ff == nil {
-		ff = db.NewFeatureFlag(
-			user.ID,
-			"imgs",
-			h.Cfg.MaxSize,
-			h.Cfg.MaxAssetSize,
-		)
-	}
-	// this is jank
-	ff.Data.StorageMax = ff.FindStorageMax(h.Cfg.MaxSize)
-	ff.Data.FileMax = ff.FindFileMax(h.Cfg.MaxAssetSize)
-
-	s.Context().SetValue(ctxFeatureFlagKey{}, ff)
-
-	s.Context().SetValue(ctxUserKey{}, user)
-	h.Cfg.Logger.Infof("(%s) attempting to upload files to (%s)", user.Name, h.Cfg.Space)
-	return nil
-}
-
 func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string, error) {
-	user, err := getUser(s)
+	user, err := util.GetUser(s)
 	if err != nil {
 		h.Cfg.Logger.Error(err)
 		return "", err
@@ -221,6 +116,10 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		text = b
 	}
 	mimeType := http.DetectContentType(text)
+	ext := filepath.Ext(filename)
+	if ext == ".svg" {
+		mimeType = "image/svg+xml"
+	}
 	// strip exif data
 	if slices.Contains([]string{"image/png", "image/jpg", "image/jpeg"}, mimeType) {
 		noExifBytes, err := exifremove.Remove(text)
@@ -237,9 +136,9 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 	}
 
 	now := time.Now()
-	slug := shared.SanitizeFileExt(filename)
 	fileSize := binary.Size(text)
 	shasum := shared.Shasum(text)
+	slug := shared.SanitizeFileExt(filename)
 
 	nextPost := db.Post{
 		Filename:  filename,
@@ -251,25 +150,16 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		Shasum:    shasum,
 	}
 
-	ext := filepath.Ext(filename)
-	// DetectContentType does not detect markdown
-	if ext == ".md" {
-		nextPost.MimeType = "text/markdown; charset=UTF-8"
-		// DetectContentType does not detect image/svg
-	} else if ext == ".svg" {
-		nextPost.MimeType = "image/svg+xml"
-	}
-
 	post, err := h.DBPool.FindPostWithFilename(
 		nextPost.Filename,
 		user.ID,
-		h.Cfg.Space,
+		Space,
 	)
 	if err != nil {
 		h.Cfg.Logger.Infof("(%s) unable to find image (%s), continuing", nextPost.Filename, err)
 	}
 
-	featureFlag, err := getFeatureFlag(s)
+	featureFlag, err := util.GetFeatureFlag(s)
 	if err != nil {
 		return "", err
 	}
@@ -302,7 +192,7 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 	url := h.Cfg.FullPostURL(
 		curl,
 		user.Name,
-		metadata.Slug,
+		metadata.Filename,
 	)
 	maxSize := int(featureFlag.Data.StorageMax)
 	str := fmt.Sprintf(

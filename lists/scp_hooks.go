@@ -9,7 +9,6 @@ import (
 	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/filehandlers"
-	"github.com/picosh/pico/imgs"
 	"github.com/picosh/pico/shared"
 )
 
@@ -41,8 +40,7 @@ func (p *ListHooks) FileValidate(s ssh.Session, data *filehandlers.PostMetaData)
 }
 
 func (p *ListHooks) FileMeta(s ssh.Session, data *filehandlers.PostMetaData) error {
-	linkify := imgs.NewImgsLinkify(data.Username)
-	parsedText := shared.ListParseText(string(data.Text), linkify)
+	parsedText := shared.ListParseText(string(data.Text))
 
 	if parsedText.Title == "" {
 		data.Title = shared.ToUpper(data.Slug)

@@ -135,7 +135,7 @@ func (f *Fetcher) Validate(lastDigest *time.Time, parsed *shared.ListParsedText)
 func (f *Fetcher) RunPost(user *db.User, post *db.Post) error {
 	f.cfg.Logger.Infof("(%s) running feed post (%s)", user.Name, post.Filename)
 
-	parsed := shared.ListParseText(post.Text, shared.NewNullLinkify())
+	parsed := shared.ListParseText(post.Text)
 
 	f.cfg.Logger.Infof("(%s) Last digest at (%s)", user.Name, post.Data.LastDigest)
 	err := f.Validate(post.Data.LastDigest, parsed)
