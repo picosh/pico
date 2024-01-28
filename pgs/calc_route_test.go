@@ -79,7 +79,7 @@ func TestCalcPossibleRoutes(t *testing.T) {
 			},
 		},
 		{
-			Name: "xml",
+			Name:   "xml",
 			Actual: calcPossibleRoutes("test", "index.xml", []*RedirectRule{}),
 			Expected: []*HttpReply{
 				{Filepath: "test/index.xml", Status: 200},
