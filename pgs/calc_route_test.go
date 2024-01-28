@@ -78,6 +78,14 @@ func TestCalcPossibleRoutes(t *testing.T) {
 				{Filepath: "test/404.html", Status: 404},
 			},
 		},
+		{
+			Name: "xml",
+			Actual: calcPossibleRoutes("test", "index.xml", []*RedirectRule{}),
+			Expected: []*HttpReply{
+				{Filepath: "test/index.xml", Status: 200},
+				{Filepath: "test/404.html", Status: 404},
+			},
+		},
 	}
 
 	for _, fixture := range fixtures {
