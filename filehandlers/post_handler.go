@@ -12,23 +12,11 @@ import (
 
 	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
-	uploadimgs "github.com/picosh/pico/filehandlers/imgs"
+	"github.com/picosh/pico/filehandlers/util"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
-	"github.com/picosh/pico/wish/cms/util"
 	"github.com/picosh/send/send/utils"
-	"go.uber.org/zap"
 )
-
-type ctxUserKey struct{}
-
-func getUser(s ssh.Session) (*db.User, error) {
-	user := s.Context().Value(ctxUserKey{}).(*db.User)
-	if user == nil {
-		return user, fmt.Errorf("user not set on `ssh.Context()` for connection")
-	}
-	return user, nil
-}
 
 type PostMetaData struct {
 	*db.Post
@@ -45,29 +33,21 @@ type ScpFileHooks interface {
 }
 
 type ScpUploadHandler struct {
-	DBPool    db.DB
-	Cfg       *shared.ConfigSite
-	Hooks     ScpFileHooks
-	ImgClient *uploadimgs.ImgsAPI
+	DBPool db.DB
+	Cfg    *shared.ConfigSite
+	Hooks  ScpFileHooks
 }
 
 func NewScpPostHandler(dbpool db.DB, cfg *shared.ConfigSite, hooks ScpFileHooks, st storage.ObjectStorage) *ScpUploadHandler {
-	client := uploadimgs.NewImgsAPI(dbpool, st)
-
 	return &ScpUploadHandler{
-		DBPool:    dbpool,
-		Cfg:       cfg,
-		Hooks:     hooks,
-		ImgClient: client,
+		DBPool: dbpool,
+		Cfg:    cfg,
+		Hooks:  hooks,
 	}
 }
 
-func (h *ScpUploadHandler) GetLogger() *zap.SugaredLogger {
-	return h.Cfg.Logger
-}
-
 func (h *ScpUploadHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileInfo, utils.ReaderAtCloser, error) {
-	user, err := getUser(s)
+	user, err := util.GetUser(s)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -94,76 +74,9 @@ func (h *ScpUploadHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileI
 	return fileInfo, reader, nil
 }
 
-func (h *ScpUploadHandler) List(s ssh.Session, fpath string, isDir bool, recursive bool) ([]os.FileInfo, error) {
-	var fileList []os.FileInfo
-	user, err := getUser(s)
-	if err != nil {
-		return fileList, err
-	}
-
-	cleanFilename := filepath.Base(fpath)
-
-	var post *db.Post
-	var posts []*db.Post
-
-	if cleanFilename == "" || cleanFilename == "." || cleanFilename == "/" {
-		name := cleanFilename
-		if name == "" {
-			name = "/"
-		}
-
-		fileList = append(fileList, &utils.VirtualFile{
-			FName:  name,
-			FIsDir: true,
-		})
-
-		posts, err = h.DBPool.FindAllPostsForUser(user.ID, h.Cfg.Space)
-	} else {
-		post, err = h.DBPool.FindPostWithFilename(cleanFilename, user.ID, h.Cfg.Space)
-
-		posts = append(posts, post)
-	}
-
-	if err != nil {
-		return nil, err
-	}
-
-	for _, post := range posts {
-		fileList = append(fileList, &utils.VirtualFile{
-			FName:    post.Filename,
-			FIsDir:   false,
-			FSize:    int64(post.FileSize),
-			FModTime: *post.UpdatedAt,
-		})
-	}
-
-	return fileList, nil
-}
-
-func (h *ScpUploadHandler) Validate(s ssh.Session) error {
-	var err error
-	key, err := util.KeyText(s)
-	if err != nil {
-		return fmt.Errorf("key not found")
-	}
-
-	user, err := h.DBPool.FindUserForKey(s.User(), key)
-	if err != nil {
-		return err
-	}
-
-	if user.Name == "" {
-		return fmt.Errorf("must have username set")
-	}
-
-	s.Context().SetValue(ctxUserKey{}, user)
-	h.Cfg.Logger.Infof("(%s) attempting to upload files to (%s)", user.Name, h.Cfg.Space)
-	return nil
-}
-
 func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string, error) {
 	logger := h.Cfg.Logger
-	user, err := getUser(s)
+	user, err := util.GetUser(s)
 	if err != nil {
 		logger.Error(err)
 		return "", err
@@ -171,10 +84,6 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 
 	userID := user.ID
 	filename := filepath.Base(entry.Filepath)
-
-	if shared.IsExtAllowed(filename, h.ImgClient.Cfg.AllowedExt) {
-		return h.ImgClient.Upload(s, entry)
-	}
 
 	var origText []byte
 	if b, err := io.ReadAll(entry.Reader); err == nil {

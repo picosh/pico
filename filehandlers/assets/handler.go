@@ -12,6 +12,7 @@ import (
 
 	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
+	futil "github.com/picosh/pico/filehandlers/util"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pico/wish/cms/util"
@@ -19,8 +20,6 @@ import (
 	"go.uber.org/zap"
 )
 
-type ctxUserKey struct{}
-type ctxFeatureFlagKey struct{}
 type ctxBucketKey struct{}
 type ctxStorageSizeKey struct{}
 type ctxProjectKey struct{}
@@ -42,14 +41,6 @@ func getBucket(s ssh.Session) (storage.Bucket, error) {
 	return bucket, nil
 }
 
-func getFeatureFlag(s ssh.Session) (*db.FeatureFlag, error) {
-	ff := s.Context().Value(ctxFeatureFlagKey{}).(*db.FeatureFlag)
-	if ff.Name == "" {
-		return ff, fmt.Errorf("feature flag not set on `ssh.Context()` for connection")
-	}
-	return ff, nil
-}
-
 func getStorageSize(s ssh.Session) uint64 {
 	return s.Context().Value(ctxStorageSizeKey{}).(uint64)
 }
@@ -59,14 +50,6 @@ func incrementStorageSize(s ssh.Session, fileSize int64) uint64 {
 	nextStorageSize := curSize + uint64(fileSize)
 	s.Context().SetValue(ctxStorageSizeKey{}, nextStorageSize)
 	return nextStorageSize
-}
-
-func getUser(s ssh.Session) (*db.User, error) {
-	user := s.Context().Value(ctxUserKey{}).(*db.User)
-	if user == nil {
-		return user, fmt.Errorf("user not set on `ssh.Context()` for connection")
-	}
-	return user, nil
 }
 
 type FileData struct {
@@ -98,7 +81,7 @@ func (h *UploadAssetHandler) GetLogger() *zap.SugaredLogger {
 }
 
 func (h *UploadAssetHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileInfo, utils.ReaderAtCloser, error) {
-	user, err := getUser(s)
+	user, err := futil.GetUser(s)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -132,7 +115,7 @@ func (h *UploadAssetHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.Fil
 func (h *UploadAssetHandler) List(s ssh.Session, fpath string, isDir bool, recursive bool) ([]os.FileInfo, error) {
 	var fileList []os.FileInfo
 
-	user, err := getUser(s)
+	user, err := futil.GetUser(s)
 	if err != nil {
 		return fileList, err
 	}
@@ -204,7 +187,8 @@ func (h *UploadAssetHandler) Validate(s ssh.Session) error {
 	ff.Data.StorageMax = ff.FindStorageMax(h.Cfg.MaxSize)
 	ff.Data.FileMax = ff.FindFileMax(h.Cfg.MaxAssetSize)
 
-	s.Context().SetValue(ctxFeatureFlagKey{}, ff)
+	futil.SetFeatureFlag(s, ff)
+	futil.SetUser(s, user)
 
 	assetBucket := shared.GetAssetBucketName(user.ID)
 	bucket, err := h.Storage.UpsertBucket(assetBucket)
@@ -220,14 +204,13 @@ func (h *UploadAssetHandler) Validate(s ssh.Session) error {
 	s.Context().SetValue(ctxStorageSizeKey{}, totalStorageSize)
 	h.Cfg.Logger.Infof("(%s) bucket size is current (%d bytes)", user.Name, totalStorageSize)
 
-	s.Context().SetValue(ctxUserKey{}, user)
 	h.Cfg.Logger.Infof("(%s) attempting to upload files to (%s)", user.Name, h.Cfg.Space)
 
 	return nil
 }
 
 func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (string, error) {
-	user, err := getUser(s)
+	user, err := futil.GetUser(s)
 	if err != nil {
 		h.Cfg.Logger.Error(err)
 		return "", err
@@ -276,7 +259,7 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 	}
 
 	storageSize := getStorageSize(s)
-	featureFlag, err := getFeatureFlag(s)
+	featureFlag, err := futil.GetFeatureFlag(s)
 	if err != nil {
 		return "", err
 	}

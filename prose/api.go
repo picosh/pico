@@ -205,8 +205,7 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 
 	readme, err := dbpool.FindPostWithFilename("_readme.md", user.ID, cfg.Space)
 	if err == nil {
-		linkify := imgs.NewImgsLinkify(readme.Username)
-		parsedText, err := shared.ParseText(readme.Text, linkify)
+		parsedText, err := shared.ParseText(readme.Text)
 		if err != nil {
 			logger.Error(err)
 		}
@@ -354,9 +353,8 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	hasCSS := false
 	var data PostPageData
 	post, err := dbpool.FindPostWithSlug(slug, user.ID, cfg.Space)
-	linkify := imgs.NewImgsLinkify(username)
 	if err == nil {
-		parsedText, err := shared.ParseText(post.Text, linkify)
+		parsedText, err := shared.ParseText(post.Text)
 		if err != nil {
 			logger.Error(err)
 		}
@@ -364,7 +362,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 		// we need the blog name from the readme unfortunately
 		readme, err := dbpool.FindPostWithFilename("_readme.md", user.ID, cfg.Space)
 		if err == nil {
-			readmeParsed, err := shared.ParseText(readme.Text, linkify)
+			readmeParsed, err := shared.ParseText(readme.Text)
 			if err != nil {
 				logger.Error(err)
 			}
@@ -394,7 +392,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 		footer, err := dbpool.FindPostWithFilename("_footer.md", user.ID, cfg.Space)
 		var footerHTML template.HTML
 		if err == nil {
-			footerParsed, err := shared.ParseText(footer.Text, linkify)
+			footerParsed, err := shared.ParseText(footer.Text)
 			if err != nil {
 				logger.Error(err)
 			}
@@ -437,6 +435,14 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			Unlisted:     unlisted,
 		}
 	} else {
+		// TODO: HACK to support imgs slugs inside prose
+		// We definitely want to kill this feature in time
+		imgPost, err := imgs.FindImgPost(r, user, slug)
+		if err == nil && imgPost != nil {
+			imgs.ImgRequest(w, r)
+			return
+		}
+
 		data = PostPageData{
 			Site:         *cfg.GetSiteData(),
 			BlogURL:      template.URL(cfg.FullBlogURL(curl, username)),
@@ -593,8 +599,7 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 
 	readme, err := dbpool.FindPostWithFilename("_readme.md", user.ID, cfg.Space)
 	if err == nil {
-		linkify := imgs.NewImgsLinkify(readme.Username)
-		parsedText, err := shared.ParseText(readme.Text, linkify)
+		parsedText, err := shared.ParseText(readme.Text)
 		if err != nil {
 			logger.Error(err)
 		}
@@ -624,8 +629,7 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 		if slices.Contains(cfg.HiddenPosts, post.Filename) {
 			continue
 		}
-		linkify := imgs.NewImgsLinkify(post.Username)
-		parsed, err := shared.ParseText(post.Text, linkify)
+		parsed, err := shared.ParseText(post.Text)
 		if err != nil {
 			logger.Error(err)
 		}
@@ -633,7 +637,7 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 		footer, err := dbpool.FindPostWithFilename("_footer.md", user.ID, cfg.Space)
 		var footerHTML string
 		if err == nil {
-			footerParsed, err := shared.ParseText(footer.Text, linkify)
+			footerParsed, err := shared.ParseText(footer.Text)
 			if err != nil {
 				logger.Error(err)
 			}
@@ -711,8 +715,7 @@ func rssHandler(w http.ResponseWriter, r *http.Request) {
 
 	var feedItems []*feeds.Item
 	for _, post := range pager.Data {
-		linkify := imgs.NewImgsLinkify(post.Username)
-		parsed, err := shared.ParseText(post.Text, linkify)
+		parsed, err := shared.ParseText(post.Text)
 		if err != nil {
 			logger.Error(err)
 		}
@@ -824,6 +827,8 @@ func createMainRoutes(staticRoutes []shared.Route) []shared.Route {
 		shared.NewRoute("GET", "/([^/]+)/feed.xml", rssBlogHandler),
 		shared.NewRoute("GET", "/([^/]+)/_styles.css", blogStyleHandler),
 		shared.NewRoute("GET", "/raw/([^/]+)/(.+)", postRawHandler),
+		shared.NewRoute("GET", "/([^/]+)/(.+)/([a-z0-9]+)", imgs.ImgRequest),
+		shared.NewRoute("GET", "/([^/]+)/(.+).(jpg|jpeg|png|gif|webp|svg)", imgs.ImgRequest),
 		shared.NewRoute("GET", "/([^/]+)/(.+)", postHandler),
 	)
 
@@ -850,6 +855,8 @@ func createSubdomainRoutes(staticRoutes []shared.Route) []shared.Route {
 	routes = append(
 		routes,
 		shared.NewRoute("GET", "/raw/(.+)", postRawHandler),
+		shared.NewRoute("GET", "/(.+)/([a-z0-9]+)", imgs.ImgRequest),
+		shared.NewRoute("GET", "/(.+).(jpg|jpeg|png|gif|webp|svg)", imgs.ImgRequest),
 		shared.NewRoute("GET", "/(.+)", postHandler),
 	)
 

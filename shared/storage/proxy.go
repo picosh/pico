@@ -61,25 +61,41 @@ func GetMimeType(fpath string) string {
 	return "text/plain"
 }
 
-func HandleProxy(dataURL string, ratio *Ratio, original bool, useProxy bool) (io.ReadCloser, string, error) {
+type ImgProcessOpts struct {
+	Quality int
+	Ratio   *Ratio
+}
+
+func (img *ImgProcessOpts) String() string {
+	processOpts := ""
+
+	if img.Quality != 0 {
+		processOpts = fmt.Sprintf("%s/q:%d", processOpts, img.Quality)
+	}
+
+	if img.Ratio != nil {
+		processOpts = fmt.Sprintf(
+			"%s/s:%d:%d",
+			processOpts,
+			img.Ratio.Width,
+			img.Ratio.Height,
+		)
+	}
+
+	return processOpts
+}
+
+func HandleProxy(dataURL string, opts *ImgProcessOpts) (io.ReadCloser, string, error) {
 	imgProxyURL := os.Getenv("IMGPROXY_URL")
 	imgProxySalt := os.Getenv("IMGPROXY_SALT")
 	imgProxyKey := os.Getenv("IMGPROXY_KEY")
 
 	signature := "_"
-	processOpts := "q:80"
 
-	if ratio != nil {
-		processOpts += fmt.Sprintf("/s:%d:%d", ratio.Width, ratio.Height)
-	}
+	processOpts := opts.String()
 
-	fileType := ".webp"
-	if original {
-		fileType = ""
-		processOpts = "raw:1"
-	}
-
-	processPath := fmt.Sprintf("/%s/%s%s", processOpts, base64.StdEncoding.EncodeToString([]byte(dataURL)), fileType)
+	fileType := ""
+	processPath := fmt.Sprintf("%s/%s%s", processOpts, base64.StdEncoding.EncodeToString([]byte(dataURL)), fileType)
 
 	if imgProxySalt != "" && imgProxyKey != "" {
 		keyBin, err := hex.DecodeString(imgProxyKey)
@@ -103,6 +119,10 @@ func HandleProxy(dataURL string, ratio *Ratio, original bool, useProxy bool) (io
 	res, err := http.Get(proxyAddress)
 	if err != nil {
 		return nil, "", err
+	}
+
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		return nil, "", fmt.Errorf("%s", res.Status)
 	}
 
 	return res.Body, res.Header.Get("Content-Type"), nil

@@ -5,28 +5,6 @@ import (
 	"github.com/picosh/pico/wish/cms/config"
 )
 
-type ImgsLinkify struct {
-	Cfg          *shared.ConfigSite
-	Username     string
-	OnSubdomain  bool
-	WithUsername bool
-}
-
-func NewImgsLinkify(username string) *ImgsLinkify {
-	cfg := NewConfigSite()
-	return &ImgsLinkify{
-		Cfg:      cfg,
-		Username: username,
-	}
-}
-
-func (i *ImgsLinkify) Create(fname string) string {
-	return i.Cfg.ImgFullURL(i.Username, fname)
-}
-
-var maxSize = uint64(500 * shared.MB)
-var maxImgSize = int64(10 * shared.MB)
-
 func NewConfigSite() *shared.ConfigSite {
 	debug := shared.GetEnv("IMGS_DEBUG", "0")
 	domain := shared.GetEnv("IMGS_DOMAIN", "prose.sh")
@@ -67,8 +45,6 @@ func NewConfigSite() *shared.ConfigSite {
 			AllowedExt:    []string{".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"},
 			Logger:        shared.CreateLogger(debug == "1"),
 			AllowRegister: allowRegister == "1",
-			MaxSize:       maxSize,
-			MaxAssetSize:  maxImgSize,
 		},
 	}
 
