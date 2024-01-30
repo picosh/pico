@@ -180,20 +180,22 @@ func ImgRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var dimes string
+	var imgOpts string
 	var slug string
 	if !cfg.IsSubdomains() || subdomain == "" {
 		slug, _ = url.PathUnescape(shared.GetField(r, 1))
-		dimes, _ = url.PathUnescape(shared.GetField(r, 2))
+		imgOpts, _ = url.PathUnescape(shared.GetField(r, 2))
 	} else {
 		slug, _ = url.PathUnescape(shared.GetField(r, 0))
-		dimes, _ = url.PathUnescape(shared.GetField(r, 1))
+		imgOpts, _ = url.PathUnescape(shared.GetField(r, 1))
 	}
 
-	ratio, _ := storage.GetRatio(dimes)
-	opts := &storage.ImgProcessOpts{
-		Quality: 80,
-		Ratio:   ratio,
+	opts, err := storage.UriToImgProcessOpts(imgOpts)
+	if err != nil {
+		errMsg := fmt.Sprintf("error processing img options: %s", err.Error())
+		logger.Infof(errMsg)
+		http.Error(w, errMsg, http.StatusUnprocessableEntity)
+		return
 	}
 
 	ext := filepath.Ext(slug)
@@ -255,7 +257,7 @@ func createMainRoutes(staticRoutes []shared.Route) []shared.Route {
 		shared.NewRoute("GET", "/([^/]+)", redirectHandler),
 		shared.NewRoute("GET", "/([^/]+)/o/([^/]+)", ImgRequest),
 		shared.NewRoute("GET", "/([^/]+)/([^/]+)", ImgRequest),
-		shared.NewRoute("GET", "/([^/]+)/([^/]+)/([a-z0-9]+)", ImgRequest),
+		shared.NewRoute("GET", "/([^/]+)/([^/]+)/(.+)", ImgRequest),
 	)
 
 	return routes
@@ -274,7 +276,7 @@ func createSubdomainRoutes(staticRoutes []shared.Route) []shared.Route {
 		shared.NewRoute("GET", "/", redirectHandler),
 		shared.NewRoute("GET", "/o/([^/]+)", ImgRequest),
 		shared.NewRoute("GET", "/([^/]+)", ImgRequest),
-		shared.NewRoute("GET", "/([^/]+)/([a-z0-9]+)", ImgRequest),
+		shared.NewRoute("GET", "/([^/]+)/(.+)", ImgRequest),
 	)
 
 	return routes
