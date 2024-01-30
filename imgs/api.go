@@ -20,22 +20,83 @@ import (
 	"github.com/picosh/pico/shared/storage"
 )
 
-type PostItemData struct {
-	BlogURL      template.URL
-	URL          template.URL
-	ImgURL       template.URL
-	PublishAtISO string
-	PublishAt    string
-	Caption      string
-}
-
 type PostPageData struct {
 	ImgURL template.URL
 }
 
+type BlogPageData struct {
+	Site      *shared.SitePageData
+	PageTitle string
+	URL       template.URL
+	Username  string
+	Posts     []template.URL
+}
+
 var Space = "imgs"
 
-func rssHandler(w http.ResponseWriter, r *http.Request) {
+func ImgsListHandler(w http.ResponseWriter, r *http.Request) {
+	username := shared.GetUsernameFromRequest(r)
+	dbpool := shared.GetDB(r)
+	logger := shared.GetLogger(r)
+	cfg := shared.GetCfg(r)
+
+	user, err := dbpool.FindUserForName(username)
+	if err != nil {
+		logger.Infof("blog not found: %s", username)
+		http.Error(w, "blog not found", http.StatusNotFound)
+		return
+	}
+
+	tag := r.URL.Query().Get("tag")
+	var posts []*db.Post
+	var p *db.Paginate[*db.Post]
+	pager := &db.Pager{Num: 1000, Page: 0}
+	if tag == "" {
+		p, err = dbpool.FindPostsForUser(pager, user.ID, Space)
+	} else {
+		p, err = dbpool.FindUserPostsByTag(pager, tag, user.ID, Space)
+	}
+	posts = p.Data
+
+	if err != nil {
+		logger.Error(err)
+		http.Error(w, "could not fetch posts for blog", http.StatusInternalServerError)
+		return
+	}
+
+	ts, err := shared.RenderTemplate(cfg, []string{
+		cfg.StaticPath("html/imgs.page.tmpl"),
+	})
+
+	if err != nil {
+		logger.Error(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	curl := shared.CreateURLFromRequest(cfg, r)
+	postCollection := make([]template.URL, 0, len(posts))
+	for _, post := range posts {
+		url := cfg.ImgURL(curl, post.Username, post.Slug)
+		postCollection = append(postCollection, template.URL(url))
+	}
+
+	data := BlogPageData{
+		Site:      cfg.GetSiteData(),
+		PageTitle: fmt.Sprintf("%s imgs", username),
+		URL:       template.URL(cfg.FullBlogURL(curl, username)),
+		Username:  username,
+		Posts:     postCollection,
+	}
+
+	err = ts.Execute(w, data)
+	if err != nil {
+		logger.Error(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func ImgsRssHandler(w http.ResponseWriter, r *http.Request) {
 	dbpool := shared.GetDB(r)
 	logger := shared.GetLogger(r)
 	cfg := shared.GetCfg(r)
@@ -171,6 +232,12 @@ func FindImgPost(r *http.Request, user *db.User, slug string) (*db.Post, error) 
 	return dbpool.FindPostWithSlug(slug, user.ID, Space)
 }
 
+func redirectHandler(w http.ResponseWriter, r *http.Request) {
+	username := shared.GetUsernameFromRequest(r)
+	url := fmt.Sprintf("https://%s.prose.sh/i", username)
+	http.Redirect(w, r, url, http.StatusMovedPermanently)
+}
+
 func createMainRoutes(staticRoutes []shared.Route) []shared.Route {
 	routes := []shared.Route{
 		shared.NewRoute("GET", "/check", shared.CheckHandler),
@@ -183,11 +250,12 @@ func createMainRoutes(staticRoutes []shared.Route) []shared.Route {
 
 	routes = append(
 		routes,
-		shared.NewRoute("GET", "/rss", rssHandler),
-		shared.NewRoute("GET", "/rss.xml", rssHandler),
-		shared.NewRoute("GET", "/atom.xml", rssHandler),
-		shared.NewRoute("GET", "/feed.xml", rssHandler),
+		shared.NewRoute("GET", "/rss", ImgsRssHandler),
+		shared.NewRoute("GET", "/rss.xml", ImgsRssHandler),
+		shared.NewRoute("GET", "/atom.xml", ImgsRssHandler),
+		shared.NewRoute("GET", "/feed.xml", ImgsRssHandler),
 
+		shared.NewRoute("GET", "/([^/]+)", redirectHandler),
 		shared.NewRoute("GET", "/([^/]+)/o/([^/]+)", ImgRequest),
 		shared.NewRoute("GET", "/([^/]+)/([^/]+)", ImgRequest),
 		shared.NewRoute("GET", "/([^/]+)/([^/]+)/([a-z0-9]+)", ImgRequest),
@@ -206,6 +274,7 @@ func createSubdomainRoutes(staticRoutes []shared.Route) []shared.Route {
 
 	routes = append(
 		routes,
+		shared.NewRoute("GET", "/", redirectHandler),
 		shared.NewRoute("GET", "/o/([^/]+)", ImgRequest),
 		shared.NewRoute("GET", "/([^/]+)", ImgRequest),
 		shared.NewRoute("GET", "/([^/]+)/([a-z0-9]+)", ImgRequest),

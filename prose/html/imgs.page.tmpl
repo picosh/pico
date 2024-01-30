@@ -1,0 +1,29 @@
+{{template "base" .}}
+
+{{define "title"}}{{.PageTitle}}{{end}}
+
+{{define "meta"}}{{end}}
+
+{{define "attrs"}}id="blog"{{end}}
+
+{{define "body"}}
+<header class="text-center">
+    <h1 class="text-2xl font-bold">{{.PageTitle}}</h1>
+    <nav>
+        <a href="{{.URL}}" class="text-lg">< blog</a>
+    </nav>
+    <hr />
+</header>
+<main>
+    <section class="albums">
+        {{range .Posts}}
+          <a href="{{.}}" class="thumbnail-link">
+            <article  class="thumbnail-container">
+                <img class="thumbnail" src="{{.}}/300x" />
+            </article>
+          </a>
+        {{end}}
+    </section>
+</main>
+{{template "footer" .}}
+{{end}}
