@@ -235,6 +235,9 @@ func redirectHandler(w http.ResponseWriter, r *http.Request) {
 func createMainRoutes(staticRoutes []shared.Route) []shared.Route {
 	routes := []shared.Route{
 		shared.NewRoute("GET", "/check", shared.CheckHandler),
+		shared.NewRoute("GET", "/", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "https://prose.sh", http.StatusMovedPermanently)
+		}),
 	}
 
 	routes = append(
