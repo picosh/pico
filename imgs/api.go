@@ -47,15 +47,9 @@ func ImgsListHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tag := r.URL.Query().Get("tag")
 	var posts []*db.Post
-	var p *db.Paginate[*db.Post]
 	pager := &db.Pager{Num: 1000, Page: 0}
-	if tag == "" {
-		p, err = dbpool.FindPostsForUser(pager, user.ID, Space)
-	} else {
-		p, err = dbpool.FindUserPostsByTag(pager, tag, user.ID, Space)
-	}
+	p, err := dbpool.FindPostsForUser(pager, user.ID, Space)
 	posts = p.Data
 
 	if err != nil {
