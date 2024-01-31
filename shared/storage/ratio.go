@@ -16,6 +16,11 @@ func GetRatio(dimes string) (*Ratio, error) {
 		return nil, nil
 	}
 
+	// bail if we detect imgproxy options
+	if strings.Contains(dimes, ":") {
+		return nil, nil
+	}
+
 	// dimes = x250 -- width is auto scaled and height is 250
 	if strings.HasPrefix(dimes, "x") {
 		height, err := strconv.Atoi(dimes[1:])

@@ -47,7 +47,12 @@ func getStorageSize(s ssh.Session) uint64 {
 
 func incrementStorageSize(s ssh.Session, fileSize int64) uint64 {
 	curSize := getStorageSize(s)
-	nextStorageSize := curSize + uint64(fileSize)
+	var nextStorageSize uint64
+	if fileSize < 0 {
+		nextStorageSize = curSize - uint64(fileSize)
+	} else {
+		nextStorageSize = curSize + uint64(fileSize)
+	}
 	s.Context().SetValue(ctxStorageSizeKey{}, nextStorageSize)
 	return nextStorageSize
 }
@@ -305,7 +310,13 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 
 func (h *UploadAssetHandler) validateAsset(data *FileData) (bool, error) {
 	storageMax := data.FeatureFlag.Data.StorageMax
-	if data.StorageSize+uint64(data.DeltaFileSize) >= storageMax {
+	var nextStorageSize uint64
+	if data.DeltaFileSize < 0 {
+		nextStorageSize = data.StorageSize - uint64(data.DeltaFileSize)
+	} else {
+		nextStorageSize = data.StorageSize + uint64(data.DeltaFileSize)
+	}
+	if nextStorageSize >= storageMax {
 		return false, fmt.Errorf(
 			"ERROR: user (%s) has exceeded (%d bytes) max (%d bytes)",
 			data.User.Name,

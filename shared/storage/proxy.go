@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 )
 
 func GetMimeType(fpath string) string {
@@ -61,18 +63,77 @@ func GetMimeType(fpath string) string {
 	return "text/plain"
 }
 
+func UriToImgProcessOpts(uri string) (*ImgProcessOpts, error) {
+	opts := &ImgProcessOpts{}
+	parts := strings.Split(uri, "/")
+
+	for _, part := range parts {
+		ratio, err := GetRatio(part)
+		if err != nil {
+			return opts, err
+		}
+
+		if ratio != nil {
+			opts.Ratio = ratio
+		}
+
+		if strings.HasPrefix(part, "s:") {
+			segs := strings.SplitN(part, ":", 4)
+			r := &Ratio{}
+			for idx, sg := range segs {
+				if sg == "" {
+					continue
+				}
+				if idx == 1 {
+					r.Width, err = strconv.Atoi(sg)
+					if err != nil {
+						return opts, err
+					}
+				} else if idx == 2 {
+					r.Height, err = strconv.Atoi(sg)
+					if err != nil {
+						return opts, err
+					}
+				}
+			}
+			opts.Ratio = r
+		}
+
+		if strings.HasPrefix(part, "q:") {
+			quality := strings.Replace(part, "q:", "", 1)
+			opts.Quality, err = strconv.Atoi(quality)
+			if err != nil {
+				return opts, err
+			}
+		}
+
+		if strings.HasPrefix(part, "rt:") {
+			angle := strings.Replace(part, "rt:", "", 1)
+			opts.Rotate, err = strconv.Atoi(angle)
+			if err != nil {
+				return opts, err
+			}
+		}
+	}
+
+	return opts, nil
+}
+
 type ImgProcessOpts struct {
 	Quality int
 	Ratio   *Ratio
+	Rotate  int
 }
 
 func (img *ImgProcessOpts) String() string {
 	processOpts := ""
 
+	// https://docs.imgproxy.net/usage/processing#quality
 	if img.Quality != 0 {
 		processOpts = fmt.Sprintf("%s/q:%d", processOpts, img.Quality)
 	}
 
+	// https://docs.imgproxy.net/usage/processing#size
 	if img.Ratio != nil {
 		processOpts = fmt.Sprintf(
 			"%s/s:%d:%d",
@@ -80,6 +141,19 @@ func (img *ImgProcessOpts) String() string {
 			img.Ratio.Width,
 			img.Ratio.Height,
 		)
+	}
+
+	// https://docs.imgproxy.net/usage/processing#rotate
+	// Only 0, 90, 180, 270, etc., degree angles are supported.
+	if img.Rotate != 0 {
+		rot := img.Rotate
+		if rot == 90 || rot == 180 || rot == 280 {
+			processOpts = fmt.Sprintf(
+				"%s/rotate:%d",
+				processOpts,
+				rot,
+			)
+		}
 	}
 
 	return processOpts

@@ -366,6 +366,20 @@ func ServeAsset(fname string, opts *storage.ImgProcessOpts, fromImgs bool, w htt
 	asset.handle(w)
 }
 
+func ImgAssetRequest(w http.ResponseWriter, r *http.Request) {
+	logger := shared.GetLogger(r)
+	fname, _ := url.PathUnescape(shared.GetField(r, 0))
+	imgOpts, _ := url.PathUnescape(shared.GetField(r, 1))
+	opts, err := storage.UriToImgProcessOpts(imgOpts)
+	if err != nil {
+		errMsg := fmt.Sprintf("error processing img options: %s", err.Error())
+		logger.Infof(errMsg)
+		http.Error(w, errMsg, http.StatusUnprocessableEntity)
+	}
+
+	ServeAsset(fname, opts, false, w, r)
+}
+
 func AssetRequest(w http.ResponseWriter, r *http.Request) {
 	fname, _ := url.PathUnescape(shared.GetField(r, 0))
 	ServeAsset(fname, nil, false, w, r)
@@ -410,6 +424,7 @@ func StartApiServer() {
 	}
 	subdomainRoutes := []shared.Route{
 		shared.NewRoute("GET", "/", AssetRequest),
+		shared.NewRoute("GET", "(/.+.(?:jpg|jpeg|png|gif|webp|svg))(/.+)", ImgAssetRequest),
 		shared.NewRoute("GET", "/(.+)", AssetRequest),
 	}
 
