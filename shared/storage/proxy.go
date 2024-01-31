@@ -114,6 +114,14 @@ func UriToImgProcessOpts(uri string) (*ImgProcessOpts, error) {
 				return opts, err
 			}
 		}
+
+		if strings.HasPrefix(part, "ext:") {
+			ext := strings.Replace(part, "ext:", "", 1)
+			opts.Ext = ext
+			if err != nil {
+				return opts, err
+			}
+		}
 	}
 
 	return opts, nil
@@ -123,6 +131,7 @@ type ImgProcessOpts struct {
 	Quality int
 	Ratio   *Ratio
 	Rotate  int
+	Ext     string
 }
 
 func (img *ImgProcessOpts) String() string {
@@ -136,7 +145,7 @@ func (img *ImgProcessOpts) String() string {
 	// https://docs.imgproxy.net/usage/processing#size
 	if img.Ratio != nil {
 		processOpts = fmt.Sprintf(
-			"%s/s:%d:%d",
+			"%s/size:%d:%d",
 			processOpts,
 			img.Ratio.Width,
 			img.Ratio.Height,
@@ -156,6 +165,11 @@ func (img *ImgProcessOpts) String() string {
 		}
 	}
 
+	// https://docs.imgproxy.net/usage/processing#format
+	if img.Ext != "" {
+		processOpts = fmt.Sprintf("%s/ext:%s", processOpts, img.Ext)
+	}
+
 	return processOpts
 }
 
@@ -168,8 +182,7 @@ func HandleProxy(dataURL string, opts *ImgProcessOpts) (io.ReadCloser, string, e
 
 	processOpts := opts.String()
 
-	fileType := ""
-	processPath := fmt.Sprintf("%s/%s%s", processOpts, base64.StdEncoding.EncodeToString([]byte(dataURL)), fileType)
+	processPath := fmt.Sprintf("%s/%s", processOpts, base64.StdEncoding.EncodeToString([]byte(dataURL)))
 
 	if imgProxySalt != "" && imgProxyKey != "" {
 		keyBin, err := hex.DecodeString(imgProxyKey)

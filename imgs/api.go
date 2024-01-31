@@ -198,6 +198,16 @@ func ImgRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// set default quality for web optimization
+	if opts.Quality == 0 {
+		opts.Quality = 80
+	}
+
+	// set default format to be webp
+	if opts.Ext == "" {
+		opts.Ext = "webp"
+	}
+
 	ext := filepath.Ext(slug)
 	// Files can contain periods.  `filepath.Ext` is greedy and will clip the last period in the slug
 	// and call that a file extension so we want to be explicit about what

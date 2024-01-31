@@ -239,6 +239,7 @@ func (h *AssetHandler) handle(w http.ResponseWriter) {
 
 	routes := calcPossibleRoutes(h.ProjectDir, h.Filepath, redirects)
 	var contents io.ReadCloser
+	contentType := ""
 	assetFilepath := ""
 	status := 200
 	attempts := []string{}
@@ -248,13 +249,14 @@ func (h *AssetHandler) handle(w http.ResponseWriter) {
 		var c io.ReadCloser
 		var err error
 		if strings.HasPrefix(mimeType, "image/") {
-			c, _, err = h.Storage.ServeFile(
+			c, contentType, err = h.Storage.ServeFile(
 				h.Bucket,
 				fp.Filepath,
 				h.ImgProcessOpts,
 			)
 		} else {
 			c, _, _, err = h.Storage.GetFile(h.Bucket, fp.Filepath)
+			contentType = storage.GetMimeType(assetFilepath)
 		}
 		if err == nil {
 			contents = c
@@ -275,7 +277,6 @@ func (h *AssetHandler) handle(w http.ResponseWriter) {
 	}
 	defer contents.Close()
 
-	contentType := storage.GetMimeType(assetFilepath)
 	w.Header().Add("Content-Type", contentType)
 	w.WriteHeader(status)
 	_, err = io.Copy(w, contents)
