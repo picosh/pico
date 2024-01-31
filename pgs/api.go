@@ -256,7 +256,6 @@ func (h *AssetHandler) handle(w http.ResponseWriter) {
 			)
 		} else {
 			c, _, _, err = h.Storage.GetFile(h.Bucket, fp.Filepath)
-			contentType = storage.GetMimeType(assetFilepath)
 		}
 		if err == nil {
 			contents = c
@@ -276,6 +275,10 @@ func (h *AssetHandler) handle(w http.ResponseWriter) {
 		return
 	}
 	defer contents.Close()
+
+	if contentType == "" {
+		contentType = storage.GetMimeType(assetFilepath)
+	}
 
 	w.Header().Add("Content-Type", contentType)
 	w.WriteHeader(status)
