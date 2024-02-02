@@ -193,6 +193,7 @@ type sishData struct {
 	PublicKey     string `json:"auth_key"`
 	Username      string `json:"user"`
 	RemoteAddress string `json:"remote_addr"`
+	Space         string `json:"space"`
 }
 
 func keyHandler(w http.ResponseWriter, r *http.Request) {
@@ -207,7 +208,12 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client.Logger.Infof("handle key (%s, %s, %s)", data.RemoteAddress, data.Username, data.PublicKey)
+	// backwards compat
+	if data.Space == "" {
+		data.Space = "tuns"
+	}
+
+	client.Logger.Infof("handle key (%s, %s, %s, %s)", data.RemoteAddress, data.Username, data.Space, data.PublicKey)
 
 	user, err := client.Dbpool.FindUserForKey(data.Username, data.PublicKey)
 	if err != nil {
@@ -216,7 +222,7 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !client.Dbpool.HasFeatureForUser(user.ID, "tuns") {
+	if !client.Dbpool.HasFeatureForUser(user.ID, data.Space) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
