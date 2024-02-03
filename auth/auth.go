@@ -21,10 +21,26 @@ type Client struct {
 	Logger *zap.SugaredLogger
 }
 
+func (client *Client) hasPrivilegedAccess(apiToken string) bool {
+	user, err := client.Dbpool.FindUserForToken(apiToken)
+	if err != nil {
+		return false
+	}
+	return client.Dbpool.HasFeatureForUser(user.ID, "auth")
+}
+
 type ctxClient struct{}
 
 func getClient(r *http.Request) *Client {
 	return r.Context().Value(ctxClient{}).(*Client)
+}
+
+func getApiToken(r *http.Request) string {
+	authHeader := r.Header.Get("authorization")
+	if authHeader == "" {
+		return ""
+	}
+	return strings.TrimPrefix(authHeader, "Bearer ")
 }
 
 type oauth2Server struct {
@@ -228,7 +244,18 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !client.hasPrivilegedAccess(getApiToken(r)) {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
+	err = json.NewEncoder(w).Encode(user)
+	if err != nil {
+		client.Logger.Error(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func createMainRoutes() []shared.Route {
