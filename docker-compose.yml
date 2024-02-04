@@ -71,10 +71,6 @@ services:
   imgs-ssh:
     image: ghcr.io/picosh/pico/imgs-ssh:latest
     restart: always
-    profiles:
-      - imgs
-      - services
-      - all
   pgs-web:
     image: ghcr.io/picosh/pico/pgs-web:latest
     restart: always
@@ -111,7 +107,7 @@ services:
       - services
       - all
   bouncer:
-    image: ghcr.io/picosh/pico/bouncer:latest
+    image: ghcr.io/picosh/pico/bouncer:main
     restart: always
     profiles:
       - bouncer

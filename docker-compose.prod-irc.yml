@@ -1,5 +1,25 @@
 version: "3.8"
 services:
+  auth-caddy:
+    image: ghcr.io/picosh/pico/caddy:latest
+    restart: always
+    networks:
+      - auth
+      - ${AUTH_NETWORK}
+    env_file:
+      - .env.prod
+    environment:
+      APP_DOMAIN: imgs.sh
+      APP_EMAIL: hello@pico.sh
+    volumes:
+      - ./caddy/Caddyfile.auth:/etc/caddy/Caddyfile
+      - ./data/auth-caddy/data:/data
+      - ./data/auth-caddy/config:/config
+    ports:
+      - "${AUTH_V4:-0.0.0.0}:443:443"
+      - "${AUTH_V4:-0.0.0.0}:80:80"
+      - "[${AUTH_V6:-::1}]:443:443"
+      - "[${AUTH_V6:-::1}]:80:80"
   auth-web:
     networks:
       - ${AUTH_NETWORK}
@@ -25,3 +45,10 @@ services:
       - ./data/bouncer:/app/db
       - ./data/certs:/certs
       - ${AUTH_REAL_CERT_MOUNT}
+networks:
+  auth:
+    driver_opts:
+      com.docker.network.bridge.name: auth
+    ipam:
+      config:
+        - subnet: 172.24.0.0/16
