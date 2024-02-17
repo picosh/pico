@@ -83,7 +83,7 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 
 	user, err := dbpool.FindUserForName(username)
 	if err != nil {
-		logger.Infof("blog not found: %s", username)
+		logger.Info("blog not found", "user", username)
 		http.Error(w, "blog not found", http.StatusNotFound)
 		return
 	}
@@ -91,7 +91,7 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	posts := pager.Data
 
 	if err != nil {
-		logger.Error(err)
+		logger.Error(err.Error())
 		http.Error(w, "could not fetch posts for blog", http.StatusInternalServerError)
 		return
 	}
@@ -101,7 +101,7 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	})
 
 	if err != nil {
-		logger.Error(err)
+		logger.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -138,7 +138,7 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 
 	err = ts.Execute(w, data)
 	if err != nil {
-		logger.Error(err)
+		logger.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -172,7 +172,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 
 	user, err := dbpool.FindUserForName(username)
 	if err != nil {
-		logger.Infof("blog not found: %s", username)
+		logger.Info("blog not found", "user", username)
 		http.Error(w, "blog not found", http.StatusNotFound)
 		return
 	}
@@ -184,7 +184,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		parsedText, err := ParseText(post.Filename, post.Text)
 		if err != nil {
-			logger.Error(err)
+			logger.Error(err.Error())
 		}
 		expiresAt := "never"
 		if post.ExpiresAt != nil {
@@ -207,7 +207,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			ExpiresAt:    expiresAt,
 		}
 	} else {
-		logger.Infof("post not found %s/%s", username, slug)
+		logger.Info("post not found", "user", username, "slug", slug)
 		data = PostPageData{
 			Site:         *cfg.GetSiteData(),
 			PageTitle:    "Paste not found",
@@ -233,7 +233,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 
 	err = ts.Execute(w, data)
 	if err != nil {
-		logger.Error(err)
+		logger.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -255,14 +255,14 @@ func postHandlerRaw(w http.ResponseWriter, r *http.Request) {
 
 	user, err := dbpool.FindUserForName(username)
 	if err != nil {
-		logger.Infof("blog not found: %s", username)
+		logger.Info("blog not found", "user", username)
 		http.Error(w, "blog not found", http.StatusNotFound)
 		return
 	}
 
 	post, err := dbpool.FindPostWithSlug(slug, user.ID, cfg.Space)
 	if err != nil {
-		logger.Infof("post not found %s/%s", username, slug)
+		logger.Info("post not found", "user", username, "slug", slug)
 		http.Error(w, "post not found", http.StatusNotFound)
 		return
 	}
@@ -270,7 +270,7 @@ func postHandlerRaw(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
 	_, err = w.Write([]byte(post.Text))
 	if err != nil {
-		logger.Error(err)
+		logger.Error(err.Error())
 	}
 }
 
@@ -281,14 +281,14 @@ func serveFile(file string, contentType string) http.HandlerFunc {
 
 		contents, err := os.ReadFile(cfg.StaticPath(fmt.Sprintf("public/%s", file)))
 		if err != nil {
-			logger.Error(err)
+			logger.Error(err.Error())
 			http.Error(w, "file not found", 404)
 		}
 		w.Header().Add("Content-Type", contentType)
 
 		_, err = w.Write(contents)
 		if err != nil {
-			logger.Error(err)
+			logger.Error(err.Error())
 			http.Error(w, "server error", 500)
 		}
 	}
@@ -367,7 +367,8 @@ func StartApiServer() {
 	cache := gocache.New(2*time.Minute, 5*time.Minute)
 
 	if err != nil {
-		logger.Fatal(err)
+		logger.Error(err.Error())
+		return
 	}
 
 	go CronDeleteExpiredPosts(cfg, db)
@@ -385,10 +386,12 @@ func StartApiServer() {
 	router := http.HandlerFunc(handler)
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)
-	logger.Infof("Starting server on port %s", cfg.Port)
-	logger.Infof("Subdomains enabled: %t", cfg.SubdomainsEnabled)
-	logger.Infof("Domain: %s", cfg.Domain)
-	logger.Infof("Email: %s", cfg.Email)
+	logger.Info(
+		"Starting server on port",
+		"port", cfg.Port,
+		"domain", cfg.Domain,
+		"email", cfg.Email,
+	)
 
-	logger.Fatal(http.ListenAndServe(portStr, router))
+	logger.Error(http.ListenAndServe(portStr, router).Error())
 }

@@ -54,7 +54,7 @@ bp-podman-%:
 	$(DOCKER_CMD) push "ghcr.io/picosh/pico/$*-web:$(DOCKER_TAG)"
 .PHONY: bp-%
 
-bp-podman-all: bp-podman-prose bp-podman-lists bp-podman-pastes bp-podman-imgs bp-podman-feeds bp-podman-pgs
+bp-podman-all: bp-podman-prose bp-podman-pastes bp-podman-imgs bp-podman-feeds bp-podman-pgs
 .PHONY: all
 
 build-auth:
@@ -66,7 +66,7 @@ build-%:
 	go build -o "build/$*-ssh" "./cmd/$*/ssh"
 .PHONY: build-%
 
-build: build-prose build-lists build-pastes build-imgs build-feeds build-pgs build-auth
+build: build-prose build-pastes build-imgs build-feeds build-pgs build-auth
 .PHONY: build
 
 store-clean:
