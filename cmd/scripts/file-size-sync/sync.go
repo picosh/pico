@@ -2,22 +2,12 @@ package main
 
 import (
 	"encoding/binary"
-	"log"
+	"log/slog"
 	"os"
 
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/wish/cms/config"
-	"go.uber.org/zap"
 )
-
-func createLogger() *zap.SugaredLogger {
-	logger, err := zap.NewProduction()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return logger.Sugar()
-}
 
 func bail(err error) {
 	if err != nil {
@@ -26,7 +16,7 @@ func bail(err error) {
 }
 
 func main() {
-	logger := createLogger()
+	logger := slog.Default()
 
 	picoCfg := config.NewConfigCms()
 	picoCfg.Logger = logger

@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,7 +18,6 @@ import (
 	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pico/wish/cms/util"
 	"github.com/picosh/send/send/utils"
-	"go.uber.org/zap"
 )
 
 type ctxBucketKey struct{}
@@ -81,7 +81,7 @@ func NewUploadAssetHandler(dbpool db.DB, cfg *shared.ConfigSite, storage storage
 	}
 }
 
-func (h *UploadAssetHandler) GetLogger() *zap.SugaredLogger {
+func (h *UploadAssetHandler) GetLogger() *slog.Logger {
 	return h.Cfg.Logger
 }
 
@@ -207,9 +207,9 @@ func (h *UploadAssetHandler) Validate(s ssh.Session) error {
 		return err
 	}
 	s.Context().SetValue(ctxStorageSizeKey{}, totalStorageSize)
-	h.Cfg.Logger.Infof("(%s) bucket size is current (%d bytes)", user.Name, totalStorageSize)
+	h.Cfg.Logger.Info("bucket size is current (%d bytes)", "user", user.Name, "size", fmt.Sprintf("%d bytes", totalStorageSize))
 
-	h.Cfg.Logger.Infof("(%s) attempting to upload files to (%s)", user.Name, h.Cfg.Space)
+	h.Cfg.Logger.Info("attempting to upload files", "user", user.Name, "space", h.Cfg.Space)
 
 	return nil
 }
@@ -217,7 +217,7 @@ func (h *UploadAssetHandler) Validate(s ssh.Session) error {
 func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (string, error) {
 	user, err := futil.GetUser(s)
 	if err != nil {
-		h.Cfg.Logger.Error(err)
+		h.Cfg.Logger.Error(err.Error())
 		return "", err
 	}
 
@@ -232,7 +232,7 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 
 	bucket, err := getBucket(s)
 	if err != nil {
-		h.Cfg.Logger.Error(err)
+		h.Cfg.Logger.Error(err.Error())
 		return "", err
 	}
 
@@ -245,18 +245,18 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 		if err == nil {
 			err = h.DBPool.UpdateProject(user.ID, projectName)
 			if err != nil {
-				h.Cfg.Logger.Error(err)
+				h.Cfg.Logger.Error(err.Error())
 				return "", err
 			}
 		} else {
 			_, err = h.DBPool.InsertProject(user.ID, projectName, projectName)
 			if err != nil {
-				h.Cfg.Logger.Error(err)
+				h.Cfg.Logger.Error(err.Error())
 				return "", err
 			}
 			project, err = h.DBPool.FindProjectByName(user.ID, projectName)
 			if err != nil {
-				h.Cfg.Logger.Error(err)
+				h.Cfg.Logger.Error(err.Error())
 				return "", err
 			}
 		}
@@ -285,7 +285,7 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 	}
 	err = h.writeAsset(data)
 	if err != nil {
-		h.Cfg.Logger.Error(err)
+		h.Cfg.Logger.Error(err.Error())
 		return "", err
 	}
 	nextStorageSize := incrementStorageSize(s, deltaFileSize)
@@ -380,10 +380,13 @@ func (h *UploadAssetHandler) writeAsset(data *FileData) error {
 	} else {
 		reader := bytes.NewReader(data.Text)
 
-		h.Cfg.Logger.Infof(
-			"(%s) uploading to (bucket: %s) (%s)",
+		h.Cfg.Logger.Info(
+			"uploading file to bucket",
+			"user",
 			data.User.Name,
+			"bucket",
 			data.Bucket.Name,
+			"filename",
 			assetFilename,
 		)
 

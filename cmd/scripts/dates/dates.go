@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"database/sql"
-	"log"
 	"os"
 	"time"
 
@@ -11,17 +10,8 @@ import (
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/wish/cms/config"
-	"go.uber.org/zap"
+	"log/slog"
 )
-
-func createLogger() *zap.SugaredLogger {
-	logger, err := zap.NewProduction()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return logger.Sugar()
-}
 
 func findPosts(dbpool *sql.DB) ([]*db.Post, error) {
 	var posts []*db.Post
@@ -67,7 +57,7 @@ func updateDates(tx *sql.Tx, postID string, date *time.Time) error {
 }
 
 func main() {
-	logger := createLogger()
+	logger := slog.Default()
 
 	picoCfg := config.NewConfigCms()
 	picoCfg.Logger = logger
@@ -79,7 +69,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	logger.Infof("found (%d) posts", len(posts))
+	logger.Info("found posts", "len", len(posts))
 
 	ctx := context.Background()
 	tx, err := picoDb.Db.BeginTx(ctx, nil)
@@ -98,14 +88,14 @@ func main() {
 		if post.Space == "prose" {
 			parsed, err := shared.ParseText(post.Text)
 			if err != nil {
-				logger.Error(err)
+				logger.Error(err.Error())
 				continue
 			}
 
 			if parsed.PublishAt != nil && !parsed.PublishAt.IsZero() {
 				err = updateDates(tx, post.ID, parsed.MetaData.PublishAt)
 				if err != nil {
-					logger.Error(err)
+					logger.Error(err.Error())
 					continue
 				}
 
@@ -116,14 +106,14 @@ func main() {
 		} else if post.Space == "lists" {
 			parsed := shared.ListParseText(post.Text)
 			if err != nil {
-				logger.Error(err)
+				logger.Error(err.Error())
 				continue
 			}
 
 			if parsed.PublishAt != nil && !parsed.PublishAt.IsZero() {
 				err = updateDates(tx, post.ID, parsed.PublishAt)
 				if err != nil {
-					logger.Error(err)
+					logger.Error(err.Error())
 					continue
 				}
 				if !parsed.PublishAt.Equal(*post.PublishAt) {
@@ -137,5 +127,5 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	logger.Infof("(%d) dates fixed!", len(datesFixed))
+	logger.Info("dates fixed!", "len", len(datesFixed))
 }

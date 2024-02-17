@@ -2,6 +2,7 @@ package filehandlers
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -10,7 +11,6 @@ import (
 	"github.com/picosh/pico/filehandlers/util"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/send/send/utils"
-	"go.uber.org/zap"
 )
 
 type ReadWriteHandler interface {
@@ -125,7 +125,7 @@ func (r *FileHandlerRouter) List(s ssh.Session, fpath string, isDir bool, recurs
 	return fileList, nil
 }
 
-func (r *FileHandlerRouter) GetLogger() *zap.SugaredLogger {
+func (r *FileHandlerRouter) GetLogger() *slog.Logger {
 	return r.Cfg.Logger
 }
 
@@ -163,6 +163,6 @@ func (r *FileHandlerRouter) Validate(s ssh.Session) error {
 	util.SetUser(s, user)
 	util.SetFeatureFlag(s, ff)
 
-	r.Cfg.Logger.Infof("(%s) attempting to upload files to (%s)", user.Name, r.Cfg.Space)
+	r.Cfg.Logger.Info("attempting to upload files", "user", user.Name, "space", r.Cfg.Space)
 	return nil
 }

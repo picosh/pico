@@ -2,6 +2,7 @@ package posts
 
 import (
 	"errors"
+	"log/slog"
 
 	pager "github.com/charmbracelet/bubbles/paginator"
 	"github.com/charmbracelet/bubbles/spinner"
@@ -11,8 +12,6 @@ import (
 	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pico/wish/cms/config"
 	"github.com/picosh/pico/wish/cms/ui/common"
-
-	"go.uber.org/zap"
 )
 
 const keysPerPage = 1
@@ -62,7 +61,7 @@ type Model struct {
 	Exit    bool
 	Quit    bool
 	spinner spinner.Model
-	logger  *zap.SugaredLogger
+	logger  *slog.Logger
 }
 
 // getSelectedIndex returns the index of the cursor in relation to the total

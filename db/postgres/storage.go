@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math"
 	"strings"
 	"time"
@@ -14,7 +15,6 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared"
-	"go.uber.org/zap"
 )
 
 var PAGER_SIZE = 15
@@ -271,7 +271,7 @@ const (
 )
 
 type PsqlDB struct {
-	Logger *zap.SugaredLogger
+	Logger *slog.Logger
 	Db     *sql.DB
 }
 
@@ -347,16 +347,16 @@ func CreatePostWithTagsFromRow(r RowScanner) (*db.Post, error) {
 	return post, nil
 }
 
-func NewDB(databaseUrl string, logger *zap.SugaredLogger) *PsqlDB {
+func NewDB(databaseUrl string, logger *slog.Logger) *PsqlDB {
 	var err error
 	d := &PsqlDB{
 		Logger: logger,
 	}
-	d.Logger.Infof("Connecting to postgres: %s", databaseUrl)
+	d.Logger.Info("Connecting to postgres", "databaseUrl", databaseUrl)
 
 	db, err := sql.Open("postgres", databaseUrl)
 	if err != nil {
-		d.Logger.Fatal(err)
+		d.Logger.Error(err.Error())
 	}
 	d.Db = db
 	return d
@@ -507,7 +507,7 @@ func (me *PsqlDB) FindPostsBeforeDate(date *time.Time, space string) ([]*db.Post
 }
 
 func (me *PsqlDB) FindUserForKey(username string, key string) (*db.User, error) {
-	me.Logger.Infof("Attempting to find user with only public key (%s)", key)
+	me.Logger.Info("attempting to find user with only public key", "key", key)
 	pk, err := me.FindPublicKeyForKey(key)
 	if err == nil {
 		user, err := me.FindUser(pk.UserID)
@@ -519,10 +519,10 @@ func (me *PsqlDB) FindUserForKey(username string, key string) (*db.User, error) 
 	}
 
 	if errors.Is(err, &db.ErrMultiplePublicKeys{}) {
-		me.Logger.Infof("Detected multiple users with same public key, using ssh username (%s) to find correct one", username)
+		me.Logger.Info("detected multiple users with same public key", "user", username)
 		user, err := me.FindUserForNameAndKey(username, key)
 		if err != nil {
-			me.Logger.Infof("Could not find user by username (%s) and public key (%s)", username, key)
+			me.Logger.Info("could not find user by username and public key", "user", username, "key", key)
 			// this is a little hacky but if we cannot find a user by name and public key
 			// then we return the multiple keys detected error so the user knows to specify their
 			// when logging in
@@ -997,9 +997,9 @@ func (me *PsqlDB) insertAliasesForPost(tx *sql.Tx, aliases []string, postID stri
 	ids := make([]string, 0)
 	for _, alias := range aliases {
 		if slices.Contains(denyList, alias) {
-			me.Logger.Infof(
-				"(%s) is in the deny list for aliases because it conflicts with a static route, skipping",
-				alias,
+			me.Logger.Info(
+				"name is in the deny list for aliases because it conflicts with a static route, skipping",
+				"alias", alias,
 			)
 			continue
 		}

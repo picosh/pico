@@ -4,13 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
-	"go.uber.org/zap"
 )
 
 func getHelpText(userName, projectName string) string {
@@ -34,7 +34,7 @@ func getHelpText(userName, projectName string) string {
 }
 
 type CmdSessionLogger struct {
-	Log *zap.SugaredLogger
+	Log *slog.Logger
 }
 
 func (c *CmdSessionLogger) Write(out []byte) (int, error) {
@@ -65,7 +65,7 @@ type CmdSession interface {
 type Cmd struct {
 	User    *db.User
 	Session CmdSession
-	Log     *zap.SugaredLogger
+	Log     *slog.Logger
 	Store   storage.ObjectStorage
 	Dbpool  db.DB
 	Write   bool
@@ -85,7 +85,7 @@ func (c *Cmd) bail(err error) {
 	if err == nil {
 		return
 	}
-	c.Log.Error(err)
+	c.Log.Error(err.Error())
 	c.error(err)
 }
 
@@ -116,11 +116,11 @@ func (c *Cmd) RmProjectAssets(projectName string) error {
 
 	for _, file := range fileList {
 		intent := fmt.Sprintf("deleted (%s)", file.Name())
-		c.Log.Infof(
-			"(%s) attempting to delete (bucket: %s) (%s)",
-			c.User.Name,
-			bucket.Name,
-			file.Name(),
+		c.Log.Info(
+			"attempting to delete file",
+			"user", c.User.Name,
+			"bucket", bucket.Name,
+			"filename", file.Name(),
 		)
 		if c.Write {
 			err = c.Store.DeleteFile(
@@ -204,7 +204,7 @@ func (c *Cmd) ls() error {
 }
 
 func (c *Cmd) unlink(projectName string) error {
-	c.Log.Infof("user (%s) running `unlink` command with (%s)", c.User.Name, projectName)
+	c.Log.Info("user running `unlink` command", "user", c.User.Name, "project", projectName)
 	project, err := c.Dbpool.FindProjectByName(c.User.ID, projectName)
 	if err != nil {
 		return errors.Join(err, fmt.Errorf("project (%s) does not exit", projectName))
@@ -220,7 +220,7 @@ func (c *Cmd) unlink(projectName string) error {
 }
 
 func (c *Cmd) link(projectName, linkTo string) error {
-	c.Log.Infof("user (%s) running `link` command with (%s) (%s)", c.User.Name, projectName, linkTo)
+	c.Log.Info("user running `link` command", "user", c.User.Name, "project", projectName, "link", linkTo)
 
 	projectDir := linkTo
 	_, err := c.Dbpool.FindProjectByName(c.User.ID, linkTo)
@@ -233,13 +233,13 @@ func (c *Cmd) link(projectName, linkTo string) error {
 	projectID := ""
 	if err == nil {
 		projectID = project.ID
-		c.Log.Infof("user (%s) already has project (%s), updating", c.User.Name, projectName)
+		c.Log.Info("user already has project, updating", "user", c.User.Name, "project", projectName)
 		err = c.Dbpool.LinkToProject(c.User.ID, project.ID, projectDir, c.Write)
 		if err != nil {
 			return err
 		}
 	} else {
-		c.Log.Infof("user (%s) has no project record (%s), creating", c.User.Name, projectName)
+		c.Log.Info("user has no project record, creating", "user", c.User.Name, "project", projectName)
 		if !c.Write {
 			out := fmt.Sprintf("(%s) cannot create a new project without `--write` permission, aborting", projectName)
 			c.output(out)
@@ -252,7 +252,7 @@ func (c *Cmd) link(projectName, linkTo string) error {
 		projectID = id
 	}
 
-	c.Log.Infof("user (%s) linking (%s) to (%s)", c.User.Name, projectName, projectDir)
+	c.Log.Info("user linking", "user", c.User.Name, "project", projectName, "projectDir", projectDir)
 	err = c.Dbpool.LinkToProject(c.User.ID, projectID, projectDir, c.Write)
 	if err != nil {
 		return err
@@ -297,7 +297,7 @@ func (c *Cmd) depends(projectName string) error {
 // delete all the projects and associated assets matching prefix
 // but keep the latest N records.
 func (c *Cmd) prune(prefix string, keepNumLatest int) error {
-	c.Log.Infof("user (%s) running `clean` command for (%s)", c.User.Name, prefix)
+	c.Log.Info("user running `clean` command", "user", c.User.Name, "prefix", prefix)
 	c.output(fmt.Sprintf("searching for projects that match prefix (%s) and are not linked to other projects", prefix))
 
 	if prefix == "" || prefix == "*" {
@@ -357,7 +357,7 @@ func (c *Cmd) prune(prefix string, keepNumLatest int) error {
 		c.output(out)
 
 		if c.Write {
-			c.Log.Infof("(%s) removing", project.Name)
+			c.Log.Info("removing project", "project", project.Name)
 			err = c.Dbpool.RemoveProject(project.ID)
 			if err != nil {
 				return err
@@ -375,10 +375,10 @@ func (c *Cmd) prune(prefix string, keepNumLatest int) error {
 }
 
 func (c *Cmd) rm(projectName string) error {
-	c.Log.Infof("user (%s) running `rm` command for (%s)", c.User.Name, projectName)
+	c.Log.Info("user running `rm` command", "user", c.User.Name, "project", projectName)
 	project, err := c.Dbpool.FindProjectByName(c.User.ID, projectName)
 	if err == nil {
-		c.Log.Infof("found project (%s) (%s), checking dependencies", projectName, project.ID)
+		c.Log.Info("found project, checking dependencies", "project", projectName, "projectID", project.ID)
 
 		links, err := c.Dbpool.FindProjectLinks(c.User.ID, projectName)
 		if err != nil {
@@ -393,7 +393,7 @@ func (c *Cmd) rm(projectName string) error {
 		out := fmt.Sprintf("(%s) removing", project.Name)
 		c.output(out)
 		if c.Write {
-			c.Log.Infof("(%s) removing", project.Name)
+			c.Log.Info("removing project", "project", project.Name)
 			err = c.Dbpool.RemoveProject(project.ID)
 			if err != nil {
 				return err

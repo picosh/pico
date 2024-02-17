@@ -2,24 +2,14 @@ package main
 
 import (
 	"database/sql"
-	"log"
+	"log/slog"
 	"os"
 
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/wish/cms/config"
-	"go.uber.org/zap"
 )
-
-func createLogger() *zap.SugaredLogger {
-	logger, err := zap.NewProduction()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return logger.Sugar()
-}
 
 func findPosts(dbpool *sql.DB) ([]*db.Post, error) {
 	var posts []*db.Post
@@ -60,7 +50,7 @@ func findPosts(dbpool *sql.DB) ([]*db.Post, error) {
 }
 
 func main() {
-	logger := createLogger()
+	logger := slog.Default()
 
 	picoCfg := config.NewConfigCms()
 	picoCfg.Logger = logger

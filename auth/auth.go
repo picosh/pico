@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -12,13 +13,12 @@ import (
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
-	"go.uber.org/zap"
 )
 
 type Client struct {
 	Cfg    *AuthCfg
 	Dbpool db.DB
-	Logger *zap.SugaredLogger
+	Logger *slog.Logger
 }
 
 func (client *Client) hasPrivilegedAccess(apiToken string) bool {
@@ -73,7 +73,7 @@ func wellKnownHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	err := json.NewEncoder(w).Encode(p)
 	if err != nil {
-		client.Logger.Error(err)
+		client.Logger.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -86,11 +86,11 @@ type oauth2Introspection struct {
 func introspectHandler(w http.ResponseWriter, r *http.Request) {
 	client := getClient(r)
 	token := r.FormValue("token")
-	client.Logger.Infof("introspect token (%s)", token)
+	client.Logger.Info("introspect token", "token", token)
 
 	user, err := client.Dbpool.FindUserForToken(token)
 	if err != nil {
-		client.Logger.Error(err)
+		client.Logger.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
 	}
@@ -103,7 +103,7 @@ func introspectHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	err = json.NewEncoder(w).Encode(p)
 	if err != nil {
-		client.Logger.Error(err)
+		client.Logger.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -116,7 +116,13 @@ func authorizeHandler(w http.ResponseWriter, r *http.Request) {
 	redirectURI := r.URL.Query().Get("redirect_uri")
 	scope := r.URL.Query().Get("scope")
 
-	client.Logger.Infof("authorize handler (%s, %s, %s, %s)", responseType, clientID, redirectURI, scope)
+	client.Logger.Info(
+		"authorize handler",
+		"responseType", responseType,
+		"clientID", clientID,
+		"redirectURI", redirectURI,
+		"scope", scope,
+	)
 
 	ts, err := template.ParseFiles(
 		"auth/html/redirect.page.tmpl",
@@ -126,7 +132,7 @@ func authorizeHandler(w http.ResponseWriter, r *http.Request) {
 	)
 
 	if err != nil {
-		client.Logger.Error(err)
+		client.Logger.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
 	}
@@ -139,7 +145,7 @@ func authorizeHandler(w http.ResponseWriter, r *http.Request) {
 	})
 
 	if err != nil {
-		client.Logger.Error(err)
+		client.Logger.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
 	}
@@ -152,7 +158,11 @@ func redirectHandler(w http.ResponseWriter, r *http.Request) {
 	redirectURI := r.FormValue("redirect_uri")
 	responseType := r.FormValue("response_type")
 
-	client.Logger.Infof("redirect handler (%s, %s, %s)", token, redirectURI, responseType)
+	client.Logger.Info("redirect handler",
+		"token", token,
+		"redirectURI", redirectURI,
+		"responseType", responseType,
+	)
 
 	if token == "" || redirectURI == "" || responseType != "code" {
 		http.Error(w, "bad request", http.StatusBadRequest)
@@ -184,11 +194,16 @@ func tokenHandler(w http.ResponseWriter, r *http.Request) {
 	redirectURI := r.FormValue("redirect_uri")
 	grantType := r.FormValue("grant_type")
 
-	client.Logger.Infof("handle token (%s, %s, %s)", token, redirectURI, grantType)
+	client.Logger.Info(
+		"handle token",
+		"token", token,
+		"redirectURI", redirectURI,
+		"grantType", grantType,
+	)
 
 	_, err := client.Dbpool.FindUserForToken(token)
 	if err != nil {
-		client.Logger.Error(err)
+		client.Logger.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
 	}
@@ -200,7 +215,7 @@ func tokenHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	err = json.NewEncoder(w).Encode(p)
 	if err != nil {
-		client.Logger.Error(err)
+		client.Logger.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -218,7 +233,7 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 
 	err := json.NewDecoder(r.Body).Decode(&data)
 	if err != nil {
-		client.Logger.Error(err)
+		client.Logger.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -226,15 +241,21 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 	space := r.URL.Query().Get("space")
 	if space == "" {
 		spaceErr := fmt.Errorf("Must provide `space` query parameter")
-		client.Logger.Error(spaceErr)
+		client.Logger.Error(spaceErr.Error())
 		http.Error(w, spaceErr.Error(), http.StatusUnprocessableEntity)
 	}
 
-	client.Logger.Infof("handle key (%s, %s, %s, %s)", data.RemoteAddress, data.Username, space, data.PublicKey)
+	client.Logger.Info(
+		"handle key",
+		"remoteAddress", data.RemoteAddress,
+		"user", data.Username,
+		"space", space,
+		"publicKey", data.PublicKey,
+	)
 
 	user, err := client.Dbpool.FindUserForKey(data.Username, data.PublicKey)
 	if err != nil {
-		client.Logger.Error(err)
+		client.Logger.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
 	}
@@ -253,7 +274,7 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	err = json.NewEncoder(w).Encode(user)
 	if err != nil {
-		client.Logger.Error(err)
+		client.Logger.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -342,6 +363,6 @@ func StartApiServer() {
 	router := http.HandlerFunc(handler(routes, client))
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)
-	client.Logger.Infof("Starting server on port %s", cfg.Port)
-	client.Logger.Fatal(http.ListenAndServe(portStr, router))
+	client.Logger.Info("starting server on port", "port", cfg.Port)
+	client.Logger.Error(http.ListenAndServe(portStr, router).Error())
 }

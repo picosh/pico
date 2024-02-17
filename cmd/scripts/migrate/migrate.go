@@ -4,23 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/wish/cms/config"
-	"go.uber.org/zap"
 )
-
-func createLogger() *zap.SugaredLogger {
-	logger, err := zap.NewProduction()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return logger.Sugar()
-}
 
 func findPosts(dbpool *sql.DB) ([]*db.Post, error) {
 	var posts []*db.Post
@@ -109,7 +99,7 @@ type ConflictData struct {
 }
 
 func main() {
-	logger := createLogger()
+	logger := slog.Default()
 
 	listsCfg := config.NewConfigCms()
 	listsCfg.Logger = logger
@@ -221,7 +211,7 @@ func main() {
 		}
 	}
 
-	logger.Infof("Adding records with no conflicts (%d)", len(noconflicts))
+	logger.Info("adding records with no conflicts", "len", len(noconflicts))
 	for _, data := range noconflicts {
 		err = insertUser(tx, data.User)
 		if err != nil {
@@ -236,7 +226,7 @@ func main() {
 		}
 	}
 
-	logger.Infof("Adding records with conflicts (%d)", len(conflicts))
+	logger.Info("adding records with conflicts", "len", len(conflicts))
 	for _, data := range conflicts {
 		data.User.Name = fmt.Sprintf("%stmp", data.User.Name)
 		err = insertUser(tx, data.User)
