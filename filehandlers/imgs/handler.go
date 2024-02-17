@@ -17,6 +17,7 @@ import (
 	"github.com/picosh/pico/filehandlers/util"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
+	"github.com/picosh/pobj"
 	"github.com/picosh/send/send/utils"
 )
 
@@ -97,7 +98,7 @@ func (h *UploadImgHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileI
 		return nil, nil, err
 	}
 
-	reader := shared.NewAllReaderAt(contents)
+	reader := pobj.NewAllReaderAt(contents)
 
 	return fileInfo, reader, nil
 }

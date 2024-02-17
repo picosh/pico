@@ -17,6 +17,7 @@ import (
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pico/wish/cms/util"
+	"github.com/picosh/pobj"
 	sst "github.com/picosh/pobj/storage"
 	"github.com/picosh/send/send/utils"
 )
@@ -113,7 +114,7 @@ func (h *UploadAssetHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.Fil
 	fileInfo.FSize = size
 	fileInfo.FModTime = modTime
 
-	reader := shared.NewAllReaderAt(contents)
+	reader := pobj.NewAllReaderAt(contents)
 
 	return fileInfo, reader, nil
 }
