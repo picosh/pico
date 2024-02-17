@@ -14,7 +14,7 @@ FROM builder-deps as builder-web
 
 COPY . .
 
-ARG APP=lists
+ARG APP=prose
 ARG TARGETOS
 ARG TARGETARCH
 
@@ -33,7 +33,7 @@ FROM scratch as release-web
 
 WORKDIR /app
 
-ARG APP=lists
+ARG APP=prose
 
 COPY --from=builder-web /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder-web /go/bin/${APP}-web ./web
@@ -46,7 +46,7 @@ FROM scratch as release-ssh
 
 WORKDIR /app
 
-ARG APP=lists
+ARG APP=prose
 
 COPY --from=builder-ssh /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder-ssh /go/bin/${APP}-ssh ./ssh

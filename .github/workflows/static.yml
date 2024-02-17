@@ -22,7 +22,7 @@ jobs:
           pgit \
             --out ./public \
             --label pico \
-            --desc "pico services - prose.sh, lists.sh, pastes.sh, imgs.sh, feeds.sh, pgs.sh" \
+            --desc "pico services - prose.sh, pastes.sh, imgs.sh, feeds.sh, pgs.sh" \
             --clone-url "https://github.com/picosh/pico.git" \
             --home-url "https://git.erock.io" \
             --revs main
