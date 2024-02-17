@@ -63,13 +63,13 @@ func checkHandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			logItems := []string{
+			logger = logger.With(
 				"user", u.Name,
 				"project", props.ProjectName,
-			}
+			)
 			p, err := dbpool.FindProjectByName(u.ID, props.ProjectName)
 			if err != nil {
-				logger.Error(err.Error(), logItems)
+				logger.Error(err.Error())
 				w.WriteHeader(http.StatusNotFound)
 				return
 			}

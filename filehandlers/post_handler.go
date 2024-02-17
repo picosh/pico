@@ -84,10 +84,10 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 
 	userID := user.ID
 	filename := filepath.Base(entry.Filepath)
-	logItems := []string{
+	logger = logger.With(
 		"user", user.Name,
 		"filename", filename,
-	}
+	)
 
 	var origText []byte
 	if b, err := io.ReadAll(entry.Reader); err == nil {
@@ -124,13 +124,13 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 
 	valid, err := h.Hooks.FileValidate(s, &metadata)
 	if !valid {
-		logger.Error(err.Error(), logItems)
+		logger.Error(err.Error())
 		return "", err
 	}
 
 	post, err := h.DBPool.FindPostWithFilename(metadata.Filename, metadata.User.ID, h.Cfg.Space)
 	if err != nil {
-		logger.Info("unable to load post, continuing", "err", err.Error(), logItems)
+		logger.Info("unable to load post, continuing", "err", err.Error())
 	}
 
 	if post != nil {
@@ -140,7 +140,7 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 
 	err = h.Hooks.FileMeta(s, &metadata)
 	if err != nil {
-		logger.Error(err.Error(), logItems)
+		logger.Error(err.Error())
 		return "", err
 	}
 
@@ -150,18 +150,18 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 	if len(origText) == 0 {
 		// skip empty files from being added to db
 		if post == nil {
-			logger.Info("file is empty, skipping record", logItems)
+			logger.Info("file is empty, skipping record")
 			return "", nil
 		}
 
 		err := h.DBPool.RemovePosts([]string{post.ID})
-		logger.Info("file is empty, removing record", logItems)
+		logger.Info("file is empty, removing record")
 		if err != nil {
-			logger.Error(err.Error(), logItems)
+			logger.Error(err.Error())
 			return "", fmt.Errorf("error for %s: %v", filename, err)
 		}
 	} else if post == nil {
-		logger.Info("file not found, adding record", logItems)
+		logger.Info("file not found, adding record")
 		insertPost := db.Post{
 			UserID: userID,
 			Space:  h.Cfg.Space,
@@ -182,19 +182,19 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		}
 		post, err = h.DBPool.InsertPost(&insertPost)
 		if err != nil {
-			logger.Error(err.Error(), logItems)
+			logger.Error(err.Error())
 			return "", fmt.Errorf("error for %s: %v", filename, err)
 		}
 
 		if len(metadata.Aliases) > 0 {
 			logger.Info(
 				"found post aliases, replacing with old aliases",
+				"aliases",
 				strings.Join(metadata.Aliases, ","),
-				logItems,
 			)
 			err = h.DBPool.ReplaceAliasesForPost(metadata.Aliases, post.ID)
 			if err != nil {
-				logger.Error(err.Error(), logItems)
+				logger.Error(err.Error())
 				return "", fmt.Errorf("error for %s: %v", filename, err)
 			}
 		}
@@ -202,23 +202,22 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		if len(metadata.Tags) > 0 {
 			logger.Info(
 				"found post tags, replacing with old tags",
-				strings.Join(metadata.Tags, ","),
-				logItems,
+				"tags", strings.Join(metadata.Tags, ","),
 			)
 			err = h.DBPool.ReplaceTagsForPost(metadata.Tags, post.ID)
 			if err != nil {
-				logger.Error(err.Error(), logItems)
+				logger.Error(err.Error())
 				return "", fmt.Errorf("error for %s: %v", filename, err)
 			}
 		}
 	} else {
 		if metadata.Text == post.Text && modTime.Equal(*post.UpdatedAt) {
-			logger.Info("file found, but text is identical, skipping", logItems)
+			logger.Info("file found, but text is identical, skipping")
 			curl := shared.NewCreateURL(h.Cfg)
 			return h.Cfg.FullPostURL(curl, user.Name, metadata.Slug), nil
 		}
 
-		logger.Info("file found, updating record", logItems)
+		logger.Info("file found, updating record")
 
 		updatePost := db.Post{
 			ID: post.ID,
@@ -237,29 +236,27 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		}
 		_, err = h.DBPool.UpdatePost(&updatePost)
 		if err != nil {
-			logger.Error(err.Error(), logItems)
+			logger.Error(err.Error())
 			return "", fmt.Errorf("error for %s: %v", filename, err)
 		}
 
 		logger.Info(
 			"found post tags, replacing with old tags",
-			strings.Join(metadata.Tags, ","),
-			logItems,
+			"tags", strings.Join(metadata.Tags, ","),
 		)
 		err = h.DBPool.ReplaceTagsForPost(metadata.Tags, post.ID)
 		if err != nil {
-			logger.Error(err.Error(), logItems)
+			logger.Error(err.Error())
 			return "", fmt.Errorf("error for %s: %v", filename, err)
 		}
 
 		logger.Info(
 			"found post aliases, replacing with old aliases",
-			strings.Join(metadata.Aliases, ","),
-			logItems,
+			"aliases", strings.Join(metadata.Aliases, ","),
 		)
 		err = h.DBPool.ReplaceAliasesForPost(metadata.Aliases, post.ID)
 		if err != nil {
-			logger.Error(err.Error(), logItems)
+			logger.Error(err.Error())
 			return "", fmt.Errorf("error for %s: %v", filename, err)
 		}
 	}

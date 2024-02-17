@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"log/slog"
 	"os"
 	"time"
 
@@ -10,7 +11,6 @@ import (
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/wish/cms/config"
-	"log/slog"
 )
 
 func findPosts(dbpool *sql.DB) ([]*db.Post, error) {

@@ -92,10 +92,10 @@ func (h *UploadImgHandler) writeImg(s ssh.Session, data *PostMetaData) error {
 	}
 
 	modTime := time.Unix(data.Mtime, 0)
-	logItems := []string{
+	logger := h.Cfg.Logger.With(
 		"user", data.Username,
 		"filename", data.Filename,
-	}
+	)
 
 	if len(data.OrigText) == 0 {
 		err = h.removePost(data)
@@ -112,7 +112,7 @@ func (h *UploadImgHandler) writeImg(s ssh.Session, data *PostMetaData) error {
 			return err
 		}
 	} else if data.Cur == nil {
-		h.Cfg.Logger.Info("file not found, adding record", logItems)
+		logger.Info("file not found, adding record")
 		insertPost := db.Post{
 			UserID: user.ID,
 			Space:  Space,
@@ -132,29 +132,28 @@ func (h *UploadImgHandler) writeImg(s ssh.Session, data *PostMetaData) error {
 		}
 		_, err := h.DBPool.InsertPost(&insertPost)
 		if err != nil {
-			h.Cfg.Logger.Error(err.Error(), logItems)
+			logger.Error(err.Error())
 			return fmt.Errorf("error for %s: %v", data.Filename, err)
 		}
 
 		if len(data.Tags) > 0 {
-			h.Cfg.Logger.Info(
+			logger.Info(
 				"found post tags, replacing with old tags",
 				"tags", strings.Join(data.Tags, ","),
-				logItems,
 			)
 			err = h.DBPool.ReplaceTagsForPost(data.Tags, data.Post.ID)
 			if err != nil {
-				h.Cfg.Logger.Error(err.Error(), logItems)
+				logger.Error(err.Error())
 				return fmt.Errorf("error for %s: %v", data.Filename, err)
 			}
 		}
 	} else {
 		if data.Shasum == data.Cur.Shasum && modTime.Equal(*data.Cur.UpdatedAt) {
-			h.Cfg.Logger.Info("image found, but image is identical, skipping", logItems)
+			logger.Info("image found, but image is identical, skipping")
 			return nil
 		}
 
-		h.Cfg.Logger.Info("file found, updating record", logItems)
+		logger.Info("file found, updating record")
 
 		updatePost := db.Post{
 			ID: data.Cur.ID,
@@ -172,18 +171,17 @@ func (h *UploadImgHandler) writeImg(s ssh.Session, data *PostMetaData) error {
 		}
 		_, err = h.DBPool.UpdatePost(&updatePost)
 		if err != nil {
-			h.Cfg.Logger.Error(err.Error(), logItems)
+			logger.Error(err.Error())
 			return fmt.Errorf("error for %s: %v", data.Filename, err)
 		}
 
-		h.Cfg.Logger.Info(
+		logger.Info(
 			"found post tags, replacing with old tags",
 			"tags", strings.Join(data.Tags, ","),
-			logItems,
 		)
 		err = h.DBPool.ReplaceTagsForPost(data.Tags, data.Cur.ID)
 		if err != nil {
-			h.Cfg.Logger.Error(err.Error(), logItems)
+			logger.Error(err.Error())
 			return fmt.Errorf("error for %s: %v", data.Filename, err)
 		}
 	}
