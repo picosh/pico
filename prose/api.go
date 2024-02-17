@@ -131,13 +131,13 @@ func blogStyleHandler(w http.ResponseWriter, r *http.Request) {
 
 	user, err := dbpool.FindUserForName(username)
 	if err != nil {
-		logger.Infof("blog not found: %s", username)
+		logger.Info("blog not found", "user", username)
 		http.Error(w, "blog not found", http.StatusNotFound)
 		return
 	}
 	styles, err := dbpool.FindPostWithFilename("_styles.css", user.ID, cfg.Space)
 	if err != nil {
-		logger.Infof("css not found for: %s", username)
+		logger.Info("css not found", "user", username)
 		http.Error(w, "css not found", http.StatusNotFound)
 		return
 	}
@@ -146,7 +146,7 @@ func blogStyleHandler(w http.ResponseWriter, r *http.Request) {
 
 	_, err = w.Write([]byte(styles.Text))
 	if err != nil {
-		logger.Error(err)
+		logger.Error(err.Error())
 		http.Error(w, "server error", 500)
 	}
 }
@@ -159,7 +159,7 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 
 	user, err := dbpool.FindUserForName(username)
 	if err != nil {
-		logger.Infof("blog not found: %s", username)
+		logger.Info("blog not found", "user", username)
 		http.Error(w, "blog not found", http.StatusNotFound)
 		return
 	}
@@ -176,7 +176,7 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	posts = p.Data
 
 	if err != nil {
-		logger.Error(err)
+		logger.Error(err.Error())
 		http.Error(w, "could not fetch posts for blog", http.StatusInternalServerError)
 		return
 	}
@@ -190,7 +190,7 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	curl := shared.CreateURLFromRequest(cfg, r)
 
 	if err != nil {
-		logger.Error(err)
+		logger.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -207,7 +207,7 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		parsedText, err := shared.ParseText(readme.Text)
 		if err != nil {
-			logger.Error(err)
+			logger.Error(err.Error())
 		}
 		headerTxt.Bio = parsedText.Description
 		headerTxt.Layout = parsedText.Layout
@@ -277,7 +277,7 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 
 	err = ts.Execute(w, data)
 	if err != nil {
-		logger.Error(err)
+		logger.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -300,14 +300,14 @@ func postRawHandler(w http.ResponseWriter, r *http.Request) {
 
 	user, err := dbpool.FindUserForName(username)
 	if err != nil {
-		logger.Infof("blog not found: %s", username)
+		logger.Info("blog not found", "user", username)
 		http.Error(w, "blog not found", http.StatusNotFound)
 		return
 	}
 
 	post, err := dbpool.FindPostWithSlug(slug, user.ID, cfg.Space)
 	if err != nil {
-		logger.Infof("post not found")
+		logger.Info("post not found")
 		http.Error(w, "post not found", http.StatusNotFound)
 		return
 	}
@@ -316,7 +316,7 @@ func postRawHandler(w http.ResponseWriter, r *http.Request) {
 
 	_, err = w.Write([]byte(post.Text))
 	if err != nil {
-		logger.Error(err)
+		logger.Error(err.Error())
 		http.Error(w, "server error", 500)
 	}
 }
@@ -339,7 +339,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 
 	user, err := dbpool.FindUserForName(username)
 	if err != nil {
-		logger.Infof("blog not found: %s", username)
+		logger.Info("blog not found", "user", username)
 		http.Error(w, "blog not found", http.StatusNotFound)
 		return
 	}
@@ -356,7 +356,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		parsedText, err := shared.ParseText(post.Text)
 		if err != nil {
-			logger.Error(err)
+			logger.Error(err.Error())
 		}
 
 		// we need the blog name from the readme unfortunately
@@ -364,7 +364,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 		if err == nil {
 			readmeParsed, err := shared.ParseText(readme.Text)
 			if err != nil {
-				logger.Error(err)
+				logger.Error(err.Error())
 			}
 			if readmeParsed.MetaData.Title != "" {
 				blogName = readmeParsed.MetaData.Title
@@ -394,7 +394,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 		if err == nil {
 			footerParsed, err := shared.ParseText(footer.Text)
 			if err != nil {
-				logger.Error(err)
+				logger.Error(err.Error())
 			}
 			footerHTML = template.HTML(footerParsed.Html)
 		}
@@ -403,7 +403,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 		if isRequestTrackable(r) {
 			_, err := dbpool.AddViewCount(post.ID)
 			if err != nil {
-				logger.Error(err)
+				logger.Error(err.Error())
 			}
 		}
 
@@ -456,7 +456,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			Contents:     "Oops!  we can't seem to find this post.",
 			Unlisted:     true,
 		}
-		logger.Infof("post not found %s/%s", username, slug)
+		logger.Info("post not found", "user", username, "slug", slug)
 	}
 
 	ts, err := shared.RenderTemplate(cfg, []string{
@@ -469,7 +469,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 
 	err = ts.Execute(w, data)
 	if err != nil {
-		logger.Error(err)
+		logger.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -490,7 +490,7 @@ func readHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		logger.Error(err)
+		logger.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -521,7 +521,7 @@ func readHandler(w http.ResponseWriter, r *http.Request) {
 
 	tags, err := dbpool.FindPopularTags(cfg.Space)
 	if err != nil {
-		logger.Error(err)
+		logger.Error(err.Error())
 	}
 
 	data := ReadPageData{
@@ -551,7 +551,7 @@ func readHandler(w http.ResponseWriter, r *http.Request) {
 
 	err = ts.Execute(w, data)
 	if err != nil {
-		logger.Error(err)
+		logger.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -564,7 +564,7 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 
 	user, err := dbpool.FindUserForName(username)
 	if err != nil {
-		logger.Infof("rss feed not found: %s", username)
+		logger.Info("rss feed not found", "user", username)
 		http.Error(w, "rss feed not found", http.StatusNotFound)
 		return
 	}
@@ -581,14 +581,14 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 	posts = p.Data
 
 	if err != nil {
-		logger.Error(err)
+		logger.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	ts, err := template.ParseFiles(cfg.StaticPath("html/rss.page.tmpl"))
 	if err != nil {
-		logger.Error(err)
+		logger.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -601,7 +601,7 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		parsedText, err := shared.ParseText(readme.Text)
 		if err != nil {
-			logger.Error(err)
+			logger.Error(err.Error())
 		}
 		if parsedText.Title != "" {
 			headerTxt.Title = parsedText.Title
@@ -631,7 +631,7 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		parsed, err := shared.ParseText(post.Text)
 		if err != nil {
-			logger.Error(err)
+			logger.Error(err.Error())
 		}
 
 		footer, err := dbpool.FindPostWithFilename("_footer.md", user.ID, cfg.Space)
@@ -639,7 +639,7 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 		if err == nil {
 			footerParsed, err := shared.ParseText(footer.Text)
 			if err != nil {
-				logger.Error(err)
+				logger.Error(err.Error())
 			}
 			footerHTML = footerParsed.Html
 		}
@@ -673,14 +673,14 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 
 	rss, err := feed.ToAtom()
 	if err != nil {
-		logger.Fatal(err)
+		logger.Error(err.Error())
 		http.Error(w, "Could not generate atom rss feed", http.StatusInternalServerError)
 	}
 
 	w.Header().Add("Content-Type", "application/atom+xml")
 	_, err = w.Write([]byte(rss))
 	if err != nil {
-		logger.Error(err)
+		logger.Error(err.Error())
 	}
 }
 
@@ -691,14 +691,14 @@ func rssHandler(w http.ResponseWriter, r *http.Request) {
 
 	pager, err := dbpool.FindAllPosts(&db.Pager{Num: 25, Page: 0}, cfg.Space)
 	if err != nil {
-		logger.Error(err)
+		logger.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	ts, err := template.ParseFiles(cfg.StaticPath("html/rss.page.tmpl"))
 	if err != nil {
-		logger.Error(err)
+		logger.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -717,7 +717,7 @@ func rssHandler(w http.ResponseWriter, r *http.Request) {
 	for _, post := range pager.Data {
 		parsed, err := shared.ParseText(post.Text)
 		if err != nil {
-			logger.Error(err)
+			logger.Error(err.Error())
 		}
 
 		var tpl bytes.Buffer
@@ -754,14 +754,14 @@ func rssHandler(w http.ResponseWriter, r *http.Request) {
 
 	rss, err := feed.ToAtom()
 	if err != nil {
-		logger.Fatal(err)
+		logger.Error(err.Error())
 		http.Error(w, "Could not generate atom rss feed", http.StatusInternalServerError)
 	}
 
 	w.Header().Add("Content-Type", "application/atom+xml")
 	_, err = w.Write([]byte(rss))
 	if err != nil {
-		logger.Error(err)
+		logger.Error(err.Error())
 	}
 }
 
@@ -772,14 +772,14 @@ func serveFile(file string, contentType string) http.HandlerFunc {
 
 		contents, err := os.ReadFile(cfg.StaticPath(fmt.Sprintf("public/%s", file)))
 		if err != nil {
-			logger.Error(err)
+			logger.Error(err.Error())
 			http.Error(w, "file not found", 404)
 		}
 		w.Header().Add("Content-Type", contentType)
 
 		_, err = w.Write(contents)
 		if err != nil {
-			logger.Error(err)
+			logger.Error(err.Error())
 			http.Error(w, "server error", 500)
 		}
 	}
@@ -882,7 +882,7 @@ func StartApiServer() {
 	cache := gocache.New(2*time.Minute, 5*time.Minute)
 
 	if err != nil {
-		logger.Fatal(err)
+		logger.Error(err.Error())
 	}
 
 	staticRoutes := createStaticRoutes()
@@ -898,10 +898,12 @@ func StartApiServer() {
 	router := http.HandlerFunc(handler)
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)
-	logger.Infof("Starting server on port %s", cfg.Port)
-	logger.Infof("Subdomains enabled: %t", cfg.SubdomainsEnabled)
-	logger.Infof("Domain: %s", cfg.Domain)
-	logger.Infof("Email: %s", cfg.Email)
+	logger.Info(
+		"Starting server on port",
+		"port", cfg.Port,
+		"domain", cfg.Domain,
+		"email", cfg.Email,
+	)
 
-	logger.Fatal(http.ListenAndServe(portStr, router))
+	logger.Error(http.ListenAndServe(portStr, router).Error())
 }
