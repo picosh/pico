@@ -43,7 +43,7 @@ func main() {
 	picoCfg.MinioPass = os.Getenv("MINIO_ROOT_PASSWORD")
 	picoDb := postgres.NewDB(picoCfg.DbURL, picoCfg.Logger)
 
-	var st storage.ObjectStorage
+	var st storage.StorageServe
 	var err error
 	st, err = storage.NewStorageMinio(picoCfg.MinioURL, picoCfg.MinioUser, picoCfg.MinioPass)
 	bail(err)
@@ -66,7 +66,7 @@ func main() {
 
 		bucket, err := st.GetBucket(bucketName)
 		bail(err)
-		bucketProjects, err := st.ListFiles(bucket, "/", false)
+		bucketProjects, err := st.ListObjects(bucket, "/", false)
 		bail(err)
 
 		userID := strings.Replace(bucketName, "static-", "", 1)

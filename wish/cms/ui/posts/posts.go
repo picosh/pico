@@ -50,7 +50,7 @@ type Model struct {
 	cfg     *config.ConfigCms
 	urls    config.ConfigURL
 	dbpool  db.DB
-	st      storage.ObjectStorage
+	st      storage.StorageServe
 	user    *db.User
 	posts   []*db.Post
 	styles  common.Styles
@@ -83,7 +83,7 @@ func (m *Model) UpdatePaging(msg tea.Msg) {
 }
 
 // NewModel creates a new model with defaults.
-func NewModel(cfg *config.ConfigCms, urls config.ConfigURL, dbpool db.DB, user *db.User, stor storage.ObjectStorage, perPage int) Model {
+func NewModel(cfg *config.ConfigCms, urls config.ConfigURL, dbpool db.DB, user *db.User, stor storage.StorageServe, perPage int) Model {
 	logger := cfg.Logger
 	st := common.DefaultStyles()
 
@@ -339,7 +339,7 @@ func removePost(m Model) tea.Cmd {
 			return errMsg{err}
 		}
 
-		err = m.st.DeleteFile(bucket, m.posts[m.getSelectedIndex()].Filename)
+		err = m.st.DeleteObject(bucket, m.posts[m.getSelectedIndex()].Filename)
 		if err != nil {
 			return errMsg{err}
 		}

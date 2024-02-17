@@ -56,7 +56,7 @@ func (h *UploadImgHandler) metaImg(data *PostMetaData) error {
 
 	reader := bytes.NewReader([]byte(data.Text))
 
-	fname, err := h.Storage.PutFile(
+	fname, err := h.Storage.PutObject(
 		bucket,
 		data.Filename,
 		utils.NopReaderAtCloser(reader),
@@ -107,7 +107,7 @@ func (h *UploadImgHandler) writeImg(s ssh.Session, data *PostMetaData) error {
 		if err != nil {
 			return err
 		}
-		err = h.Storage.DeleteFile(bucket, data.Filename)
+		err = h.Storage.DeleteObject(bucket, data.Filename)
 		if err != nil {
 			return err
 		}

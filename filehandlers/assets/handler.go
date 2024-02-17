@@ -17,6 +17,7 @@ import (
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pico/wish/cms/util"
+	sst "github.com/picosh/pobj/storage"
 	"github.com/picosh/send/send/utils"
 )
 
@@ -33,8 +34,8 @@ func getProject(s ssh.Session) *db.Project {
 	return project
 }
 
-func getBucket(s ssh.Session) (storage.Bucket, error) {
-	bucket := s.Context().Value(ctxBucketKey{}).(storage.Bucket)
+func getBucket(s ssh.Session) (sst.Bucket, error) {
+	bucket := s.Context().Value(ctxBucketKey{}).(sst.Bucket)
 	if bucket.Name == "" {
 		return bucket, fmt.Errorf("bucket not set on `ssh.Context()` for connection")
 	}
@@ -61,7 +62,7 @@ type FileData struct {
 	*utils.FileEntry
 	Text          []byte
 	User          *db.User
-	Bucket        storage.Bucket
+	Bucket        sst.Bucket
 	StorageSize   uint64
 	FeatureFlag   *db.FeatureFlag
 	DeltaFileSize int64
@@ -70,10 +71,10 @@ type FileData struct {
 type UploadAssetHandler struct {
 	DBPool  db.DB
 	Cfg     *shared.ConfigSite
-	Storage storage.ObjectStorage
+	Storage storage.StorageServe
 }
 
-func NewUploadAssetHandler(dbpool db.DB, cfg *shared.ConfigSite, storage storage.ObjectStorage) *UploadAssetHandler {
+func NewUploadAssetHandler(dbpool db.DB, cfg *shared.ConfigSite, storage storage.StorageServe) *UploadAssetHandler {
 	return &UploadAssetHandler{
 		DBPool:  dbpool,
 		Cfg:     cfg,
@@ -104,7 +105,7 @@ func (h *UploadAssetHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.Fil
 	}
 
 	fname := shared.GetAssetFileName(entry)
-	contents, size, modTime, err := h.Storage.GetFile(bucket, fname)
+	contents, size, modTime, err := h.Storage.GetObject(bucket, fname)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -150,7 +151,7 @@ func (h *UploadAssetHandler) List(s ssh.Session, fpath string, isDir bool, recur
 			cleanFilename += "/"
 		}
 
-		foundList, err := h.Storage.ListFiles(bucket, cleanFilename, recursive)
+		foundList, err := h.Storage.ListObjects(bucket, cleanFilename, recursive)
 		if err != nil {
 			return fileList, err
 		}
@@ -271,7 +272,7 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 	// calculate the filsize difference between the same file already
 	// stored and the updated file being uploaded
 	assetFilename := shared.GetAssetFileName(entry)
-	curFileSize, _ := h.Storage.GetFileSize(bucket, assetFilename)
+	curFileSize, _ := h.Storage.GetObjectSize(bucket, assetFilename)
 	deltaFileSize := curFileSize - entry.Size
 
 	data := &FileData{
@@ -373,7 +374,7 @@ func (h *UploadAssetHandler) writeAsset(data *FileData) error {
 	assetFilename := shared.GetAssetFileName(data.FileEntry)
 
 	if data.Size == 0 {
-		err = h.Storage.DeleteFile(data.Bucket, assetFilename)
+		err = h.Storage.DeleteObject(data.Bucket, assetFilename)
 		if err != nil {
 			return err
 		}
@@ -390,7 +391,7 @@ func (h *UploadAssetHandler) writeAsset(data *FileData) error {
 			assetFilename,
 		)
 
-		_, err := h.Storage.PutFile(
+		_, err := h.Storage.PutObject(
 			data.Bucket,
 			assetFilename,
 			utils.NopReaderAtCloser(reader),

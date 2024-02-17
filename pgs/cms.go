@@ -100,7 +100,7 @@ func CmsMiddleware(cfg *config.ConfigCms, urls config.ConfigURL) bm.Handler {
 
 		dbpool := postgres.NewDB(cfg.DbURL, cfg.Logger)
 
-		var st storage.ObjectStorage
+		var st storage.StorageServe
 		if cfg.MinioURL == "" {
 			st, err = storage.NewStorageFS(cfg.StorageDir)
 		} else {
@@ -145,7 +145,7 @@ type model struct {
 	urls          config.ConfigURL
 	publicKey     string
 	dbpool        db.DB
-	st            storage.ObjectStorage
+	st            storage.StorageServe
 	user          *db.User
 	err           error
 	sshUser       string

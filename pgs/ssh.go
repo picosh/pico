@@ -67,7 +67,7 @@ func StartSshServer() {
 	dbh := postgres.NewDB(cfg.DbURL, cfg.Logger)
 	defer dbh.Close()
 
-	var st storage.ObjectStorage
+	var st storage.StorageServe
 	var err error
 	if cfg.MinioURL == "" {
 		st, err = storage.NewStorageFS(cfg.StorageDir)

@@ -66,7 +66,7 @@ type Cmd struct {
 	User    *db.User
 	Session CmdSession
 	Log     *slog.Logger
-	Store   storage.ObjectStorage
+	Store   storage.StorageServe
 	Dbpool  db.DB
 	Write   bool
 }
@@ -103,7 +103,7 @@ func (c *Cmd) RmProjectAssets(projectName string) error {
 	}
 	c.output(fmt.Sprintf("removing project assets (%s)", projectName))
 
-	fileList, err := c.Store.ListFiles(bucket, projectName+"/", true)
+	fileList, err := c.Store.ListObjects(bucket, projectName+"/", true)
 	if err != nil {
 		return err
 	}
@@ -123,7 +123,7 @@ func (c *Cmd) RmProjectAssets(projectName string) error {
 			"filename", file.Name(),
 		)
 		if c.Write {
-			err = c.Store.DeleteFile(
+			err = c.Store.DeleteObject(
 				bucket,
 				filepath.Join(projectName, file.Name()),
 			)
