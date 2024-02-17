@@ -252,5 +252,10 @@ func (c *ConfigSite) AssetURL(username, projectName, fpath string) string {
 }
 
 func CreateLogger(debug bool) *slog.Logger {
-	return slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	opts := &slog.HandlerOptions{
+		AddSource: true,
+	}
+	return slog.New(
+		slog.NewJSONHandler(os.Stdout, opts),
+	)
 }
