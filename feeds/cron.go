@@ -133,14 +133,14 @@ func (f *Fetcher) Validate(lastDigest *time.Time, parsed *shared.ListParsedText)
 }
 
 func (f *Fetcher) RunPost(user *db.User, post *db.Post) error {
-	f.cfg.Logger.Infof("(%s) running feed post (%s)", user.Name, post.Filename)
+	f.cfg.Logger.Info("running feed post", "user", user.Name, "filename", post.Filename)
 
 	parsed := shared.ListParseText(post.Text)
 
-	f.cfg.Logger.Infof("(%s) Last digest at (%s)", user.Name, post.Data.LastDigest)
+	f.cfg.Logger.Info("last digest at", "user", user.Name, "lastDigest", post.Data.LastDigest)
 	err := f.Validate(post.Data.LastDigest, parsed)
 	if err != nil {
-		f.cfg.Logger.Infof("(%s) %s", user.Name, err.Error())
+		f.cfg.Logger.Info(err.Error(), "user", user.Name)
 		return nil
 	}
 
@@ -184,13 +184,13 @@ func (f *Fetcher) RunUser(user *db.User) error {
 	}
 
 	if len(posts.Data) > 0 {
-		f.cfg.Logger.Infof("(%s) found (%d) feed posts", user.Name, len(posts.Data))
+		f.cfg.Logger.Info("found feed posts", "user", user.Name, "len", len(posts.Data))
 	}
 
 	for _, post := range posts.Data {
 		err = f.RunPost(user, post)
 		if err != nil {
-			f.cfg.Logger.Infof("(%s) %s", user.Name, err.Error())
+			f.cfg.Logger.Info(err.Error(), "user", user)
 		}
 	}
 
@@ -232,7 +232,7 @@ func (f *Fetcher) ParseURL(fp *gofeed.Parser, url string) (*gofeed.Feed, error) 
 }
 
 func (f *Fetcher) Fetch(fp *gofeed.Parser, url string, username string, feedItems []*db.FeedItem) (*Feed, error) {
-	f.cfg.Logger.Infof("(%s) %s fetching feed", username, url)
+	f.cfg.Logger.Info("fetching feed", "user", username, "url", url)
 
 	feed, err := f.ParseURL(fp, url)
 	if err != nil {
@@ -328,9 +328,9 @@ func (f *Fetcher) FetchAll(urls []string, inlineContent bool, postID string, use
 		feedTmpl, err := f.Fetch(fp, url, username, feedItems)
 		if err != nil {
 			if errors.Is(err, ErrNoRecentArticles) {
-				f.cfg.Logger.Info(err)
+				f.cfg.Logger.Info(err.Error())
 			} else {
-				f.cfg.Logger.Error(err)
+				f.cfg.Logger.Error(err.Error())
 			}
 			continue
 		}
@@ -391,7 +391,7 @@ func (f *Fetcher) SendEmail(username, email string, subject string, msg *MsgBody
 	message := mail.NewSingleEmail(from, subject, to, msg.Text, msg.Html)
 	client := sendgrid.NewSendClient(f.cfg.SendgridKey)
 
-	f.cfg.Logger.Infof("(%s) sending email digest", username)
+	f.cfg.Logger.Info("sending email digest", "user", username)
 	response, err := client.Send(message)
 	if err != nil {
 		return err
@@ -400,15 +400,15 @@ func (f *Fetcher) SendEmail(username, email string, subject string, msg *MsgBody
 	// f.cfg.Logger.Infof("(%s) email digest response: %v", username, response)
 
 	if len(response.Headers["X-Message-Id"]) > 0 {
-		f.cfg.Logger.Infof(
-			"(%s) successfully sent email digest (x-message-id: %s)",
-			email,
-			response.Headers["X-Message-Id"][0],
+		f.cfg.Logger.Info(
+			"successfully sent email digest",
+			"email", email,
+			"x-message-id", response.Headers["X-Message-Id"][0],
 		)
 	} else {
-		f.cfg.Logger.Errorf(
-			"(%s) could not find x-message-id, which means sending an email failed",
-			email,
+		f.cfg.Logger.Error(
+			"could not find x-message-id, which means sending an email failed",
+			"email", email,
 		)
 	}
 
@@ -424,7 +424,7 @@ func (f *Fetcher) Run() error {
 	for _, user := range users {
 		err := f.RunUser(user)
 		if err != nil {
-			f.cfg.Logger.Error(err)
+			f.cfg.Logger.Error(err.Error())
 			continue
 		}
 	}
@@ -438,7 +438,7 @@ func (f *Fetcher) Loop() {
 
 		err := f.Run()
 		if err != nil {
-			f.cfg.Logger.Error(err)
+			f.cfg.Logger.Error(err.Error())
 		}
 
 		f.cfg.Logger.Info("digest emailer finished, waiting 10 mins")

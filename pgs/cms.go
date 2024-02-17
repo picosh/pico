@@ -93,7 +93,7 @@ func CmsMiddleware(cfg *config.ConfigCms, urls config.ConfigURL) bm.Handler {
 		}
 		key, err := util.KeyText(s)
 		if err != nil {
-			logger.Error(err)
+			logger.Error(err.Error())
 		}
 
 		sshUser := s.User()
@@ -108,7 +108,7 @@ func CmsMiddleware(cfg *config.ConfigCms, urls config.ConfigURL) bm.Handler {
 		}
 
 		if err != nil {
-			logger.Fatal(err)
+			logger.Error(err.Error())
 		}
 
 		m := model{
@@ -171,14 +171,14 @@ func (m model) findUser() (*db.User, error) {
 	var user *db.User
 
 	if m.sshUser == "new" {
-		logger.Infof("User requesting to register account")
+		logger.Info("user requesting to register account", "user", user.Name)
 		return nil, nil
 	}
 
 	user, err := m.dbpool.FindUserForKey(m.sshUser, m.publicKey)
 
 	if err != nil {
-		logger.Error(err)
+		logger.Error(err.Error())
 		// we only want to throw an error for specific cases
 		if errors.Is(err, &db.ErrMultiplePublicKeys{}) {
 			return nil, err

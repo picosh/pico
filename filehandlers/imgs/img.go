@@ -87,11 +87,15 @@ func (h *UploadImgHandler) writeImg(s ssh.Session, data *PostMetaData) error {
 
 	err = h.metaImg(data)
 	if err != nil {
-		h.Cfg.Logger.Info(err)
+		h.Cfg.Logger.Info(err.Error())
 		return err
 	}
 
 	modTime := time.Unix(data.Mtime, 0)
+	logger := h.Cfg.Logger.With(
+		"user", data.Username,
+		"filename", data.Filename,
+	)
 
 	if len(data.OrigText) == 0 {
 		err = h.removePost(data)
@@ -108,7 +112,7 @@ func (h *UploadImgHandler) writeImg(s ssh.Session, data *PostMetaData) error {
 			return err
 		}
 	} else if data.Cur == nil {
-		h.Cfg.Logger.Infof("(%s) not found, adding record", data.Filename)
+		logger.Info("file not found, adding record")
 		insertPost := db.Post{
 			UserID: user.ID,
 			Space:  Space,
@@ -128,28 +132,28 @@ func (h *UploadImgHandler) writeImg(s ssh.Session, data *PostMetaData) error {
 		}
 		_, err := h.DBPool.InsertPost(&insertPost)
 		if err != nil {
-			h.Cfg.Logger.Errorf("error for %s: %v", data.Filename, err)
+			logger.Error(err.Error())
 			return fmt.Errorf("error for %s: %v", data.Filename, err)
 		}
 
 		if len(data.Tags) > 0 {
-			h.Cfg.Logger.Infof(
-				"Found (%s) post tags, replacing with old tags",
-				strings.Join(data.Tags, ","),
+			logger.Info(
+				"found post tags, replacing with old tags",
+				"tags", strings.Join(data.Tags, ","),
 			)
 			err = h.DBPool.ReplaceTagsForPost(data.Tags, data.Post.ID)
 			if err != nil {
-				h.Cfg.Logger.Errorf("error for %s: %v", data.Filename, err)
+				logger.Error(err.Error())
 				return fmt.Errorf("error for %s: %v", data.Filename, err)
 			}
 		}
 	} else {
 		if data.Shasum == data.Cur.Shasum && modTime.Equal(*data.Cur.UpdatedAt) {
-			h.Cfg.Logger.Infof("(%s) found, but image is identical, skipping", data.Filename)
+			logger.Info("image found, but image is identical, skipping")
 			return nil
 		}
 
-		h.Cfg.Logger.Infof("(%s) found, updating record", data.Filename)
+		logger.Info("file found, updating record")
 
 		updatePost := db.Post{
 			ID: data.Cur.ID,
@@ -167,17 +171,17 @@ func (h *UploadImgHandler) writeImg(s ssh.Session, data *PostMetaData) error {
 		}
 		_, err = h.DBPool.UpdatePost(&updatePost)
 		if err != nil {
-			h.Cfg.Logger.Errorf("error for %s: %v", data.Filename, err)
+			logger.Error(err.Error())
 			return fmt.Errorf("error for %s: %v", data.Filename, err)
 		}
 
-		h.Cfg.Logger.Infof(
-			"Found (%s) post tags, replacing with old tags",
-			strings.Join(data.Tags, ","),
+		logger.Info(
+			"found post tags, replacing with old tags",
+			"tags", strings.Join(data.Tags, ","),
 		)
 		err = h.DBPool.ReplaceTagsForPost(data.Tags, data.Cur.ID)
 		if err != nil {
-			h.Cfg.Logger.Errorf("error for %s: %v", data.Filename, err)
+			logger.Error(err.Error())
 			return fmt.Errorf("error for %s: %v", data.Filename, err)
 		}
 	}

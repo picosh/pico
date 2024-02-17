@@ -42,7 +42,7 @@ func ImgsListHandler(w http.ResponseWriter, r *http.Request) {
 
 	user, err := dbpool.FindUserForName(username)
 	if err != nil {
-		logger.Infof("blog not found: %s", username)
+		logger.Info("blog not found", "username", username)
 		http.Error(w, "blog not found", http.StatusNotFound)
 		return
 	}
@@ -53,7 +53,7 @@ func ImgsListHandler(w http.ResponseWriter, r *http.Request) {
 	posts = p.Data
 
 	if err != nil {
-		logger.Error(err)
+		logger.Error(err.Error())
 		http.Error(w, "could not fetch posts for blog", http.StatusInternalServerError)
 		return
 	}
@@ -63,7 +63,7 @@ func ImgsListHandler(w http.ResponseWriter, r *http.Request) {
 	})
 
 	if err != nil {
-		logger.Error(err)
+		logger.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -85,7 +85,7 @@ func ImgsListHandler(w http.ResponseWriter, r *http.Request) {
 
 	err = ts.Execute(w, data)
 	if err != nil {
-		logger.Error(err)
+		logger.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -97,14 +97,14 @@ func ImgsRssHandler(w http.ResponseWriter, r *http.Request) {
 
 	pager, err := dbpool.FindAllPosts(&db.Pager{Num: 25, Page: 0}, Space)
 	if err != nil {
-		logger.Error(err)
+		logger.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	ts, err := template.ParseFiles(cfg.StaticPath("html/rss.page.tmpl"))
 	if err != nil {
-		logger.Error(err)
+		logger.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -155,14 +155,14 @@ func ImgsRssHandler(w http.ResponseWriter, r *http.Request) {
 
 	rss, err := feed.ToAtom()
 	if err != nil {
-		logger.Fatal(err)
+		logger.Error(err.Error())
 		http.Error(w, "Could not generate atom rss feed", http.StatusInternalServerError)
 	}
 
 	w.Header().Add("Content-Type", "application/atom+xml")
 	_, err = w.Write([]byte(rss))
 	if err != nil {
-		logger.Error(err)
+		logger.Error(err.Error())
 	}
 }
 
@@ -175,7 +175,7 @@ func ImgRequest(w http.ResponseWriter, r *http.Request) {
 
 	user, err := dbpool.FindUserForName(username)
 	if err != nil {
-		logger.Infof("rss feed not found: %s", username)
+		logger.Info("rss feed not found", "user", username)
 		http.Error(w, "rss feed not found", http.StatusNotFound)
 		return
 	}
@@ -193,7 +193,7 @@ func ImgRequest(w http.ResponseWriter, r *http.Request) {
 	opts, err := storage.UriToImgProcessOpts(imgOpts)
 	if err != nil {
 		errMsg := fmt.Sprintf("error processing img options: %s", err.Error())
-		logger.Infof(errMsg)
+		logger.Info(errMsg)
 		http.Error(w, errMsg, http.StatusUnprocessableEntity)
 		return
 	}
@@ -224,7 +224,7 @@ func ImgRequest(w http.ResponseWriter, r *http.Request) {
 	post, err := FindImgPost(r, user, slug)
 	if err != nil {
 		errMsg := fmt.Sprintf("image not found %s/%s", user.Name, slug)
-		logger.Infof(errMsg)
+		logger.Info(errMsg)
 		http.Error(w, errMsg, http.StatusNotFound)
 		return
 	}
@@ -313,7 +313,7 @@ func StartApiServer() {
 	cache := gocache.New(2*time.Minute, 5*time.Minute)
 
 	if err != nil {
-		logger.Fatal(err)
+		logger.Error(err.Error())
 	}
 
 	staticRoutes := []shared.Route{}
@@ -328,10 +328,12 @@ func StartApiServer() {
 	router := http.HandlerFunc(handler)
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)
-	logger.Infof("Starting server on port %s", cfg.Port)
-	logger.Infof("Subdomains enabled: %t", cfg.SubdomainsEnabled)
-	logger.Infof("Domain: %s", cfg.Domain)
-	logger.Infof("Email: %s", cfg.Email)
+	logger.Info(
+		"Starting server on port",
+		"port", cfg.Port,
+		"domain", cfg.Domain,
+		"email", cfg.Email,
+	)
 
-	logger.Fatal(http.ListenAndServe(portStr, router))
+	logger.Error(http.ListenAndServe(portStr, router).Error())
 }

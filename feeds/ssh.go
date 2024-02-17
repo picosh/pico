@@ -81,7 +81,8 @@ func StartSshServer() {
 	}
 
 	if err != nil {
-		logger.Fatal(err)
+		logger.Error(err.Error())
+		return
 	}
 
 	fileMap := map[string]filehandlers.ReadWriteHandler{
@@ -100,15 +101,16 @@ func StartSshServer() {
 		),
 	)
 	if err != nil {
-		logger.Fatal(err)
+		logger.Error(err.Error())
+		return
 	}
 
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-	logger.Infof("Starting SSH server on %s:%s", host, port)
+	logger.Info("Starting SSH server", "host", host, "port", port)
 	go func() {
 		if err = s.ListenAndServe(); err != nil {
-			logger.Fatal(err)
+			logger.Error(err.Error())
 		}
 	}()
 
@@ -117,6 +119,6 @@ func StartSshServer() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer func() { cancel() }()
 	if err := s.Shutdown(ctx); err != nil {
-		logger.Fatal(err)
+		logger.Error(err.Error())
 	}
 }

@@ -1,26 +1,16 @@
 package main
 
 import (
-	"log"
+	"log/slog"
 	"os"
 
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/wish/cms/config"
-	"go.uber.org/zap"
 )
 
-func createLogger() *zap.SugaredLogger {
-	logger, err := zap.NewProduction()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return logger.Sugar()
-}
-
 func main() {
-	logger := createLogger()
+	logger := slog.Default()
 	picoCfg := config.NewConfigCms()
 	picoCfg.Logger = logger
 	picoCfg.DbURL = os.Getenv("DATABASE_URL")
@@ -49,5 +39,5 @@ func main() {
 		}
 	}
 
-	logger.Infof("empty (%d), diff (%d)", empty, diff)
+	logger.Info("empty, diff", "empty", empty, "diff", diff)
 }

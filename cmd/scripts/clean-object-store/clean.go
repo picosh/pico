@@ -1,7 +1,7 @@
 package main
 
 import (
-	"log"
+	"log/slog"
 	"os"
 	"strings"
 
@@ -11,17 +11,7 @@ import (
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pico/wish/cms/config"
-	"go.uber.org/zap"
 )
-
-func createLogger() *zap.SugaredLogger {
-	logger, err := zap.NewProduction()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return logger.Sugar()
-}
 
 func bail(err error) {
 	if err != nil {
@@ -43,7 +33,7 @@ func main() {
 	if writeEnv == "1" {
 		write = true
 	}
-	logger := createLogger()
+	logger := slog.Default()
 
 	picoCfg := config.NewConfigCms()
 	picoCfg.Logger = logger
@@ -104,7 +94,7 @@ func main() {
 				}
 			}
 			if !found {
-				logger.Infof("marking (bucket: %s) (%s) for removal", bucketName, bucketProject.Name())
+				logger.Info("marking for removal", "bucket", bucketName, "project", bucketProject.Name())
 				rmProjects = append(rmProjects, RmProject{
 					name: bucketProject.Name(),
 					user: user,
@@ -130,9 +120,9 @@ func main() {
 		bail(err)
 	}
 
-	logger.Infof("(%d) Store projects marked for deletion", len(rmProjects))
+	logger.Info("store projects marked for deletion", "length", len(rmProjects))
 	for _, project := range rmProjects {
-		logger.Infof("(user: %s) (project: %s)", project.user.Name, project.name)
+		logger.Info("removing project", "user", project.user.Name, "project", project.name)
 	}
 	if !write {
 		logger.Info("WARNING: changes not committed, need env var WRITE=1")

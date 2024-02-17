@@ -3,14 +3,14 @@ package shared
 import (
 	"fmt"
 	"html/template"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
 	"strings"
 
 	"github.com/picosh/pico/wish/cms/config"
-	"go.uber.org/zap"
 )
 
 type SitePageData struct {
@@ -251,21 +251,11 @@ func (c *ConfigSite) AssetURL(username, projectName, fpath string) string {
 	)
 }
 
-func CreateLogger(debug bool) *zap.SugaredLogger {
-	var (
-		err    error
-		logger *zap.Logger
+func CreateLogger(debug bool) *slog.Logger {
+	opts := &slog.HandlerOptions{
+		AddSource: true,
+	}
+	return slog.New(
+		slog.NewJSONHandler(os.Stdout, opts),
 	)
-
-	if debug {
-		logger, err = zap.NewDevelopment()
-	} else {
-		logger, err = zap.NewProduction()
-	}
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return logger.Sugar()
 }

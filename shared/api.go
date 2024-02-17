@@ -11,14 +11,13 @@ import (
 func CheckHandler(w http.ResponseWriter, r *http.Request) {
 	dbpool := GetDB(r)
 	cfg := GetCfg(r)
-	logger := GetLogger(r)
 
 	if cfg.IsCustomdomains() {
 		hostDomain := r.URL.Query().Get("domain")
 		appDomain := strings.Split(cfg.ConfigCms.Domain, ":")[0]
 
 		if !strings.Contains(hostDomain, appDomain) {
-			subdomain := GetCustomDomain(logger, hostDomain, cfg.Space)
+			subdomain := GetCustomDomain(hostDomain, cfg.Space)
 			if subdomain != "" {
 				u, err := dbpool.FindUserForName(subdomain)
 				if u != nil && err == nil {
@@ -49,7 +48,7 @@ func ServeFile(file string, contentType string) http.HandlerFunc {
 
 		contents, err := os.ReadFile(cfg.StaticPath(fmt.Sprintf("public/%s", file)))
 		if err != nil {
-			logger.Error(err)
+			logger.Error(err.Error())
 			http.Error(w, "file not found", 404)
 		}
 
@@ -57,7 +56,7 @@ func ServeFile(file string, contentType string) http.HandlerFunc {
 
 		_, err = w.Write(contents)
 		if err != nil {
-			logger.Error(err)
+			logger.Error(err.Error())
 		}
 	}
 }
@@ -104,7 +103,7 @@ func CreatePageHandler(fname string) http.HandlerFunc {
 		ts, err := RenderTemplate(cfg, []string{cfg.StaticPath(fname)})
 
 		if err != nil {
-			logger.Error(err)
+			logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -114,7 +113,7 @@ func CreatePageHandler(fname string) http.HandlerFunc {
 		}
 		err = ts.Execute(w, data)
 		if err != nil {
-			logger.Error(err)
+			logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	}

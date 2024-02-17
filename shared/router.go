@@ -3,6 +3,7 @@ package shared
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/pprof"
@@ -12,7 +13,6 @@ import (
 	"github.com/patrickmn/go-cache"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared/storage"
-	"go.uber.org/zap"
 )
 
 type Route struct {
@@ -46,7 +46,7 @@ func CreatePProfRoutes(routes []Route) []Route {
 
 type ServeFn func(http.ResponseWriter, *http.Request)
 
-func CreateServe(routes []Route, subdomainRoutes []Route, cfg *ConfigSite, dbpool db.DB, st storage.ObjectStorage, logger *zap.SugaredLogger, cache *cache.Cache) ServeFn {
+func CreateServe(routes []Route, subdomainRoutes []Route, cfg *ConfigSite, dbpool db.DB, st storage.ObjectStorage, logger *slog.Logger, cache *cache.Cache) ServeFn {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var allow []string
 		var subdomain string
@@ -63,7 +63,7 @@ func CreateServe(routes []Route, subdomainRoutes []Route, cfg *ConfigSite, dbpoo
 						curRoutes = subdomainRoutes
 					}
 				} else {
-					subdomain = GetCustomDomain(logger, hostDomain, cfg.Space)
+					subdomain = GetCustomDomain(hostDomain, cfg.Space)
 					if subdomain != "" {
 						curRoutes = subdomainRoutes
 					}
@@ -110,8 +110,8 @@ func GetCfg(r *http.Request) *ConfigSite {
 	return r.Context().Value(ctxCfg{}).(*ConfigSite)
 }
 
-func GetLogger(r *http.Request) *zap.SugaredLogger {
-	return r.Context().Value(ctxLoggerKey{}).(*zap.SugaredLogger)
+func GetLogger(r *http.Request) *slog.Logger {
+	return r.Context().Value(ctxLoggerKey{}).(*slog.Logger)
 }
 
 func GetCache(r *http.Request) *cache.Cache {
@@ -138,11 +138,10 @@ func GetSubdomain(r *http.Request) string {
 	return r.Context().Value(ctxSubdomainKey{}).(string)
 }
 
-func GetCustomDomain(logger *zap.SugaredLogger, host string, space string) string {
+func GetCustomDomain(host string, space string) string {
 	txt := fmt.Sprintf("_%s.%s", space, host)
 	records, err := net.LookupTXT(txt)
 	if err != nil {
-		logger.Info(err)
 		return ""
 	}
 

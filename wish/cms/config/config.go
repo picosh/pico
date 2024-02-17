@@ -1,8 +1,6 @@
 package config
 
-import (
-	"go.uber.org/zap"
-)
+import "log/slog"
 
 type ConfigURL interface {
 	BlogURL(username string) string
@@ -24,7 +22,7 @@ type ConfigCms struct {
 	Space         string
 	AllowedExt    []string
 	HiddenPosts   []string
-	Logger        *zap.SugaredLogger
+	Logger        *slog.Logger
 	AllowRegister bool
 	MaxSize       uint64
 	MaxAssetSize  int64

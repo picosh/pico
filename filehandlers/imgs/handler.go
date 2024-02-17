@@ -49,14 +49,14 @@ func NewUploadImgHandler(dbpool db.DB, cfg *shared.ConfigSite, storage storage.O
 func (h *UploadImgHandler) removePost(data *PostMetaData) error {
 	// skip empty files from being added to db
 	if data.Post == nil {
-		h.Cfg.Logger.Infof("(%s) is empty, skipping record", data.Filename)
+		h.Cfg.Logger.Info("file is empty, skipping record", "filename", data.Filename)
 		return nil
 	}
 
-	h.Cfg.Logger.Infof("(%s) is empty, removing record (%s)", data.Filename, data.Cur.ID)
+	h.Cfg.Logger.Info("file is empty, removing record", "filename", data.Filename, "recordId", data.Cur.ID)
 	err := h.DBPool.RemovePosts([]string{data.Cur.ID})
 	if err != nil {
-		h.Cfg.Logger.Errorf("error for %s: %v", data.Filename, err)
+		h.Cfg.Logger.Error(err.Error(), "filename", data.Filename)
 		return fmt.Errorf("error for %s: %v", data.Filename, err)
 	}
 
@@ -105,7 +105,7 @@ func (h *UploadImgHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileI
 func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string, error) {
 	user, err := util.GetUser(s)
 	if err != nil {
-		h.Cfg.Logger.Error(err)
+		h.Cfg.Logger.Error(err.Error())
 		return "", err
 	}
 
@@ -125,13 +125,13 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		noExifBytes, err := exifremove.Remove(text)
 		if err == nil {
 			if len(noExifBytes) == 0 {
-				h.Cfg.Logger.Infof("(%s) silently failed to strip exif data", filename)
+				h.Cfg.Logger.Info("file silently failed to strip exif data", "filename", filename)
 			} else {
 				text = noExifBytes
-				h.Cfg.Logger.Infof("(%s) stripped exif data", filename)
+				h.Cfg.Logger.Info("stripped exif data", "filename", filename)
 			}
 		} else {
-			h.Cfg.Logger.Error(err)
+			h.Cfg.Logger.Error(err.Error())
 		}
 	}
 
@@ -156,7 +156,7 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		Space,
 	)
 	if err != nil {
-		h.Cfg.Logger.Infof("(%s) unable to find image (%s), continuing", nextPost.Filename, err)
+		h.Cfg.Logger.Info("unable to find image, continuing", "filename", nextPost.Filename, "err", err.Error())
 	}
 
 	featureFlag, err := util.GetFeatureFlag(s)
@@ -178,13 +178,13 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 
 	err = h.writeImg(s, &metadata)
 	if err != nil {
-		h.Cfg.Logger.Error(err)
+		h.Cfg.Logger.Error(err.Error())
 		return "", err
 	}
 
 	totalFileSize, err := h.DBPool.FindTotalSizeForUser(user.ID)
 	if err != nil {
-		h.Cfg.Logger.Error(err)
+		h.Cfg.Logger.Error(err.Error())
 		return "", err
 	}
 

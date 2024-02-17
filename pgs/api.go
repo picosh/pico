@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"path/filepath"
@@ -20,7 +21,6 @@ import (
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/send/send/utils"
-	"go.uber.org/zap"
 )
 
 type AssetHandler struct {
@@ -31,7 +31,7 @@ type AssetHandler struct {
 	Cfg            *shared.ConfigSite
 	Dbpool         db.DB
 	Storage        storage.ObjectStorage
-	Logger         *zap.SugaredLogger
+	Logger         *slog.Logger
 	Cache          *gocache.Cache
 	UserID         string
 	Bucket         storage.Bucket
@@ -48,24 +48,28 @@ func checkHandler(w http.ResponseWriter, r *http.Request) {
 		appDomain := strings.Split(cfg.ConfigCms.Domain, ":")[0]
 
 		if !strings.Contains(hostDomain, appDomain) {
-			subdomain := shared.GetCustomDomain(logger, hostDomain, cfg.Space)
+			subdomain := shared.GetCustomDomain(hostDomain, cfg.Space)
 			props, err := getProjectFromSubdomain(subdomain)
 			if err != nil {
-				logger.Error(err)
+				logger.Error(err.Error())
 				w.WriteHeader(http.StatusNotFound)
 				return
 			}
 
 			u, err := dbpool.FindUserForName(props.Username)
 			if err != nil {
-				logger.Error(err)
+				logger.Error(err.Error())
 				w.WriteHeader(http.StatusNotFound)
 				return
 			}
 
+			logger = logger.With(
+				"user", u.Name,
+				"project", props.ProjectName,
+			)
 			p, err := dbpool.FindProjectByName(u.ID, props.ProjectName)
 			if err != nil {
-				logger.Error(err)
+				logger.Error(err.Error())
 				w.WriteHeader(http.StatusNotFound)
 				return
 			}
@@ -91,7 +95,7 @@ func rssHandler(w http.ResponseWriter, r *http.Request) {
 
 	pager, err := dbpool.FindAllProjects(&db.Pager{Num: 50, Page: 0})
 	if err != nil {
-		logger.Error(err)
+		logger.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -128,14 +132,14 @@ func rssHandler(w http.ResponseWriter, r *http.Request) {
 
 	rss, err := feed.ToAtom()
 	if err != nil {
-		logger.Fatal(err)
+		logger.Error(err.Error())
 		http.Error(w, "Could not generate atom rss feed", http.StatusInternalServerError)
 	}
 
 	w.Header().Add("Content-Type", "application/atom+xml")
 	_, err = w.Write([]byte(rss))
 	if err != nil {
-		logger.Error(err)
+		logger.Error(err.Error())
 	}
 }
 
@@ -226,14 +230,14 @@ func (h *AssetHandler) handle(w http.ResponseWriter) {
 		buf := new(strings.Builder)
 		_, err := io.Copy(buf, redirectFp)
 		if err != nil {
-			h.Logger.Error(err)
+			h.Logger.Error(err.Error())
 			http.Error(w, "cannot read _redirect file", http.StatusInternalServerError)
 			return
 		}
 
 		redirects, err = parseRedirectText(buf.String())
 		if err != nil {
-			h.Logger.Error(err)
+			h.Logger.Error(err.Error())
 		}
 	}
 
@@ -266,10 +270,10 @@ func (h *AssetHandler) handle(w http.ResponseWriter) {
 	}
 
 	if assetFilepath == "" {
-		h.Logger.Infof(
-			"asset not found in bucket: bucket:[%s], routes:[%s]",
-			h.Bucket.Name,
-			strings.Join(attempts, ", "),
+		h.Logger.Info(
+			"asset not found in bucket",
+			"bucket", h.Bucket.Name,
+			"routes", strings.Join(attempts, ", "),
 		)
 		http.Error(w, "404 not found", http.StatusNotFound)
 		return
@@ -285,7 +289,7 @@ func (h *AssetHandler) handle(w http.ResponseWriter) {
 	_, err = io.Copy(w, contents)
 
 	if err != nil {
-		h.Logger.Error(err)
+		h.Logger.Error(err.Error())
 	}
 }
 
@@ -318,14 +322,14 @@ func ServeAsset(fname string, opts *storage.ImgProcessOpts, fromImgs bool, w htt
 
 	props, err := getProjectFromSubdomain(subdomain)
 	if err != nil {
-		logger.Info(err)
+		logger.Info(err.Error(), "subdomain", subdomain, "filename", fname)
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 
 	user, err := dbpool.FindUserForName(props.Username)
 	if err != nil {
-		logger.Infof("user not found: %s", props.Username)
+		logger.Info("user not found", "user", props.Username)
 		http.Error(w, "user not found", http.StatusNotFound)
 		return
 	}
@@ -347,7 +351,7 @@ func ServeAsset(fname string, opts *storage.ImgProcessOpts, fromImgs bool, w htt
 	}
 
 	if err != nil {
-		logger.Infof("bucket not found for %s", props.Username)
+		logger.Info("bucket not found", "user", props.Username)
 		http.Error(w, "bucket not found", http.StatusNotFound)
 		return
 	}
@@ -377,7 +381,7 @@ func ImgAssetRequest(w http.ResponseWriter, r *http.Request) {
 	opts, err := storage.UriToImgProcessOpts(imgOpts)
 	if err != nil {
 		errMsg := fmt.Sprintf("error processing img options: %s", err.Error())
-		logger.Infof(errMsg)
+		logger.Info(errMsg)
 		http.Error(w, errMsg, http.StatusUnprocessableEntity)
 	}
 
@@ -410,7 +414,8 @@ func StartApiServer() {
 	cache := gocache.New(2*time.Minute, 5*time.Minute)
 
 	if err != nil {
-		logger.Fatal(err)
+		logger.Error(err.Error())
+		return
 	}
 
 	mainRoutes := []shared.Route{
@@ -436,10 +441,11 @@ func StartApiServer() {
 	router := http.HandlerFunc(handler)
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)
-	logger.Infof("Starting server on port %s", cfg.Port)
-	logger.Infof("Subdomains enabled: %t", cfg.SubdomainsEnabled)
-	logger.Infof("Domain: %s", cfg.Domain)
-	logger.Infof("Email: %s", cfg.Email)
-
-	logger.Fatal(http.ListenAndServe(portStr, router))
+	logger.Info(
+		"Starting server on port",
+		"port", cfg.Port,
+		"domain", cfg.Domain,
+		"email", cfg.Email,
+	)
+	logger.Error(http.ListenAndServe(portStr, router).Error())
 }

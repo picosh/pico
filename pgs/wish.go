@@ -83,7 +83,7 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 				}
 			}
 
-			log.Infof("pgs middleware detected command: %s", args)
+			log.Info("pgs middleware detected command", "args", args)
 			projectName := strings.TrimSpace(args[1])
 
 			if projectName == "--write" {
