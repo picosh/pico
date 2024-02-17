@@ -414,7 +414,8 @@ func StartApiServer() {
 	cache := gocache.New(2*time.Minute, 5*time.Minute)
 
 	if err != nil {
-		logger.Fatal(err)
+		logger.Error(err.Error())
+		return
 	}
 
 	mainRoutes := []shared.Route{
@@ -440,10 +441,11 @@ func StartApiServer() {
 	router := http.HandlerFunc(handler)
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)
-	logger.Infof("Starting server on port %s", cfg.Port)
-	logger.Infof("Subdomains enabled: %t", cfg.SubdomainsEnabled)
-	logger.Infof("Domain: %s", cfg.Domain)
-	logger.Infof("Email: %s", cfg.Email)
-
-	logger.Fatal(http.ListenAndServe(portStr, router))
+	logger.Info(
+		"Starting server on port",
+		"port", cfg.Port,
+		"domain", cfg.Domain,
+		"email", cfg.Email,
+	)
+	logger.Error(http.ListenAndServe(portStr, router).Error())
 }
