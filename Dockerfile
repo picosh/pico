@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM golang:1.21 as builder-deps
+FROM --platform=$BUILDPLATFORM golang:1.22 as builder-deps
 LABEL maintainer="Pico Maintainers <hello@pico.sh>"
 
 WORKDIR /app

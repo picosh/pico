@@ -38,7 +38,7 @@ type ScpUploadHandler struct {
 	Hooks  ScpFileHooks
 }
 
-func NewScpPostHandler(dbpool db.DB, cfg *shared.ConfigSite, hooks ScpFileHooks, st storage.ObjectStorage) *ScpUploadHandler {
+func NewScpPostHandler(dbpool db.DB, cfg *shared.ConfigSite, hooks ScpFileHooks, st storage.StorageServe) *ScpUploadHandler {
 	return &ScpUploadHandler{
 		DBPool: dbpool,
 		Cfg:    cfg,

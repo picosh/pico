@@ -46,7 +46,7 @@ func CreatePProfRoutes(routes []Route) []Route {
 
 type ServeFn func(http.ResponseWriter, *http.Request)
 
-func CreateServe(routes []Route, subdomainRoutes []Route, cfg *ConfigSite, dbpool db.DB, st storage.ObjectStorage, logger *slog.Logger, cache *cache.Cache) ServeFn {
+func CreateServe(routes []Route, subdomainRoutes []Route, cfg *ConfigSite, dbpool db.DB, st storage.StorageServe, logger *slog.Logger, cache *cache.Cache) ServeFn {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var allow []string
 		var subdomain string
@@ -122,8 +122,8 @@ func GetDB(r *http.Request) db.DB {
 	return r.Context().Value(ctxDBKey{}).(db.DB)
 }
 
-func GetStorage(r *http.Request) storage.ObjectStorage {
-	return r.Context().Value(ctxStorageKey{}).(storage.ObjectStorage)
+func GetStorage(r *http.Request) storage.StorageServe {
+	return r.Context().Value(ctxStorageKey{}).(storage.StorageServe)
 }
 
 func GetField(r *http.Request, index int) string {

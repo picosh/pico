@@ -17,6 +17,7 @@ import (
 	"github.com/picosh/pico/filehandlers/util"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
+	"github.com/picosh/pobj"
 	"github.com/picosh/send/send/utils"
 )
 
@@ -35,10 +36,10 @@ type PostMetaData struct {
 type UploadImgHandler struct {
 	DBPool  db.DB
 	Cfg     *shared.ConfigSite
-	Storage storage.ObjectStorage
+	Storage storage.StorageServe
 }
 
-func NewUploadImgHandler(dbpool db.DB, cfg *shared.ConfigSite, storage storage.ObjectStorage) *UploadImgHandler {
+func NewUploadImgHandler(dbpool db.DB, cfg *shared.ConfigSite, storage storage.StorageServe) *UploadImgHandler {
 	return &UploadImgHandler{
 		DBPool:  dbpool,
 		Cfg:     cfg,
@@ -92,12 +93,12 @@ func (h *UploadImgHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileI
 		return nil, nil, err
 	}
 
-	contents, _, _, err := h.Storage.GetFile(bucket, post.Filename)
+	contents, _, _, err := h.Storage.GetObject(bucket, post.Filename)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	reader := shared.NewAllReaderAt(contents)
+	reader := pobj.NewAllReaderAt(contents)
 
 	return fileInfo, reader, nil
 }

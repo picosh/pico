@@ -20,6 +20,7 @@ import (
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
+	sst "github.com/picosh/pobj/storage"
 	"github.com/picosh/send/send/utils"
 )
 
@@ -30,11 +31,11 @@ type AssetHandler struct {
 	ProjectDir     string
 	Cfg            *shared.ConfigSite
 	Dbpool         db.DB
-	Storage        storage.ObjectStorage
+	Storage        storage.StorageServe
 	Logger         *slog.Logger
 	Cache          *gocache.Cache
 	UserID         string
-	Bucket         storage.Bucket
+	Bucket         sst.Bucket
 	ImgProcessOpts *storage.ImgProcessOpts
 }
 
@@ -224,7 +225,7 @@ func calcPossibleRoutes(projectName, fp string, userRedirects []*RedirectRule) [
 
 func (h *AssetHandler) handle(w http.ResponseWriter) {
 	var redirects []*RedirectRule
-	redirectFp, _, _, err := h.Storage.GetFile(h.Bucket, filepath.Join(h.ProjectDir, "_redirects"))
+	redirectFp, _, _, err := h.Storage.GetObject(h.Bucket, filepath.Join(h.ProjectDir, "_redirects"))
 	if err == nil {
 		defer redirectFp.Close()
 		buf := new(strings.Builder)
@@ -253,13 +254,13 @@ func (h *AssetHandler) handle(w http.ResponseWriter) {
 		var c io.ReadCloser
 		var err error
 		if strings.HasPrefix(mimeType, "image/") {
-			c, contentType, err = h.Storage.ServeFile(
+			c, contentType, err = h.Storage.ServeObject(
 				h.Bucket,
 				fp.Filepath,
 				h.ImgProcessOpts,
 			)
 		} else {
-			c, _, _, err = h.Storage.GetFile(h.Bucket, fp.Filepath)
+			c, _, _, err = h.Storage.GetObject(h.Bucket, fp.Filepath)
 		}
 		if err == nil {
 			contents = c
@@ -337,7 +338,7 @@ func ServeAsset(fname string, opts *storage.ImgProcessOpts, fromImgs bool, w htt
 	// TODO: this could probably be cleaned up more
 	// imgs wont have a project directory
 	projectDir := ""
-	var bucket storage.Bucket
+	var bucket sst.Bucket
 	// imgs has a different bucket directory
 	if fromImgs {
 		bucket, err = st.GetBucket(shared.GetImgsBucketName(user.ID))
@@ -400,7 +401,7 @@ func StartApiServer() {
 	db := postgres.NewDB(cfg.DbURL, cfg.Logger)
 	defer db.Close()
 
-	var st storage.ObjectStorage
+	var st storage.StorageServe
 	var err error
 	if cfg.MinioURL == "" {
 		st, err = storage.NewStorageFS(cfg.StorageDir)

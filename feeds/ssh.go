@@ -72,7 +72,7 @@ func StartSshServer() {
 		Db:  dbh,
 	}
 
-	var st storage.ObjectStorage
+	var st storage.StorageServe
 	var err error
 	if cfg.MinioURL == "" {
 		st, err = storage.NewStorageFS(cfg.StorageDir)

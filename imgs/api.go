@@ -299,7 +299,7 @@ func StartApiServer() {
 	db := postgres.NewDB(cfg.DbURL, cfg.Logger)
 	defer db.Close()
 
-	var st storage.ObjectStorage
+	var st storage.StorageServe
 	var err error
 	if cfg.MinioURL == "" {
 		st, err = storage.NewStorageFS(cfg.StorageDir)
