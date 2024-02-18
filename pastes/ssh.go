@@ -12,11 +12,11 @@ import (
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
 	bm "github.com/charmbracelet/wish/bubbletea"
-	lm "github.com/charmbracelet/wish/logging"
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/filehandlers"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
+	wsh "github.com/picosh/pico/wish"
 	"github.com/picosh/pico/wish/cms"
 	"github.com/picosh/send/list"
 	"github.com/picosh/send/pipe"
@@ -42,7 +42,7 @@ func createRouter(handler *filehandlers.FileHandlerRouter) proxy.Router {
 			wishrsync.Middleware(handler),
 			auth.Middleware(handler),
 			bm.Middleware(cms.Middleware(&handler.Cfg.ConfigCms, handler.Cfg)),
-			lm.Middleware(),
+			wsh.LogMiddleware(handler.GetLogger()),
 		}
 	}
 }

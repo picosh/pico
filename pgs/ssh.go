@@ -12,11 +12,11 @@ import (
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
 	bm "github.com/charmbracelet/wish/bubbletea"
-	lm "github.com/charmbracelet/wish/logging"
 	"github.com/picosh/pico/db/postgres"
 	uploadassets "github.com/picosh/pico/filehandlers/assets"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
+	wsh "github.com/picosh/pico/wish"
 	"github.com/picosh/send/list"
 	"github.com/picosh/send/pipe"
 	"github.com/picosh/send/proxy"
@@ -42,7 +42,7 @@ func createRouter(cfg *shared.ConfigSite, handler *uploadassets.UploadAssetHandl
 			wishrsync.Middleware(handler),
 			auth.Middleware(handler),
 			bm.Middleware(CmsMiddleware(&cfg.ConfigCms, cfg)),
-			lm.Middleware(),
+			wsh.LogMiddleware(handler.GetLogger()),
 		}
 	}
 }
