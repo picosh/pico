@@ -10,7 +10,6 @@ import (
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pico/wish/cms/util"
-	"github.com/picosh/send/send/utils"
 )
 
 func getUser(s ssh.Session, dbpool db.DB) (*db.User, error) {
@@ -42,22 +41,23 @@ func WishMiddleware(dbpool db.DB, log *slog.Logger, store storage.StorageServe) 
 				return
 			}
 
+			opts := Cmd{
+				Session:  session,
+				Username: session.User(),
+				Store:    store,
+				Log:      log,
+				Dbpool:   dbpool,
+				Write:    false,
+			}
+
 			user, err := getUser(session, dbpool)
 			if err != nil {
-				utils.ErrorHandler(session, err)
+				opts.help()
 				return
 			}
+			opts.User = user
 
 			args := session.Command()
-
-			opts := Cmd{
-				Session: session,
-				User:    user,
-				Store:   store,
-				Log:     log,
-				Dbpool:  dbpool,
-				Write:   false,
-			}
 
 			cmd := strings.TrimSpace(args[0])
 			if len(args) == 1 {

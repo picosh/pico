@@ -103,7 +103,7 @@ func main() {
 		}
 	}
 
-	session := &pgs.CmdSessionLogger{
+	session := &shared.CmdSessionLogger{
 		Log: logger,
 	}
 

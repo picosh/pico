@@ -10,12 +10,14 @@ import (
 )
 
 type Cmd struct {
-	User    *db.User
-	Session shared.CmdSession
-	Log     *slog.Logger
-	Store   storage.StorageServe
-	Dbpool  db.DB
-	Write   bool
+	Username  string
+	PublicKey string
+	User      *db.User
+	Session   shared.CmdSession
+	Log       *slog.Logger
+	Store     storage.StorageServe
+	Dbpool    db.DB
+	Write     bool
 }
 
 func (c *Cmd) output(out string) {
@@ -36,7 +38,42 @@ func (c *Cmd) bail(err error) {
 	c.error(err)
 }
 
-func (c *Cmd) help() {}
+func (c *Cmd) help() {
+	if c.User == nil {
+		helpStr := "commands: [help, register]\n"
+		c.output(helpStr)
+	}
+}
+
+func (c *Cmd) registerUser() (*db.User, error) {
+	userID, err := c.Dbpool.AddUser()
+	if err != nil {
+		return nil, err
+	}
+
+	err = c.Dbpool.LinkUserKey(userID, c.PublicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	user, err := c.Dbpool.FindUser(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	err = c.Dbpool.SetUserName(user.ID, c.Username)
+	if err != nil {
+		return nil, err
+	}
+
+	return user, nil
+}
+
 func (c *Cmd) register() error {
-	return nil
+	if c.User != nil {
+		c.output("you already have an account")
+		return nil
+	}
+	_, err := c.registerUser()
+	return err
 }
