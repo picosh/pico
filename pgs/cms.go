@@ -171,7 +171,7 @@ func (m model) findUser() (*db.User, error) {
 	var user *db.User
 
 	if m.sshUser == "new" {
-		logger.Info("user requesting to register account", "user", user.Name)
+		logger.Info("user requesting to register account")
 		return nil, nil
 	}
 
