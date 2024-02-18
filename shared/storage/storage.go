@@ -9,4 +9,5 @@ import (
 type StorageServe interface {
 	sst.ObjectStorage
 	ServeObject(bucket sst.Bucket, fpath string, opts *ImgProcessOpts) (io.ReadCloser, string, error)
+	GetObjectSize(bucket sst.Bucket, fpath string) (int64, error)
 }

@@ -182,8 +182,8 @@ github.com/patrickmn/go-cache v2.1.0+incompatible h1:HRMgzkcYKYpi3C8ajMPV8OFXaaR
 github.com/patrickmn/go-cache v2.1.0+incompatible/go.mod h1:3Qf8kWWT7OJRJbdiICTKqZju1ZixQ/KpMGzzAfe6+WQ=
 github.com/philhofer/fwd v1.1.2 h1:bnDivRJ1EWPjUIRXV5KfORO897HTbpFAQddBdE8t7Gw=
 github.com/philhofer/fwd v1.1.2/go.mod h1:qkPdfjR2SIEbspLqpe1tO4n5yICnr2DY7mqEx2tUTP0=
-github.com/picosh/pobj v0.0.0-20240217191723-5a89dec577a1 h1:6aJBn2UsA0pWvwjV6C6/klcMzFUu6PpOfkI5DzHr6xo=
-github.com/picosh/pobj v0.0.0-20240217191723-5a89dec577a1/go.mod h1:ILtZ0GOqkozrrGCvyJqCSUIwal2XQqzSfbKCNdS+HyU=
+github.com/picosh/pobj v0.0.0-20240218150308-1dc70e819bbf h1:xtr5DoSgoOqbPFnm8p5YjTqrRKVW8KYI0bDwwRiG8yI=
+github.com/picosh/pobj v0.0.0-20240218150308-1dc70e819bbf/go.mod h1:ILtZ0GOqkozrrGCvyJqCSUIwal2XQqzSfbKCNdS+HyU=
 github.com/picosh/send v0.0.0-20240217194807-77b972121e63 h1:VSSbAejFzj2KBThfVnMcNXQwzHmwjPUridgi29LxihU=
 github.com/picosh/send v0.0.0-20240217194807-77b972121e63/go.mod h1:1JCq0NVOdTDenQ0/Kd8e4rP80lu06UHJJ+6dQxhcpew=
 github.com/pkg/sftp v1.13.6 h1:JFZT4XbOU7l77xGSpOdW+pwIMqP044IyjXX6FGyEKFo=
