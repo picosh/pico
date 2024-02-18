@@ -31,10 +31,6 @@ bp-caddy: bp-setup
 	$(DOCKER_BUILDX_BUILD) -t ghcr.io/picosh/pico/caddy:$(DOCKER_TAG) ./caddy
 .PHONY: bp-caddy
 
-bp-auth: bp-setup
-	$(DOCKER_BUILDX_BUILD) -t ghcr.io/picosh/pico/auth-web:$(DOCKER_TAG) --build-arg APP=auth --target release-web .
-.PHONY: bp-auth
-
 bp-bouncer: bp-setup
 	$(DOCKER_BUILDX_BUILD) -t ghcr.io/picosh/pico/bouncer:$(DOCKER_TAG) ./bouncer
 .PHONY: bp-bouncer
@@ -56,10 +52,6 @@ bp-podman-%:
 
 bp-podman-all: bp-podman-prose bp-podman-pastes bp-podman-imgs bp-podman-feeds bp-podman-pgs
 .PHONY: all
-
-build-auth:
-	go build -o "build/auth" "./cmd/auth/web"
-.PHONY: build-auth
 
 build-%:
 	go build -o "build/$*-web" "./cmd/$*/web"
