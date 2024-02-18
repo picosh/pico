@@ -1,6 +1,6 @@
 module github.com/picosh/pico
 
-go 1.21.4
+go 1.22.0
 
 require (
 	github.com/alecthomas/chroma v0.10.0
@@ -15,12 +15,11 @@ require (
 	github.com/gorilla/feeds v1.1.2
 	github.com/lib/pq v1.10.9
 	github.com/microcosm-cc/bluemonday v1.0.26
-	github.com/minio/madmin-go/v3 v3.0.29
-	github.com/minio/minio-go/v7 v7.0.63
 	github.com/mmcdole/gofeed v1.2.1
 	github.com/muesli/reflow v0.3.0
 	github.com/neurosnap/go-exif-remove v0.0.0-20221010134343-50d1e3c35577
 	github.com/patrickmn/go-cache v2.1.0+incompatible
+	github.com/picosh/pobj v0.0.0-20240217191723-5a89dec577a1
 	github.com/picosh/send v0.0.0-20240217010313-c282075fbdf8
 	github.com/sendgrid/sendgrid-go v3.13.0+incompatible
 	github.com/yuin/goldmark v1.6.0
@@ -75,7 +74,9 @@ require (
 	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/matttproud/golang_protobuf_extensions/v2 v2.0.0 // indirect
+	github.com/minio/madmin-go/v3 v3.0.29 // indirect
 	github.com/minio/md5-simd v1.1.2 // indirect
+	github.com/minio/minio-go/v7 v7.0.63 // indirect
 	github.com/minio/sha256-simd v1.0.1 // indirect
 	github.com/mmcdole/goxpp v1.1.0 // indirect
 	github.com/mmcloughlin/md4 v0.1.2 // indirect
