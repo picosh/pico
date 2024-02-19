@@ -67,10 +67,10 @@ const (
 
 // menu text corresponding to menu choices. these are presented to the user.
 var menuChoices = map[menuChoice]string{
-	keysChoice:    "Manage keys",
-	tokensChoice:  "Manage tokens",
-	postsChoice:   "Manage posts",
-	exitChoice:    "Exit",
+	keysChoice:   "Manage keys",
+	tokensChoice: "Manage tokens",
+	postsChoice:  "Manage posts",
+	exitChoice:   "Exit",
 }
 
 var (
