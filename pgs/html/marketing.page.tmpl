@@ -27,13 +27,72 @@
 {{define "attrs"}}{{end}}
 
 {{define "body"}}
-<header class="text-center">
+<header>
   <h1 class="text-2xl font-bold">{{.Site.Domain}}</h1>
-  <p class="text-lg">{{.Site.Description}}</p>
+  <p class="text-lg">A zero-install static site hosting service for hackers</p>
   <div>
-    <a href="https://pico.sh/pgs" class="btn-link mt inline-block">
-      LEARN MORE
+    <a href="https://pico.sh/pgs" class="btn-link my">
+      GET STARTED
     </a>
+  </div>
+
+  <hr />
+
+  <div class="group">
+    <div class="box">
+      <h2 class="text-xl">Features</h2>
+      <ul>
+        <li>10GB asset storage</li>
+        <li>Terminal workflows</li>
+        <li>No client-side installation required to fully manage static sites</li>
+        <li>Distinct static sites as projects</li>
+        <li>Unlimited projects, created instantly upon upload</li>
+        <li>Deploy using <a href="https://pico.sh/file-uploads">rsync, sftp, or scp</a></li>
+        <li>Promotion/rollback support</li>
+        <li>Managed HTTPS for all projects</li>
+        <li><a href="https://pico.sh/custom-domains#pgssh">Custom domains</a> for projects</li>
+        <li><a href="https://pico.sh/pgs#user-defined-redirects">User-defined redirects</a></li>
+        <li><a href="https://pico.sh/pgs#single-page-applications">SPA support</a></li>
+        <li><a href="https://pico.sh/images#image-manipulation">Image manipulation API</a></li>
+        <li><a href="https://pico.sh/pgs#what-file-types-are-supported">Only web assets are supported</a></li>
+      </ul>
+    </div>
+
+    <div class="box">
+      <h2 class="text-xl">Publish your site with one command</h2>
+
+      <p>
+        When your site is ready to be published, copy the files to our server with a
+        familiar command:
+      </p>
+
+      <pre>rsync -rv public/ pgs.sh:/myproj</pre>
+
+      <p>
+        That's it! There's no need to formally create a project, we create them
+        on-the-fly. Further, we provide TLS for every project automatically. In this
+        case the url for the project above would look like:
+      </p>
+
+      <pre>https://{username}-myproj.pgs.sh</pre>
+    </div>
+
+    <div class="box">
+      <h2 class="text-xl">Instant promotion and rollback</h2>
+
+      <p>
+        Additionally you can setup a pipeline for promotion and rollbacks, which will
+        instantly update your project.
+      </p>
+
+      <pre>ssh pgs.sh link project-prod project-d0131d4</pre>
+    </div>
+
+    <div>
+      <a href="https://pico.sh/pgs" class="btn-link mt">
+        GET STARTED
+      </a>
+    </div>
   </div>
 </header>
 
