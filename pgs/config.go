@@ -11,7 +11,7 @@ var maxAssetSize = int64(5 * shared.MB)
 func NewConfigSite() *shared.ConfigSite {
 	debug := shared.GetEnv("PGS_DEBUG", "0")
 	domain := shared.GetEnv("PGS_DOMAIN", "pgs.sh")
-	email := shared.GetEnv("PGS_EMAIL", "hello@prose.sh")
+	email := shared.GetEnv("PGS_EMAIL", "hello@pico.sh")
 	subdomains := shared.GetEnv("PGS_SUBDOMAINS", "0")
 	customdomains := shared.GetEnv("PGS_CUSTOMDOMAINS", "0")
 	port := shared.GetEnv("PGS_WEB_PORT", "3000")
@@ -24,8 +24,8 @@ func NewConfigSite() *shared.ConfigSite {
 	dbURL := shared.GetEnv("DATABASE_URL", "")
 	useImgProxy := shared.GetEnv("USE_IMGPROXY", "1")
 
-	intro := "To get started, enter a username.\n"
-	intro += "To learn next steps go to our docs at https://pico.sh/pgs\n"
+	intro := "To create an account, enter a username.\n"
+	intro += "After that, go to https://pico.sh/getting-started#next-steps"
 
 	cfg := shared.ConfigSite{
 		Debug:                debug == "1",
@@ -42,7 +42,7 @@ func NewConfigSite() *shared.ConfigSite {
 			MinioURL:    minioURL,
 			MinioUser:   minioUser,
 			MinioPass:   minioPass,
-			Description: "A zero-dependency static site hosting service for hackers.",
+			Description: "hacker labs",
 			IntroText:   intro,
 			Space:       "pgs",
 			// IMPORTANT: make sure `shared.GetMimeType` has the extensions being

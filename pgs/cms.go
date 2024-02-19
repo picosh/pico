@@ -385,7 +385,7 @@ func (m model) errorView(err error) string {
 
 func (m model) View() string {
 	w := m.terminalSize.Width - m.styles.App.GetHorizontalFrameSize()
-	s := m.styles.Logo.SetString(m.cfg.Domain).String() + "\n\n"
+	s := m.styles.Logo.SetString("pico.sh").String() + "\n\n"
 	switch m.status {
 	case statusNoAccount:
 		s += account.View(m.createAccount)
