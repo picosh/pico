@@ -427,10 +427,14 @@ func StartApiServer() {
 		shared.NewRoute("GET", "/favicon.ico", shared.ServeFile("favicon.ico", "image/x-icon")),
 		shared.NewRoute("GET", "/robots.txt", shared.ServeFile("robots.txt", "text/plain")),
 
-		shared.NewRoute("GET", "/", shared.CreatePageHandler("html/marketing.page.tmpl")),
+		shared.NewRoute("GET", "/", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "https://pico.sh/pgs", http.StatusMovedPermanently)
+		}),
 		shared.NewRoute("GET", "/check", checkHandler),
 		shared.NewRoute("GET", "/rss", rssHandler),
-		shared.NewRoute("GET", "/(.+)", shared.CreatePageHandler("html/marketing.page.tmpl")),
+		shared.NewRoute("GET", "/(.+)", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "https://pico.sh/pgs", http.StatusMovedPermanently)
+		}),
 	}
 	subdomainRoutes := []shared.Route{
 		shared.NewRoute("GET", "/", AssetRequest),

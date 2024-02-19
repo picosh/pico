@@ -310,7 +310,9 @@ func createStaticRoutes() []shared.Route {
 
 func createMainRoutes(staticRoutes []shared.Route) []shared.Route {
 	routes := []shared.Route{
-		shared.NewRoute("GET", "/", shared.CreatePageHandler("html/marketing.page.tmpl")),
+		shared.NewRoute("GET", "/", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "https://pico.sh/pastes", http.StatusMovedPermanently)
+		}),
 		shared.NewRoute("GET", "/check", shared.CheckHandler),
 	}
 
