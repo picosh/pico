@@ -9,7 +9,9 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
+	"github.com/gorilla/feeds"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
@@ -30,9 +32,18 @@ func (client *Client) hasPrivilegedAccess(apiToken string) bool {
 }
 
 type ctxClient struct{}
+type ctxKey struct{}
 
 func getClient(r *http.Request) *Client {
 	return r.Context().Value(ctxClient{}).(*Client)
+}
+
+func getField(r *http.Request, index int) string {
+	fields := r.Context().Value(ctxKey{}).([]string)
+	if index >= len(fields) {
+		return ""
+	}
+	return fields[index]
 }
 
 func getApiToken(r *http.Request) string {
@@ -279,6 +290,94 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func genFeedItem(now time.Time, expiresAt time.Time, warning time.Time, txt string) *feeds.Item {
+	if now.After(warning) {
+		realUrl := warning.Format("2006-01-02 15:04:05")
+		content := fmt.Sprintf(
+			"Your pico+ membership is going to expire on %s",
+			expiresAt.Format("2006-01-02 15:04:05"),
+		)
+		return &feeds.Item{
+			Id:          realUrl,
+			Title:       fmt.Sprintf("pico+ %s expiration notice", txt),
+			Link:        &feeds.Link{Href: realUrl},
+			Content:     content,
+			Created:     warning,
+			Updated:     warning,
+			Description: content,
+			Author:      &feeds.Author{Name: "team pico"},
+		}
+	}
+
+	return nil
+}
+
+func rssHandler(w http.ResponseWriter, r *http.Request) {
+	client := getClient(r)
+	apiToken, err := url.PathUnescape(getField(r, 0))
+	if err != nil {
+		client.Logger.Error(err.Error())
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	user, err := client.Dbpool.FindUserForToken(apiToken)
+	if err != nil {
+		client.Logger.Error(err.Error())
+		http.Error(w, "invalid token", http.StatusNotFound)
+		return
+	}
+
+	href := fmt.Sprintf("https://auth.pico.sh/rss/%s", apiToken)
+
+	feed := &feeds.Feed{
+		Title:       "pico+",
+		Link:        &feeds.Link{Href: href},
+		Description: "get notified of important membership updates",
+		Author:      &feeds.Author{Name: "team pico"},
+		Created:     time.Now(),
+	}
+	var feedItems []*feeds.Item
+
+	now := time.Now()
+	// using pgs as the signal
+	ff, err := client.Dbpool.FindFeatureForUser(user.ID, "pgs")
+	if err != nil {
+		// still want to send an empty feed
+	} else {
+		oneMonthWarning := ff.ExpiresAt.AddDate(0, -1, 0)
+		mo := genFeedItem(now, *ff.ExpiresAt, oneMonthWarning, "1-month")
+		if mo != nil {
+			feedItems = append(feedItems, mo)
+		}
+
+		oneWeekWarning := ff.ExpiresAt.AddDate(0, 0, -7)
+		wk := genFeedItem(now, *ff.ExpiresAt, oneWeekWarning, "1-week")
+		if wk != nil {
+			feedItems = append(feedItems, wk)
+		}
+
+		oneDayWarning := ff.ExpiresAt.AddDate(0, 0, -1)
+		day := genFeedItem(now, *ff.ExpiresAt, oneDayWarning, "1-day")
+		if day != nil {
+			feedItems = append(feedItems, day)
+		}
+	}
+
+	feed.Items = feedItems
+
+	rss, err := feed.ToAtom()
+	if err != nil {
+		client.Logger.Error(err.Error())
+		http.Error(w, "Could not generate atom rss feed", http.StatusInternalServerError)
+	}
+
+	w.Header().Add("Content-Type", "application/atom+xml")
+	_, err = w.Write([]byte(rss))
+	if err != nil {
+		client.Logger.Error(err.Error())
+	}
+}
+
 func createMainRoutes() []shared.Route {
 	fileServer := http.FileServer(http.Dir("auth/public"))
 
@@ -288,6 +387,7 @@ func createMainRoutes() []shared.Route {
 		shared.NewRoute("GET", "/authorize", authorizeHandler),
 		shared.NewRoute("POST", "/token", tokenHandler),
 		shared.NewRoute("POST", "/key", keyHandler),
+		shared.NewRoute("GET", "/rss/(.+)", rssHandler),
 		shared.NewRoute("POST", "/redirect", redirectHandler),
 		shared.NewRoute("GET", "/main.css", fileServer.ServeHTTP),
 		shared.NewRoute("GET", "/card.png", fileServer.ServeHTTP),
@@ -313,7 +413,8 @@ func handler(routes []shared.Route, client *Client) shared.ServeFn {
 					continue
 				}
 				clientCtx := context.WithValue(r.Context(), ctxClient{}, client)
-				route.Handler(w, r.WithContext(clientCtx))
+				ctx := context.WithValue(clientCtx, ctxKey{}, matches[1:])
+				route.Handler(w, r.WithContext(ctx))
 				return
 			}
 		}
@@ -364,5 +465,8 @@ func StartApiServer() {
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)
 	client.Logger.Info("starting server on port", "port", cfg.Port)
-	client.Logger.Error(http.ListenAndServe(portStr, router).Error())
+	err := http.ListenAndServe(portStr, router)
+	if err != nil {
+		client.Logger.Info(err.Error())
+	}
 }
