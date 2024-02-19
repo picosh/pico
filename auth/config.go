@@ -9,8 +9,6 @@ func NewConfigSite() *shared.ConfigSite {
 	debug := shared.GetEnv("AUTH_DEBUG", "0")
 	domain := shared.GetEnv("AUTH_DOMAIN", "pico.sh")
 	email := shared.GetEnv("AUTH_EMAIL", "hello@pico.sh")
-	subdomains := shared.GetEnv("AUTH_SUBDOMAINS", "0")
-	customdomains := shared.GetEnv("AUTH_CUSTOMDOMAINS", "0")
 	port := shared.GetEnv("AUTH_WEB_PORT", "3000")
 	protocol := shared.GetEnv("AUTH_PROTOCOL", "https")
 	allowRegister := shared.GetEnv("AUTH_ALLOW_REGISTER", "1")
@@ -26,8 +24,6 @@ func NewConfigSite() *shared.ConfigSite {
 
 	cfg := shared.ConfigSite{
 		Debug:                debug == "1",
-		SubdomainsEnabled:    subdomains == "1",
-		CustomdomainsEnabled: customdomains == "1",
 		UseImgProxy:          useImgProxy == "1",
 		ConfigCms: config.ConfigCms{
 			Domain:        domain,

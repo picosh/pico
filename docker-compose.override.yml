@@ -153,6 +153,15 @@ services:
       - .env.example
     ports:
       - "3006:3000"
+  auth-ssh:
+    build:
+      args:
+        APP: auth
+      target: release-ssh
+    env_file:
+      - .env.example
+    ports:
+      - "2226:2222"
   bouncer:
     build:
       context: bouncer/

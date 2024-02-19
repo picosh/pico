@@ -108,6 +108,13 @@ services:
       - auth
       - services
       - all
+  auth-ssh:
+    image: ghcr.io/picosh/pico/auth-ssh:latest
+    restart: always
+    profiles:
+      - auth
+      - services
+      - all
   bouncer:
     image: ghcr.io/picosh/pico/bouncer:main
     restart: always
