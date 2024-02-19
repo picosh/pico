@@ -14,7 +14,6 @@ import (
 	bm "github.com/charmbracelet/wish/bubbletea"
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
-	// "github.com/picosh/pico/shared/storage"
 	wsh "github.com/picosh/pico/wish"
 )
 
@@ -32,18 +31,18 @@ func StartSshServer() {
 	defer dbh.Close()
 
 	/*
-	var st storage.StorageServe
-	var err error
-	if cfg.MinioURL == "" {
-		st, err = storage.NewStorageFS(cfg.StorageDir)
-	} else {
-		st, err = storage.NewStorageMinio(cfg.MinioURL, cfg.MinioUser, cfg.MinioPass)
-	}
+		var st storage.StorageServe
+		var err error
+		if cfg.MinioURL == "" {
+			st, err = storage.NewStorageFS(cfg.StorageDir)
+		} else {
+			st, err = storage.NewStorageMinio(cfg.MinioURL, cfg.MinioUser, cfg.MinioPass)
+		}
 
-	if err != nil {
-		logger.Error(err.Error())
-		return
-	}
+		if err != nil {
+			logger.Error(err.Error())
+			return
+		}
 	*/
 
 	s, err := wish.NewServer(

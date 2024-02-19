@@ -23,8 +23,8 @@ func NewConfigSite() *shared.ConfigSite {
 	intro += "To learn next steps go to our docs at https://pico.sh\n"
 
 	cfg := shared.ConfigSite{
-		Debug:                debug == "1",
-		UseImgProxy:          useImgProxy == "1",
+		Debug:       debug == "1",
+		UseImgProxy: useImgProxy == "1",
 		ConfigCms: config.ConfigCms{
 			Domain:        domain,
 			Email:         email,
