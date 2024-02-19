@@ -33,7 +33,6 @@ const (
 	statusNoAccount
 	statusBrowsingKeys
 	statusBrowsingTokens
-	statusSettingUsername
 	statusQuitting
 )
 
@@ -41,7 +40,6 @@ func (s status) String() string {
 	return [...]string{
 		"initializing",
 		"ready",
-		"setting username",
 		"browsing keys",
 		"quitting",
 		"error",
@@ -53,8 +51,7 @@ type menuChoice int
 
 // menu choices.
 const (
-	setUserChoice menuChoice = iota
-	keysChoice
+	keysChoice menuChoice = iota
 	tokensChoice
 	exitChoice
 	unsetChoice // set when no choice has been made
@@ -305,15 +302,6 @@ func updateChildren(msg tea.Msg, m model) (model, tea.Cmd) {
 			m.status = statusQuitting
 			return m, tea.Quit
 		}
-	case statusSettingUsername:
-		m.username, cmd = username.Update(msg, m.username)
-		if m.username.Done {
-			m.username = username.NewModel(m.dbpool, m.user, m.sshUser) // reset the state
-			m.status = statusReady
-		} else if m.username.Quit {
-			m.status = statusQuitting
-			return m, tea.Quit
-		}
 	case statusNoAccount:
 		m.createAccount, cmd = account.Update(msg, m.createAccount)
 		if m.createAccount.Done {
@@ -327,10 +315,6 @@ func updateChildren(msg tea.Msg, m model) (model, tea.Cmd) {
 
 	// Handle the menu
 	switch m.menuChoice {
-	case setUserChoice:
-		m.status = statusSettingUsername
-		m.menuChoice = unsetChoice
-		cmd = username.InitialCmd()
 	case keysChoice:
 		m.status = statusBrowsingKeys
 		m.menuChoice = unsetChoice
@@ -392,8 +376,6 @@ func (m model) View() string {
 		s += m.info.View()
 		s += "\n\n" + m.menuView()
 		s += footerView(m)
-	case statusSettingUsername:
-		s += username.View(m.username)
 	case statusBrowsingKeys:
 		s += m.keys.View()
 	case statusBrowsingTokens:
