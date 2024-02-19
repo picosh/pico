@@ -40,9 +40,10 @@ func (c *Cmd) bail(err error) {
 
 func (c *Cmd) help() {
 	if c.User == nil {
-		helpStr := "commands: [help, register]\n"
+		helpStr := "commands: [help, register]"
 		c.output(helpStr)
 	}
+	c.output("commands: [help]")
 }
 
 func (c *Cmd) registerUser(username string) (*db.User, error) {

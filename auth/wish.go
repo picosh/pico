@@ -84,11 +84,9 @@ func WishMiddleware(dbpool db.DB, log *slog.Logger, store storage.StorageServe) 
 				return
 			} else if cmd == "register" {
 				username := opts.Username
-				fmt.Println(username)
 				if len(args) > 1 && args[1] != "" {
 					username = args[1]
 				}
-				fmt.Println(username)
 				err := opts.register(username)
 				opts.bail(err)
 				return
