@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -12,20 +13,31 @@ import (
 	"github.com/picosh/pico/wish/cms/util"
 )
 
-func getUser(s ssh.Session, dbpool db.DB) (*db.User, error) {
+func findUser(logger *slog.Logger, s ssh.Session, dbpool db.DB) (*db.User, error) {
 	var err error
 	key, err := util.KeyText(s)
 	if err != nil {
-		return nil, fmt.Errorf("key not found")
+		return nil, fmt.Errorf("Key not found")
+	}
+
+	username := s.User()
+	if username == "new" {
+		logger.Info("User requesting to register account")
+		return nil, nil
 	}
 
 	user, err := dbpool.FindUserForKey(s.User(), key)
 	if err != nil {
-		return nil, err
+		logger.Error(err.Error())
+		// we only want to throw an error for specific cases
+		if errors.Is(err, &db.ErrMultiplePublicKeys{}) {
+			return nil, err
+		}
+		return nil, nil
 	}
 
 	if user.Name == "" {
-		return nil, fmt.Errorf("must have username set")
+		return nil, fmt.Errorf("Must have username set")
 	}
 
 	return user, nil
@@ -34,6 +46,12 @@ func getUser(s ssh.Session, dbpool db.DB) (*db.User, error) {
 func WishMiddleware(dbpool db.DB, log *slog.Logger, store storage.StorageServe) wish.Middleware {
 	return func(sshHandler ssh.Handler) ssh.Handler {
 		return func(session ssh.Session) {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Error("Error running auth middleware", "err", r)
+					_, _ = session.Stderr().Write([]byte("Error running auth middleware\r\n"))
+				}
+			}()
 			_, _, activePty := session.Pty()
 			if activePty {
 				_ = session.Exit(0)
@@ -50,29 +68,34 @@ func WishMiddleware(dbpool db.DB, log *slog.Logger, store storage.StorageServe) 
 				Write:    false,
 			}
 
-			user, err := getUser(session, dbpool)
+			user, err := findUser(log, session, dbpool)
 			if err != nil {
-				opts.help()
+				opts.bail(err)
 				return
 			}
+			// could be nil
 			opts.User = user
 
 			args := session.Command()
 
 			cmd := strings.TrimSpace(args[0])
-			if len(args) == 1 {
-				if cmd == "help" {
-					opts.help()
-					return
-				} else if cmd == "register" {
-					err := opts.register()
-					opts.bail(err)
-					return
-				} else {
-					e := fmt.Errorf("%s not a valid command", args)
-					opts.bail(e)
-					return
+			if cmd == "help" {
+				opts.help()
+				return
+			} else if cmd == "register" {
+				username := opts.Username
+				fmt.Println(username)
+				if len(args) > 1 && args[1] != "" {
+					username = args[1]
 				}
+				fmt.Println(username)
+				err := opts.register(username)
+				opts.bail(err)
+				return
+			} else {
+				e := fmt.Errorf("%s not a valid command", args)
+				opts.bail(e)
+				return
 			}
 		}
 	}

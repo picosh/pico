@@ -45,7 +45,7 @@ func (c *Cmd) help() {
 	}
 }
 
-func (c *Cmd) registerUser() (*db.User, error) {
+func (c *Cmd) registerUser(username string) (*db.User, error) {
 	userID, err := c.Dbpool.AddUser()
 	if err != nil {
 		return nil, err
@@ -56,12 +56,12 @@ func (c *Cmd) registerUser() (*db.User, error) {
 		return nil, err
 	}
 
-	user, err := c.Dbpool.FindUser(userID)
+	err = c.Dbpool.SetUserName(userID, username)
 	if err != nil {
 		return nil, err
 	}
 
-	err = c.Dbpool.SetUserName(user.ID, c.Username)
+	user, err := c.Dbpool.FindUser(userID)
 	if err != nil {
 		return nil, err
 	}
@@ -69,11 +69,15 @@ func (c *Cmd) registerUser() (*db.User, error) {
 	return user, nil
 }
 
-func (c *Cmd) register() error {
+func (c *Cmd) register(username string) error {
 	if c.User != nil {
-		c.output("you already have an account")
+		c.output("You already have an account")
 		return nil
 	}
-	_, err := c.registerUser()
-	return err
+	user, err := c.registerUser(username)
+	if err != nil {
+		return err
+	}
+	c.output(fmt.Sprintf("%s, you have successfully created an account!", user.Name))
+	return nil
 }
