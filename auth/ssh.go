@@ -14,13 +14,11 @@ import (
 	bm "github.com/charmbracelet/wish/bubbletea"
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
-	"github.com/picosh/pico/shared/storage"
+	// "github.com/picosh/pico/shared/storage"
 	wsh "github.com/picosh/pico/wish"
 )
 
-type SSHServer struct{}
-
-func (me *SSHServer) authHandler(ctx ssh.Context, key ssh.PublicKey) bool {
+func authHandler(ctx ssh.Context, key ssh.PublicKey) bool {
 	return true
 }
 
@@ -33,6 +31,7 @@ func StartSshServer() {
 	dbh := postgres.NewDB(cfg.DbURL, cfg.Logger)
 	defer dbh.Close()
 
+	/*
 	var st storage.StorageServe
 	var err error
 	if cfg.MinioURL == "" {
@@ -45,18 +44,14 @@ func StartSshServer() {
 		logger.Error(err.Error())
 		return
 	}
+	*/
 
-	sshServer := &SSHServer{}
 	s, err := wish.NewServer(
 		wish.WithAddress(fmt.Sprintf("%s:%s", host, port)),
 		wish.WithHostKeyPath("ssh_data/term_info_ed25519"),
-		wish.WithPublicKeyAuth(sshServer.authHandler),
+		wish.WithPublicKeyAuth(authHandler),
 		wish.WithMiddleware(
-			WishMiddleware(
-				dbh,
-				logger,
-				st,
-			),
+			// WishMiddleware(dbh, logger, st),
 			bm.Middleware(CmsMiddleware(&cfg.ConfigCms, cfg)),
 			wsh.LogMiddleware(cfg.Logger),
 			promwish.Middleware(fmt.Sprintf("%s:%s", host, promPort), "auth-ssh"),
