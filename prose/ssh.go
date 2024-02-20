@@ -42,7 +42,7 @@ func createRouter(handler *filehandlers.FileHandlerRouter) proxy.Router {
 			scp.Middleware(handler),
 			wishrsync.Middleware(handler),
 			auth.Middleware(handler),
-			bm.Middleware(cms.Middleware(&handler.Cfg.ConfigCms, handler.Cfg)),
+			wsh.PtyMdw(bm.Middleware(cms.Middleware(&handler.Cfg.ConfigCms, handler.Cfg))),
 			wsh.LogMiddleware(handler.GetLogger()),
 		}
 	}

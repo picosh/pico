@@ -56,10 +56,14 @@ func SanitizeFileExt(fname string) string {
 
 func KeyText(s ssh.Session) (string, error) {
 	if s.PublicKey() == nil {
-		return "", fmt.Errorf("session doesn't have public key")
+		return "", fmt.Errorf("Session doesn't have public key")
 	}
-	kb := base64.StdEncoding.EncodeToString(s.PublicKey().Marshal())
-	return fmt.Sprintf("%s %s", s.PublicKey().Type(), kb), nil
+	return KeyForKeyText(s.PublicKey())
+}
+
+func KeyForKeyText(pk ssh.PublicKey) (string, error) {
+	kb := base64.StdEncoding.EncodeToString(pk.Marshal())
+	return fmt.Sprintf("%s %s", pk.Type(), kb), nil
 }
 
 func GetEnv(key string, defaultVal string) string {

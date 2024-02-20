@@ -14,6 +14,7 @@ import (
 	"github.com/muesli/reflow/wrap"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
+	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pico/wish/cms/config"
 	"github.com/picosh/pico/wish/cms/ui/account"
@@ -22,7 +23,6 @@ import (
 	"github.com/picosh/pico/wish/cms/ui/keys"
 	"github.com/picosh/pico/wish/cms/ui/tokens"
 	"github.com/picosh/pico/wish/cms/ui/username"
-	"github.com/picosh/pico/wish/cms/util"
 )
 
 type status int
@@ -80,6 +80,7 @@ type GotDBMsg db.DB
 
 func CmsMiddleware(cfg *config.ConfigCms, urls config.ConfigURL) bm.Handler {
 	return func(s ssh.Session) (tea.Model, []tea.ProgramOption) {
+		fmt.Println("MADE IT HERE")
 		logger := cfg.Logger
 
 		_, _, active := s.Pty()
@@ -87,7 +88,7 @@ func CmsMiddleware(cfg *config.ConfigCms, urls config.ConfigURL) bm.Handler {
 			logger.Info("no active terminal, skipping")
 			return nil, nil
 		}
-		key, err := util.KeyText(s)
+		key, err := shared.KeyText(s)
 		if err != nil {
 			logger.Error(err.Error())
 		}

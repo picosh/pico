@@ -2,19 +2,20 @@ package pgs
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
 	"github.com/picosh/pico/db"
 	uploadassets "github.com/picosh/pico/filehandlers/assets"
-	"github.com/picosh/pico/wish/cms/util"
+	"github.com/picosh/pico/shared"
 	"github.com/picosh/send/send/utils"
 )
 
 func getUser(s ssh.Session, dbpool db.DB) (*db.User, error) {
 	var err error
-	key, err := util.KeyText(s)
+	key, err := shared.KeyText(s)
 	if err != nil {
 		return nil, fmt.Errorf("key not found")
 	}
@@ -37,25 +38,24 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 	cfg := handler.Cfg
 	store := handler.Storage
 
-	return func(sshHandler ssh.Handler) ssh.Handler {
-		return func(session ssh.Session) {
-			_, _, activePty := session.Pty()
+	return func(next ssh.Handler) ssh.Handler {
+		return func(sesh ssh.Session) {
+			_, _, activePty := sesh.Pty()
 			if activePty {
-				_ = session.Exit(0)
-				_ = session.Close()
+				next(sesh)
 				return
 			}
 
-			user, err := getUser(session, dbpool)
+			user, err := getUser(sesh, dbpool)
 			if err != nil {
-				utils.ErrorHandler(session, err)
+				utils.ErrorHandler(sesh, err)
 				return
 			}
 
-			args := session.Command()
+			args := sesh.Command()
 
 			opts := Cmd{
-				Session: session,
+				Session: sesh,
 				User:    user,
 				Store:   store,
 				Log:     log,
@@ -77,8 +77,7 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 					opts.bail(err)
 					return
 				} else {
-					e := fmt.Errorf("%s not a valid command", args)
-					opts.bail(e)
+					next(sesh)
 					return
 				}
 			}
@@ -87,13 +86,13 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 			projectName := strings.TrimSpace(args[1])
 
 			if projectName == "--write" {
-				utils.ErrorHandler(session, fmt.Errorf("`--write` should be placed at end of command"))
+				utils.ErrorHandler(sesh, fmt.Errorf("`--write` should be placed at end of command"))
 				return
 			}
 
 			if cmd == "link" {
 				if len(args) < 3 {
-					utils.ErrorHandler(session, fmt.Errorf("must supply link command like: `projectA link projectB`"))
+					utils.ErrorHandler(sesh, fmt.Errorf("must supply link command like: `projectA link projectB`"))
 					return
 				}
 				linkTo := strings.TrimSpace(args[2])
@@ -137,9 +136,41 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 				opts.notice()
 				opts.bail(err)
 				return
+			} else if cmd == "acl" {
+				aclType := strings.TrimSpace(args[2])
+				if !slices.Contains([]string{"public", "public_keys", "pico"}, aclType) {
+					err := fmt.Errorf("acl type must be one of the following: [public, public_keys, pico], found %s", aclType)
+					opts.bail(err)
+					return
+				}
+
+				aclsRaw := ""
+				if len(args) == 4 {
+					if strings.TrimSpace(args[3]) == "--write" {
+						opts.Write = true
+					} else {
+						aclsRaw = strings.TrimSpace(args[3])
+					}
+				}
+				if len(args) == 5 {
+					aclsRaw = strings.TrimSpace(args[3])
+					if strings.TrimSpace(args[4]) == "--write" {
+						opts.Write = true
+					}
+				}
+				acls := []string{}
+				for _, key := range strings.Split(aclsRaw, ",") {
+					st := strings.TrimSpace(key)
+					if st == "" {
+						continue
+					}
+					acls = append(acls, st)
+				}
+				err := opts.acl(projectName, aclType, acls)
+				opts.notice()
+				opts.bail(err)
 			} else {
-				e := fmt.Errorf("%s not a valid command", args)
-				opts.bail(e)
+				next(sesh)
 				return
 			}
 		}

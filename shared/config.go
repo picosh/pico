@@ -256,6 +256,6 @@ func CreateLogger(debug bool) *slog.Logger {
 		AddSource: true,
 	}
 	return slog.New(
-		slog.NewJSONHandler(os.Stdout, opts),
+		slog.NewTextHandler(os.Stdout, opts),
 	)
 }

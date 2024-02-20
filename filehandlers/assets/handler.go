@@ -16,7 +16,6 @@ import (
 	futil "github.com/picosh/pico/filehandlers/util"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
-	"github.com/picosh/pico/wish/cms/util"
 	"github.com/picosh/pobj"
 	sst "github.com/picosh/pobj/storage"
 	"github.com/picosh/send/send/utils"
@@ -165,7 +164,7 @@ func (h *UploadAssetHandler) List(s ssh.Session, fpath string, isDir bool, recur
 
 func (h *UploadAssetHandler) Validate(s ssh.Session) error {
 	var err error
-	key, err := util.KeyText(s)
+	key, err := shared.KeyText(s)
 	if err != nil {
 		return fmt.Errorf("key not found")
 	}
