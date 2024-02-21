@@ -378,6 +378,10 @@ func (me *PsqlDB) RemoveUsers(userIDs []string) error {
 }
 
 func (me *PsqlDB) LinkUserKey(userID string, key string) error {
+	pk, _ := me.FindPublicKeyForKey(key)
+	if pk != nil {
+		return db.ErrPublicKeyTaken
+	}
 	_, err := me.Db.Exec(sqlInsertPublicKey, userID, key)
 	return err
 }

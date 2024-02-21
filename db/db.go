@@ -11,6 +11,7 @@ import (
 var ErrNameTaken = errors.New("username has already been claimed")
 var ErrNameDenied = errors.New("username is on the denylist")
 var ErrNameInvalid = errors.New("username has invalid characters in it")
+var ErrPublicKeyTaken = errors.New("public key is already associated with another user")
 
 type PublicKey struct {
 	ID        string     `json:"id"`

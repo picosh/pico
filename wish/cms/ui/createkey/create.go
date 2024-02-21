@@ -1,6 +1,7 @@
 package createkey
 
 import (
+	"errors"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -30,6 +31,7 @@ const (
 type KeySetMsg string
 
 type KeyInvalidMsg struct{}
+type KeyTakenMsg struct{}
 
 type errMsg struct {
 	err error
@@ -193,6 +195,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		return m, nil
 
+	case KeyTakenMsg:
+		m.state = ready
+		head := m.styles.Error.Render("Invalid public key. ")
+		helpMsg := "Public key is associated with another user"
+		body := m.styles.Subtle.Render(helpMsg)
+		m.errMsg = m.styles.Wrap.Render(head + body)
+
+		return m, nil
+
 	case errMsg:
 		m.state = ready
 		head := m.styles.Error.Render("Oh, what? There was a curious error we were not expecting. ")
@@ -270,6 +281,9 @@ func addPublicKey(m Model) tea.Cmd {
 		key := sanitizeKey(m.newKey)
 		err := m.dbpool.LinkUserKey(m.user.ID, key)
 		if err != nil {
+			if errors.Is(err, db.ErrPublicKeyTaken) {
+				return KeyTakenMsg{}
+			}
 			return errMsg{err}
 		}
 
