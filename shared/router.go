@@ -106,7 +106,8 @@ func findRouteConfig(r *http.Request, routes []Route, subdomainRoutes []Route, c
 func CreateServe(routes []Route, subdomainRoutes []Route, cfg *ConfigSite, dbpool db.DB, st storage.StorageServe, logger *slog.Logger, cache *cache.Cache) ServeFn {
 	return func(w http.ResponseWriter, r *http.Request) {
 		curRoutes, subdomain := findRouteConfig(r, routes, subdomainRoutes, cfg)
-		CreateServeBasic(curRoutes, subdomain, cfg, dbpool, st, logger, cache)
+		router := CreateServeBasic(curRoutes, subdomain, cfg, dbpool, st, logger, cache)
+		router(w, r)
 	}
 }
 
