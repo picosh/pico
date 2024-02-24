@@ -15,6 +15,7 @@ import (
 	"github.com/charmbracelet/wish"
 	bm "github.com/charmbracelet/wish/bubbletea"
 	gocache "github.com/patrickmn/go-cache"
+	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
 	uploadassets "github.com/picosh/pico/filehandlers/assets"
 	"github.com/picosh/pico/shared"
@@ -76,6 +77,10 @@ func withProxy(cfg *shared.ConfigSite, handler *uploadassets.UploadAssetHandler,
 
 func unauthorizedHandler(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "You do not have access to this site", http.StatusUnauthorized)
+}
+
+func allowPerm(proj *db.Project) bool {
+	return true
 }
 
 type PicoApi struct {
@@ -189,6 +194,8 @@ func StartSshServer() {
 					}
 				}),
 			}
+
+			subdomainRoutes := createSubdomainRoutes(allowPerm)
 			routes = append(routes, subdomainRoutes...)
 			httpHandler := shared.CreateServeBasic(
 				routes,

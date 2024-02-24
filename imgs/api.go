@@ -166,6 +166,10 @@ func ImgsRssHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func anyPerm(proj *db.Project) bool {
+	return true
+}
+
 func ImgRequest(w http.ResponseWriter, r *http.Request) {
 	subdomain := shared.GetSubdomain(r)
 	cfg := shared.GetCfg(r)
@@ -230,7 +234,7 @@ func ImgRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fname := post.Filename
-	pgs.ServeAsset(fname, opts, true, w, r)
+	pgs.ServeAsset(fname, opts, true, anyPerm, w, r)
 }
 
 func FindImgPost(r *http.Request, user *db.User, slug string) (*db.Post, error) {

@@ -80,7 +80,6 @@ type GotDBMsg db.DB
 
 func CmsMiddleware(cfg *config.ConfigCms, urls config.ConfigURL) bm.Handler {
 	return func(s ssh.Session) (tea.Model, []tea.ProgramOption) {
-		fmt.Println("MADE IT HERE")
 		logger := cfg.Logger
 
 		_, _, active := s.Pty()

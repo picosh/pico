@@ -313,7 +313,7 @@ func getProjectFromSubdomain(subdomain string) (*SubdomainProps, error) {
 	return props, nil
 }
 
-func ServeAsset(fname string, opts *storage.ImgProcessOpts, fromImgs bool, w http.ResponseWriter, r *http.Request) {
+func ServeAsset(fname string, opts *storage.ImgProcessOpts, fromImgs bool, hasPerm HasPerm, w http.ResponseWriter, r *http.Request) {
 	subdomain := shared.GetSubdomain(r)
 	cfg := shared.GetCfg(r)
 	dbpool := shared.GetDB(r)
@@ -344,10 +344,20 @@ func ServeAsset(fname string, opts *storage.ImgProcessOpts, fromImgs bool, w htt
 		bucket, err = st.GetBucket(shared.GetImgsBucketName(user.ID))
 	} else {
 		bucket, err = st.GetBucket(shared.GetAssetBucketName(user.ID))
-		projectDir = props.ProjectName
 		project, err := dbpool.FindProjectByName(user.ID, props.ProjectName)
-		if err == nil {
-			projectDir = project.ProjectDir
+		if err != nil {
+			logger.Info(
+				"project not found",
+				"projectName", props.ProjectName,
+			)
+			http.Error(w, "project not found", http.StatusNotFound)
+			return
+		}
+
+		projectDir = project.ProjectDir
+		if !hasPerm(project) {
+			http.Error(w, "You do not have access to this site", http.StatusUnauthorized)
+			return
 		}
 	}
 
@@ -375,28 +385,29 @@ func ServeAsset(fname string, opts *storage.ImgProcessOpts, fromImgs bool, w htt
 	asset.handle(w)
 }
 
-func ImgAssetRequest(w http.ResponseWriter, r *http.Request) {
-	logger := shared.GetLogger(r)
-	fname, _ := url.PathUnescape(shared.GetField(r, 0))
-	imgOpts, _ := url.PathUnescape(shared.GetField(r, 1))
-	opts, err := storage.UriToImgProcessOpts(imgOpts)
-	if err != nil {
-		errMsg := fmt.Sprintf("error processing img options: %s", err.Error())
-		logger.Info(errMsg)
-		http.Error(w, errMsg, http.StatusUnprocessableEntity)
+type HasPerm = func(proj *db.Project) bool
+
+func ImgAssetRequest(hasPerm HasPerm) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		logger := shared.GetLogger(r)
+		fname, _ := url.PathUnescape(shared.GetField(r, 0))
+		imgOpts, _ := url.PathUnescape(shared.GetField(r, 1))
+		opts, err := storage.UriToImgProcessOpts(imgOpts)
+		if err != nil {
+			errMsg := fmt.Sprintf("error processing img options: %s", err.Error())
+			logger.Info(errMsg)
+			http.Error(w, errMsg, http.StatusUnprocessableEntity)
+		}
+
+		ServeAsset(fname, opts, false, hasPerm, w, r)
 	}
-
-	ServeAsset(fname, opts, false, w, r)
 }
 
-func AssetRequest(w http.ResponseWriter, r *http.Request) {
-	fname, _ := url.PathUnescape(shared.GetField(r, 0))
-	ServeAsset(fname, nil, false, w, r)
-}
-
-func PrivateAssetRequest(w http.ResponseWriter, r *http.Request) {
-	fname, _ := url.PathUnescape(shared.GetField(r, 0))
-	ServeAsset(fname, nil, false, w, r)
+func AssetRequest(hasPerm HasPerm) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		fname, _ := url.PathUnescape(shared.GetField(r, 0))
+		ServeAsset(fname, nil, false, hasPerm, w, r)
+	}
 }
 
 var mainRoutes = []shared.Route{
@@ -412,10 +423,20 @@ var mainRoutes = []shared.Route{
 	shared.NewRoute("GET", "/rss", rssHandler),
 	shared.NewRoute("GET", "/(.+)", shared.CreatePageHandler("html/marketing.page.tmpl")),
 }
-var subdomainRoutes = []shared.Route{
-	shared.NewRoute("GET", "/", AssetRequest),
-	shared.NewRoute("GET", "(/.+.(?:jpg|jpeg|png|gif|webp|svg))(/.+)", ImgAssetRequest),
-	shared.NewRoute("GET", "/(.+)", AssetRequest),
+
+func createSubdomainRoutes(hasPerm HasPerm) []shared.Route {
+	assetRequest := AssetRequest(hasPerm)
+	imgRequest := ImgAssetRequest(hasPerm)
+
+	return []shared.Route{
+		shared.NewRoute("GET", "/", assetRequest),
+		shared.NewRoute("GET", "(/.+.(?:jpg|jpeg|png|gif|webp|svg))(/.+)", imgRequest),
+		shared.NewRoute("GET", "/(.+)", assetRequest),
+	}
+}
+
+func publicPerm(proj *db.Project) bool {
+	return proj.Acl.Type == "public"
 }
 
 func StartApiServer() {
@@ -443,7 +464,7 @@ func StartApiServer() {
 		return
 	}
 
-	handler := shared.CreateServe(mainRoutes, subdomainRoutes, cfg, db, st, logger, cache)
+	handler := shared.CreateServe(mainRoutes, createSubdomainRoutes(publicPerm), cfg, db, st, logger, cache)
 	router := http.HandlerFunc(handler)
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)
