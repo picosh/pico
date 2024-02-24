@@ -232,7 +232,7 @@ func (h *AssetHandler) handle(w http.ResponseWriter) {
 		_, err := io.Copy(buf, redirectFp)
 		if err != nil {
 			h.Logger.Error(err.Error())
-			http.Error(w, "cannot read _redirect file", http.StatusInternalServerError)
+			http.Error(w, "cannot read _redirects file", http.StatusInternalServerError)
 			return
 		}
 
