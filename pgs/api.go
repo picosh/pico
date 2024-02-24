@@ -242,6 +242,25 @@ func (h *AssetHandler) handle(w http.ResponseWriter) {
 		}
 	}
 
+	var headers []*HeaderRule
+	headersFp, _, _, err := h.Storage.GetObject(h.Bucket, filepath.Join(h.ProjectDir, "_headers"))
+	if err == nil {
+		defer headersFp.Close()
+		buf := new(strings.Builder)
+		_, err := io.Copy(buf, headersFp)
+		if err != nil {
+			h.Logger.Error(err.Error())
+			http.Error(w, "cannot read _headers file", http.StatusInternalServerError)
+			return
+		}
+
+		headers, err = parseHeaderText(buf.String())
+		if err != nil {
+			h.Logger.Error(err.Error())
+		}
+	}
+	fmt.Println(headers)
+
 	routes := calcPossibleRoutes(h.ProjectDir, h.Filepath, redirects)
 	var contents io.ReadCloser
 	contentType := ""
