@@ -30,8 +30,6 @@ import (
 	"github.com/picosh/send/send/sftp"
 )
 
-type SSHServer struct{}
-
 type ctxPublicKey struct{}
 
 func getPublicKeyCtx(ctx ssh.Context) (ssh.PublicKey, error) {
@@ -45,7 +43,7 @@ func setPublicKeyCtx(ctx ssh.Context, pk ssh.PublicKey) {
 	ctx.SetValue(ctxPublicKey{}, pk)
 }
 
-func (me *SSHServer) authHandler(ctx ssh.Context, key ssh.PublicKey) bool {
+func authHandler(ctx ssh.Context, key ssh.PublicKey) bool {
 	setPublicKeyCtx(ctx, key)
 	return true
 }
@@ -116,6 +114,7 @@ func StartSshServer() {
 	cache := gocache.New(2*time.Minute, 5*time.Minute)
 
 	webTunnel := &ptun.WebTunnelHandler{
+		Logger: logger,
 		HttpHandler: func(ctx ssh.Context) http.Handler {
 			subdomain := ctx.User()
 			log := logger.With(
@@ -205,11 +204,10 @@ func StartSshServer() {
 		},
 	}
 
-	sshServer := &SSHServer{}
 	s, err := wish.NewServer(
 		wish.WithAddress(fmt.Sprintf("%s:%s", host, port)),
 		wish.WithHostKeyPath("ssh_data/term_info_ed25519"),
-		wish.WithPublicKeyAuth(sshServer.authHandler),
+		wish.WithPublicKeyAuth(authHandler),
 		ptun.WithWebTunnel(webTunnel),
 		withProxy(
 			cfg,
@@ -224,18 +222,20 @@ func StartSshServer() {
 
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-	logger.Info("Starting SSH server on", "host", host, "port", port)
+	logger.Info("starting SSH server on", "host", host, "port", port)
 	go func() {
 		if err = s.ListenAndServe(); err != nil {
-			logger.Error(err.Error())
+			logger.Error("serve", "err", err.Error())
+			os.Exit(1)
 		}
 	}()
 
 	<-done
-	logger.Info("Stopping SSH server")
+	logger.Info("stopping SSH server")
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer func() { cancel() }()
 	if err := s.Shutdown(ctx); err != nil {
-		logger.Error(err.Error())
+		logger.Error("shutdown", "err", err.Error())
+		os.Exit(1)
 	}
 }
