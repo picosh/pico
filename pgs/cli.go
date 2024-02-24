@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared"
@@ -30,6 +31,7 @@ func getHelpText(userName, projectName string) string {
 	helpStr += fmt.Sprintf("`%s prune %s`: removes all projects that match prefix `%s` and is not linked to another project\n", sshCmdStr, projectName, projectName)
 	helpStr += fmt.Sprintf("`%s retain %s`: alias for `prune` but retains the (3) most recently updated projects\n", sshCmdStr, projectName)
 	helpStr += fmt.Sprintf("`%s depends %s`: lists all projects linked to `%s`\n", sshCmdStr, projectName, projectName)
+	helpStr += fmt.Sprintf("`%s acl %s [public, public_keys, pico] [comma delimited shasum keys or pico usernames]`: control access to project `%s`\n", sshCmdStr, projectName, projectName)
 	return helpStr
 }
 
@@ -406,4 +408,23 @@ func (c *Cmd) rm(projectName string) error {
 
 	err = c.RmProjectAssets(project.Name)
 	return err
+}
+
+func (c *Cmd) acl(projectName, aclType string, acls []string) error {
+	c.Log.Info(
+		"user running `acl` command",
+		"user", c.User.Name,
+		"project", projectName,
+		"actType", aclType,
+		"acls", acls,
+	)
+	c.output(fmt.Sprintf("setting acl for %s to %s (%s)", projectName, aclType, strings.Join(acls, ",")))
+	acl := db.ProjectAcl{
+		Type: aclType,
+		Data: acls,
+	}
+	if c.Write {
+		return c.Dbpool.UpdateProjectAcl(c.User.ID, projectName, acl)
+	}
+	return nil
 }

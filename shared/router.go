@@ -46,44 +46,23 @@ func CreatePProfRoutes(routes []Route) []Route {
 
 type ServeFn func(http.ResponseWriter, *http.Request)
 
-func CreateServe(routes []Route, subdomainRoutes []Route, cfg *ConfigSite, dbpool db.DB, st storage.StorageServe, logger *slog.Logger, cache *cache.Cache) ServeFn {
+func CreateServeBasic(routes []Route, subdomain string, cfg *ConfigSite, dbpool db.DB, st storage.StorageServe, logger *slog.Logger, cache *cache.Cache) ServeFn {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var allow []string
-		var subdomain string
-		curRoutes := routes
+		loggerCtx := context.WithValue(r.Context(), ctxLoggerKey{}, logger)
+		subdomainCtx := context.WithValue(loggerCtx, ctxSubdomainKey{}, subdomain)
+		dbCtx := context.WithValue(subdomainCtx, ctxDBKey{}, dbpool)
+		storageCtx := context.WithValue(dbCtx, ctxStorageKey{}, st)
+		cfgCtx := context.WithValue(storageCtx, ctxCfg{}, cfg)
+		cacheCtx := context.WithValue(cfgCtx, ctxCacheKey{}, cache)
 
-		if cfg.IsCustomdomains() || cfg.IsSubdomains() {
-			hostDomain := strings.ToLower(strings.Split(r.Host, ":")[0])
-			appDomain := strings.ToLower(strings.Split(cfg.ConfigCms.Domain, ":")[0])
-
-			if hostDomain != appDomain {
-				if strings.Contains(hostDomain, appDomain) {
-					subdomain = strings.TrimSuffix(hostDomain, fmt.Sprintf(".%s", appDomain))
-					if subdomain != "" {
-						curRoutes = subdomainRoutes
-					}
-				} else {
-					subdomain = GetCustomDomain(hostDomain, cfg.Space)
-					if subdomain != "" {
-						curRoutes = subdomainRoutes
-					}
-				}
-			}
-		}
-
-		for _, route := range curRoutes {
+		for _, route := range routes {
 			matches := route.Regex.FindStringSubmatch(r.URL.Path)
 			if len(matches) > 0 {
 				if r.Method != route.Method {
 					allow = append(allow, route.Method)
 					continue
 				}
-				loggerCtx := context.WithValue(r.Context(), ctxLoggerKey{}, logger)
-				subdomainCtx := context.WithValue(loggerCtx, ctxSubdomainKey{}, subdomain)
-				dbCtx := context.WithValue(subdomainCtx, ctxDBKey{}, dbpool)
-				storageCtx := context.WithValue(dbCtx, ctxStorageKey{}, st)
-				cfgCtx := context.WithValue(storageCtx, ctxCfg{}, cfg)
-				cacheCtx := context.WithValue(cfgCtx, ctxCacheKey{}, cache)
 				ctx := context.WithValue(cacheCtx, ctxKey{}, matches[1:])
 				route.Handler(w, r.WithContext(ctx))
 				return
@@ -95,6 +74,39 @@ func CreateServe(routes []Route, subdomainRoutes []Route, cfg *ConfigSite, dbpoo
 			return
 		}
 		http.NotFound(w, r)
+	}
+}
+
+func findRouteConfig(r *http.Request, routes []Route, subdomainRoutes []Route, cfg *ConfigSite) ([]Route, string) {
+	var subdomain string
+	curRoutes := routes
+
+	if cfg.IsCustomdomains() || cfg.IsSubdomains() {
+		hostDomain := strings.ToLower(strings.Split(r.Host, ":")[0])
+		appDomain := strings.ToLower(strings.Split(cfg.ConfigCms.Domain, ":")[0])
+
+		if hostDomain != appDomain {
+			if strings.Contains(hostDomain, appDomain) {
+				subdomain = strings.TrimSuffix(hostDomain, fmt.Sprintf(".%s", appDomain))
+				if subdomain != "" {
+					curRoutes = subdomainRoutes
+				}
+			} else {
+				subdomain = GetCustomDomain(hostDomain, cfg.Space)
+				if subdomain != "" {
+					curRoutes = subdomainRoutes
+				}
+			}
+		}
+	}
+
+	return curRoutes, subdomain
+}
+
+func CreateServe(routes []Route, subdomainRoutes []Route, cfg *ConfigSite, dbpool db.DB, st storage.StorageServe, logger *slog.Logger, cache *cache.Cache) ServeFn {
+	return func(w http.ResponseWriter, r *http.Request) {
+		curRoutes, subdomain := findRouteConfig(r, routes, subdomainRoutes, cfg)
+		CreateServeBasic(curRoutes, subdomain, cfg, dbpool, st, logger, cache)
 	}
 }
 

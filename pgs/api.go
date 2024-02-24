@@ -394,6 +394,30 @@ func AssetRequest(w http.ResponseWriter, r *http.Request) {
 	ServeAsset(fname, nil, false, w, r)
 }
 
+func PrivateAssetRequest(w http.ResponseWriter, r *http.Request) {
+	fname, _ := url.PathUnescape(shared.GetField(r, 0))
+	ServeAsset(fname, nil, false, w, r)
+}
+
+var mainRoutes = []shared.Route{
+	shared.NewRoute("GET", "/main.css", shared.ServeFile("main.css", "text/css")),
+	shared.NewRoute("GET", "/card.png", shared.ServeFile("card.png", "image/png")),
+	shared.NewRoute("GET", "/favicon-16x16.png", shared.ServeFile("favicon-16x16.png", "image/png")),
+	shared.NewRoute("GET", "/apple-touch-icon.png", shared.ServeFile("apple-touch-icon.png", "image/png")),
+	shared.NewRoute("GET", "/favicon.ico", shared.ServeFile("favicon.ico", "image/x-icon")),
+	shared.NewRoute("GET", "/robots.txt", shared.ServeFile("robots.txt", "text/plain")),
+
+	shared.NewRoute("GET", "/", shared.CreatePageHandler("html/marketing.page.tmpl")),
+	shared.NewRoute("GET", "/check", checkHandler),
+	shared.NewRoute("GET", "/rss", rssHandler),
+	shared.NewRoute("GET", "/(.+)", shared.CreatePageHandler("html/marketing.page.tmpl")),
+}
+var subdomainRoutes = []shared.Route{
+	shared.NewRoute("GET", "/", AssetRequest),
+	shared.NewRoute("GET", "(/.+.(?:jpg|jpeg|png|gif|webp|svg))(/.+)", ImgAssetRequest),
+	shared.NewRoute("GET", "/(.+)", AssetRequest),
+}
+
 func StartApiServer() {
 	cfg := NewConfigSite()
 	logger := cfg.Logger
@@ -417,25 +441,6 @@ func StartApiServer() {
 	if err != nil {
 		logger.Error(err.Error())
 		return
-	}
-
-	mainRoutes := []shared.Route{
-		shared.NewRoute("GET", "/main.css", shared.ServeFile("main.css", "text/css")),
-		shared.NewRoute("GET", "/card.png", shared.ServeFile("card.png", "image/png")),
-		shared.NewRoute("GET", "/favicon-16x16.png", shared.ServeFile("favicon-16x16.png", "image/png")),
-		shared.NewRoute("GET", "/apple-touch-icon.png", shared.ServeFile("apple-touch-icon.png", "image/png")),
-		shared.NewRoute("GET", "/favicon.ico", shared.ServeFile("favicon.ico", "image/x-icon")),
-		shared.NewRoute("GET", "/robots.txt", shared.ServeFile("robots.txt", "text/plain")),
-
-		shared.NewRoute("GET", "/", shared.CreatePageHandler("html/marketing.page.tmpl")),
-		shared.NewRoute("GET", "/check", checkHandler),
-		shared.NewRoute("GET", "/rss", rssHandler),
-		shared.NewRoute("GET", "/(.+)", shared.CreatePageHandler("html/marketing.page.tmpl")),
-	}
-	subdomainRoutes := []shared.Route{
-		shared.NewRoute("GET", "/", AssetRequest),
-		shared.NewRoute("GET", "(/.+.(?:jpg|jpeg|png|gif|webp|svg))(/.+)", ImgAssetRequest),
-		shared.NewRoute("GET", "/(.+)", AssetRequest),
 	}
 
 	handler := shared.CreateServe(mainRoutes, subdomainRoutes, cfg, db, st, logger, cache)
