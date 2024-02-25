@@ -34,6 +34,7 @@ var headerDenyList = []string{
 	"upgrade",
 }
 
+// from https://github.com/netlify/build/tree/main/packages/headers-parser
 func parseHeaderText(text string) ([]*HeaderRule, error) {
 	rules := []*HeaderRule{}
 	parsed := []*HeaderLine{}
