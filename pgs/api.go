@@ -232,7 +232,7 @@ func (h *AssetHandler) handle(w http.ResponseWriter) {
 		_, err := io.Copy(buf, redirectFp)
 		if err != nil {
 			h.Logger.Error(err.Error())
-			http.Error(w, "cannot read _redirect file", http.StatusInternalServerError)
+			http.Error(w, "cannot read _redirects file", http.StatusInternalServerError)
 			return
 		}
 
@@ -285,7 +285,40 @@ func (h *AssetHandler) handle(w http.ResponseWriter) {
 		contentType = storage.GetMimeType(assetFilepath)
 	}
 
-	w.Header().Add("Content-Type", contentType)
+	var headers []*HeaderRule
+	headersFp, _, _, err := h.Storage.GetObject(h.Bucket, filepath.Join(h.ProjectDir, "_headers"))
+	if err == nil {
+		defer headersFp.Close()
+		buf := new(strings.Builder)
+		_, err := io.Copy(buf, headersFp)
+		if err != nil {
+			h.Logger.Error(err.Error())
+			http.Error(w, "cannot read _headers file", http.StatusInternalServerError)
+			return
+		}
+
+		headers, err = parseHeaderText(buf.String())
+		if err != nil {
+			h.Logger.Error(err.Error())
+		}
+	}
+
+	userHeaders := []*HeaderLine{}
+	for _, headerRule := range headers {
+		rr := regexp.MustCompile(headerRule.Path)
+		match := rr.FindStringSubmatch(assetFilepath)
+		if len(match) > 0 {
+			userHeaders = headerRule.Headers
+		}
+	}
+
+	for _, hdr := range userHeaders {
+		w.Header().Add(hdr.Name, hdr.Value)
+	}
+	if w.Header().Get("content-type") == "" {
+		w.Header().Set("Content-Type", contentType)
+	}
+
 	w.WriteHeader(status)
 	_, err = io.Copy(w, contents)
 

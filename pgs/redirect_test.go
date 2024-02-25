@@ -6,7 +6,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-type Fixture struct {
+type RedirectFixture struct {
 	name   string
 	input  string
 	expect []*RedirectRule
@@ -14,7 +14,7 @@ type Fixture struct {
 
 func TestParseRedirectText(t *testing.T) {
 	empty := map[string]string{}
-	spa := Fixture{
+	spa := RedirectFixture{
 		name:  "spa",
 		input: "/*   /index.html   200",
 		expect: []*RedirectRule{
@@ -28,7 +28,7 @@ func TestParseRedirectText(t *testing.T) {
 		},
 	}
 
-	fixtures := []Fixture{
+	fixtures := []RedirectFixture{
 		spa,
 	}
 

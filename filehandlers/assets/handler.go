@@ -356,7 +356,7 @@ func (h *UploadAssetHandler) validateAsset(data *FileData) (bool, error) {
 	}
 
 	// special file we use for custom routing
-	if fname == "_redirects" {
+	if fname == "_redirects" || fname == "_headers" {
 		return true, nil
 	}
 
