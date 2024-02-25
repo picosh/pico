@@ -208,9 +208,17 @@ func (h *UploadAssetHandler) Validate(s ssh.Session) error {
 		return err
 	}
 	s.Context().SetValue(ctxStorageSizeKey{}, totalStorageSize)
-	h.Cfg.Logger.Info("bucket size is current (%d bytes)", "user", user.Name, "size", fmt.Sprintf("%d bytes", totalStorageSize))
+	h.Cfg.Logger.Info(
+		"bucket size",
+		"user", user.Name,
+		"bytes", totalStorageSize,
+	)
 
-	h.Cfg.Logger.Info("attempting to upload files", "user", user.Name, "space", h.Cfg.Space)
+	h.Cfg.Logger.Info(
+		"attempting to upload files",
+		"user", user.Name,
+		"space", h.Cfg.Space,
+	)
 
 	return nil
 }
@@ -246,18 +254,18 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 		if err == nil {
 			err = h.DBPool.UpdateProject(user.ID, projectName)
 			if err != nil {
-				h.Cfg.Logger.Error(err.Error())
+				h.Cfg.Logger.Error("could not update project", "err", err.Error())
 				return "", err
 			}
 		} else {
 			_, err = h.DBPool.InsertProject(user.ID, projectName, projectName)
 			if err != nil {
-				h.Cfg.Logger.Error(err.Error())
+				h.Cfg.Logger.Error("could not create project", "err", err.Error())
 				return "", err
 			}
 			project, err = h.DBPool.FindProjectByName(user.ID, projectName)
 			if err != nil {
-				h.Cfg.Logger.Error(err.Error())
+				h.Cfg.Logger.Error("could not find project", "err", err.Error())
 				return "", err
 			}
 		}
@@ -383,12 +391,9 @@ func (h *UploadAssetHandler) writeAsset(data *FileData) error {
 
 		h.Cfg.Logger.Info(
 			"uploading file to bucket",
-			"user",
-			data.User.Name,
-			"bucket",
-			data.Bucket.Name,
-			"filename",
-			assetFilename,
+			"user", data.User.Name,
+			"bucket", data.Bucket.Name,
+			"filename", assetFilename,
 		)
 
 		_, err := h.Storage.PutObject(
