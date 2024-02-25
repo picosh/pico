@@ -23,7 +23,7 @@ require (
 	github.com/neurosnap/go-exif-remove v0.0.0-20221010134343-50d1e3c35577
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/picosh/pobj v0.0.0-20240218150308-1dc70e819bbf
-	github.com/picosh/ptun v0.0.0-20240224204132-32279ba91baf
+	github.com/picosh/ptun v0.0.0-20240225010823-a5e18b5be928
 	github.com/picosh/send v0.0.0-20240217194807-77b972121e63
 	github.com/sendgrid/sendgrid-go v3.13.0+incompatible
 	github.com/yuin/goldmark v1.6.0

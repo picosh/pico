@@ -192,6 +192,8 @@ github.com/picosh/pobj v0.0.0-20240218150308-1dc70e819bbf h1:xtr5DoSgoOqbPFnm8p5
 github.com/picosh/pobj v0.0.0-20240218150308-1dc70e819bbf/go.mod h1:ILtZ0GOqkozrrGCvyJqCSUIwal2XQqzSfbKCNdS+HyU=
 github.com/picosh/ptun v0.0.0-20240224204132-32279ba91baf h1:vnG5rYDPzSg0DFBK78zuRm/0DaiEUycmduwAjrTKzfg=
 github.com/picosh/ptun v0.0.0-20240224204132-32279ba91baf/go.mod h1:uQfDebjN3JJPsI3PAx8T5rmJwdpfmjvdRe7fXY33Kbw=
+github.com/picosh/ptun v0.0.0-20240225010823-a5e18b5be928 h1:EcEJ2OZxh5CAR4p7eBkCVYZ/WW8Vk8BSJtsc0OZ23Jk=
+github.com/picosh/ptun v0.0.0-20240225010823-a5e18b5be928/go.mod h1:uQfDebjN3JJPsI3PAx8T5rmJwdpfmjvdRe7fXY33Kbw=
 github.com/picosh/send v0.0.0-20240217194807-77b972121e63 h1:VSSbAejFzj2KBThfVnMcNXQwzHmwjPUridgi29LxihU=
 github.com/picosh/send v0.0.0-20240217194807-77b972121e63/go.mod h1:1JCq0NVOdTDenQ0/Kd8e4rP80lu06UHJJ+6dQxhcpew=
 github.com/pkg/sftp v1.13.6 h1:JFZT4XbOU7l77xGSpOdW+pwIMqP044IyjXX6FGyEKFo=
