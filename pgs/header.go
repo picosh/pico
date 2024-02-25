@@ -2,6 +2,7 @@ package pgs
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -14,6 +15,23 @@ type HeaderLine struct {
 	Path  string
 	Name  string
 	Value string
+}
+
+var headerDenyList = []string{
+	"accept-ranges",
+	"age",
+	"allow",
+	"alt-svc",
+	"connection",
+	"content-encoding",
+	"content-length",
+	"content-range",
+	"date",
+	"location",
+	"server",
+	"trailer",
+	"transfer-encoding",
+	"upgrade",
 }
 
 func parseHeaderText(text string) ([]*HeaderRule, error) {
@@ -33,17 +51,21 @@ func parseHeaderText(text string) ([]*HeaderRule, error) {
 
 	var prevPath *HeaderRule
 	for _, rule := range parsed {
-		fmt.Printf("rule: %+v\n", rule)
-		fmt.Printf("prev: %+v\n", prevPath)
 		if rule.Path != "" {
 			if prevPath != nil {
-				rules = append(rules, prevPath)
+				if len(prevPath.Headers) > 0 {
+					rules = append(rules, prevPath)
+				}
 			}
 
 			prevPath = &HeaderRule{
 				Path: rule.Path,
 			}
 		} else if prevPath != nil {
+			// do not add headers in deny list
+			if slices.Contains(headerDenyList, rule.Name) {
+				continue
+			}
 			prevPath.Headers = append(
 				prevPath.Headers,
 				&HeaderLine{Name: rule.Name, Value: rule.Value},
@@ -52,7 +74,9 @@ func parseHeaderText(text string) ([]*HeaderRule, error) {
 	}
 
 	// cleanup
-	rules = append(rules, prevPath)
+	if prevPath != nil && len(prevPath.Headers) > 0 {
+		rules = append(rules, prevPath)
+	}
 
 	return rules, nil
 }
@@ -78,7 +102,7 @@ func parseLine(line string) (*HeaderLine, error) {
 	}
 
 	results := strings.SplitN(line, ":", 2)
-	name := strings.TrimSpace(results[0])
+	name := strings.ToLower(strings.TrimSpace(results[0]))
 	value := strings.TrimSpace(results[1])
 
 	if name == "" {

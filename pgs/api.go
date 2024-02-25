@@ -311,11 +311,12 @@ func (h *AssetHandler) handle(w http.ResponseWriter) {
 			userHeaders = headerRule.Headers
 		}
 	}
-	fmt.Println(userHeaders)
 
-	w.Header().Add("Content-Type", contentType)
 	for _, hdr := range userHeaders {
 		w.Header().Add(hdr.Name, hdr.Value)
+	}
+	if w.Header().Get("content-type") == "" {
+		w.Header().Set("Content-Type", contentType)
 	}
 
 	w.WriteHeader(status)
