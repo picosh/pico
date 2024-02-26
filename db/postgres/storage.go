@@ -912,15 +912,17 @@ func (me *PsqlDB) FindUsers() ([]*db.User, error) {
 		return users, err
 	}
 	for rs.Next() {
+		var name sql.NullString
 		user := &db.User{}
 		err := rs.Scan(
 			&user.ID,
-			&user.Name,
+			&name,
 			&user.CreatedAt,
 		)
 		if err != nil {
 			return users, err
 		}
+		user.Name = name.String
 
 		users = append(users, user)
 	}
