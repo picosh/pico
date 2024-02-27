@@ -9,29 +9,122 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/lipgloss/table"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
+	"github.com/picosh/pico/wish/cms/ui/common"
 )
 
-func getHelpText(userName, projectName string) string {
-	helpStr := "commands: [help, stats, ls, rm, link, unlink, prune, retain, depends]\n\n"
-	helpStr += "NOTICE: any cmd that results in a mutation *must* be appended with `--write` for the changes to persist, otherwise it will simply output a dry-run.\n\n"
+var re = lipgloss.NewRenderer(os.Stdout)
+var baseStyle = re.NewStyle().Padding(0, 1)
+var headerStyle = baseStyle.Copy().Foreground(common.Indigo).Bold(true)
+var borderStyle = re.NewStyle().Foreground(lipgloss.Color("238"))
 
-	sshCmdStr := fmt.Sprintf("ssh %s@pgs.sh", userName)
-	helpStr += fmt.Sprintf("`%s help`: prints this screen\n", sshCmdStr)
-	helpStr += fmt.Sprintf("`%s stats`: prints stats for user\n", sshCmdStr)
-	helpStr += fmt.Sprintf("`%s ls`: lists projects\n", sshCmdStr)
-	helpStr += fmt.Sprintf("`%s rm %s`: deletes `%s`\n", sshCmdStr, projectName, projectName)
-	helpStr += fmt.Sprintf("`%s link %s project-b`: symbolic link from `%s` to `project-b`\n", sshCmdStr, projectName, projectName)
-	helpStr += fmt.Sprintf(
-		"`%s unlink %s`: alias for `link %s %s`, which removes symbolic link for `%s`\n",
-		sshCmdStr, projectName, projectName, projectName, projectName,
-	)
-	helpStr += fmt.Sprintf("`%s prune %s`: removes all projects that match prefix `%s` and is not linked to another project\n", sshCmdStr, projectName, projectName)
-	helpStr += fmt.Sprintf("`%s retain %s`: alias for `prune` but retains the (3) most recently updated projects\n", sshCmdStr, projectName)
-	helpStr += fmt.Sprintf("`%s depends %s`: lists all projects linked to `%s`\n", sshCmdStr, projectName, projectName)
-	helpStr += fmt.Sprintf("`%s acl %s [public, public_keys, pico] [comma delimited shasum keys or pico usernames]`: control access to project `%s`\n", sshCmdStr, projectName, projectName)
+func styleRows(row, col int) lipgloss.Style {
+	if row == 0 {
+		return headerStyle
+	}
+
+	even := row%2 == 0
+	if even {
+		return baseStyle.Copy().Foreground(lipgloss.Color("245"))
+	}
+	return baseStyle.Copy().Foreground(lipgloss.Color("252"))
+}
+
+func projectTable(projects []*db.Project) *table.Table {
+	headers := []string{
+		"Name",
+		"Last Updated",
+		"Links To",
+		"ACL Type",
+		"ACL",
+	}
+	data := [][]string{}
+	for _, project := range projects {
+		row := []string{
+			project.Name,
+			project.UpdatedAt.Format("2006-01-02 15:04:05"),
+		}
+		links := ""
+		if project.ProjectDir != project.Name {
+			links = project.ProjectDir
+		}
+		row = append(row, links)
+		row = append(row,
+			project.Acl.Type,
+			strings.Join(project.Acl.Data, " "),
+		)
+		data = append(data, row)
+	}
+
+	t := table.New().
+		Border(lipgloss.NormalBorder()).
+		BorderStyle(borderStyle).
+		Headers(headers...).
+		Rows(data...).
+		StyleFunc(styleRows)
+	return t
+}
+
+func getHelpText(userName, projectName string) string {
+	helpStr := "Commands: [help, stats, ls, rm, link, unlink, prune, retain, depends, acl]\n\n"
+	helpStr += "NOTICE: *must* append with `--write` for the changes to persist.\n\n"
+
+	headers := []string{"Cmd", "Description"}
+	data := [][]string{
+		{
+			"help",
+			"prints this screen",
+		},
+		{
+			"stats",
+			"usage statistics",
+		},
+		{
+			"ls",
+			"lists projects",
+		},
+		{
+			fmt.Sprintf("rm %s", projectName),
+			fmt.Sprintf("delete %s", projectName),
+		},
+		{
+			fmt.Sprintf("link %s project-b", projectName),
+			fmt.Sprintf("symbolic link `%s` to `project-b`", projectName),
+		},
+		{
+			fmt.Sprintf("unlink %s", projectName),
+			fmt.Sprintf("removes symbolic link for `%s`", projectName),
+		},
+		{
+			fmt.Sprintf("prune %s", projectName),
+			fmt.Sprintf("removes projects that match prefix `%s`", projectName),
+		},
+		{
+			fmt.Sprintf("retain %s", projectName),
+			"alias `prune` but keeps last (3) projects",
+		},
+		{
+			fmt.Sprintf("depends %s", projectName),
+			fmt.Sprintf("lists all projects linked to `%s`", projectName),
+		},
+		{
+			fmt.Sprintf("acl %s", projectName),
+			fmt.Sprintf("access control for `%s`", projectName),
+		},
+	}
+
+	t := table.New().
+		Border(lipgloss.NormalBorder()).
+		BorderStyle(borderStyle).
+		Headers(headers...).
+		Rows(data...).
+		StyleFunc(styleRows)
+
+	helpStr += t.String()
 	return helpStr
 }
 
@@ -170,16 +263,21 @@ func (c *Cmd) stats(cfgMaxSize uint64) error {
 		return err
 	}
 
-	str := "stats\n"
-	str += "=====\n"
-	str += fmt.Sprintf(
-		"space:\t\t%.4f/%.4fGB, %.4f%%\n",
-		shared.BytesToGB(int(totalFileSize)),
-		shared.BytesToGB(int(storageMax)),
-		(float32(totalFileSize)/float32(storageMax))*100,
-	)
-	str += fmt.Sprintf("projects:\t%d", len(projects))
-	c.output(str)
+	headers := []string{"Used (GB)", "Quota (GB)", "Used (%)", "Projects (#)"}
+	data := []string{
+		fmt.Sprintf("%.4f", shared.BytesToGB(int(totalFileSize))),
+		fmt.Sprintf("%.4f", shared.BytesToGB(int(storageMax))),
+		fmt.Sprintf("%.4f", (float32(totalFileSize)/float32(storageMax))*100),
+		fmt.Sprintf("%d", len(projects)),
+	}
+
+	t := table.New().
+		Border(lipgloss.NormalBorder()).
+		BorderStyle(borderStyle).
+		Headers(headers...).
+		Rows(data).
+		StyleFunc(styleRows)
+	c.output(t.String())
 
 	return nil
 }
@@ -194,13 +292,8 @@ func (c *Cmd) ls() error {
 		c.output("no projects found")
 	}
 
-	for _, project := range projects {
-		out := fmt.Sprintf("%s (links to: %s)", project.Name, project.ProjectDir)
-		if project.Name == project.ProjectDir {
-			out = fmt.Sprintf("%s\t(last updated: %s)", project.Name, project.UpdatedAt)
-		}
-		c.output(out)
-	}
+	t := projectTable(projects)
+	c.output(t.String())
 
 	return nil
 }
@@ -280,18 +373,13 @@ func (c *Cmd) depends(projectName string) error {
 	}
 
 	if len(projects) == 0 {
-		out := fmt.Sprintf("no projects linked to this project (%s) found", projectName)
+		out := fmt.Sprintf("no projects linked to (%s)", projectName)
 		c.output(out)
 		return nil
 	}
 
-	for _, project := range projects {
-		out := fmt.Sprintf("%s (links to: %s)", project.Name, project.ProjectDir)
-		if project.Name == project.ProjectDir {
-			out = project.Name
-		}
-		c.output(out)
-	}
+	t := projectTable(projects)
+	c.output(t.String())
 
 	return nil
 }

@@ -35,19 +35,19 @@ func VerticalLine(state State) string {
 		String()
 }
 
-var valStyle = lipgloss.NewStyle().Foreground(indigo)
+var valStyle = lipgloss.NewStyle().Foreground(Indigo)
 
 var (
 	spinnerStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.AdaptiveColor{Light: "#8E8E8E", Dark: "#747373"})
 
 	blurredButtonStyle = lipgloss.NewStyle().
-				Foreground(cream).
+				Foreground(Cream).
 				Background(lipgloss.AdaptiveColor{Light: "#BDB0BE", Dark: "#827983"}).
 				Padding(0, 3)
 
 	focusedButtonStyle = blurredButtonStyle.Copy().
-				Background(fuschia)
+				Background(Fuschia)
 )
 
 // KeyValueView renders key-value pairs.

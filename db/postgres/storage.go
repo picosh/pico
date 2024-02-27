@@ -264,7 +264,7 @@ const (
 	LEFT JOIN app_users ON app_users.id = projects.user_id
 	ORDER BY created_at ASC
 	LIMIT $1 OFFSET $2`
-	sqlFindProjectsByUser   = `SELECT id, user_id, name, project_dir, acl, created_at, updated_at FROM projects WHERE user_id = $1 ORDER BY updated_at DESC;`
+	sqlFindProjectsByUser   = `SELECT id, user_id, name, project_dir, acl, created_at, updated_at FROM projects WHERE user_id = $1 ORDER BY name ASC, updated_at DESC;`
 	sqlFindProjectsByPrefix = `SELECT id, user_id, name, project_dir, acl, created_at, updated_at FROM projects WHERE user_id = $1 AND name = project_dir AND name ILIKE $2 ORDER BY updated_at ASC, name ASC;`
 	sqlFindProjectLinks     = `SELECT id, user_id, name, project_dir, acl, created_at, updated_at FROM projects WHERE user_id = $1 AND name != project_dir AND project_dir = $2 ORDER BY name ASC;`
 	sqlLinkToProject        = `UPDATE projects SET project_dir = $1, updated_at = $2 WHERE id = $3;`
