@@ -42,7 +42,8 @@
     <div class="box">
       <h2 class="text-xl">Features</h2>
       <ul>
-        <li>10GB asset storage</li>
+        <li>25MB asset storage with our free tier</li>
+        <li>10GB asset storage with <a href="https://pico.sh/plus">pico+</a></li>
         <li>Terminal workflows</li>
         <li>No client-side installation required to fully manage static sites</li>
         <li>Distinct static sites as projects</li>
@@ -72,18 +73,15 @@
 
       <p>
         That's it! There's no need to formally create a project, we create them
-        on-the-fly. Further, we provide TLS for every project automatically. In this
-        case the url for the project above would look like:
+        on-the-fly. Further, we provide TLS for every project automatically.
       </p>
-
-      <pre>https://{username}-myproj.pgs.sh</pre>
     </div>
 
     <div class="box">
       <h2 class="text-xl">Manage your projects with a remote CLI</h2>
 
       <p>
-        Use our CLI to manage projects:
+        Use our CLI to manage your projects:
       </p>
 
       <pre>ssh pgs.sh help</pre>
@@ -97,7 +95,19 @@
         instantly update your project.
       </p>
 
-      <pre>ssh pgs.sh link project-prod project-d0131d4</pre>
+      <pre>ssh pgs.sh link project-prod --to project-d0131d4</pre>
+    </div>
+
+    <div class="box">
+      <h2 class="text-xl">Private projects</h2>
+
+      <p>
+        With SSH tunnels we support private sites with an access control list API.  Try it out:
+      </p>
+
+      <pre>ssh -L 5000:localhost:80 -N hey-tunnels@pgs.sh</pre>
+
+      <p>Then go to <a href="http://localhost:5000">localhost:5000</a></p>
     </div>
 
     <div>
