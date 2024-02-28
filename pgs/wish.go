@@ -44,11 +44,11 @@ func (i *arrayFlags) Set(value string) error {
 	return nil
 }
 
-func flagSet(cmdName string, sesh ssh.Session) (*flag.FlagSet, bool) {
+func flagSet(cmdName string, sesh ssh.Session) (*flag.FlagSet, *bool) {
 	cmd := flag.NewFlagSet(cmdName, flag.ContinueOnError)
 	cmd.SetOutput(sesh)
 	write := cmd.Bool("write", false, "apply changes")
-	return cmd, *write
+	return cmd, write
 }
 
 func flagCheck(cmd *flag.FlagSet, posArg string, cmdArgs []string) bool {
@@ -123,11 +123,11 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 
 			if cmd == "link" {
 				linkCmd, write := flagSet("link", sesh)
-				opts.Write = write
 				linkTo := linkCmd.String("to", "", "symbolic link to this project")
 				if !flagCheck(linkCmd, projectName, cmdArgs) {
 					return
 				}
+				opts.Write = *write
 
 				if *linkTo == "" {
 					err := fmt.Errorf(
@@ -145,10 +145,10 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 				return
 			} else if cmd == "unlink" {
 				unlinkCmd, write := flagSet("unlink", sesh)
-				opts.Write = write
 				if !flagCheck(unlinkCmd, projectName, cmdArgs) {
 					return
 				}
+				opts.Write = *write
 
 				err := opts.unlink(projectName)
 				opts.notice()
@@ -160,11 +160,11 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 				return
 			} else if cmd == "retain" {
 				retainCmd, write := flagSet("retain", sesh)
-				opts.Write = write
 				retainNum := retainCmd.Int("n", 3, "latest number of projects to keep")
 				if !flagCheck(retainCmd, projectName, cmdArgs) {
 					return
 				}
+				opts.Write = *write
 
 				err := opts.prune(projectName, *retainNum)
 				opts.notice()
@@ -172,10 +172,10 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 				return
 			} else if cmd == "prune" {
 				pruneCmd, write := flagSet("prune", sesh)
-				opts.Write = write
 				if !flagCheck(pruneCmd, projectName, cmdArgs) {
 					return
 				}
+				opts.Write = *write
 
 				err := opts.prune(projectName, 0)
 				opts.notice()
@@ -183,10 +183,10 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 				return
 			} else if cmd == "rm" {
 				rmCmd, write := flagSet("rm", sesh)
-				opts.Write = write
 				if !flagCheck(rmCmd, projectName, cmdArgs) {
 					return
 				}
+				opts.Write = *write
 
 				err := opts.rm(projectName)
 				opts.notice()
@@ -194,7 +194,6 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 				return
 			} else if cmd == "acl" {
 				aclCmd, write := flagSet("acl", sesh)
-				opts.Write = write
 				aclType := aclCmd.String("type", "", "access type: public, pico, pubkeys")
 				var acls arrayFlags
 				aclCmd.Var(
@@ -205,6 +204,7 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 				if !flagCheck(aclCmd, projectName, cmdArgs) {
 					return
 				}
+				opts.Write = *write
 
 				if !slices.Contains([]string{"public", "pubkeys", "pico"}, *aclType) {
 					err := fmt.Errorf(
