@@ -36,23 +36,23 @@ func getUser(s ssh.Session, dbpool db.DB) (*db.User, error) {
 type arrayFlags []string
 
 func (i *arrayFlags) String() string {
-    return "array flags"
+	return "array flags"
 }
 
 func (i *arrayFlags) Set(value string) error {
-    *i = append(*i, value)
-    return nil
+	*i = append(*i, value)
+	return nil
 }
 
 func flagSet(cmdName string, sesh ssh.Session) (*flag.FlagSet, bool) {
 	cmd := flag.NewFlagSet(cmdName, flag.ContinueOnError)
 	cmd.SetOutput(sesh)
-    write := cmd.Bool("write", false, "apply changes")
-    return cmd, *write
+	write := cmd.Bool("write", false, "apply changes")
+	return cmd, *write
 }
 
 func flagCheck(cmd *flag.FlagSet, posArg string, cmdArgs []string) bool {
-    cmd.Parse(cmdArgs)
+	_ = cmd.Parse(cmdArgs)
 
 	if posArg == "-h" || posArg == "--help" || posArg == "-help" {
 		cmd.Usage()
@@ -60,7 +60,6 @@ func flagCheck(cmd *flag.FlagSet, posArg string, cmdArgs []string) bool {
 	}
 	return true
 }
-
 
 func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 	dbpool := handler.DBPool
@@ -124,13 +123,10 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 
 			if cmd == "link" {
 				linkCmd, write := flagSet("link", sesh)
-    			linkTo := linkCmd.String("to", "", "symbolic link to this project")
-    			if !flagCheck(linkCmd, projectName, cmdArgs) {
-    				return
-    			}
-
-				if write == true {
-					opts.Write = true
+				opts.Write = write
+				linkTo := linkCmd.String("to", "", "symbolic link to this project")
+				if !flagCheck(linkCmd, projectName, cmdArgs) {
+					return
 				}
 
 				if *linkTo == "" {
@@ -149,12 +145,9 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 				return
 			} else if cmd == "unlink" {
 				unlinkCmd, write := flagSet("unlink", sesh)
+				opts.Write = write
 				if !flagCheck(unlinkCmd, projectName, cmdArgs) {
 					return
-				}
-
-				if write == true {
-					opts.Write = true
 				}
 
 				err := opts.unlink(projectName)
@@ -167,13 +160,10 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 				return
 			} else if cmd == "retain" {
 				retainCmd, write := flagSet("retain", sesh)
-    			retainNum := retainCmd.Int("n", 3, "latest number of projects to keep")
-    			if !flagCheck(retainCmd, projectName, cmdArgs) {
-    				return
-    			}
-
-				if write == true {
-					opts.Write = true
+				opts.Write = write
+				retainNum := retainCmd.Int("n", 3, "latest number of projects to keep")
+				if !flagCheck(retainCmd, projectName, cmdArgs) {
+					return
 				}
 
 				err := opts.prune(projectName, *retainNum)
@@ -182,12 +172,9 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 				return
 			} else if cmd == "prune" {
 				pruneCmd, write := flagSet("prune", sesh)
+				opts.Write = write
 				if !flagCheck(pruneCmd, projectName, cmdArgs) {
 					return
-				}
-
-				if write == true {
-					opts.Write = true
 				}
 
 				err := opts.prune(projectName, 0)
@@ -196,12 +183,9 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 				return
 			} else if cmd == "rm" {
 				rmCmd, write := flagSet("rm", sesh)
+				opts.Write = write
 				if !flagCheck(rmCmd, projectName, cmdArgs) {
 					return
-				}
-
-				if write == true {
-					opts.Write = true
 				}
 
 				err := opts.rm(projectName)
@@ -210,19 +194,16 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 				return
 			} else if cmd == "acl" {
 				aclCmd, write := flagSet("acl", sesh)
-    			aclType := aclCmd.String("type", "", "access type: public, pico, pubkeys")
-    			var acls arrayFlags
-    			aclCmd.Var(
-    				&acls,
-    				"acl",
-    				"list of pico usernames or sha256 public keys, delimited by commas",
-    			)
-    			if !flagCheck(aclCmd, projectName, cmdArgs) {
-    				return
-    			}
-
-				if write == true {
-					opts.Write = true
+				opts.Write = write
+				aclType := aclCmd.String("type", "", "access type: public, pico, pubkeys")
+				var acls arrayFlags
+				aclCmd.Var(
+					&acls,
+					"acl",
+					"list of pico usernames or sha256 public keys, delimited by commas",
+				)
+				if !flagCheck(aclCmd, projectName, cmdArgs) {
+					return
 				}
 
 				if !slices.Contains([]string{"public", "pubkeys", "pico"}, *aclType) {
