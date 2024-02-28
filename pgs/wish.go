@@ -1,6 +1,7 @@
 package pgs
 
 import (
+	"flag"
 	"fmt"
 	"slices"
 	"strings"
@@ -31,6 +32,35 @@ func getUser(s ssh.Session, dbpool db.DB) (*db.User, error) {
 
 	return user, nil
 }
+
+type arrayFlags []string
+
+func (i *arrayFlags) String() string {
+    return "array flags"
+}
+
+func (i *arrayFlags) Set(value string) error {
+    *i = append(*i, value)
+    return nil
+}
+
+func flagSet(cmdName string, sesh ssh.Session) (*flag.FlagSet, bool) {
+	cmd := flag.NewFlagSet(cmdName, flag.ContinueOnError)
+	cmd.SetOutput(sesh)
+    write := cmd.Bool("write", false, "apply changes")
+    return cmd, *write
+}
+
+func flagCheck(cmd *flag.FlagSet, posArg string, cmdArgs []string) bool {
+    cmd.Parse(cmdArgs)
+
+	if posArg == "-h" || posArg == "--help" || posArg == "-help" {
+		cmd.Usage()
+		return false
+	}
+	return true
+}
+
 
 func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 	dbpool := handler.DBPool
@@ -82,37 +112,51 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 				}
 			}
 
-			log.Info("pgs middleware detected command", "args", args)
 			projectName := strings.TrimSpace(args[1])
-
-			if projectName == "--write" {
-				utils.ErrorHandler(sesh, fmt.Errorf("`--write` should be placed at end of command"))
-				return
-			}
+			cmdArgs := args[2:]
+			log.Info(
+				"pgs middleware detected command",
+				"args", args,
+				"cmd", cmd,
+				"projectName", projectName,
+				"cmdArgs", cmdArgs,
+			)
 
 			if cmd == "link" {
-				if len(args) < 3 {
-					utils.ErrorHandler(sesh, fmt.Errorf("must supply link command like: `projectA link projectB`"))
-					return
-				}
-				linkTo := strings.TrimSpace(args[2])
-				if len(args) >= 4 && strings.TrimSpace(args[3]) == "--write" {
+				linkCmd, write := flagSet("link", sesh)
+    			linkTo := linkCmd.String("to", "", "symbolic link to this project")
+    			if !flagCheck(linkCmd, projectName, cmdArgs) {
+    				return
+    			}
+
+				if write == true {
 					opts.Write = true
 				}
 
-				err := opts.link(projectName, linkTo)
+				if *linkTo == "" {
+					err := fmt.Errorf(
+						"must provide `--to` flag",
+					)
+					opts.bail(err)
+					return
+				}
+
+				err := opts.link(projectName, *linkTo)
 				opts.notice()
 				if err != nil {
 					opts.bail(err)
 				}
 				return
-			}
+			} else if cmd == "unlink" {
+				unlinkCmd, write := flagSet("unlink", sesh)
+				if !flagCheck(unlinkCmd, projectName, cmdArgs) {
+					return
+				}
 
-			if len(args) >= 3 && strings.TrimSpace(args[2]) == "--write" {
-				opts.Write = true
-			}
+				if write == true {
+					opts.Write = true
+				}
 
-			if cmd == "unlink" {
 				err := opts.unlink(projectName)
 				opts.notice()
 				opts.bail(err)
@@ -122,51 +166,75 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 				opts.bail(err)
 				return
 			} else if cmd == "retain" {
-				err := opts.prune(projectName, 3)
+				retainCmd, write := flagSet("retain", sesh)
+    			retainNum := retainCmd.Int("n", 3, "latest number of projects to keep")
+    			if !flagCheck(retainCmd, projectName, cmdArgs) {
+    				return
+    			}
+
+				if write == true {
+					opts.Write = true
+				}
+
+				err := opts.prune(projectName, *retainNum)
 				opts.notice()
 				opts.bail(err)
 				return
 			} else if cmd == "prune" {
+				pruneCmd, write := flagSet("prune", sesh)
+				if !flagCheck(pruneCmd, projectName, cmdArgs) {
+					return
+				}
+
+				if write == true {
+					opts.Write = true
+				}
+
 				err := opts.prune(projectName, 0)
 				opts.notice()
 				opts.bail(err)
 				return
 			} else if cmd == "rm" {
+				rmCmd, write := flagSet("rm", sesh)
+				if !flagCheck(rmCmd, projectName, cmdArgs) {
+					return
+				}
+
+				if write == true {
+					opts.Write = true
+				}
+
 				err := opts.rm(projectName)
 				opts.notice()
 				opts.bail(err)
 				return
 			} else if cmd == "acl" {
-				aclType := strings.TrimSpace(args[2])
-				if !slices.Contains([]string{"public", "public_keys", "pico"}, aclType) {
-					err := fmt.Errorf("acl type must be one of the following: [public, public_keys, pico], found %s", aclType)
+				aclCmd, write := flagSet("acl", sesh)
+    			aclType := aclCmd.String("type", "", "access type: public, pico, pubkeys")
+    			var acls arrayFlags
+    			aclCmd.Var(
+    				&acls,
+    				"acl",
+    				"list of pico usernames or sha256 public keys, delimited by commas",
+    			)
+    			if !flagCheck(aclCmd, projectName, cmdArgs) {
+    				return
+    			}
+
+				if write == true {
+					opts.Write = true
+				}
+
+				if !slices.Contains([]string{"public", "pubkeys", "pico"}, *aclType) {
+					err := fmt.Errorf(
+						"acl type must be one of the following: [public, pubkeys, pico], found %s",
+						*aclType,
+					)
 					opts.bail(err)
 					return
 				}
 
-				aclsRaw := ""
-				if len(args) == 4 {
-					if strings.TrimSpace(args[3]) == "--write" {
-						opts.Write = true
-					} else {
-						aclsRaw = strings.TrimSpace(args[3])
-					}
-				}
-				if len(args) == 5 {
-					aclsRaw = strings.TrimSpace(args[3])
-					if strings.TrimSpace(args[4]) == "--write" {
-						opts.Write = true
-					}
-				}
-				acls := []string{}
-				for _, key := range strings.Split(aclsRaw, ",") {
-					st := strings.TrimSpace(key)
-					if st == "" {
-						continue
-					}
-					acls = append(acls, st)
-				}
-				err := opts.acl(projectName, aclType, acls)
+				err := opts.acl(projectName, *aclType, acls)
 				opts.notice()
 				opts.bail(err)
 			} else {

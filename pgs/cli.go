@@ -69,10 +69,11 @@ func projectTable(projects []*db.Project) *table.Table {
 	return t
 }
 
-func getHelpText(userName, projectName string) string {
+func getHelpText(userName string) string {
 	helpStr := "Commands: [help, stats, ls, rm, link, unlink, prune, retain, depends, acl]\n\n"
 	helpStr += "NOTICE: *must* append with `--write` for the changes to persist.\n\n"
 
+	projectName := "projA"
 	headers := []string{"Cmd", "Description"}
 	data := [][]string{
 		{
@@ -92,8 +93,8 @@ func getHelpText(userName, projectName string) string {
 			fmt.Sprintf("delete %s", projectName),
 		},
 		{
-			fmt.Sprintf("link %s project-b", projectName),
-			fmt.Sprintf("symbolic link `%s` to `project-b`", projectName),
+			fmt.Sprintf("link %s --to projB", projectName),
+			fmt.Sprintf("symbolic link `%s` to `projB`", projectName),
 		},
 		{
 			fmt.Sprintf("unlink %s", projectName),
@@ -105,7 +106,7 @@ func getHelpText(userName, projectName string) string {
 		},
 		{
 			fmt.Sprintf("retain %s", projectName),
-			"alias `prune` but keeps last (3) projects",
+			"alias to `prune` but keeps last N projects",
 		},
 		{
 			fmt.Sprintf("depends %s", projectName),
@@ -235,7 +236,7 @@ func (c *Cmd) RmProjectAssets(projectName string) error {
 }
 
 func (c *Cmd) help() {
-	c.output(getHelpText(c.User.Name, "project-a"))
+	c.output(getHelpText(c.User.Name))
 }
 
 func (c *Cmd) stats(cfgMaxSize uint64) error {

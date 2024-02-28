@@ -32,7 +32,7 @@ func HasProjectAccess(project *db.Project, owner *db.User, requester *db.User, p
 		return slices.Contains(data, requester.Name)
 	}
 
-	if aclType == "public_keys" {
+	if aclType == "pubkeys" {
 		key := ssh.FingerprintSHA256(pubkey)
 		if len(data) == 0 {
 			return true
