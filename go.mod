@@ -3,6 +3,11 @@ module github.com/picosh/pico
 go 1.22.0
 
 // replace github.com/picosh/ptun => /home/erock/dev/pico/ptun
+replace github.com/charmbracelet/bubbletea => github.com/charmbracelet/bubbletea v0.24.2
+
+replace github.com/charmbracelet/wish => github.com/charmbracelet/wish v1.2.0
+
+replace github.com/charmbracelet/ssh => github.com/charmbracelet/ssh v0.0.0-20230822194956-1a051f898e09
 
 require (
 	github.com/alecthomas/chroma v0.10.0
@@ -20,6 +25,7 @@ require (
 	github.com/minio/minio-go/v7 v7.0.63
 	github.com/mmcdole/gofeed v1.2.1
 	github.com/muesli/reflow v0.3.0
+	github.com/muesli/termenv v0.15.2
 	github.com/neurosnap/go-exif-remove v0.0.0-20221010134343-50d1e3c35577
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/picosh/pobj v0.0.0-20240218150308-1dc70e819bbf
@@ -47,10 +53,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/charmbracelet/keygen v0.5.0 // indirect
 	github.com/charmbracelet/log v0.3.1 // indirect
-	github.com/charmbracelet/x/errors v0.0.0-20240117030013-d31dba354651 // indirect
-	github.com/charmbracelet/x/exp/term v0.0.0-20240130180102-bafe6fbaee60 // indirect
 	github.com/containerd/console v1.0.4-0.20230313162750-1ae8d489ac81 // indirect
-	github.com/creack/pty v1.1.21 // indirect
 	github.com/dlclark/regexp2 v1.10.0 // indirect
 	github.com/dsoprea/go-exif v0.0.0-20230826092837-6579e82b732d // indirect
 	github.com/dsoprea/go-exif/v2 v2.0.0-20230826092837-6579e82b732d // indirect
@@ -90,7 +93,6 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
-	github.com/muesli/termenv v0.15.2 // indirect
 	github.com/neurosnap/go-jpeg-image-structure v0.0.0-20221010133817-70b1c1ff679e // indirect
 	github.com/philhofer/fwd v1.1.2 // indirect
 	github.com/pkg/sftp v1.13.6 // indirect
@@ -111,7 +113,6 @@ require (
 	github.com/tinylib/msgp v1.1.9 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
-	github.com/u-root/u-root v0.11.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.3 // indirect
 	golang.org/x/exp v0.0.0-20231108232855-2478ac86f678 // indirect
 	golang.org/x/net v0.19.0 // indirect
