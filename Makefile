@@ -74,6 +74,8 @@ store-clean:
 .PHONY: store-clean
 
 pico-plus:
+	# USER=picouser TXID=pi_xxx make pico-plus
+	# TXID is from stripe, but can be empty
 	go run ./cmd/scripts/pico-plus/main.go $(USER) $(TXID)
 .PHONY: pico-plus
 
