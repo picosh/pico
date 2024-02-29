@@ -42,7 +42,7 @@ func NewConfigSite() *shared.ConfigSite {
 			MinioURL:    minioURL,
 			MinioUser:   minioUser,
 			MinioPass:   minioPass,
-			Description: "hacker labs",
+			Description: "A zero-install static site hosting service for hackers",
 			IntroText:   intro,
 			Space:       "pgs",
 			// IMPORTANT: make sure `shared.GetMimeType` has the extensions being

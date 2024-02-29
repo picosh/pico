@@ -87,13 +87,11 @@ func (m *Model) indexBackward() {
 }
 
 // NewModel returns a new username model in its initial state.
-func NewModel(cfg *config.ConfigCms, dbpool db.DB, user *db.User) Model {
-	st := common.DefaultStyles()
-
+func NewModel(styles common.Styles, cfg *config.ConfigCms, dbpool db.DB, user *db.User) Model {
 	im := input.New()
-	im.Cursor.Style = st.Cursor
+	im.Cursor.Style = styles.Cursor
 	im.Placeholder = "ssh-ed25519 AAAA..."
-	im.Prompt = st.FocusedPrompt.String()
+	im.Prompt = styles.FocusedPrompt.String()
 	im.CharLimit = 2049
 	im.Focus()
 
@@ -102,13 +100,13 @@ func NewModel(cfg *config.ConfigCms, dbpool db.DB, user *db.User) Model {
 		Quit:    false,
 		dbpool:  dbpool,
 		user:    user,
-		styles:  st,
+		styles:  styles,
 		state:   ready,
 		newKey:  "",
 		index:   textInput,
 		errMsg:  "",
 		input:   im,
-		spinner: common.NewSpinner(),
+		spinner: common.NewSpinner(styles),
 	}
 }
 
@@ -234,8 +232,8 @@ func (m Model) View() string {
 	if m.state == submitting {
 		s += spinnerView(m)
 	} else {
-		s += common.OKButtonView(m.index == 1, true)
-		s += " " + common.CancelButtonView(m.index == 2, false)
+		s += common.OKButtonView(m.styles, m.index == 1, true)
+		s += " " + common.CancelButtonView(m.styles, m.index == 2, false)
 		if m.errMsg != "" {
 			s += "\n\n" + m.errMsg
 		}
@@ -279,7 +277,7 @@ func addPublicKey(m Model) tea.Cmd {
 		}
 
 		key := sanitizeKey(m.newKey)
-		err := m.dbpool.LinkUserKey(m.user.ID, key)
+		err := m.dbpool.LinkUserKey(m.user.ID, key, nil)
 		if err != nil {
 			if errors.Is(err, db.ErrPublicKeyTaken) {
 				return KeyTakenMsg{}

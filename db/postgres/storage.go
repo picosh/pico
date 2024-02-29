@@ -234,7 +234,7 @@ const (
 		file_size, mime_type, shasum, data, expires_at, updated_at)
 	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 	RETURNING id`
-	sqlInsertUser      = `INSERT INTO app_users DEFAULT VALUES returning id`
+	sqlInsertUser      = `INSERT INTO app_users (name) VALUES($1) returning id`
 	sqlInsertTag       = `INSERT INTO post_tags (post_id, name) VALUES($1, $2) RETURNING id;`
 	sqlInsertAliases   = `INSERT INTO post_aliases (post_id, slug) VALUES($1, $2) RETURNING id;`
 	sqlInsertFeedItems = `INSERT INTO feed_items (post_id, guid, data) VALUES ($1, $2, $3) RETURNING id;`
@@ -363,13 +363,45 @@ func NewDB(databaseUrl string, logger *slog.Logger) *PsqlDB {
 	return d
 }
 
-func (me *PsqlDB) AddUser() (string, error) {
-	var id string
-	err := me.Db.QueryRow(sqlInsertUser).Scan(&id)
-	if err != nil {
-		return "", err
+func (me *PsqlDB) RegisterUser(username string, pubkey string) (*db.User, error) {
+	lowerName := strings.ToLower(username)
+	valid, err := me.ValidateName(lowerName)
+	if !valid {
+		return nil, err
 	}
-	return id, nil
+
+	ctx := context.Background()
+	tx, err := me.Db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		err = tx.Rollback()
+	}()
+
+	stmt, err := tx.Prepare(sqlInsertUser)
+	if err != nil {
+		return nil, err
+	}
+	defer stmt.Close()
+
+	var id string
+	err = stmt.QueryRow(lowerName).Scan(&id)
+	if err != nil {
+		return nil, err
+	}
+
+	err = me.LinkUserKey(id, pubkey, tx)
+	if err != nil {
+		return nil, err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return nil, err
+	}
+
+	return me.FindUserForKey(username, pubkey)
 }
 
 func (me *PsqlDB) RemoveUsers(userIDs []string) error {
@@ -378,12 +410,17 @@ func (me *PsqlDB) RemoveUsers(userIDs []string) error {
 	return err
 }
 
-func (me *PsqlDB) LinkUserKey(userID string, key string) error {
+func (me *PsqlDB) LinkUserKey(userID string, key string, tx *sql.Tx) error {
 	pk, _ := me.FindPublicKeyForKey(key)
 	if pk != nil {
 		return db.ErrPublicKeyTaken
 	}
-	_, err := me.Db.Exec(sqlInsertPublicKey, userID, key)
+	var err error
+	if tx != nil {
+		_, err = tx.Exec(sqlInsertPublicKey, userID, key)
+	} else {
+		_, err = me.Db.Exec(sqlInsertPublicKey, userID, key)
+	}
 	return err
 }
 
@@ -556,7 +593,7 @@ func (me *PsqlDB) FindUser(userID string) (*db.User, error) {
 func (me *PsqlDB) ValidateName(name string) (bool, error) {
 	lower := strings.ToLower(name)
 	if slices.Contains(db.DenyList, lower) {
-		return false, fmt.Errorf("%s is invalid: %w", lower, db.ErrNameDenied)
+		return false, fmt.Errorf("%s is on deny list: %w", lower, db.ErrNameDenied)
 	}
 	v := db.NameValidator.MatchString(lower)
 	if !v {
@@ -566,7 +603,7 @@ func (me *PsqlDB) ValidateName(name string) (bool, error) {
 	if user == nil {
 		return true, nil
 	}
-	return false, fmt.Errorf("%s is invalid: %w", lower, db.ErrNameTaken)
+	return false, fmt.Errorf("%s already taken: %w", lower, db.ErrNameTaken)
 }
 
 func (me *PsqlDB) FindUserForName(name string) (*db.User, error) {

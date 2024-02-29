@@ -17,24 +17,21 @@ import (
 	"github.com/picosh/pico/wish/cms/ui/common"
 )
 
-var re = lipgloss.NewRenderer(os.Stdout)
-var baseStyle = re.NewStyle().Padding(0, 1)
-var headerStyle = baseStyle.Copy().Foreground(common.Indigo).Bold(true)
-var borderStyle = re.NewStyle().Foreground(lipgloss.Color("238"))
+func styleRows(styles common.Styles) func(row, col int) lipgloss.Style {
+	return func(row, col int) lipgloss.Style {
+		if row == 0 {
+			return styles.CliHeader
+		}
 
-func styleRows(row, col int) lipgloss.Style {
-	if row == 0 {
-		return headerStyle
+		even := row%2 == 0
+		if even {
+			return styles.CliPadding.Copy().Foreground(lipgloss.Color("245"))
+		}
+		return styles.CliPadding.Copy().Foreground(lipgloss.Color("252"))
 	}
-
-	even := row%2 == 0
-	if even {
-		return baseStyle.Copy().Foreground(lipgloss.Color("245"))
-	}
-	return baseStyle.Copy().Foreground(lipgloss.Color("252"))
 }
 
-func projectTable(projects []*db.Project) *table.Table {
+func projectTable(styles common.Styles, projects []*db.Project) *table.Table {
 	headers := []string{
 		"Name",
 		"Last Updated",
@@ -62,16 +59,16 @@ func projectTable(projects []*db.Project) *table.Table {
 
 	t := table.New().
 		Border(lipgloss.NormalBorder()).
-		BorderStyle(borderStyle).
+		BorderStyle(styles.CliBorder).
 		Headers(headers...).
 		Rows(data...).
-		StyleFunc(styleRows)
+		StyleFunc(styleRows(styles))
 	return t
 }
 
-func getHelpText(userName string) string {
+func getHelpText(styles common.Styles, userName string) string {
 	helpStr := "Commands: [help, stats, ls, rm, link, unlink, prune, retain, depends, acl]\n\n"
-	helpStr += "NOTICE: *must* append with `--write` for the changes to persist.\n\n"
+	helpStr += styles.Note.Render("NOTICE:") + " *must* append with `--write` for the changes to persist.\n\n"
 
 	projectName := "projA"
 	headers := []string{"Cmd", "Description"}
@@ -120,10 +117,10 @@ func getHelpText(userName string) string {
 
 	t := table.New().
 		Border(lipgloss.NormalBorder()).
-		BorderStyle(borderStyle).
+		BorderStyle(styles.CliBorder).
 		Headers(headers...).
 		Rows(data...).
-		StyleFunc(styleRows)
+		StyleFunc(styleRows(styles))
 
 	helpStr += t.String()
 	return helpStr
@@ -165,6 +162,7 @@ type Cmd struct {
 	Store   storage.StorageServe
 	Dbpool  db.DB
 	Write   bool
+	Styles  common.Styles
 }
 
 func (c *Cmd) output(out string) {
@@ -236,7 +234,7 @@ func (c *Cmd) RmProjectAssets(projectName string) error {
 }
 
 func (c *Cmd) help() {
-	c.output(getHelpText(c.User.Name))
+	c.output(getHelpText(c.Styles, c.User.Name))
 }
 
 func (c *Cmd) stats(cfgMaxSize uint64) error {
@@ -274,10 +272,10 @@ func (c *Cmd) stats(cfgMaxSize uint64) error {
 
 	t := table.New().
 		Border(lipgloss.NormalBorder()).
-		BorderStyle(borderStyle).
+		BorderStyle(c.Styles.CliBorder).
 		Headers(headers...).
 		Rows(data).
-		StyleFunc(styleRows)
+		StyleFunc(styleRows(c.Styles))
 	c.output(t.String())
 
 	return nil
@@ -293,7 +291,7 @@ func (c *Cmd) ls() error {
 		c.output("no projects found")
 	}
 
-	t := projectTable(projects)
+	t := projectTable(c.Styles, projects)
 	c.output(t.String())
 
 	return nil
@@ -379,7 +377,7 @@ func (c *Cmd) depends(projectName string) error {
 		return nil
 	}
 
-	t := projectTable(projects)
+	t := projectTable(c.Styles, projects)
 	c.output(t.String())
 
 	return nil

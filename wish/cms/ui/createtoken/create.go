@@ -89,13 +89,11 @@ func (m *Model) indexBackward() {
 }
 
 // NewModel returns a new username model in its initial state.
-func NewModel(cfg *config.ConfigCms, dbpool db.DB, user *db.User) Model {
-	st := common.DefaultStyles()
-
+func NewModel(styles common.Styles, cfg *config.ConfigCms, dbpool db.DB, user *db.User) Model {
 	im := input.New()
-	im.Cursor.Style = st.Cursor
+	im.Cursor.Style = styles.Cursor
 	im.Placeholder = "A name used for your reference"
-	im.Prompt = st.FocusedPrompt.String()
+	im.Prompt = styles.FocusedPrompt.String()
 	im.CharLimit = 256
 	im.Focus()
 
@@ -104,14 +102,14 @@ func NewModel(cfg *config.ConfigCms, dbpool db.DB, user *db.User) Model {
 		Quit:      false,
 		dbpool:    dbpool,
 		user:      user,
-		styles:    st,
+		styles:    styles,
 		state:     ready,
 		tokenName: "",
 		token:     "",
 		index:     textInput,
 		errMsg:    "",
 		input:     im,
-		spinner:   common.NewSpinner(),
+		spinner:   common.NewSpinner(styles),
 	}
 }
 
@@ -232,10 +230,10 @@ func (m Model) View() string {
 	} else if m.state == submitted {
 		s = fmt.Sprintf("Save this token:\n%s\n\n", m.token)
 		s += "After you exit this screen you will *not* be able to see it again.\n\n"
-		s += common.OKButtonView(m.index == 1, true)
+		s += common.OKButtonView(m.styles, m.index == 1, true)
 	} else {
-		s += common.OKButtonView(m.index == 1, true)
-		s += " " + common.CancelButtonView(m.index == 2, false)
+		s += common.OKButtonView(m.styles, m.index == 1, true)
+		s += " " + common.CancelButtonView(m.styles, m.index == 2, false)
 		if m.errMsg != "" {
 			s += "\n\n" + m.errMsg
 		}

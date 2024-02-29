@@ -41,6 +41,9 @@ type errMsg struct{ err error }
 
 func (e errMsg) Error() string { return e.err.Error() }
 
+var deny = strings.Join(db.DenyList, ", ")
+var helpMsg = fmt.Sprintf("Names can only contain plain letters and numbers and must be less than 50 characters. No emjois. No names from deny list: %s", deny)
+
 // Model holds the state of the username UI.
 type CreateModel struct {
 	Done bool // true when it's time to exit this view
@@ -91,13 +94,11 @@ func (m *CreateModel) indexBackward() {
 }
 
 // NewModel returns a new username model in its initial state.
-func NewCreateModel(cfg *config.ConfigCms, dbpool db.DB, publicKey string) CreateModel {
-	st := common.DefaultStyles()
-
+func NewCreateModel(styles common.Styles, cfg *config.ConfigCms, dbpool db.DB, publicKey string) CreateModel {
 	im := input.New()
-	im.Cursor.Style = st.Cursor
-	im.Placeholder = "erock"
-	im.Prompt = st.FocusedPrompt.String()
+	im.Cursor.Style = styles.Cursor
+	im.Placeholder = "enter username"
+	im.Prompt = styles.FocusedPrompt.String()
 	im.CharLimit = 50
 	im.Focus()
 
@@ -106,21 +107,21 @@ func NewCreateModel(cfg *config.ConfigCms, dbpool db.DB, publicKey string) Creat
 		Done:      false,
 		Quit:      false,
 		dbpool:    dbpool,
-		styles:    st,
+		styles:    styles,
 		state:     ready,
 		newName:   "",
 		index:     textInput,
 		errMsg:    "",
 		input:     im,
-		spinner:   common.NewSpinner(),
+		spinner:   common.NewSpinner(styles),
 		publicKey: publicKey,
 	}
 }
 
 // Init is the Bubble Tea initialization function.
-func Init(cfg *config.ConfigCms, dbpool db.DB, publicKey string) func() (CreateModel, tea.Cmd) {
+func Init(styles common.Styles, cfg *config.ConfigCms, dbpool db.DB, publicKey string) func() (CreateModel, tea.Cmd) {
 	return func() (CreateModel, tea.Cmd) {
-		m := NewCreateModel(cfg, dbpool, publicKey)
+		m := NewCreateModel(styles, cfg, dbpool, publicKey)
 		return m, InitialCmd()
 	}
 }
@@ -207,8 +208,6 @@ func Update(msg tea.Msg, m CreateModel) (CreateModel, tea.Cmd) {
 	case NameInvalidMsg:
 		m.state = ready
 		head := m.styles.Error.Render("Invalid name. ")
-		deny := strings.Join(db.DenyList, ", ")
-		helpMsg := fmt.Sprintf("Names can only contain plain letters and numbers and must be less than 50 characters. No emjois. No names from deny list: %s", deny)
 		body := m.styles.Subtle.Render(helpMsg)
 		m.errMsg = m.styles.Wrap.Render(head + body)
 
@@ -242,19 +241,20 @@ func View(m CreateModel) string {
 		return "Registration is closed for this service.  Press 'esc' to exit."
 	}
 
-	s := fmt.Sprintf("%s\n\n%s\n\n", m.cfg.Description, m.cfg.IntroText)
-	s += "Enter a username\n\n"
+	s := fmt.Sprintf("%s\n\n%s\n", "hacker labs", m.cfg.IntroText)
+	s += fmt.Sprintf("Public Key: %s\n\n", m.publicKey)
 	s += m.input.View() + "\n\n"
 
 	if m.state == submitting {
 		s += spinnerView(m)
 	} else {
-		s += common.OKButtonView(m.index == 1, true)
-		s += " " + common.CancelButtonView(m.index == 2, false)
+		s += common.OKButtonView(m.styles, m.index == 1, true)
+		s += " " + common.CancelButtonView(m.styles, m.index == 2, false)
 		if m.errMsg != "" {
 			s += "\n\n" + m.errMsg
 		}
 	}
+	s += fmt.Sprintf("\n\n%s\n", helpMsg)
 
 	return s
 }
@@ -263,57 +263,24 @@ func spinnerView(m CreateModel) string {
 	return m.spinner.View() + " Creating account..."
 }
 
-func registerUser(m CreateModel) (*db.User, error) {
-	userID, err := m.dbpool.AddUser()
-	if err != nil {
-		return nil, err
-	}
-
-	err = m.dbpool.LinkUserKey(userID, m.publicKey)
-	if err != nil {
-		return nil, err
-	}
-
-	user, err := m.dbpool.FindUser(userID)
-	if err != nil {
-		return nil, err
-	}
-
-	return user, nil
-
-}
-
-// Attempt to update the username on the server.
 func createAccount(m CreateModel) tea.Cmd {
 	return func() tea.Msg {
 		if m.newName == "" {
 			return NameInvalidMsg{}
 		}
 
-		valid, err := m.dbpool.ValidateName(m.newName)
-		// Validate before resetting the session to potentially save some
-		// network traffic and keep things feeling speedy.
-		if !valid {
+		user, err := m.dbpool.RegisterUser(m.newName, m.publicKey)
+		fmt.Println(err)
+		if err != nil {
 			if errors.Is(err, db.ErrNameTaken) {
 				return NameTakenMsg{}
-			} else {
+			} else if errors.Is(err, db.ErrNameInvalid) {
 				return NameInvalidMsg{}
+			} else if errors.Is(err, db.ErrNameDenied) {
+				return NameInvalidMsg{}
+			} else {
+				return errMsg{err}
 			}
-		}
-
-		user, err := registerUser(m)
-		if err != nil {
-			return errMsg{err}
-		}
-
-		err = m.dbpool.SetUserName(user.ID, m.newName)
-		if err != nil {
-			return errMsg{err}
-		}
-
-		user, err = m.dbpool.FindUserForKey(m.newName, m.publicKey)
-		if err != nil {
-			return errMsg{err}
 		}
 
 		return CreateAccountMsg(user)

@@ -28,30 +28,15 @@ var lineColors = map[State]lipgloss.TerminalColor{
 }
 
 // VerticalLine return a vertical line colored according to the given state.
-func VerticalLine(state State) string {
-	return lipgloss.NewStyle().
+func VerticalLine(renderer *lipgloss.Renderer, state State) string {
+	return renderer.NewStyle().
 		SetString("│").
 		Foreground(lineColors[state]).
 		String()
 }
 
-var valStyle = lipgloss.NewStyle().Foreground(Indigo)
-
-var (
-	spinnerStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.AdaptiveColor{Light: "#8E8E8E", Dark: "#747373"})
-
-	blurredButtonStyle = lipgloss.NewStyle().
-				Foreground(Cream).
-				Background(lipgloss.AdaptiveColor{Light: "#BDB0BE", Dark: "#827983"}).
-				Padding(0, 3)
-
-	focusedButtonStyle = blurredButtonStyle.Copy().
-				Background(Fuschia)
-)
-
 // KeyValueView renders key-value pairs.
-func KeyValueView(stuff ...string) string {
+func KeyValueView(styles Styles, stuff ...string) string {
 	if len(stuff) == 0 {
 		return ""
 	}
@@ -63,11 +48,11 @@ func KeyValueView(stuff ...string) string {
 	for i := 0; i < len(stuff); i++ {
 		if i%2 == 0 {
 			// even: key
-			s += fmt.Sprintf("%s %s: ", VerticalLine(StateNormal), stuff[i])
+			s += fmt.Sprintf("%s %s: ", VerticalLine(styles.Renderer, StateNormal), stuff[i])
 			continue
 		}
 		// odd: value
-		s += valStyle.Render(stuff[i])
+		s += styles.LabelDim.Render(stuff[i])
 		s += "\n"
 		index++
 	}
@@ -76,7 +61,10 @@ func KeyValueView(stuff ...string) string {
 }
 
 // NewSpinner returns a spinner model.
-func NewSpinner() spinner.Model {
+func NewSpinner(styles Styles) spinner.Model {
+	spinnerStyle := styles.Renderer.NewStyle().
+		Foreground(lipgloss.AdaptiveColor{Light: "#8E8E8E", Dark: "#747373"})
+
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = spinnerStyle
@@ -84,21 +72,21 @@ func NewSpinner() spinner.Model {
 }
 
 // OKButtonView returns a button reading "OK".
-func OKButtonView(focused bool, defaultButton bool) string {
-	return styledButton("OK", defaultButton, focused)
+func OKButtonView(styles Styles, focused bool, defaultButton bool) string {
+	return styledButton(styles, "OK", defaultButton, focused)
 }
 
 // CancelButtonView returns a button reading "Cancel.".
-func CancelButtonView(focused bool, defaultButton bool) string {
-	return styledButton("Cancel", defaultButton, focused)
+func CancelButtonView(styles Styles, focused bool, defaultButton bool) string {
+	return styledButton(styles, "Cancel", defaultButton, focused)
 }
 
-func styledButton(str string, underlined, focused bool) string {
+func styledButton(styles Styles, str string, underlined, focused bool) string {
 	var st lipgloss.Style
 	if focused {
-		st = focusedButtonStyle.Copy()
+		st = styles.FocusedButtonStyle.Copy()
 	} else {
-		st = blurredButtonStyle.Copy()
+		st = styles.BlurredButtonStyle.Copy()
 	}
 	if underlined {
 		st = st.Underline(true)
@@ -106,28 +94,18 @@ func styledButton(str string, underlined, focused bool) string {
 	return st.Render(str)
 }
 
-var (
-	helpDivider = lipgloss.NewStyle().
-			Foreground(lipgloss.AdaptiveColor{Light: "#DDDADA", Dark: "#3C3C3C"}).
-			Padding(0, 1).
-			Render("•")
-
-	helpSection = lipgloss.NewStyle().
-			Foreground(lipgloss.AdaptiveColor{Light: "#9B9B9B", Dark: "#5C5C5C"})
-)
-
 // HelpView renders text intended to display at help text, often at the
 // bottom of a view.
-func HelpView(sections ...string) string {
+func HelpView(styles Styles, sections ...string) string {
 	var s string
 	if len(sections) == 0 {
 		return s
 	}
 
 	for i := 0; i < len(sections); i++ {
-		s += helpSection.Render(sections[i])
+		s += styles.HelpSection.Render(sections[i])
 		if i < len(sections)-1 {
-			s += helpDivider
+			s += styles.HelpDivider.Render()
 		}
 	}
 

@@ -1,6 +1,7 @@
 package db
 
 import (
+	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
@@ -255,19 +256,19 @@ var DenyList = []string{
 }
 
 type DB interface {
-	AddUser() (string, error)
+	RegisterUser(name, pubkey string) (*User, error)
 	RemoveUsers(userIDs []string) error
-	LinkUserKey(userID string, key string) error
-	FindPublicKeyForKey(key string) (*PublicKey, error)
+	LinkUserKey(userID string, pubkey string, tx *sql.Tx) error
+	FindPublicKeyForKey(pubkey string) (*PublicKey, error)
 	FindKeysForUser(user *User) ([]*PublicKey, error)
-	RemoveKeys(keyIDs []string) error
+	RemoveKeys(pubkeyIDs []string) error
 
 	FindSiteAnalytics(space string) (*Analytics, error)
 
 	FindUsers() ([]*User, error)
 	FindUserForName(name string) (*User, error)
-	FindUserForNameAndKey(name string, key string) (*User, error)
-	FindUserForKey(name string, key string) (*User, error)
+	FindUserForNameAndKey(name string, pubkey string) (*User, error)
+	FindUserForKey(name string, pubkey string) (*User, error)
 	FindUser(userID string) (*User, error)
 	ValidateName(name string) (bool, error)
 	SetUserName(userID string, name string) error

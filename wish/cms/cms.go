@@ -24,7 +24,6 @@ import (
 	"github.com/picosh/pico/wish/cms/ui/keys"
 	"github.com/picosh/pico/wish/cms/ui/posts"
 	"github.com/picosh/pico/wish/cms/ui/tokens"
-	"github.com/picosh/pico/wish/cms/ui/username"
 )
 
 type status int
@@ -70,15 +69,10 @@ var menuChoices = map[menuChoice]string{
 	exitChoice:   "Exit",
 }
 
-var (
-	spinnerStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.AdaptiveColor{Light: "#8E8E8E", Dark: "#747373"})
-)
-
-func NewSpinner() spinner.Model {
+func NewSpinner(styles common.Styles) spinner.Model {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
-	s.Style = spinnerStyle
+	s.Style = styles.Spinner
 	return s
 }
 
@@ -113,6 +107,10 @@ func Middleware(cfg *config.ConfigCms, urls config.ConfigURL) bm.Handler {
 			logger.Error(err.Error())
 		}
 
+		renderer := lipgloss.NewRenderer(s)
+		renderer.SetOutput(common.OutputFromSession(s))
+		styles := common.DefaultStyles(renderer)
+
 		m := model{
 			cfg:        cfg,
 			urls:       urls,
@@ -122,8 +120,8 @@ func Middleware(cfg *config.ConfigCms, urls config.ConfigURL) bm.Handler {
 			sshUser:    sshUser,
 			status:     statusInit,
 			menuChoice: unsetChoice,
-			styles:     common.DefaultStyles(),
-			spinner:    common.NewSpinner(),
+			styles:     styles,
+			spinner:    common.NewSpinner(styles),
 			terminalSize: tea.WindowSizeMsg{
 				Width:  80,
 				Height: 24,
@@ -137,32 +135,35 @@ func Middleware(cfg *config.ConfigCms, urls config.ConfigURL) bm.Handler {
 		}
 		m.user = user
 
+		ff, _ := m.findPlusFeatureFlag()
+		m.plusFeatureFlag = ff
+
 		return m, []tea.ProgramOption{tea.WithAltScreen()}
 	}
 }
 
 // Just a generic tea.Model to demo terminal information of ssh.
 type model struct {
-	cfg           *config.ConfigCms
-	urls          config.ConfigURL
-	publicKey     string
-	dbpool        db.DB
-	st            storage.StorageServe
-	user          *db.User
-	err           error
-	sshUser       string
-	status        status
-	menuIndex     int
-	menuChoice    menuChoice
-	terminalSize  tea.WindowSizeMsg
-	styles        common.Styles
-	info          info.Model
-	spinner       spinner.Model
-	username      username.Model
-	posts         posts.Model
-	keys          keys.Model
-	tokens        tokens.Model
-	createAccount account.CreateModel
+	cfg             *config.ConfigCms
+	urls            config.ConfigURL
+	publicKey       string
+	dbpool          db.DB
+	st              storage.StorageServe
+	user            *db.User
+	plusFeatureFlag *db.FeatureFlag
+	err             error
+	sshUser         string
+	status          status
+	menuIndex       int
+	menuChoice      menuChoice
+	terminalSize    tea.WindowSizeMsg
+	styles          common.Styles
+	info            info.Model
+	spinner         spinner.Model
+	posts           posts.Model
+	keys            keys.Model
+	tokens          tokens.Model
+	createAccount   account.CreateModel
 }
 
 func (m model) Init() tea.Cmd {
@@ -190,6 +191,19 @@ func (m model) findUser() (*db.User, error) {
 	}
 
 	return user, nil
+}
+
+func (m model) findPlusFeatureFlag() (*db.FeatureFlag, error) {
+	if m.user == nil {
+		return nil, nil
+	}
+
+	ff, err := m.dbpool.FindFeatureForUser(m.user.ID, "pgs")
+	if err != nil {
+		return nil, err
+	}
+
+	return ff, nil
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -235,32 +249,26 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		}
-	case username.NameSetMsg:
-		m.status = statusReady
-		m.info.User.Name = string(msg)
-		m.user = m.info.User
-		m.username = username.NewModel(m.dbpool, m.user, m.sshUser) // reset the state
+
 	case account.CreateAccountMsg:
 		m.status = statusReady
 		m.info.User = msg
 		m.user = msg
-		m.username = username.NewModel(m.dbpool, m.user, m.sshUser)
-		m.info = info.NewModel(m.cfg, m.urls, m.user)
-		m.keys = keys.NewModel(m.cfg, m.dbpool, m.user)
-		m.tokens = tokens.NewModel(m.cfg, m.dbpool, m.user)
-		m.createAccount = account.NewCreateModel(m.cfg, m.dbpool, m.publicKey)
+		m.info = info.NewModel(m.styles, m.cfg, m.urls, m.user, m.plusFeatureFlag)
+		m.keys = keys.NewModel(m.styles, m.cfg, m.dbpool, m.user)
+		m.tokens = tokens.NewModel(m.styles, m.cfg, m.dbpool, m.user)
+		m.createAccount = account.NewCreateModel(m.styles, m.cfg, m.dbpool, m.publicKey)
 
 		perPage := math.Floor(float64(m.terminalSize.Height) / 10.0)
-		m.posts = posts.NewModel(m.cfg, m.urls, m.dbpool, m.user, m.st, int(perPage))
+		m.posts = posts.NewModel(m.styles, m.cfg, m.urls, m.dbpool, m.user, m.st, int(perPage))
 	}
 
 	switch m.status {
 	case statusInit:
-		m.username = username.NewModel(m.dbpool, m.user, m.sshUser)
-		m.info = info.NewModel(m.cfg, m.urls, m.user)
-		m.keys = keys.NewModel(m.cfg, m.dbpool, m.user)
-		m.tokens = tokens.NewModel(m.cfg, m.dbpool, m.user)
-		m.createAccount = account.NewCreateModel(m.cfg, m.dbpool, m.publicKey)
+		m.info = info.NewModel(m.styles, m.cfg, m.urls, m.user, m.plusFeatureFlag)
+		m.keys = keys.NewModel(m.styles, m.cfg, m.dbpool, m.user)
+		m.tokens = tokens.NewModel(m.styles, m.cfg, m.dbpool, m.user)
+		m.createAccount = account.NewCreateModel(m.styles, m.cfg, m.dbpool, m.publicKey)
 		if m.user == nil {
 			m.status = statusNoAccount
 		} else {
@@ -268,7 +276,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		perPage := math.Floor(float64(m.terminalSize.Height) / 10.0)
-		m.posts = posts.NewModel(m.cfg, m.urls, m.dbpool, m.user, m.st, int(perPage))
+		m.posts = posts.NewModel(m.styles, m.cfg, m.urls, m.dbpool, m.user, m.st, int(perPage))
 	}
 
 	m, cmd = updateChildren(msg, m)
@@ -294,9 +302,9 @@ func updateChildren(msg tea.Msg, m model) (model, tea.Cmd) {
 
 		if m.posts.Exit {
 			perPage := math.Floor(float64(m.terminalSize.Height) / 10.0)
-			m.posts = posts.NewModel(m.cfg, m.urls, m.dbpool, m.user, m.st, int(perPage))
+			m.posts = posts.NewModel(m.styles, m.cfg, m.urls, m.dbpool, m.user, m.st, int(perPage))
 
-			m.posts = posts.NewModel(m.cfg, m.urls, m.dbpool, m.user, m.st, int(perPage))
+			m.posts = posts.NewModel(m.styles, m.cfg, m.urls, m.dbpool, m.user, m.st, int(perPage))
 			m.status = statusReady
 		} else if m.posts.Quit {
 			m.status = statusQuitting
@@ -312,7 +320,7 @@ func updateChildren(msg tea.Msg, m model) (model, tea.Cmd) {
 		cmd = newCmd
 
 		if m.keys.Exit {
-			m.keys = keys.NewModel(m.cfg, m.dbpool, m.user)
+			m.keys = keys.NewModel(m.styles, m.cfg, m.dbpool, m.user)
 			m.status = statusReady
 		} else if m.keys.Quit {
 			m.status = statusQuitting
@@ -328,7 +336,7 @@ func updateChildren(msg tea.Msg, m model) (model, tea.Cmd) {
 		cmd = newCmd
 
 		if m.tokens.Exit {
-			m.tokens = tokens.NewModel(m.cfg, m.dbpool, m.user)
+			m.tokens = tokens.NewModel(m.styles, m.cfg, m.dbpool, m.user)
 			m.status = statusReady
 		} else if m.tokens.Quit {
 			m.status = statusQuitting
@@ -337,7 +345,7 @@ func updateChildren(msg tea.Msg, m model) (model, tea.Cmd) {
 	case statusNoAccount:
 		m.createAccount, cmd = account.Update(msg, m.createAccount)
 		if m.createAccount.Done {
-			m.createAccount = account.NewCreateModel(m.cfg, m.dbpool, m.publicKey) // reset the state
+			m.createAccount = account.NewCreateModel(m.styles, m.cfg, m.dbpool, m.publicKey) // reset the state
 			m.status = statusReady
 		} else if m.createAccount.Quit {
 			m.status = statusQuitting
@@ -392,7 +400,7 @@ func footerView(m model) string {
 	if m.err != nil {
 		return m.errorView(m.err)
 	}
-	return "\n\n" + common.HelpView("j/k, ↑/↓: choose", "enter: select")
+	return "\n\n" + common.HelpView(m.styles, "j/k, ↑/↓: choose", "enter: select")
 }
 
 func (m model) errorView(err error) string {

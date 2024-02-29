@@ -6,11 +6,13 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
 	"github.com/picosh/pico/db"
 	uploadassets "github.com/picosh/pico/filehandlers/assets"
 	"github.com/picosh/pico/shared"
+	"github.com/picosh/pico/wish/cms/ui/common"
 	"github.com/picosh/send/send/utils"
 )
 
@@ -83,6 +85,11 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 
 			args := sesh.Command()
 
+			renderer := lipgloss.NewRenderer(sesh)
+			// this might be dangerous but going with it for now
+			// renderer.SetColorProfile(termenv.ANSI256)
+			styles := common.DefaultStyles(renderer)
+
 			opts := Cmd{
 				Session: sesh,
 				User:    user,
@@ -90,6 +97,7 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 				Log:     log,
 				Dbpool:  dbpool,
 				Write:   false,
+				Styles:  styles,
 			}
 
 			cmd := strings.TrimSpace(args[0])
