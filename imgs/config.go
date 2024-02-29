@@ -42,7 +42,7 @@ func NewConfigSite() *shared.ConfigSite {
 			Description:   "An image hosting service for hackers.",
 			IntroText:     intro,
 			Space:         "imgs",
-			AllowedExt:    []string{".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"},
+			AllowedExt:    []string{".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".ico"},
 			Logger:        shared.CreateLogger(debug == "1"),
 			AllowRegister: allowRegister == "1",
 		},

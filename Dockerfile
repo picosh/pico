@@ -46,8 +46,6 @@ FROM scratch as release-ssh
 
 WORKDIR /app
 
-ENV TERM screen-256color
-
 ARG APP=prose
 
 COPY --from=builder-ssh /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
