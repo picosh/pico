@@ -18,22 +18,24 @@ func (e errMsg) Error() string {
 
 // Model stores the state of the info user interface.
 type Model struct {
-	cfg    *config.ConfigCms
-	urls   config.ConfigURL
-	Quit   bool // signals it's time to exit the whole application
-	Err    error
-	User   *db.User
-	styles common.Styles
+	cfg             *config.ConfigCms
+	urls            config.ConfigURL
+	Quit            bool // signals it's time to exit the whole application
+	Err             error
+	User            *db.User
+	PlusFeatureFlag *db.FeatureFlag
+	styles          common.Styles
 }
 
 // NewModel returns a new Model in its initial state.
-func NewModel(cfg *config.ConfigCms, urls config.ConfigURL, user *db.User) Model {
+func NewModel(cfg *config.ConfigCms, urls config.ConfigURL, user *db.User, ff *db.FeatureFlag) Model {
 	return Model{
-		Quit:   false,
-		User:   user,
-		styles: common.DefaultStyles(),
-		cfg:    cfg,
-		urls:   urls,
+		Quit:            false,
+		User:            user,
+		styles:          common.DefaultStyles(),
+		cfg:             cfg,
+		urls:            urls,
+		PlusFeatureFlag: ff,
 	}
 }
 
@@ -76,8 +78,22 @@ func (m Model) bioView() string {
 		username = m.styles.Subtle.Render("(none set)")
 	}
 
-	return common.KeyValueView(
+	plus := "No"
+	expires := ""
+	if m.PlusFeatureFlag != nil {
+		plus = "Yes"
+		expires = m.PlusFeatureFlag.ExpiresAt.Format("02 Jan 2006")
+	}
+
+	vals := []string{
 		"Username", username,
 		"Joined", m.User.CreatedAt.Format("02 Jan 2006"),
-	)
+		"Pico+", plus,
+	}
+
+	if expires != "" {
+		vals = append(vals, "Pico+ Expires At", expires)
+	}
+
+	return common.KeyValueView(vals...)
 }

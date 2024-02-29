@@ -130,30 +130,34 @@ func CmsMiddleware(cfg *config.ConfigCms, urls config.ConfigURL) bm.Handler {
 		}
 		m.user = user
 
+		ff, _ := m.findPlusFeatureFlag()
+		m.plusFeatureFlag = ff
+
 		return m, []tea.ProgramOption{tea.WithAltScreen()}
 	}
 }
 
 // Just a generic tea.Model to demo terminal information of ssh.
 type model struct {
-	cfg           *config.ConfigCms
-	urls          config.ConfigURL
-	publicKey     string
-	dbpool        db.DB
-	st            storage.StorageServe
-	user          *db.User
-	err           error
-	sshUser       string
-	status        status
-	menuIndex     int
-	menuChoice    menuChoice
-	styles        common.Styles
-	info          info.Model
-	spinner       spinner.Model
-	keys          keys.Model
-	tokens        tokens.Model
-	createAccount account.CreateModel
-	terminalSize  tea.WindowSizeMsg
+	cfg             *config.ConfigCms
+	urls            config.ConfigURL
+	publicKey       string
+	dbpool          db.DB
+	st              storage.StorageServe
+	user            *db.User
+	plusFeatureFlag *db.FeatureFlag
+	err             error
+	sshUser         string
+	status          status
+	menuIndex       int
+	menuChoice      menuChoice
+	styles          common.Styles
+	info            info.Model
+	spinner         spinner.Model
+	keys            keys.Model
+	tokens          tokens.Model
+	createAccount   account.CreateModel
+	terminalSize    tea.WindowSizeMsg
 }
 
 func (m model) Init() tea.Cmd {
@@ -172,7 +176,7 @@ func (m model) findUser() (*db.User, error) {
 	user, err := m.dbpool.FindUserForKey(m.sshUser, m.publicKey)
 
 	if err != nil {
-		logger.Error(err.Error())
+		logger.Error("no user found for public key", "err", err.Error())
 		// we only want to throw an error for specific cases
 		if errors.Is(err, &db.ErrMultiplePublicKeys{}) {
 			return nil, err
@@ -181,6 +185,15 @@ func (m model) findUser() (*db.User, error) {
 	}
 
 	return user, nil
+}
+
+func (m model) findPlusFeatureFlag() (*db.FeatureFlag, error) {
+	ff, err := m.dbpool.FindFeatureForUser(m.user.ID, "pgs")
+	if err != nil {
+		return nil, err
+	}
+
+	return ff, nil
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -230,7 +243,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.status = statusReady
 		m.info.User = msg
 		m.user = msg
-		m.info = info.NewModel(m.cfg, m.urls, m.user)
+		m.info = info.NewModel(m.cfg, m.urls, m.user, m.plusFeatureFlag)
 		m.keys = keys.NewModel(m.cfg, m.dbpool, m.user)
 		m.tokens = tokens.NewModel(m.cfg, m.dbpool, m.user)
 		m.createAccount = account.NewCreateModel(m.cfg, m.dbpool, m.publicKey)
@@ -238,7 +251,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch m.status {
 	case statusInit:
-		m.info = info.NewModel(m.cfg, m.urls, m.user)
+		m.info = info.NewModel(m.cfg, m.urls, m.user, m.plusFeatureFlag)
 		m.keys = keys.NewModel(m.cfg, m.dbpool, m.user)
 		m.tokens = tokens.NewModel(m.cfg, m.dbpool, m.user)
 		m.createAccount = account.NewCreateModel(m.cfg, m.dbpool, m.publicKey)
