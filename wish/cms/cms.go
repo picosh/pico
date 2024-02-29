@@ -24,7 +24,6 @@ import (
 	"github.com/picosh/pico/wish/cms/ui/keys"
 	"github.com/picosh/pico/wish/cms/ui/posts"
 	"github.com/picosh/pico/wish/cms/ui/tokens"
-	"github.com/picosh/pico/wish/cms/ui/username"
 )
 
 type status int
@@ -158,7 +157,6 @@ type model struct {
 	styles        common.Styles
 	info          info.Model
 	spinner       spinner.Model
-	username      username.Model
 	posts         posts.Model
 	keys          keys.Model
 	tokens        tokens.Model
@@ -235,16 +233,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		}
-	case username.NameSetMsg:
-		m.status = statusReady
-		m.info.User.Name = string(msg)
-		m.user = m.info.User
-		m.username = username.NewModel(m.dbpool, m.user, m.sshUser) // reset the state
+
 	case account.CreateAccountMsg:
 		m.status = statusReady
 		m.info.User = msg
 		m.user = msg
-		m.username = username.NewModel(m.dbpool, m.user, m.sshUser)
 		m.info = info.NewModel(m.cfg, m.urls, m.user)
 		m.keys = keys.NewModel(m.cfg, m.dbpool, m.user)
 		m.tokens = tokens.NewModel(m.cfg, m.dbpool, m.user)
@@ -256,7 +249,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch m.status {
 	case statusInit:
-		m.username = username.NewModel(m.dbpool, m.user, m.sshUser)
 		m.info = info.NewModel(m.cfg, m.urls, m.user)
 		m.keys = keys.NewModel(m.cfg, m.dbpool, m.user)
 		m.tokens = tokens.NewModel(m.cfg, m.dbpool, m.user)

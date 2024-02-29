@@ -242,7 +242,7 @@ func View(m CreateModel) string {
 		return "Registration is closed for this service.  Press 'esc' to exit."
 	}
 
-	s := fmt.Sprintf("%s\n\n%s\n\n", m.cfg.Description, m.cfg.IntroText)
+	s := fmt.Sprintf("%s\n\n%s\n\n", "hacker labs", m.cfg.IntroText)
 	s += "Enter a username\n\n"
 	s += m.input.View() + "\n\n"
 
@@ -263,57 +263,24 @@ func spinnerView(m CreateModel) string {
 	return m.spinner.View() + " Creating account..."
 }
 
-func registerUser(m CreateModel) (*db.User, error) {
-	userID, err := m.dbpool.AddUser()
-	if err != nil {
-		return nil, err
-	}
-
-	err = m.dbpool.LinkUserKey(userID, m.publicKey)
-	if err != nil {
-		return nil, err
-	}
-
-	user, err := m.dbpool.FindUser(userID)
-	if err != nil {
-		return nil, err
-	}
-
-	return user, nil
-
-}
-
-// Attempt to update the username on the server.
 func createAccount(m CreateModel) tea.Cmd {
 	return func() tea.Msg {
 		if m.newName == "" {
 			return NameInvalidMsg{}
 		}
 
-		valid, err := m.dbpool.ValidateName(m.newName)
-		// Validate before resetting the session to potentially save some
-		// network traffic and keep things feeling speedy.
-		if !valid {
+		user, err := m.dbpool.RegisterUser(m.newName, m.publicKey)
+		fmt.Println(err)
+		if err != nil {
 			if errors.Is(err, db.ErrNameTaken) {
 				return NameTakenMsg{}
-			} else {
+			} else if errors.Is(err, db.ErrNameInvalid) {
 				return NameInvalidMsg{}
+			} else if errors.Is(err, db.ErrNameDenied) {
+				return NameInvalidMsg{}
+			} else {
+				return errMsg{err}
 			}
-		}
-
-		user, err := registerUser(m)
-		if err != nil {
-			return errMsg{err}
-		}
-
-		err = m.dbpool.SetUserName(user.ID, m.newName)
-		if err != nil {
-			return errMsg{err}
-		}
-
-		user, err = m.dbpool.FindUserForKey(m.newName, m.publicKey)
-		if err != nil {
-			return errMsg{err}
 		}
 
 		return CreateAccountMsg(user)

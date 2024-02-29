@@ -279,7 +279,7 @@ func addPublicKey(m Model) tea.Cmd {
 		}
 
 		key := sanitizeKey(m.newKey)
-		err := m.dbpool.LinkUserKey(m.user.ID, key)
+		err := m.dbpool.LinkUserKey(m.user.ID, key, nil)
 		if err != nil {
 			if errors.Is(err, db.ErrPublicKeyTaken) {
 				return KeyTakenMsg{}

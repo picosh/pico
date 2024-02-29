@@ -78,8 +78,6 @@ func (m Model) bioView() string {
 
 	return common.KeyValueView(
 		"Username", username,
-		"URL", m.urls.BlogURL(username),
-		"Public key", m.User.PublicKey.Key,
 		"Joined", m.User.CreatedAt.Format("02 Jan 2006"),
 	)
 }
