@@ -27,7 +27,7 @@ type Fingerprint struct {
 	Type      string
 	Value     string
 	Algorithm string
-	Styles common.Styles
+	Styles    common.Styles
 }
 
 // String outputs a string representation of the fingerprint.
@@ -51,7 +51,7 @@ func FingerprintSHA256(styles common.Styles, k *db.PublicKey) (Fingerprint, erro
 		Algorithm: algo(key.Type()),
 		Type:      "SHA256",
 		Value:     strings.TrimPrefix(ssh.FingerprintSHA256(key), "SHA256:"),
-		Styles: styles,
+		Styles:    styles,
 	}, nil
 }
 

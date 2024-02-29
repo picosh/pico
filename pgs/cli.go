@@ -18,7 +18,7 @@ import (
 )
 
 func styleRows(styles common.Styles) func(row, col int) lipgloss.Style {
-	return func (row, col int) lipgloss.Style {
+	return func(row, col int) lipgloss.Style {
 		if row == 0 {
 			return styles.CliHeader
 		}
@@ -162,7 +162,7 @@ type Cmd struct {
 	Store   storage.StorageServe
 	Dbpool  db.DB
 	Write   bool
-	Styles common.Styles
+	Styles  common.Styles
 }
 
 func (c *Cmd) output(out string) {
