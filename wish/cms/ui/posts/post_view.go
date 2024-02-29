@@ -54,7 +54,7 @@ func (m Model) newStyledKey(styles common.Styles, post *db.Post, urls config.Con
 
 // Selected state.
 func (k *styledKey) selected() {
-	k.gutter = common.VerticalLine(common.StateSelected)
+	k.gutter = common.VerticalLine(k.styles.Renderer, common.StateSelected)
 	k.postLabel = k.styles.Label.Render("post:")
 	k.dateLabel = k.styles.Label.Render("publish_at:")
 	k.viewsLabel = k.styles.Label.Render("views:")
@@ -64,7 +64,7 @@ func (k *styledKey) selected() {
 
 // Deleting state.
 func (k *styledKey) deleting() {
-	k.gutter = common.VerticalLine(common.StateDeleting)
+	k.gutter = common.VerticalLine(k.styles.Renderer, common.StateDeleting)
 	k.postLabel = k.styles.Delete.Render("post:")
 	k.dateLabel = k.styles.Delete.Render("publish_at:")
 	k.urlLabel = k.styles.Delete.Render("url:")

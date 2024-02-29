@@ -83,14 +83,13 @@ func (m *Model) UpdatePaging(msg tea.Msg) {
 }
 
 // NewModel creates a new model with defaults.
-func NewModel(cfg *config.ConfigCms, urls config.ConfigURL, dbpool db.DB, user *db.User, stor storage.StorageServe, perPage int) Model {
+func NewModel(styles common.Styles, cfg *config.ConfigCms, urls config.ConfigURL, dbpool db.DB, user *db.User, stor storage.StorageServe, perPage int) Model {
 	logger := cfg.Logger
-	st := common.DefaultStyles()
 
 	p := pager.New()
 	p.PerPage = keysPerPage
 	p.Type = pager.Dots
-	p.InactiveDot = st.InactivePagination.Render("•")
+	p.InactiveDot = styles.InactivePagination.Render("•")
 
 	if perPage > 0 {
 		p.PerPage = perPage
@@ -101,13 +100,13 @@ func NewModel(cfg *config.ConfigCms, urls config.ConfigURL, dbpool db.DB, user *
 		dbpool:  dbpool,
 		st:      stor,
 		user:    user,
-		styles:  st,
+		styles:  styles,
 		pager:   p,
 		state:   stateLoading,
 		err:     nil,
 		posts:   []*db.Post{},
 		index:   0,
-		spinner: common.NewSpinner(),
+		spinner: common.NewSpinner(styles),
 		Exit:    false,
 		Quit:    false,
 		logger:  logger,
@@ -298,7 +297,7 @@ func helpView(m Model) string {
 		items = append(items, "x: delete")
 	}
 	items = append(items, "esc: exit")
-	return common.HelpView(items...)
+	return common.HelpView(m.styles, items...)
 }
 
 func (m Model) promptView(prompt string) string {

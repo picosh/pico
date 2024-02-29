@@ -94,13 +94,11 @@ func (m *CreateModel) indexBackward() {
 }
 
 // NewModel returns a new username model in its initial state.
-func NewCreateModel(cfg *config.ConfigCms, dbpool db.DB, publicKey string) CreateModel {
-	st := common.DefaultStyles()
-
+func NewCreateModel(styles common.Styles, cfg *config.ConfigCms, dbpool db.DB, publicKey string) CreateModel {
 	im := input.New()
-	im.Cursor.Style = st.Cursor
+	im.Cursor.Style = styles.Cursor
 	im.Placeholder = "enter username"
-	im.Prompt = st.FocusedPrompt.String()
+	im.Prompt = styles.FocusedPrompt.String()
 	im.CharLimit = 50
 	im.Focus()
 
@@ -109,21 +107,21 @@ func NewCreateModel(cfg *config.ConfigCms, dbpool db.DB, publicKey string) Creat
 		Done:      false,
 		Quit:      false,
 		dbpool:    dbpool,
-		styles:    st,
+		styles:    styles,
 		state:     ready,
 		newName:   "",
 		index:     textInput,
 		errMsg:    "",
 		input:     im,
-		spinner:   common.NewSpinner(),
+		spinner:   common.NewSpinner(styles),
 		publicKey: publicKey,
 	}
 }
 
 // Init is the Bubble Tea initialization function.
-func Init(cfg *config.ConfigCms, dbpool db.DB, publicKey string) func() (CreateModel, tea.Cmd) {
+func Init(styles common.Styles, cfg *config.ConfigCms, dbpool db.DB, publicKey string) func() (CreateModel, tea.Cmd) {
 	return func() (CreateModel, tea.Cmd) {
-		m := NewCreateModel(cfg, dbpool, publicKey)
+		m := NewCreateModel(styles, cfg, dbpool, publicKey)
 		return m, InitialCmd()
 	}
 }
@@ -250,8 +248,8 @@ func View(m CreateModel) string {
 	if m.state == submitting {
 		s += spinnerView(m)
 	} else {
-		s += common.OKButtonView(m.index == 1, true)
-		s += " " + common.CancelButtonView(m.index == 2, false)
+		s += common.OKButtonView(m.styles, m.index == 1, true)
+		s += " " + common.CancelButtonView(m.styles, m.index == 2, false)
 		if m.errMsg != "" {
 			s += "\n\n" + m.errMsg
 		}

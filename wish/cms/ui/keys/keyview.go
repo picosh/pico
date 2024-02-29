@@ -9,8 +9,6 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-var styles = common.DefaultStyles()
-
 func algo(keyType string) string {
 	if idx := strings.Index(keyType, "@"); idx > 0 {
 		return algo(keyType[0:idx])
@@ -29,20 +27,21 @@ type Fingerprint struct {
 	Type      string
 	Value     string
 	Algorithm string
+	Styles common.Styles
 }
 
 // String outputs a string representation of the fingerprint.
 func (f Fingerprint) String() string {
 	return fmt.Sprintf(
 		"%s %s",
-		styles.ListDim.Render(strings.ToUpper(f.Algorithm)),
-		styles.ListKey.Render(f.Type+":"+f.Value),
+		f.Styles.ListDim.Render(strings.ToUpper(f.Algorithm)),
+		f.Styles.ListKey.Render(f.Type+":"+f.Value),
 	)
 }
 
 // FingerprintSHA256 returns the algorithm and SHA256 fingerprint for the given
 // key.
-func FingerprintSHA256(k *db.PublicKey) (Fingerprint, error) {
+func FingerprintSHA256(styles common.Styles, k *db.PublicKey) (Fingerprint, error) {
 	key, _, _, _, err := ssh.ParseAuthorizedKey([]byte(k.Key))
 	if err != nil {
 		return Fingerprint{}, fmt.Errorf("failed to parse public key: %w", err)
@@ -52,6 +51,7 @@ func FingerprintSHA256(k *db.PublicKey) (Fingerprint, error) {
 		Algorithm: algo(key.Type()),
 		Type:      "SHA256",
 		Value:     strings.TrimPrefix(ssh.FingerprintSHA256(key), "SHA256:"),
+		Styles: styles,
 	}, nil
 }
 
@@ -84,7 +84,7 @@ type styledKey struct {
 
 func (m Model) newStyledKey(styles common.Styles, key *db.PublicKey, active bool) styledKey {
 	date := key.CreatedAt.Format("02 Jan 2006 15:04:05 MST")
-	fp, err := FingerprintSHA256(key)
+	fp, err := FingerprintSHA256(styles, key)
 	if err != nil {
 		fp = Fingerprint{Value: "[error generating fingerprint]"}
 	}
@@ -109,14 +109,14 @@ func (m Model) newStyledKey(styles common.Styles, key *db.PublicKey, active bool
 
 // Selected state.
 func (k *styledKey) selected() {
-	k.gutter = common.VerticalLine(common.StateSelected)
+	k.gutter = common.VerticalLine(k.styles.Renderer, common.StateSelected)
 	k.keyLabel = k.styles.Label.Render("Key:")
 	k.dateLabel = k.styles.Label.Render("Added:")
 }
 
 // Deleting state.
 func (k *styledKey) deleting() {
-	k.gutter = common.VerticalLine(common.StateDeleting)
+	k.gutter = common.VerticalLine(k.styles.Renderer, common.StateDeleting)
 	k.keyLabel = k.styles.Delete.Render("Key:")
 	k.dateLabel = k.styles.Delete.Render("Added:")
 	k.dateVal = k.styles.DeleteDim.Render(k.date)

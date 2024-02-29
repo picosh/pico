@@ -20,6 +20,7 @@ require (
 	github.com/charmbracelet/wish v1.3.0
 	github.com/google/go-cmp v0.6.0
 	github.com/gorilla/feeds v1.1.2
+	github.com/kr/pty v1.1.8
 	github.com/lib/pq v1.10.9
 	github.com/microcosm-cc/bluemonday v1.0.26
 	github.com/minio/minio-go/v7 v7.0.63
@@ -54,6 +55,7 @@ require (
 	github.com/charmbracelet/keygen v0.5.0 // indirect
 	github.com/charmbracelet/log v0.3.1 // indirect
 	github.com/containerd/console v1.0.4-0.20230313162750-1ae8d489ac81 // indirect
+	github.com/creack/pty v1.1.21 // indirect
 	github.com/dlclark/regexp2 v1.10.0 // indirect
 	github.com/dsoprea/go-exif v0.0.0-20230826092837-6579e82b732d // indirect
 	github.com/dsoprea/go-exif/v2 v2.0.0-20230826092837-6579e82b732d // indirect

@@ -80,26 +80,24 @@ func (m *Model) UpdatePaging(msg tea.Msg) {
 }
 
 // NewModel creates a new model with defaults.
-func NewModel(cfg *config.ConfigCms, dbpool db.DB, user *db.User) Model {
-	st := common.DefaultStyles()
-
+func NewModel(styles common.Styles, cfg *config.ConfigCms, dbpool db.DB, user *db.User) Model {
 	p := pager.New()
 	p.PerPage = keysPerPage
 	p.Type = pager.Dots
-	p.InactiveDot = st.InactivePagination.Render("•")
+	p.InactiveDot = styles.InactivePagination.Render("•")
 
 	return Model{
 		cfg:            cfg,
 		dbpool:         dbpool,
 		user:           user,
-		styles:         st,
+		styles:         styles,
 		pager:          p,
 		state:          stateLoading,
 		err:            nil,
 		activeKeyIndex: -1,
 		tokens:         []*db.Token{},
 		index:          0,
-		spinner:        common.NewSpinner(),
+		spinner:        common.NewSpinner(styles),
 		Exit:           false,
 		Quit:           false,
 	}
@@ -209,7 +207,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch m.state {
 	case stateNormal:
-		m.createKey = createtoken.NewModel(m.cfg, m.dbpool, m.user)
+		m.createKey = createtoken.NewModel(m.styles, m.cfg, m.dbpool, m.user)
 	case stateDeletingKey:
 		// If an item is being confirmed for delete, any key (other than the key
 		// used for confirmation above) cancels the deletion
@@ -242,7 +240,7 @@ func updateChildren(msg tea.Msg, m Model) (Model, tea.Cmd) {
 		m.createKey = createKeyModel
 		cmd = newCmd
 		if m.createKey.Done {
-			m.createKey = createtoken.NewModel(m.cfg, m.dbpool, m.user) // reset the state
+			m.createKey = createtoken.NewModel(m.styles, m.cfg, m.dbpool, m.user) // reset the state
 			m.state = stateNormal
 		} else if m.createKey.Quit {
 			m.state = stateQuitting
@@ -333,7 +331,7 @@ func helpView(m Model) string {
 		items = append(items, "h/l, ←/→: page")
 	}
 	items = append(items, []string{"x: delete", "n: create", "esc: exit"}...)
-	return common.HelpView(items...)
+	return common.HelpView(m.styles, items...)
 }
 
 func (m Model) promptView(prompt string) string {

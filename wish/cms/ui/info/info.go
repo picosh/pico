@@ -28,11 +28,11 @@ type Model struct {
 }
 
 // NewModel returns a new Model in its initial state.
-func NewModel(cfg *config.ConfigCms, urls config.ConfigURL, user *db.User, ff *db.FeatureFlag) Model {
+func NewModel(styles common.Styles, cfg *config.ConfigCms, urls config.ConfigURL, user *db.User, ff *db.FeatureFlag) Model {
 	return Model{
 		Quit:            false,
 		User:            user,
-		styles:          common.DefaultStyles(),
+		styles:          styles,
 		cfg:             cfg,
 		urls:            urls,
 		PlusFeatureFlag: ff,
@@ -95,5 +95,5 @@ func (m Model) bioView() string {
 		vals = append(vals, "Pico+ Expires At", expires)
 	}
 
-	return common.KeyValueView(vals...)
+	return common.KeyValueView(m.styles, vals...)
 }

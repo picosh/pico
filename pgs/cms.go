@@ -63,15 +63,10 @@ var menuChoices = map[menuChoice]string{
 	exitChoice:   "Exit",
 }
 
-var (
-	spinnerStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.AdaptiveColor{Light: "#8E8E8E", Dark: "#747373"})
-)
-
-func NewSpinner() spinner.Model {
+func NewSpinner(styles common.Styles) spinner.Model {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
-	s.Style = spinnerStyle
+	s.Style = styles.Spinner
 	return s
 }
 
@@ -106,6 +101,10 @@ func CmsMiddleware(cfg *config.ConfigCms, urls config.ConfigURL) bm.Handler {
 			logger.Error(err.Error())
 		}
 
+		renderer := lipgloss.NewRenderer(s)
+		renderer.SetOutput(common.OutputFromSession(s))
+		styles := common.DefaultStyles(renderer)
+
 		m := model{
 			cfg:        cfg,
 			urls:       urls,
@@ -115,8 +114,8 @@ func CmsMiddleware(cfg *config.ConfigCms, urls config.ConfigURL) bm.Handler {
 			sshUser:    sshUser,
 			status:     statusInit,
 			menuChoice: unsetChoice,
-			styles:     common.DefaultStyles(),
-			spinner:    common.NewSpinner(),
+			styles:     styles,
+			spinner:    common.NewSpinner(styles),
 			terminalSize: tea.WindowSizeMsg{
 				Width:  80,
 				Height: 24,
@@ -247,18 +246,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.status = statusReady
 		m.info.User = msg
 		m.user = msg
-		m.info = info.NewModel(m.cfg, m.urls, m.user, m.plusFeatureFlag)
-		m.keys = keys.NewModel(m.cfg, m.dbpool, m.user)
-		m.tokens = tokens.NewModel(m.cfg, m.dbpool, m.user)
-		m.createAccount = account.NewCreateModel(m.cfg, m.dbpool, m.publicKey)
+		m.info = info.NewModel(m.styles, m.cfg, m.urls, m.user, m.plusFeatureFlag)
+		m.keys = keys.NewModel(m.styles, m.cfg, m.dbpool, m.user)
+		m.tokens = tokens.NewModel(m.styles, m.cfg, m.dbpool, m.user)
+		m.createAccount = account.NewCreateModel(m.styles, m.cfg, m.dbpool, m.publicKey)
 	}
 
 	switch m.status {
 	case statusInit:
-		m.info = info.NewModel(m.cfg, m.urls, m.user, m.plusFeatureFlag)
-		m.keys = keys.NewModel(m.cfg, m.dbpool, m.user)
-		m.tokens = tokens.NewModel(m.cfg, m.dbpool, m.user)
-		m.createAccount = account.NewCreateModel(m.cfg, m.dbpool, m.publicKey)
+		m.info = info.NewModel(m.styles, m.cfg, m.urls, m.user, m.plusFeatureFlag)
+		m.keys = keys.NewModel(m.styles, m.cfg, m.dbpool, m.user)
+		m.tokens = tokens.NewModel(m.styles, m.cfg, m.dbpool, m.user)
+		m.createAccount = account.NewCreateModel(m.styles, m.cfg, m.dbpool, m.publicKey)
 		if m.user == nil {
 			m.status = statusNoAccount
 		} else {
@@ -288,7 +287,7 @@ func updateChildren(msg tea.Msg, m model) (model, tea.Cmd) {
 		cmd = newCmd
 
 		if m.keys.Exit {
-			m.keys = keys.NewModel(m.cfg, m.dbpool, m.user)
+			m.keys = keys.NewModel(m.styles, m.cfg, m.dbpool, m.user)
 			m.status = statusReady
 		} else if m.keys.Quit {
 			m.status = statusQuitting
@@ -304,7 +303,7 @@ func updateChildren(msg tea.Msg, m model) (model, tea.Cmd) {
 		cmd = newCmd
 
 		if m.tokens.Exit {
-			m.tokens = tokens.NewModel(m.cfg, m.dbpool, m.user)
+			m.tokens = tokens.NewModel(m.styles, m.cfg, m.dbpool, m.user)
 			m.status = statusReady
 		} else if m.tokens.Quit {
 			m.status = statusQuitting
@@ -313,7 +312,7 @@ func updateChildren(msg tea.Msg, m model) (model, tea.Cmd) {
 	case statusNoAccount:
 		m.createAccount, cmd = account.Update(msg, m.createAccount)
 		if m.createAccount.Done {
-			m.createAccount = account.NewCreateModel(m.cfg, m.dbpool, m.publicKey) // reset the state
+			m.createAccount = account.NewCreateModel(m.styles, m.cfg, m.dbpool, m.publicKey) // reset the state
 			m.status = statusReady
 		} else if m.createAccount.Quit {
 			m.status = statusQuitting
@@ -364,7 +363,7 @@ func footerView(m model) string {
 	if m.err != nil {
 		return m.errorView(m.err)
 	}
-	return "\n\n" + common.HelpView("j/k, ↑/↓: choose", "enter: select")
+	return "\n\n" + common.HelpView(m.styles, "j/k, ↑/↓: choose", "enter: select")
 }
 
 func (m model) errorView(err error) string {

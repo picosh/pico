@@ -39,7 +39,7 @@ func (m Model) newStyledKey(styles common.Styles, token *db.Token, active bool) 
 
 // Selected state.
 func (k *styledKey) selected() {
-	k.gutter = common.VerticalLine(common.StateSelected)
+	k.gutter = common.VerticalLine(k.styles.Renderer, common.StateSelected)
 	k.nameLabel = k.styles.Label.Render("Name:")
 	k.dateLabel = k.styles.Label.Render("Added:")
 	k.expiresLabel = k.styles.Label.Render("Expires:")
@@ -47,7 +47,7 @@ func (k *styledKey) selected() {
 
 // Deleting state.
 func (k *styledKey) deleting() {
-	k.gutter = common.VerticalLine(common.StateDeleting)
+	k.gutter = common.VerticalLine(k.styles.Renderer, common.StateDeleting)
 	k.nameLabel = k.styles.Delete.Render("Name:")
 	k.dateLabel = k.styles.Delete.Render("Added:")
 	k.dateVal = k.styles.DeleteDim.Render(k.date)
