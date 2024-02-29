@@ -188,6 +188,10 @@ func (m model) findUser() (*db.User, error) {
 }
 
 func (m model) findPlusFeatureFlag() (*db.FeatureFlag, error) {
+	if m.user == nil {
+		return nil, nil
+	}
+
 	ff, err := m.dbpool.FindFeatureForUser(m.user.ID, "pgs")
 	if err != nil {
 		return nil, err

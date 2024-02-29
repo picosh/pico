@@ -41,6 +41,9 @@ type errMsg struct{ err error }
 
 func (e errMsg) Error() string { return e.err.Error() }
 
+var deny = strings.Join(db.DenyList, ", ")
+var helpMsg = fmt.Sprintf("Names can only contain plain letters and numbers and must be less than 50 characters. No emjois. No names from deny list: %s", deny)
+
 // Model holds the state of the username UI.
 type CreateModel struct {
 	Done bool // true when it's time to exit this view
@@ -96,7 +99,7 @@ func NewCreateModel(cfg *config.ConfigCms, dbpool db.DB, publicKey string) Creat
 
 	im := input.New()
 	im.Cursor.Style = st.Cursor
-	im.Placeholder = "erock"
+	im.Placeholder = "enter username"
 	im.Prompt = st.FocusedPrompt.String()
 	im.CharLimit = 50
 	im.Focus()
@@ -207,8 +210,6 @@ func Update(msg tea.Msg, m CreateModel) (CreateModel, tea.Cmd) {
 	case NameInvalidMsg:
 		m.state = ready
 		head := m.styles.Error.Render("Invalid name. ")
-		deny := strings.Join(db.DenyList, ", ")
-		helpMsg := fmt.Sprintf("Names can only contain plain letters and numbers and must be less than 50 characters. No emjois. No names from deny list: %s", deny)
 		body := m.styles.Subtle.Render(helpMsg)
 		m.errMsg = m.styles.Wrap.Render(head + body)
 
@@ -242,8 +243,8 @@ func View(m CreateModel) string {
 		return "Registration is closed for this service.  Press 'esc' to exit."
 	}
 
-	s := fmt.Sprintf("%s\n\n%s\n\n", "hacker labs", m.cfg.IntroText)
-	s += "Enter a username\n\n"
+	s := fmt.Sprintf("%s\n\n%s\n", "hacker labs", m.cfg.IntroText)
+	s += fmt.Sprintf("Public Key: %s\n\n", m.publicKey)
 	s += m.input.View() + "\n\n"
 
 	if m.state == submitting {
@@ -255,6 +256,7 @@ func View(m CreateModel) string {
 			s += "\n\n" + m.errMsg
 		}
 	}
+	s += fmt.Sprintf("\n\n%s\n", helpMsg)
 
 	return s
 }
