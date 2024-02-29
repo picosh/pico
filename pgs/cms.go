@@ -84,6 +84,7 @@ func CmsMiddleware(cfg *config.ConfigCms, urls config.ConfigURL) bm.Handler {
 		key, err := shared.KeyText(s)
 		if err != nil {
 			logger.Error(err.Error())
+			return nil, nil
 		}
 
 		sshUser := s.User()

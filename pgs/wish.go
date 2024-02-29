@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
+	"github.com/muesli/termenv"
 	"github.com/picosh/pico/db"
 	uploadassets "github.com/picosh/pico/filehandlers/assets"
 	"github.com/picosh/pico/shared"
@@ -86,6 +87,8 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 			args := sesh.Command()
 
 			renderer := lipgloss.NewRenderer(sesh)
+			// this might be dangerous but going with it for now
+			renderer.SetColorProfile(termenv.ANSI256)
 			styles := common.DefaultStyles(renderer)
 
 			opts := Cmd{
