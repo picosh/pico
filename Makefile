@@ -73,6 +73,10 @@ store-clean:
 	WRITE=$(WRITE) go run ./cmd/scripts/clean-object-store/clean.go
 .PHONY: store-clean
 
+pico-plus:
+	go run ./cmd/scripts/pico-plus/main.go $(USER) $(TXID)
+.PHONY: pico-plus
+
 scripts:
 	# might need to set MINIO_URL
 	docker run --rm -it --env-file .env -v $(shell pwd):/app -w /app golang:1.21 /bin/bash

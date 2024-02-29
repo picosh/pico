@@ -235,6 +235,27 @@ func (p *FeatureFlagData) Scan(value interface{}) error {
 	return json.Unmarshal(b, &p)
 }
 
+type PaymentHistoryData struct {
+	Notes string `json:"notes"`
+	TxID  string `json:"tx_id"`
+}
+
+// Make the Attrs struct implement the driver.Valuer interface. This method
+// simply returns the JSON-encoded representation of the struct.
+func (p PaymentHistoryData) Value() (driver.Value, error) {
+	return json.Marshal(p)
+}
+
+// Make the Attrs struct implement the sql.Scanner interface. This method
+// simply decodes a JSON-encoded value into the struct fields.
+func (p *PaymentHistoryData) Scan(value interface{}) error {
+	b, ok := value.([]byte)
+	if !ok {
+		return errors.New("type assertion to []byte failed")
+	}
+	return json.Unmarshal(b, &p)
+}
+
 type ErrMultiplePublicKeys struct{}
 
 func (m *ErrMultiplePublicKeys) Error() string {
@@ -303,6 +324,7 @@ type DB interface {
 
 	AddViewCount(postID string) (int, error)
 
+	AddPicoPlusUser(username string, txId string) error
 	FindFeatureForUser(userID string, feature string) (*FeatureFlag, error)
 	HasFeatureForUser(userID string, feature string) bool
 	FindTotalSizeForUser(userID string) (int, error)

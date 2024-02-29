@@ -1540,3 +1540,65 @@ func (me *PsqlDB) FindTokensForUser(userID string) ([]*db.Token, error) {
 	}
 	return keys, nil
 }
+
+func (me *PsqlDB) AddPicoPlusUser(username, txId string) error {
+	user, err := me.FindUserForName(username)
+	if err != nil {
+		return err
+	}
+
+	ctx := context.Background()
+	tx, err := me.Db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		err = tx.Rollback()
+	}()
+
+	if txId != "" {
+		data := db.PaymentHistoryData{
+			Notes: "",
+			TxID:  txId,
+		}
+		_, err := tx.Exec(
+			`INSERT INTO payment_history (user_id, payment_type, amount, data) VALUES ($1, 'stripe', 20 * 1000000, $2);`,
+			user.ID,
+			data,
+		)
+		if err != nil {
+			fmt.Println(err)
+			return err
+		}
+	}
+
+	pgsQuery := `INSERT INTO feature_flags (user_id, name, data, expires_at)
+	VALUES ($1, 'pgs', '{"storage_max":10000000000, "file_max":50000000}'::jsonb, now() + '1 year'::interval);`
+	_, err = tx.Exec(pgsQuery, user.ID)
+	if err != nil {
+		return err
+	}
+
+	imgsQuery := `INSERT INTO feature_flags (user_id, name, data, expires_at)
+	VALUES ($1, 'imgs', '{"storage_max":2000000000}'::jsonb, now() + '1 year'::interval);`
+	_, err = tx.Exec(imgsQuery, user.ID)
+	if err != nil {
+		return err
+	}
+
+	proseQuery := `INSERT INTO feature_flags (user_id, name, data, expires_at)
+	VALUES ($1, 'prose', '{"storage_max":1000000000, "file_max":50000000}'::jsonb, now() + '1 year'::interval);`
+	_, err = tx.Exec(proseQuery, user.ID)
+	if err != nil {
+		return err
+	}
+
+	tunsQuery := `INSERT INTO feature_flags (user_id, name, expires_at)
+	VALUES ($1, 'tuns', now() + '1 year'::interval);`
+	_, err = tx.Exec(tunsQuery, user.ID)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
