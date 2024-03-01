@@ -250,6 +250,7 @@ services:
     volumes:
       - ./data/storage/data:/app/.storage
       - ./data/pgs-ssh/data:/app/ssh_data
+      - ./data/tmp:/tmp
     ports:
       - "${PGS_SSH_V4:-22}:2222"
       - "${PGS_SSH_V6:-[::1]:22}:2222"
