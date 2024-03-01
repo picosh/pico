@@ -351,26 +351,44 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	ogImageCard := ""
 	hasCSS := false
 	var data PostPageData
+
+	css, err := dbpool.FindPostWithFilename("_styles.css", user.ID, cfg.Space)
+	if err == nil {
+		if len(css.Text) > 0 {
+			hasCSS = true
+		}
+	}
+
+	footer, err := dbpool.FindPostWithFilename("_footer.md", user.ID, cfg.Space)
+	var footerHTML template.HTML
+	if err == nil {
+		footerParsed, err := shared.ParseText(footer.Text)
+		if err != nil {
+			logger.Error(err.Error())
+		}
+		footerHTML = template.HTML(footerParsed.Html)
+	}
+
+	// we need the blog name from the readme unfortunately
+	readme, err := dbpool.FindPostWithFilename("_readme.md", user.ID, cfg.Space)
+	if err == nil {
+		readmeParsed, err := shared.ParseText(readme.Text)
+		if err != nil {
+			logger.Error(err.Error())
+		}
+		if readmeParsed.MetaData.Title != "" {
+			blogName = readmeParsed.MetaData.Title
+		}
+		ogImage = readmeParsed.Image
+		ogImageCard = readmeParsed.ImageCard
+		favicon = readmeParsed.Favicon
+	}
+
 	post, err := dbpool.FindPostWithSlug(slug, user.ID, cfg.Space)
 	if err == nil {
 		parsedText, err := shared.ParseText(post.Text)
 		if err != nil {
 			logger.Error(err.Error())
-		}
-
-		// we need the blog name from the readme unfortunately
-		readme, err := dbpool.FindPostWithFilename("_readme.md", user.ID, cfg.Space)
-		if err == nil {
-			readmeParsed, err := shared.ParseText(readme.Text)
-			if err != nil {
-				logger.Error(err.Error())
-			}
-			if readmeParsed.MetaData.Title != "" {
-				blogName = readmeParsed.MetaData.Title
-			}
-			ogImage = readmeParsed.Image
-			ogImageCard = readmeParsed.ImageCard
-			favicon = readmeParsed.Favicon
 		}
 
 		if parsedText.Image != "" {
@@ -379,23 +397,6 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 
 		if parsedText.ImageCard != "" {
 			ogImageCard = parsedText.ImageCard
-		}
-
-		css, err := dbpool.FindPostWithFilename("_styles.css", user.ID, cfg.Space)
-		if err == nil {
-			if len(css.Text) > 0 {
-				hasCSS = true
-			}
-		}
-
-		footer, err := dbpool.FindPostWithFilename("_footer.md", user.ID, cfg.Space)
-		var footerHTML template.HTML
-		if err == nil {
-			footerParsed, err := shared.ParseText(footer.Text)
-			if err != nil {
-				logger.Error(err.Error())
-			}
-			footerHTML = template.HTML(footerParsed.Html)
 		}
 
 		// validate and fire off analytic event
@@ -442,20 +443,48 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		notFound, err := dbpool.FindPostWithFilename("_404.md", user.ID, cfg.Space)
+		contents := template.HTML("Oops!  we can't seem to find this post.")
+		title := "Post not found"
+		desc := "Post not found"
+		if err == nil {
+			notFoundParsed, err := shared.ParseText(notFound.Text)
+			if err != nil {
+				logger.Error(err.Error())
+			}
+			if notFoundParsed.MetaData.Title != "" {
+				title = notFoundParsed.MetaData.Title
+			}
+			if notFoundParsed.MetaData.Description != "" {
+				desc = notFoundParsed.MetaData.Description
+			}
+			ogImage = notFoundParsed.Image
+			ogImageCard = notFoundParsed.ImageCard
+			favicon = notFoundParsed.Favicon
+			contents = template.HTML(notFoundParsed.Html)
+		}
+
 		data = PostPageData{
 			Site:         *cfg.GetSiteData(),
 			BlogURL:      template.URL(cfg.FullBlogURL(curl, username)),
-			PageTitle:    "Post not found",
-			Description:  "Post not found",
-			Title:        "Post not found",
+			PageTitle:    title,
+			Description:  desc,
+			Title:        title,
 			PublishAt:    time.Now().Format("02 Jan, 2006"),
 			PublishAtISO: time.Now().Format(time.RFC3339),
 			Username:     username,
 			BlogName:     blogName,
-			Contents:     "Oops!  we can't seem to find this post.",
+			HasCSS:       hasCSS,
+			CssURL:       template.URL(cfg.CssURL(username)),
+			Image:        template.URL(ogImage),
+			ImageCard:    ogImageCard,
+			Favicon:      template.URL(favicon),
+			Footer:       footerHTML,
+			Contents:     contents,
 			Unlisted:     true,
 		}
 		logger.Info("post not found", "user", username, "slug", slug)
+		w.WriteHeader(http.StatusNotFound)
 	}
 
 	ts, err := shared.RenderTemplate(cfg, []string{

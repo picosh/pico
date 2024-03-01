@@ -53,7 +53,7 @@ func NewConfigSite() *shared.ConfigSite {
 				".webp",
 				".svg",
 			},
-			HiddenPosts:   []string{"_readme.md", "_styles.css", "_footer.md"},
+			HiddenPosts:   []string{"_readme.md", "_styles.css", "_footer.md", "_404.md"},
 			Logger:        shared.CreateLogger(debug == "1"),
 			AllowRegister: allowRegister == "1",
 			MaxSize:       maxSize,
