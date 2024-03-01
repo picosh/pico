@@ -20,7 +20,7 @@ func main() {
 	}
 	txId := ""
 	if len(args) > 3 {
-		txId = args[2]
+		txId = args[3]
 	}
 
 	logger.Info(
