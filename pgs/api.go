@@ -15,7 +15,6 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/gorilla/feeds"
-	gocache "github.com/patrickmn/go-cache"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
@@ -33,7 +32,6 @@ type AssetHandler struct {
 	Dbpool         db.DB
 	Storage        storage.StorageServe
 	Logger         *slog.Logger
-	Cache          *gocache.Cache
 	UserID         string
 	Bucket         sst.Bucket
 	ImgProcessOpts *storage.ImgProcessOpts
@@ -352,7 +350,6 @@ func ServeAsset(fname string, opts *storage.ImgProcessOpts, fromImgs bool, hasPe
 	dbpool := shared.GetDB(r)
 	st := shared.GetStorage(r)
 	logger := shared.GetLogger(r)
-	cache := shared.GetCache(r)
 
 	props, err := getProjectFromSubdomain(subdomain)
 	if err != nil {
@@ -410,7 +407,6 @@ func ServeAsset(fname string, opts *storage.ImgProcessOpts, fromImgs bool, hasPe
 		Dbpool:         dbpool,
 		Storage:        st,
 		Logger:         logger,
-		Cache:          cache,
 		Bucket:         bucket,
 		ImgProcessOpts: opts,
 	}
@@ -487,17 +483,18 @@ func StartApiServer() {
 		st, err = storage.NewStorageMinio(cfg.MinioURL, cfg.MinioUser, cfg.MinioPass)
 	}
 
-	// cache resizing images since they are CPU-bound
-	// we want to clear the cache since we are storing images
-	// as []byte in-memory
-	cache := gocache.New(2*time.Minute, 5*time.Minute)
-
 	if err != nil {
 		logger.Error(err.Error())
 		return
 	}
 
-	handler := shared.CreateServe(mainRoutes, createSubdomainRoutes(publicPerm), cfg, db, st, logger, cache)
+	httpCtx := &shared.HttpCtx{
+		Cfg:     cfg,
+		Dbpool:  db,
+		Storage: st,
+		Logger:  logger,
+	}
+	handler := shared.CreateServe(mainRoutes, createSubdomainRoutes(publicPerm), httpCtx)
 	router := http.HandlerFunc(handler)
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)

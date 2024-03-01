@@ -12,7 +12,6 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/gorilla/feeds"
-	gocache "github.com/patrickmn/go-cache"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/pgs"
@@ -311,11 +310,6 @@ func StartApiServer() {
 		st, err = storage.NewStorageMinio(cfg.MinioURL, cfg.MinioUser, cfg.MinioPass)
 	}
 
-	// cache resizing images since they are CPU-bound
-	// we want to clear the cache since we are storing images
-	// as []byte in-memory
-	cache := gocache.New(2*time.Minute, 5*time.Minute)
-
 	if err != nil {
 		logger.Error(err.Error())
 	}
@@ -328,7 +322,13 @@ func StartApiServer() {
 	mainRoutes := createMainRoutes(staticRoutes)
 	subdomainRoutes := createSubdomainRoutes(staticRoutes)
 
-	handler := shared.CreateServe(mainRoutes, subdomainRoutes, cfg, db, st, logger, cache)
+	httpCtx := &shared.HttpCtx{
+		Cfg:     cfg,
+		Dbpool:  db,
+		Storage: st,
+		Logger:  logger,
+	}
+	handler := shared.CreateServe(mainRoutes, subdomainRoutes, httpCtx)
 	router := http.HandlerFunc(handler)
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)

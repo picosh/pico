@@ -183,8 +183,6 @@ github.com/neurosnap/go-exif-remove v0.0.0-20221010134343-50d1e3c35577 h1:hVmVNt
 github.com/neurosnap/go-exif-remove v0.0.0-20221010134343-50d1e3c35577/go.mod h1:G3Cu1AW+dmRLDFpOi8eUAfc3cGoRHUjTkGjeRcndgl4=
 github.com/neurosnap/go-jpeg-image-structure v0.0.0-20221010133817-70b1c1ff679e h1:76Dng5ms0fR+26doKZAvNqhi2UPfnLxGfPIDEr+BBlM=
 github.com/neurosnap/go-jpeg-image-structure v0.0.0-20221010133817-70b1c1ff679e/go.mod h1:nZBDA7+RD63GDJwjZmxhxac65MJqiCIHUUUvdYOsFkk=
-github.com/patrickmn/go-cache v2.1.0+incompatible h1:HRMgzkcYKYpi3C8ajMPV8OFXaaRUnok+kx1WdO15EQc=
-github.com/patrickmn/go-cache v2.1.0+incompatible/go.mod h1:3Qf8kWWT7OJRJbdiICTKqZju1ZixQ/KpMGzzAfe6+WQ=
 github.com/philhofer/fwd v1.1.2 h1:bnDivRJ1EWPjUIRXV5KfORO897HTbpFAQddBdE8t7Gw=
 github.com/philhofer/fwd v1.1.2/go.mod h1:qkPdfjR2SIEbspLqpe1tO4n5yICnr2DY7mqEx2tUTP0=
 github.com/picosh/pobj v0.0.0-20240218150308-1dc70e819bbf h1:xtr5DoSgoOqbPFnm8p5YjTqrRKVW8KYI0bDwwRiG8yI=

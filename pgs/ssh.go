@@ -14,7 +14,6 @@ import (
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
 	bm "github.com/charmbracelet/wish/bubbletea"
-	gocache "github.com/patrickmn/go-cache"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
 	uploadassets "github.com/picosh/pico/filehandlers/assets"
@@ -89,6 +88,95 @@ type PicoApi struct {
 	PublicKey string `json:"public_key"`
 }
 
+type CtxHttpBridge = func(ssh.Context) http.Handler
+
+func createHttpHandler(httpCtx *shared.HttpCtx) CtxHttpBridge {
+	return func(ctx ssh.Context) http.Handler {
+		subdomain := ctx.User()
+		dbh := httpCtx.Dbpool
+		logger := httpCtx.Logger
+		log := logger.With(
+			"subdomain", subdomain,
+		)
+
+		pubkey, err := getPublicKeyCtx(ctx)
+		if err != nil {
+			log.Error(err.Error(), "subdomain", subdomain)
+			return http.HandlerFunc(unauthorizedHandler)
+		}
+		pubkeyStr, err := shared.KeyForKeyText(pubkey)
+		if err != nil {
+			log.Error(err.Error())
+			return http.HandlerFunc(unauthorizedHandler)
+		}
+		log = log.With(
+			"pubkey", pubkeyStr,
+		)
+
+		props, err := getProjectFromSubdomain(subdomain)
+		if err != nil {
+			log.Error(err.Error())
+			return http.HandlerFunc(unauthorizedHandler)
+		}
+
+		owner, err := dbh.FindUserForName(props.Username)
+		if err != nil {
+			log.Error(err.Error())
+			return http.HandlerFunc(unauthorizedHandler)
+		}
+		log = log.With(
+			"owner", owner.Name,
+		)
+
+		project, err := dbh.FindProjectByName(owner.ID, props.ProjectName)
+		if err != nil {
+			log.Error(err.Error())
+			return http.HandlerFunc(unauthorizedHandler)
+		}
+
+		requester, _ := dbh.FindUserForKey("", pubkeyStr)
+		if requester != nil {
+			log = logger.With(
+				"requester", requester.Name,
+			)
+		}
+
+		if !HasProjectAccess(project, owner, requester, pubkey) {
+			log.Error("no access")
+			return http.HandlerFunc(unauthorizedHandler)
+		}
+
+		log.Info("user has access to site")
+
+		routes := []shared.Route{
+			// special API endpoint for tunnel users accessing site
+			shared.NewRoute("GET", "/pico", func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				pico := &PicoApi{
+					UserID:    "",
+					UserName:  "",
+					PublicKey: pubkeyStr,
+				}
+				if requester != nil {
+					pico.UserID = requester.ID
+					pico.UserName = requester.Name
+				}
+				err := json.NewEncoder(w).Encode(pico)
+				if err != nil {
+					log.Error(err.Error())
+				}
+			}),
+		}
+
+		subdomainRoutes := createSubdomainRoutes(allowPerm)
+		routes = append(routes, subdomainRoutes...)
+		finctx := httpCtx.CreateCtx(ctx, subdomain)
+		httpHandler := shared.CreateServeBasic(routes, finctx)
+		httpRouter := http.HandlerFunc(httpHandler)
+		return httpRouter
+	}
+}
+
 func StartSshServer() {
 	host := shared.GetEnv("PGS_HOST", "0.0.0.0")
 	port := shared.GetEnv("PGS_SSH_PORT", "2222")
@@ -116,99 +204,16 @@ func StartSshServer() {
 		cfg,
 		st,
 	)
-	cache := gocache.New(2*time.Minute, 5*time.Minute)
+
+	httpCtx := &shared.HttpCtx{
+		Cfg:     cfg,
+		Dbpool:  dbh,
+		Storage: st,
+	}
 
 	webTunnel := &ptun.WebTunnelHandler{
-		Logger: logger,
-		HttpHandler: func(ctx ssh.Context) http.Handler {
-			subdomain := ctx.User()
-			log := logger.With(
-				"subdomain", subdomain,
-			)
-
-			pubkey, err := getPublicKeyCtx(ctx)
-			if err != nil {
-				log.Error(err.Error(), "subdomain", subdomain)
-				return http.HandlerFunc(unauthorizedHandler)
-			}
-			pubkeyStr, err := shared.KeyForKeyText(pubkey)
-			if err != nil {
-				log.Error(err.Error())
-				return http.HandlerFunc(unauthorizedHandler)
-			}
-			log = log.With(
-				"pubkey", pubkeyStr,
-			)
-
-			props, err := getProjectFromSubdomain(subdomain)
-			if err != nil {
-				log.Error(err.Error())
-				return http.HandlerFunc(unauthorizedHandler)
-			}
-
-			owner, err := dbh.FindUserForName(props.Username)
-			if err != nil {
-				log.Error(err.Error())
-				return http.HandlerFunc(unauthorizedHandler)
-			}
-			log = log.With(
-				"owner", owner.Name,
-			)
-
-			project, err := dbh.FindProjectByName(owner.ID, props.ProjectName)
-			if err != nil {
-				log.Error(err.Error())
-				return http.HandlerFunc(unauthorizedHandler)
-			}
-
-			requester, _ := dbh.FindUserForKey("", pubkeyStr)
-			if requester != nil {
-				log = logger.With(
-					"requester", requester.Name,
-				)
-			}
-
-			if !HasProjectAccess(project, owner, requester, pubkey) {
-				log.Error("no access")
-				return http.HandlerFunc(unauthorizedHandler)
-			}
-
-			log.Info("user has access to site")
-
-			routes := []shared.Route{
-				// special API endpoint for tunnel users accessing site
-				shared.NewRoute("GET", "/pico", func(w http.ResponseWriter, r *http.Request) {
-					w.Header().Set("Content-Type", "application/json")
-					pico := &PicoApi{
-						UserID:    "",
-						UserName:  "",
-						PublicKey: pubkeyStr,
-					}
-					if requester != nil {
-						pico.UserID = requester.ID
-						pico.UserName = requester.Name
-					}
-					err := json.NewEncoder(w).Encode(pico)
-					if err != nil {
-						log.Error(err.Error())
-					}
-				}),
-			}
-
-			subdomainRoutes := createSubdomainRoutes(allowPerm)
-			routes = append(routes, subdomainRoutes...)
-			httpHandler := shared.CreateServeBasic(
-				routes,
-				subdomain,
-				cfg,
-				dbh,
-				st,
-				logger,
-				cache,
-			)
-			httpRouter := http.HandlerFunc(httpHandler)
-			return httpRouter
-		},
+		Logger:      logger,
+		HttpHandler: createHttpHandler(httpCtx),
 	}
 
 	s, err := wish.NewServer(

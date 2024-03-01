@@ -28,7 +28,6 @@ require (
 	github.com/muesli/reflow v0.3.0
 	github.com/muesli/termenv v0.15.2
 	github.com/neurosnap/go-exif-remove v0.0.0-20221010134343-50d1e3c35577
-	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/picosh/pobj v0.0.0-20240218150308-1dc70e819bbf
 	github.com/picosh/ptun v0.0.0-20240225010823-a5e18b5be928
 	github.com/picosh/send v0.0.0-20240217194807-77b972121e63

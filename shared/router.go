@@ -10,7 +10,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/patrickmn/go-cache"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared/storage"
 )
@@ -45,17 +44,25 @@ func CreatePProfRoutes(routes []Route) []Route {
 }
 
 type ServeFn func(http.ResponseWriter, *http.Request)
+type HttpCtx struct {
+	Logger  *slog.Logger
+	Cfg     *ConfigSite
+	Dbpool  db.DB
+	Storage storage.StorageServe
+}
 
-func CreateServeBasic(routes []Route, subdomain string, cfg *ConfigSite, dbpool db.DB, st storage.StorageServe, logger *slog.Logger, cache *cache.Cache) ServeFn {
+func (hc *HttpCtx) CreateCtx(prevCtx context.Context, subdomain string) context.Context {
+	loggerCtx := context.WithValue(prevCtx, ctxLoggerKey{}, hc.Logger)
+	subdomainCtx := context.WithValue(loggerCtx, ctxSubdomainKey{}, subdomain)
+	dbCtx := context.WithValue(subdomainCtx, ctxDBKey{}, hc.Dbpool)
+	storageCtx := context.WithValue(dbCtx, ctxStorageKey{}, hc.Storage)
+	cfgCtx := context.WithValue(storageCtx, ctxCfg{}, hc.Cfg)
+	return cfgCtx
+}
+
+func CreateServeBasic(routes []Route, ctx context.Context) ServeFn {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var allow []string
-		loggerCtx := context.WithValue(r.Context(), ctxLoggerKey{}, logger)
-		subdomainCtx := context.WithValue(loggerCtx, ctxSubdomainKey{}, subdomain)
-		dbCtx := context.WithValue(subdomainCtx, ctxDBKey{}, dbpool)
-		storageCtx := context.WithValue(dbCtx, ctxStorageKey{}, st)
-		cfgCtx := context.WithValue(storageCtx, ctxCfg{}, cfg)
-		cacheCtx := context.WithValue(cfgCtx, ctxCacheKey{}, cache)
-
 		for _, route := range routes {
 			matches := route.Regex.FindStringSubmatch(r.URL.Path)
 			if len(matches) > 0 {
@@ -63,8 +70,8 @@ func CreateServeBasic(routes []Route, subdomain string, cfg *ConfigSite, dbpool 
 					allow = append(allow, route.Method)
 					continue
 				}
-				ctx := context.WithValue(cacheCtx, ctxKey{}, matches[1:])
-				route.Handler(w, r.WithContext(ctx))
+				finctx := context.WithValue(ctx, ctxKey{}, matches[1:])
+				route.Handler(w, r.WithContext(finctx))
 				return
 			}
 		}
@@ -103,10 +110,11 @@ func findRouteConfig(r *http.Request, routes []Route, subdomainRoutes []Route, c
 	return curRoutes, subdomain
 }
 
-func CreateServe(routes []Route, subdomainRoutes []Route, cfg *ConfigSite, dbpool db.DB, st storage.StorageServe, logger *slog.Logger, cache *cache.Cache) ServeFn {
+func CreateServe(routes []Route, subdomainRoutes []Route, httpCtx *HttpCtx) ServeFn {
 	return func(w http.ResponseWriter, r *http.Request) {
-		curRoutes, subdomain := findRouteConfig(r, routes, subdomainRoutes, cfg)
-		router := CreateServeBasic(curRoutes, subdomain, cfg, dbpool, st, logger, cache)
+		curRoutes, subdomain := findRouteConfig(r, routes, subdomainRoutes, httpCtx.Cfg)
+		ctx := httpCtx.CreateCtx(r.Context(), subdomain)
+		router := CreateServeBasic(curRoutes, ctx)
 		router(w, r)
 	}
 }
@@ -115,7 +123,6 @@ type ctxDBKey struct{}
 type ctxStorageKey struct{}
 type ctxKey struct{}
 type ctxLoggerKey struct{}
-type ctxCacheKey struct{}
 type ctxSubdomainKey struct{}
 type ctxCfg struct{}
 
@@ -125,10 +132,6 @@ func GetCfg(r *http.Request) *ConfigSite {
 
 func GetLogger(r *http.Request) *slog.Logger {
 	return r.Context().Value(ctxLoggerKey{}).(*slog.Logger)
-}
-
-func GetCache(r *http.Request) *cache.Cache {
-	return r.Context().Value(ctxCacheKey{}).(*cache.Cache)
 }
 
 func GetDB(r *http.Request) db.DB {
