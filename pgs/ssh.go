@@ -83,6 +83,7 @@ func allowPerm(proj *db.Project) bool {
 }
 
 type PicoApi struct {
+	Jwt string `json:"token"`
 	UserID    string `json:"user_id"`
 	UserName  string `json:"username"`
 	PublicKey string `json:"public_key"`
