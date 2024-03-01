@@ -43,7 +43,24 @@ func CreatePProfRoutes(routes []Route) []Route {
 	)
 }
 
-type ServeFn func(http.ResponseWriter, *http.Request)
+func WwwRedirect(serve http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasPrefix(r.Host, "www.") {
+			serve(w, r)
+			return
+		}
+
+		logger := GetLogger(r)
+		url := strings.Replace(r.Host, "www.", "", 1)
+		logger.Info(
+			"redirecting",
+			"host", r.Host,
+			"url", url,
+		)
+		http.Redirect(w, r, url, http.StatusMovedPermanently)
+	}
+}
+
 type HttpCtx struct {
 	Cfg     *ConfigSite
 	Dbpool  db.DB
@@ -59,7 +76,7 @@ func (hc *HttpCtx) CreateCtx(prevCtx context.Context, subdomain string) context.
 	return cfgCtx
 }
 
-func CreateServeBasic(routes []Route, ctx context.Context) ServeFn {
+func CreateServeBasic(routes []Route, ctx context.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var allow []string
 		for _, route := range routes {
@@ -109,7 +126,7 @@ func findRouteConfig(r *http.Request, routes []Route, subdomainRoutes []Route, c
 	return curRoutes, subdomain
 }
 
-func CreateServe(routes []Route, subdomainRoutes []Route, httpCtx *HttpCtx) ServeFn {
+func CreateServe(routes []Route, subdomainRoutes []Route, httpCtx *HttpCtx) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		curRoutes, subdomain := findRouteConfig(r, routes, subdomainRoutes, httpCtx.Cfg)
 		ctx := httpCtx.CreateCtx(r.Context(), subdomain)
@@ -154,7 +171,12 @@ func GetSubdomain(r *http.Request) string {
 }
 
 func GetCustomDomain(host string, space string) string {
-	txt := fmt.Sprintf("_%s.%s", space, host)
+	finhost := host
+	if strings.HasPrefix(host, "www.") {
+		finhost = strings.Replace(host, "www.", "", 1)
+	}
+
+	txt := fmt.Sprintf("_%s.%s", space, finhost)
 	records, err := net.LookupTXT(txt)
 	if err != nil {
 		return ""

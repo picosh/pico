@@ -458,9 +458,9 @@ func createSubdomainRoutes(hasPerm HasPerm) []shared.Route {
 	imgRequest := ImgAssetRequest(hasPerm)
 
 	return []shared.Route{
-		shared.NewRoute("GET", "/", assetRequest),
-		shared.NewRoute("GET", "(/.+.(?:jpg|jpeg|png|gif|webp|svg))(/.+)", imgRequest),
-		shared.NewRoute("GET", "/(.+)", assetRequest),
+		shared.NewRoute("GET", "/", shared.WwwRedirect(assetRequest)),
+		shared.NewRoute("GET", "(/.+.(?:jpg|jpeg|png|gif|webp|svg))(/.+)", shared.WwwRedirect(imgRequest)),
+		shared.NewRoute("GET", "/(.+)", shared.WwwRedirect(assetRequest)),
 	}
 }
 
