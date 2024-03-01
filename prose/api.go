@@ -895,7 +895,6 @@ func StartApiServer() {
 		Cfg:     cfg,
 		Dbpool:  db,
 		Storage: st,
-		Logger:  logger,
 	}
 	handler := shared.CreateServe(mainRoutes, subdomainRoutes, httpCtx)
 	router := http.HandlerFunc(handler)

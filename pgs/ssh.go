@@ -94,7 +94,7 @@ func createHttpHandler(httpCtx *shared.HttpCtx) CtxHttpBridge {
 	return func(ctx ssh.Context) http.Handler {
 		subdomain := ctx.User()
 		dbh := httpCtx.Dbpool
-		logger := httpCtx.Logger
+		logger := httpCtx.Cfg.Logger
 		log := logger.With(
 			"subdomain", subdomain,
 		)

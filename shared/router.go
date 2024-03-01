@@ -45,14 +45,13 @@ func CreatePProfRoutes(routes []Route) []Route {
 
 type ServeFn func(http.ResponseWriter, *http.Request)
 type HttpCtx struct {
-	Logger  *slog.Logger
 	Cfg     *ConfigSite
 	Dbpool  db.DB
 	Storage storage.StorageServe
 }
 
 func (hc *HttpCtx) CreateCtx(prevCtx context.Context, subdomain string) context.Context {
-	loggerCtx := context.WithValue(prevCtx, ctxLoggerKey{}, hc.Logger)
+	loggerCtx := context.WithValue(prevCtx, ctxLoggerKey{}, hc.Cfg.Logger)
 	subdomainCtx := context.WithValue(loggerCtx, ctxSubdomainKey{}, subdomain)
 	dbCtx := context.WithValue(subdomainCtx, ctxDBKey{}, hc.Dbpool)
 	storageCtx := context.WithValue(dbCtx, ctxStorageKey{}, hc.Storage)
