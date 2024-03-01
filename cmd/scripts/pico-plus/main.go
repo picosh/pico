@@ -14,15 +14,23 @@ func main() {
 
 	args := os.Args
 	username := args[1]
-	txId := args[2]
+	paymentType := ""
+	if len(args) > 2 {
+		paymentType = args[2]
+	}
+	txId := ""
+	if len(args) > 3 {
+		txId = args[2]
+	}
 
 	logger.Info(
 		"Upgrading user to pico+",
 		"username", username,
+		"paymentType", paymentType,
 		"txId", txId,
 	)
 
-	err := dbpool.AddPicoPlusUser(username, txId)
+	err := dbpool.AddPicoPlusUser(username, paymentType, txId)
 	if err != nil {
 		logger.Error("Failed to add pico+ user", "err", err)
 		os.Exit(1)

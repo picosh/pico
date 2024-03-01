@@ -324,7 +324,7 @@ type DB interface {
 
 	AddViewCount(postID string) (int, error)
 
-	AddPicoPlusUser(username string, txId string) error
+	AddPicoPlusUser(username string, paymentType, txId string) error
 	FindFeatureForUser(userID string, feature string) (*FeatureFlag, error)
 	HasFeatureForUser(userID string, feature string) bool
 	FindTotalSizeForUser(userID string) (int, error)

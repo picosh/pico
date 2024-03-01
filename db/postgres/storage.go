@@ -1541,7 +1541,7 @@ func (me *PsqlDB) FindTokensForUser(userID string) ([]*db.Token, error) {
 	return keys, nil
 }
 
-func (me *PsqlDB) AddPicoPlusUser(username, txId string) error {
+func (me *PsqlDB) AddPicoPlusUser(username, paymentType, txId string) error {
 	user, err := me.FindUserForName(username)
 	if err != nil {
 		return err
@@ -1556,14 +1556,15 @@ func (me *PsqlDB) AddPicoPlusUser(username, txId string) error {
 		err = tx.Rollback()
 	}()
 
-	if txId != "" {
+	if paymentType != "" {
 		data := db.PaymentHistoryData{
 			Notes: "",
 			TxID:  txId,
 		}
 		_, err := tx.Exec(
-			`INSERT INTO payment_history (user_id, payment_type, amount, data) VALUES ($1, 'stripe', 20 * 1000000, $2);`,
+			`INSERT INTO payment_history (user_id, payment_type, amount, data) VALUES ($1, $2, 20 * 1000000, $3);`,
 			user.ID,
+			paymentType,
 			data,
 		)
 		if err != nil {
