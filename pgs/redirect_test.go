@@ -28,8 +28,38 @@ func TestParseRedirectText(t *testing.T) {
 		},
 	}
 
+	withStatus := RedirectFixture{
+		name:  "with-status",
+		input: "/wow     /index.html     301",
+		expect: []*RedirectRule{
+			{
+				From:       "/wow",
+				To:         "/index.html",
+				Status:     301,
+				Query:      empty,
+				Conditions: empty,
+			},
+		},
+	}
+
+	noStatus := RedirectFixture{
+		name:  "no-status",
+		input: "/wow     /index.html",
+		expect: []*RedirectRule{
+			{
+				From:       "/wow",
+				To:         "/index.html",
+				Status:     200,
+				Query:      empty,
+				Conditions: empty,
+			},
+		},
+	}
+
 	fixtures := []RedirectFixture{
 		spa,
+		withStatus,
+		noStatus,
 	}
 
 	for _, fixture := range fixtures {
