@@ -341,7 +341,7 @@ type DB interface {
 	FindProjectLinks(userID, name string) ([]*Project, error)
 	FindProjectsByUser(userID string) ([]*Project, error)
 	FindProjectsByPrefix(userID, name string) ([]*Project, error)
-	FindAllProjects(page *Pager) (*Paginate[*Project], error)
+	FindAllProjects(page *Pager, by string) (*Paginate[*Project], error)
 
 	Close() error
 }

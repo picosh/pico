@@ -87,58 +87,67 @@ type RssData struct {
 	Contents template.HTML
 }
 
-func rssHandler(w http.ResponseWriter, r *http.Request) {
-	dbpool := shared.GetDB(r)
-	logger := shared.GetLogger(r)
-	cfg := shared.GetCfg(r)
+func createRssHandler(by string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		dbpool := shared.GetDB(r)
+		logger := shared.GetLogger(r)
+		cfg := shared.GetCfg(r)
 
-	pager, err := dbpool.FindAllProjects(&db.Pager{Num: 50, Page: 0})
-	if err != nil {
-		logger.Error(err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	feed := &feeds.Feed{
-		Title:       fmt.Sprintf("%s discovery feed", cfg.Domain),
-		Link:        &feeds.Link{Href: cfg.ReadURL()},
-		Description: fmt.Sprintf("%s latest projects", cfg.Domain),
-		Author:      &feeds.Author{Name: cfg.Domain},
-		Created:     time.Now(),
-	}
-
-	var feedItems []*feeds.Item
-	for _, project := range pager.Data {
-		realUrl := strings.TrimSuffix(
-			cfg.AssetURL(project.Username, project.Name, ""),
-			"/",
-		)
-
-		item := &feeds.Item{
-			Id:          realUrl,
-			Title:       project.Name,
-			Link:        &feeds.Link{Href: realUrl},
-			Content:     fmt.Sprintf(`<a href="%s">%s</a>`, realUrl, realUrl),
-			Created:     *project.CreatedAt,
-			Updated:     *project.CreatedAt,
-			Description: "",
-			Author:      &feeds.Author{Name: project.Username},
+		pager, err := dbpool.FindAllProjects(&db.Pager{Num: 100, Page: 0}, by)
+		if err != nil {
+			logger.Error(err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
 
-		feedItems = append(feedItems, item)
-	}
-	feed.Items = feedItems
+		feed := &feeds.Feed{
+			Title:       fmt.Sprintf("%s discovery feed %s", cfg.Domain, by),
+			Link:        &feeds.Link{Href: cfg.ReadURL()},
+			Description: fmt.Sprintf("%s projects %s", cfg.Domain, by),
+			Author:      &feeds.Author{Name: cfg.Domain},
+			Created:     time.Now(),
+		}
 
-	rss, err := feed.ToAtom()
-	if err != nil {
-		logger.Error(err.Error())
-		http.Error(w, "Could not generate atom rss feed", http.StatusInternalServerError)
-	}
+		var feedItems []*feeds.Item
+		for _, project := range pager.Data {
+			realUrl := strings.TrimSuffix(
+				cfg.AssetURL(project.Username, project.Name, ""),
+				"/",
+			)
+			uat := project.UpdatedAt.Unix()
+			id := realUrl
+			title := fmt.Sprintf("%s-%s", project.Username, project.Name)
+			if by == "updated_at" {
+				id = fmt.Sprintf("%s:%d", realUrl, uat)
+				title = fmt.Sprintf("%s - %d", title, uat)
+			}
 
-	w.Header().Add("Content-Type", "application/atom+xml")
-	_, err = w.Write([]byte(rss))
-	if err != nil {
-		logger.Error(err.Error())
+			item := &feeds.Item{
+				Id:          id,
+				Title:       title,
+				Link:        &feeds.Link{Href: realUrl},
+				Content:     fmt.Sprintf(`<a href="%s">%s</a>`, realUrl, realUrl),
+				Created:     *project.CreatedAt,
+				Updated:     *project.CreatedAt,
+				Description: "",
+				Author:      &feeds.Author{Name: project.Username},
+			}
+
+			feedItems = append(feedItems, item)
+		}
+		feed.Items = feedItems
+
+		rss, err := feed.ToAtom()
+		if err != nil {
+			logger.Error(err.Error())
+			http.Error(w, "Could not generate atom rss feed", http.StatusInternalServerError)
+		}
+
+		w.Header().Add("Content-Type", "application/atom+xml")
+		_, err = w.Write([]byte(rss))
+		if err != nil {
+			logger.Error(err.Error())
+		}
 	}
 }
 
@@ -449,7 +458,8 @@ var mainRoutes = []shared.Route{
 
 	shared.NewRoute("GET", "/", shared.CreatePageHandler("html/marketing.page.tmpl")),
 	shared.NewRoute("GET", "/check", checkHandler),
-	shared.NewRoute("GET", "/rss", rssHandler),
+	shared.NewRoute("GET", "/rss/updated", createRssHandler("updated_at")),
+	shared.NewRoute("GET", "/rss", createRssHandler("created_at")),
 	shared.NewRoute("GET", "/(.+)", shared.CreatePageHandler("html/marketing.page.tmpl")),
 }
 
