@@ -150,7 +150,7 @@ func createRssHandler(by string) http.HandlerFunc {
 	}
 }
 
-func (h *AssetHandler) handle(w http.ResponseWriter) {
+func (h *AssetHandler) handle(w http.ResponseWriter, r *http.Request) {
 	var redirects []*RedirectRule
 	redirectFp, _, _, err := h.Storage.GetObject(h.Bucket, filepath.Join(h.ProjectDir, "_redirects"))
 	if err == nil {
@@ -174,7 +174,7 @@ func (h *AssetHandler) handle(w http.ResponseWriter) {
 	var contents io.ReadCloser
 	contentType := ""
 	assetFilepath := ""
-	status := 200
+	status := http.StatusOK
 	attempts := []string{}
 	for _, fp := range routes {
 		attempts = append(attempts, fp.Filepath)
@@ -244,8 +244,18 @@ func (h *AssetHandler) handle(w http.ResponseWriter) {
 		w.Header().Add(hdr.Name, hdr.Value)
 	}
 	if w.Header().Get("content-type") == "" {
-		w.Header().Set("Content-Type", contentType)
+		w.Header().Set("content-type", contentType)
 	}
+
+	h.Logger.Info(
+		"serving asset",
+		"host", r.Host,
+		"url", r.URL,
+		"bucket", h.Bucket.Name,
+		"asset", assetFilepath,
+		"status", status,
+		"contentType", w.Header().Get("content-type"),
+	)
 
 	w.WriteHeader(status)
 	_, err = io.Copy(w, contents)
@@ -341,7 +351,7 @@ func ServeAsset(fname string, opts *storage.ImgProcessOpts, fromImgs bool, hasPe
 		ImgProcessOpts: opts,
 	}
 
-	asset.handle(w)
+	asset.handle(w, r)
 }
 
 type HasPerm = func(proj *db.Project) bool

@@ -64,7 +64,7 @@ func expandRoute(projectName, fp string, status int) []*HttpReply {
 func calcRoutes(projectName, fp string, userRedirects []*RedirectRule) []*HttpReply {
 	notFound := &HttpReply{
 		Filepath: filepath.Join(projectName, "404.html"),
-		Status:   404,
+		Status:   http.StatusNotFound,
 	}
 
 	rts := expandRoute(projectName, fp, http.StatusOK)
@@ -78,7 +78,7 @@ func calcRoutes(projectName, fp string, userRedirects []*RedirectRule) []*HttpRe
 
 		rts = append(rts,
 			&HttpReply{
-				Filepath: defRoute, Status: 200,
+				Filepath: defRoute, Status: http.StatusOK,
 			},
 		)
 	}
