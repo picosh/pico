@@ -20,7 +20,6 @@ import (
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
 	sst "github.com/picosh/pobj/storage"
-	"github.com/picosh/send/send/utils"
 )
 
 type AssetHandler struct {
@@ -151,85 +150,6 @@ func createRssHandler(by string) http.HandlerFunc {
 	}
 }
 
-type HttpReply struct {
-	Filepath string
-	Query    map[string]string
-	Status   int
-}
-
-func calcPossibleRoutes(projectName, fp string, userRedirects []*RedirectRule) []*HttpReply {
-	fname := filepath.Base(fp)
-	fdir := filepath.Dir(fp)
-	fext := filepath.Ext(fp)
-	mimeType := storage.GetMimeType(fp)
-	rts := []*HttpReply{}
-	notFound := &HttpReply{
-		Filepath: filepath.Join(projectName, "404.html"),
-		Status:   404,
-	}
-
-	for _, redirect := range userRedirects {
-		rr := regexp.MustCompile(redirect.From)
-		match := rr.FindStringSubmatch(fp)
-		if len(match) > 0 {
-			ruleRoute := shared.GetAssetFileName(&utils.FileEntry{
-				Filepath: filepath.Join(projectName, redirect.To),
-			})
-			rule := &HttpReply{
-				Filepath: ruleRoute,
-				Status:   redirect.Status,
-				Query:    redirect.Query,
-			}
-			if redirect.Force {
-				rts = append([]*HttpReply{rule}, rts...)
-			} else {
-				rts = append(rts, rule)
-			}
-		}
-	}
-
-	// user routes take precedence
-	if len(rts) > 0 {
-		rts = append(rts, notFound)
-		return rts
-	}
-
-	// file extension is unknown
-	if mimeType == "text/plain" && fext != ".txt" {
-		dirRoute := shared.GetAssetFileName(&utils.FileEntry{
-			Filepath: filepath.Join(projectName, fp, "index.html"),
-		})
-		// we need to accommodate routes that are just directories
-		// and point the user to the index.html of each root dir.
-		nameRoute := shared.GetAssetFileName(&utils.FileEntry{
-			Filepath: filepath.Join(
-				projectName,
-				fdir,
-				fmt.Sprintf("%s.html", fname),
-			),
-		})
-		rts = append(rts,
-			&HttpReply{Filepath: nameRoute, Status: 200},
-			&HttpReply{Filepath: dirRoute, Status: 200},
-			notFound,
-		)
-		return rts
-	}
-
-	defRoute := shared.GetAssetFileName(&utils.FileEntry{
-		Filepath: filepath.Join(projectName, fdir, fname),
-	})
-
-	rts = append(rts,
-		&HttpReply{
-			Filepath: defRoute, Status: 200,
-		},
-		notFound,
-	)
-
-	return rts
-}
-
 func (h *AssetHandler) handle(w http.ResponseWriter) {
 	var redirects []*RedirectRule
 	redirectFp, _, _, err := h.Storage.GetObject(h.Bucket, filepath.Join(h.ProjectDir, "_redirects"))
@@ -249,7 +169,8 @@ func (h *AssetHandler) handle(w http.ResponseWriter) {
 		}
 	}
 
-	routes := calcPossibleRoutes(h.ProjectDir, h.Filepath, redirects)
+	routes := calcRoutes(h.ProjectDir, h.Filepath, redirects)
+
 	var contents io.ReadCloser
 	contentType := ""
 	assetFilepath := ""
@@ -470,7 +391,7 @@ func createSubdomainRoutes(hasPerm HasPerm) []shared.Route {
 	return []shared.Route{
 		shared.NewRoute("GET", "/", assetRequest),
 		shared.NewRoute("GET", "(/.+.(?:jpg|jpeg|png|gif|webp|svg))(/.+)", imgRequest),
-		shared.NewRoute("GET", "/(.+)", assetRequest),
+		shared.NewRoute("GET", "(/.+)", assetRequest),
 	}
 }
 

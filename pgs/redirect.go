@@ -2,6 +2,7 @@ package pgs
 
 import (
 	"fmt"
+	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
@@ -120,7 +121,15 @@ func parseRedirectText(text string) ([]*RedirectRule, error) {
 			queryParts := parts[:toIndex]
 			to := parts[toIndex]
 			lastParts := parts[toIndex+1:]
-			sts, frcd := hasStatusCode(lastParts[0])
+			conditions := map[string]string{}
+			sts := http.StatusOK
+			frcd := false
+			if len(lastParts) > 0 {
+				sts, frcd = hasStatusCode(lastParts[0])
+			}
+			if len(lastParts) > 1 {
+				conditions = parsePairs(lastParts[1:])
+			}
 
 			rules = append(rules, &RedirectRule{
 				To:         to,
@@ -128,7 +137,7 @@ func parseRedirectText(text string) ([]*RedirectRule, error) {
 				Status:     sts,
 				Force:      frcd,
 				Query:      parsePairs(queryParts),
-				Conditions: parsePairs(lastParts[1:]),
+				Conditions: conditions,
 			})
 		}
 	}

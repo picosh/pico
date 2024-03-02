@@ -13,11 +13,11 @@ type RouteFixture struct {
 	Expected []*HttpReply
 }
 
-func TestCalcPossibleRoutes(t *testing.T) {
+func TestCalcRoutes(t *testing.T) {
 	fixtures := []RouteFixture{
 		{
 			Name:   "basic-index",
-			Actual: calcPossibleRoutes("test", "index.html", []*RedirectRule{}),
+			Actual: calcRoutes("test", "/index.html", []*RedirectRule{}),
 			Expected: []*HttpReply{
 				{Filepath: "test/index.html", Status: 200},
 				{Filepath: "test/404.html", Status: 404},
@@ -25,7 +25,7 @@ func TestCalcPossibleRoutes(t *testing.T) {
 		},
 		{
 			Name:   "basic-txt",
-			Actual: calcPossibleRoutes("test", "index.txt", []*RedirectRule{}),
+			Actual: calcRoutes("test", "/index.txt", []*RedirectRule{}),
 			Expected: []*HttpReply{
 				{Filepath: "test/index.txt", Status: 200},
 				{Filepath: "test/404.html", Status: 404},
@@ -33,7 +33,7 @@ func TestCalcPossibleRoutes(t *testing.T) {
 		},
 		{
 			Name:   "basic-named",
-			Actual: calcPossibleRoutes("test", "wow.html", []*RedirectRule{}),
+			Actual: calcRoutes("test", "/wow.html", []*RedirectRule{}),
 			Expected: []*HttpReply{
 				{Filepath: "test/wow.html", Status: 200},
 				{Filepath: "test/404.html", Status: 404},
@@ -41,7 +41,7 @@ func TestCalcPossibleRoutes(t *testing.T) {
 		},
 		{
 			Name:   "subdirectory-index",
-			Actual: calcPossibleRoutes("test", "nice/index.html", []*RedirectRule{}),
+			Actual: calcRoutes("test", "/nice/index.html", []*RedirectRule{}),
 			Expected: []*HttpReply{
 				{Filepath: "test/nice/index.html", Status: 200},
 				{Filepath: "test/404.html", Status: 404},
@@ -49,7 +49,7 @@ func TestCalcPossibleRoutes(t *testing.T) {
 		},
 		{
 			Name:   "subdirectory-named",
-			Actual: calcPossibleRoutes("test", "nice/wow.html", []*RedirectRule{}),
+			Actual: calcRoutes("test", "/nice/wow.html", []*RedirectRule{}),
 			Expected: []*HttpReply{
 				{Filepath: "test/nice/wow.html", Status: 200},
 				{Filepath: "test/404.html", Status: 404},
@@ -57,7 +57,7 @@ func TestCalcPossibleRoutes(t *testing.T) {
 		},
 		{
 			Name:   "subdirectory-bare",
-			Actual: calcPossibleRoutes("test", "nice", []*RedirectRule{}),
+			Actual: calcRoutes("test", "/nice", []*RedirectRule{}),
 			Expected: []*HttpReply{
 				{Filepath: "test/nice.html", Status: 200},
 				{Filepath: "test/nice/index.html", Status: 200},
@@ -66,7 +66,7 @@ func TestCalcPossibleRoutes(t *testing.T) {
 		},
 		{
 			Name: "spa",
-			Actual: calcPossibleRoutes("test", "nice", []*RedirectRule{
+			Actual: calcRoutes("test", "/nice", []*RedirectRule{
 				{
 					From:   "/*",
 					To:     "/index.html",
@@ -74,15 +74,76 @@ func TestCalcPossibleRoutes(t *testing.T) {
 				},
 			}),
 			Expected: []*HttpReply{
+				{Filepath: "test/nice.html", Status: 200},
+				{Filepath: "test/nice/index.html", Status: 200},
 				{Filepath: "test/index.html", Status: 200},
 				{Filepath: "test/404.html", Status: 404},
 			},
 		},
 		{
 			Name:   "xml",
-			Actual: calcPossibleRoutes("test", "index.xml", []*RedirectRule{}),
+			Actual: calcRoutes("test", "/index.xml", []*RedirectRule{}),
 			Expected: []*HttpReply{
 				{Filepath: "test/index.xml", Status: 200},
+				{Filepath: "test/404.html", Status: 404},
+			},
+		},
+		{
+			Name: "redirectRule",
+			Actual: calcRoutes(
+				"test",
+				"/wow",
+				[]*RedirectRule{
+					{
+						From:   "/wow",
+						To:     "index.html",
+						Status: 301,
+					},
+				},
+			),
+			Expected: []*HttpReply{
+				{Filepath: "test/wow.html", Status: 200},
+				{Filepath: "test/wow/index.html", Status: 200},
+				{Filepath: "test/index.html", Status: 301},
+				{Filepath: "test/404.html", Status: 404},
+			},
+		},
+		{
+			Name: "root",
+			Actual: calcRoutes(
+				"test",
+				"/wow",
+				[]*RedirectRule{
+					{
+						From:   "/wow",
+						To:     "/",
+						Status: 301,
+					},
+				},
+			),
+			Expected: []*HttpReply{
+				{Filepath: "test/wow.html", Status: 200},
+				{Filepath: "test/wow/index.html", Status: 200},
+				{Filepath: "test/index.html", Status: 301},
+				{Filepath: "test/404.html", Status: 404},
+			},
+		},
+		{
+			Name: "force",
+			Actual: calcRoutes(
+				"test",
+				"/wow",
+				[]*RedirectRule{
+					{
+						From:   "/wow",
+						To:     "/",
+						Status: 301,
+						Force:  true,
+					},
+				},
+			),
+			Expected: []*HttpReply{
+				{Filepath: "test/index.html", Status: 301},
 				{Filepath: "test/404.html", Status: 404},
 			},
 		},
