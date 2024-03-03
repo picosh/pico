@@ -12,9 +12,11 @@ import (
 	"github.com/yuin/goldmark"
 	highlighting "github.com/yuin/goldmark-highlighting"
 	meta "github.com/yuin/goldmark-meta"
+	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
 	ghtml "github.com/yuin/goldmark/renderer/html"
+	gtext "github.com/yuin/goldmark/text"
 	"go.abhg.dev/goldmark/anchor"
 	yaml "gopkg.in/yaml.v2"
 )
@@ -200,18 +202,41 @@ func ParseText(text string) (*ParsedText, error) {
 		),
 	)
 	context := parser.NewContext()
-	if err := md.Convert([]byte(text), &buf, parser.WithContext(context)); err != nil {
+
+	// we do the Parse/Render steps manually to get a chance to examine the AST
+	btext := []byte(text)
+	doc := md.Parser().Parse(gtext.NewReader(btext), parser.WithContext(context))
+	if err := md.Renderer().Render(&buf, btext, doc); err != nil {
 		return &parsed, err
 	}
 
 	parsed.Html = policy.Sanitize(buf.String())
 	metaData := meta.Get(context)
 
+	// title:
+	// 1. if specified in frontmatter, use that
 	title, err := toString(metaData["title"])
 	if err != nil {
 		return &parsed, fmt.Errorf("front-matter field (%s): %w", "title", err)
 	}
 	parsed.MetaData.Title = title
+	// 2. If an <h1> is found before a <p> or other heading is found, use that
+	if parsed.MetaData.Title == "" {
+		ast.Walk(doc, func (n ast.Node, entering bool) (ast.WalkStatus, error) {
+			if n.Kind() == ast.KindHeading {
+				if h := n.(*ast.Heading); h.Level == 1 {
+					parsed.MetaData.Title = string(h.Text(btext))
+				}
+				return ast.WalkStop, nil
+			}
+			if ast.IsParagraph(n) {
+				return ast.WalkStop, nil
+			}
+			return ast.WalkStop, nil
+		})
+	}
+	// 3. else, set it to nothing (slug should get used later down the line)
+	// this is implicit since it's already ""
 
 	description, err := toString(metaData["description"])
 	if err != nil {
