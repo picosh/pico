@@ -1,12 +1,27 @@
 package shared
 
 import (
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"net/http"
 	"os"
 	"strings"
 )
+
+func UnauthorizedHandler(w http.ResponseWriter, r *http.Request) {
+	http.Error(w, "You do not have access to this site", http.StatusUnauthorized)
+}
+
+type errPayload struct {
+	Message string `json:"message"`
+}
+
+func JSONError(w http.ResponseWriter, msg string, code int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	_ = json.NewEncoder(w).Encode(errPayload{Message: msg})
+}
 
 func CheckHandler(w http.ResponseWriter, r *http.Request) {
 	dbpool := GetDB(r)

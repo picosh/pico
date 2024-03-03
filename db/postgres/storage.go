@@ -148,9 +148,10 @@ const (
 	FROM app_users
 	LEFT JOIN tokens ON tokens.user_id = app_users.id
 	WHERE tokens.token = $1 AND tokens.expires_at > NOW()`
-	sqlInsertToken         = `INSERT INTO tokens (user_id, name) VALUES($1, $2) RETURNING token;`
-	sqlRemoveToken         = `DELETE FROM tokens WHERE id = $1`
-	sqlSelectTokensForUser = `SELECT id, user_id, name, created_at, expires_at FROM tokens WHERE user_id = $1`
+	sqlInsertToken           = `INSERT INTO tokens (user_id, name) VALUES($1, $2) RETURNING token;`
+	sqlRemoveToken           = `DELETE FROM tokens WHERE id = $1`
+	sqlSelectTokensForUser   = `SELECT id, user_id, name, created_at, expires_at FROM tokens WHERE user_id = $1`
+	sqlSelectRssTokenForUser = `SELECT token FROM tokens WHERE user_id = $1 AND name = 'pico-rss'`
 
 	sqlSelectTotalUsers          = `SELECT count(id) FROM app_users`
 	sqlSelectUsersAfterDate      = `SELECT count(id) FROM app_users WHERE created_at >= $1`
@@ -1199,6 +1200,38 @@ func (me *PsqlDB) FindFeatureForUser(userID string, feature string) (*db.Feature
 	return ff, nil
 }
 
+func (me *PsqlDB) FindFeaturesForUser(userID string) ([]*db.FeatureFlag, error) {
+	var features []*db.FeatureFlag
+	query := "SELECT id, user_id, payment_history_id, name, data, created_at, expires_at FROM feature_flags WHERE user_id=$1"
+	rs, err := me.Db.Query(query, userID)
+	if err != nil {
+		return features, err
+	}
+	for rs.Next() {
+		var paymentHistoryID sql.NullString
+		ff := &db.FeatureFlag{}
+		err := rs.Scan(
+			&ff.ID,
+			&ff.UserID,
+			&paymentHistoryID,
+			&ff.Name,
+			&ff.Data,
+			&ff.CreatedAt,
+			&ff.ExpiresAt,
+		)
+		if err != nil {
+			return features, err
+		}
+		ff.Name = paymentHistoryID.String
+
+		features = append(features, ff)
+	}
+	if rs.Err() != nil {
+		return features, rs.Err()
+	}
+	return features, nil
+}
+
 func (me *PsqlDB) HasFeatureForUser(userID string, feature string) bool {
 	ff, err := me.FindFeatureForUser(userID, feature)
 	if err != nil {
@@ -1509,6 +1542,15 @@ func (me *PsqlDB) FindAllProjects(page *db.Pager, by string) (*db.Paginate[*db.P
 func (me *PsqlDB) InsertToken(userID, name string) (string, error) {
 	var token string
 	err := me.Db.QueryRow(sqlInsertToken, userID, name).Scan(&token)
+	if err != nil {
+		return "", err
+	}
+	return token, nil
+}
+
+func (me *PsqlDB) FindRssToken(userID string) (string, error) {
+	var token string
+	err := me.Db.QueryRow(sqlSelectRssTokenForUser, userID).Scan(&token)
 	if err != nil {
 		return "", err
 	}

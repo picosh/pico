@@ -28,6 +28,12 @@ type User struct {
 	CreatedAt *time.Time `json:"created_at"`
 }
 
+type PicoApi struct {
+	UserID    string `json:"user_id"`
+	UserName  string `json:"username"`
+	PublicKey string `json:"pubkey"`
+}
+
 type PostData struct {
 	ImgPath    string     `json:"img_path"`
 	LastDigest *time.Time `json:"last_digest"`
@@ -165,21 +171,21 @@ type FeedItem struct {
 }
 
 type Token struct {
-	ID        string
-	UserID    string
-	Name      string
-	CreatedAt *time.Time
-	ExpiresAt *time.Time
+	ID        string     `json:"id"`
+	UserID    string     `json:"user_id"`
+	Name      string     `json:"name"`
+	CreatedAt *time.Time `json:"created_at"`
+	ExpiresAt *time.Time `json:"expires_at"`
 }
 
 type FeatureFlag struct {
-	ID               string
-	UserID           string
-	PaymentHistoryID string
-	Name             string
-	CreatedAt        *time.Time
-	ExpiresAt        *time.Time
-	Data             FeatureFlagData
+	ID               string          `json:"id"`
+	UserID           string          `json:"user_id"`
+	PaymentHistoryID string          `json:"payment_history_id"`
+	Name             string          `json:"name"`
+	CreatedAt        *time.Time      `json:"created_at"`
+	ExpiresAt        *time.Time      `json:"expires_at"`
+	Data             FeatureFlagData `json:"data"`
 }
 
 func NewFeatureFlag(userID, name string, storageMax uint64, fileMax int64) *FeatureFlag {
@@ -297,6 +303,7 @@ type DB interface {
 	FindUserForToken(token string) (*User, error)
 	FindTokensForUser(userID string) ([]*Token, error)
 	InsertToken(userID, name string) (string, error)
+	FindRssToken(userID string) (string, error)
 	RemoveToken(tokenID string) error
 
 	FindPosts() ([]*Post, error)
@@ -326,6 +333,7 @@ type DB interface {
 
 	AddPicoPlusUser(username string, paymentType, txId string) error
 	FindFeatureForUser(userID string, feature string) (*FeatureFlag, error)
+	FindFeaturesForUser(userID string) ([]*FeatureFlag, error)
 	HasFeatureForUser(userID string, feature string) bool
 	FindTotalSizeForUser(userID string) (int, error)
 
