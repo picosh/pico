@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"regexp"
+	"strings"
 
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
@@ -61,6 +62,11 @@ func expandRoute(projectName, fp string, status int) []*HttpReply {
 	return routes
 }
 
+func hasProtocol(url string) bool {
+	isFullUrl := strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://")
+	return isFullUrl
+}
+
 func calcRoutes(projectName, fp string, userRedirects []*RedirectRule) []*HttpReply {
 	notFound := &HttpReply{
 		Filepath: filepath.Join(projectName, "404.html"),
@@ -89,9 +95,16 @@ func calcRoutes(projectName, fp string, userRedirects []*RedirectRule) []*HttpRe
 		match := rr.FindStringSubmatch(fp)
 		if len(match) > 0 {
 			userReply := []*HttpReply{}
-			ruleRoute := shared.GetAssetFileName(&utils.FileEntry{
-				Filepath: filepath.Join(projectName, redirect.To),
-			})
+			ruleRoute := redirect.To
+
+			// special case for redirects that include http(s)://
+			isFullUrl := hasProtocol(redirect.To)
+			if !isFullUrl {
+				ruleRoute = shared.GetAssetFileName(&utils.FileEntry{
+					Filepath: filepath.Join(projectName, redirect.To),
+				})
+			}
+
 			var rule *HttpReply
 			if redirect.To != "" && redirect.To != "/" {
 				rule = &HttpReply{
@@ -102,8 +115,10 @@ func calcRoutes(projectName, fp string, userRedirects []*RedirectRule) []*HttpRe
 				userReply = append(userReply, rule)
 			}
 
-			expandedRoutes := expandRoute(projectName, redirect.To, redirect.Status)
-			userReply = append(userReply, expandedRoutes...)
+			if !isFullUrl {
+				expandedRoutes := expandRoute(projectName, redirect.To, redirect.Status)
+				userReply = append(userReply, expandedRoutes...)
+			}
 
 			if redirect.Force {
 				rts = userReply

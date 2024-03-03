@@ -177,6 +177,18 @@ func (h *AssetHandler) handle(w http.ResponseWriter, r *http.Request) {
 	status := http.StatusOK
 	attempts := []string{}
 	for _, fp := range routes {
+		if hasProtocol(fp.Filepath) {
+			h.Logger.Info(
+				"redirecting request",
+				"bucket", h.Bucket.Name,
+				"url", r.URL,
+				"destination", fp.Filepath,
+				"status", fp.Status,
+			)
+			http.Redirect(w, r, fp.Filepath, fp.Status)
+			return
+		}
+
 		attempts = append(attempts, fp.Filepath)
 		mimeType := storage.GetMimeType(fp.Filepath)
 		var c io.ReadCloser

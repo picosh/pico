@@ -147,6 +147,26 @@ func TestCalcRoutes(t *testing.T) {
 				{Filepath: "test/404.html", Status: 404},
 			},
 		},
+		{
+			Name: "redirectFullUrl",
+			Actual: calcRoutes(
+				"test",
+				"/wow",
+				[]*RedirectRule{
+					{
+						From:   "/wow",
+						To:     "https://pico.sh",
+						Status: 301,
+					},
+				},
+			),
+			Expected: []*HttpReply{
+				{Filepath: "test/wow.html", Status: 200},
+				{Filepath: "test/wow/index.html", Status: 200},
+				{Filepath: "https://pico.sh", Status: 301},
+				{Filepath: "test/404.html", Status: 404},
+			},
+		},
 	}
 
 	for _, fixture := range fixtures {
