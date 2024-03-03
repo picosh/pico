@@ -48,9 +48,8 @@ func (p *MarkdownHooks) FileValidate(s ssh.Session, data *filehandlers.PostMetaD
 
 func (p *MarkdownHooks) FileMeta(s ssh.Session, data *filehandlers.PostMetaData) error {
 	parsedText, err := shared.ParseText(data.Text)
-	// we return nil here because we don't want the file upload to fail
 	if err != nil {
-		return nil
+		return fmt.Errorf("%s: %w", data.Filename, err)
 	}
 
 	if parsedText.Title == "" {

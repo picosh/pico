@@ -52,18 +52,28 @@ func HtmlPolicy() *bluemonday.Policy {
 
 var policy = HtmlPolicy()
 
-func toString(obj interface{}) string {
+func toString(obj interface{}) (string, error) {
 	if obj == nil {
-		return ""
+		return "", nil
 	}
-	return obj.(string)
+	switch val := obj.(type) {
+	case string:
+		return val, nil
+	default:
+		return "", fmt.Errorf("incorrect type for value: %T, should be string", val)
+	}
 }
 
-func toBool(obj interface{}) bool {
+func toBool(obj interface{}) (bool, error) {
 	if obj == nil {
-		return false
+		return false, nil
 	}
-	return obj.(bool)
+	switch val := obj.(type) {
+	case bool:
+		return val, nil
+	default:
+		return false, fmt.Errorf("incorrect type for value: %T, should be bool", val)
+	}
 }
 
 func toLinks(orderedMetaData yaml.MapSlice) ([]Link, error) {
@@ -196,17 +206,55 @@ func ParseText(text string) (*ParsedText, error) {
 
 	parsed.Html = policy.Sanitize(buf.String())
 	metaData := meta.Get(context)
-	parsed.MetaData.Title = toString(metaData["title"])
-	parsed.MetaData.Description = toString(metaData["description"])
-	parsed.MetaData.Layout = toString(metaData["layout"])
-	parsed.MetaData.Image = toString(metaData["image"])
-	parsed.MetaData.ImageCard = toString(metaData["card"])
-	parsed.MetaData.Hidden = toBool(metaData["draft"])
-	parsed.MetaData.Favicon = toString(metaData["favicon"])
+
+	title, err := toString(metaData["title"])
+	if err != nil {
+		return &parsed, fmt.Errorf("front-matter field (%s): %w", "title", err)
+	}
+	parsed.MetaData.Title = title
+
+	description, err := toString(metaData["description"])
+	if err != nil {
+		return &parsed, fmt.Errorf("front-matter field (%s): %w", "description", err)
+	}
+	parsed.MetaData.Description = description
+
+	layout, err := toString(metaData["layout"])
+	if err != nil {
+		return &parsed, fmt.Errorf("front-matter field (%s): %w", "layout", err)
+	}
+	parsed.MetaData.Layout = layout
+
+	image, err := toString(metaData["image"])
+	if err != nil {
+		return &parsed, fmt.Errorf("front-matter field (%s): %w", "image", err)
+	}
+	parsed.MetaData.Image = image
+
+	card, err := toString(metaData["card"])
+	if err != nil {
+		return &parsed, fmt.Errorf("front-matter field (%s): %w", "card", err)
+	}
+	parsed.MetaData.ImageCard = card
+
+	hidden, err := toBool(metaData["draft"])
+	if err != nil {
+		return &parsed, fmt.Errorf("front-matter field (%s): %w", "draft", err)
+	}
+	parsed.MetaData.Hidden = hidden
+
+	favicon, err := toString(metaData["favicon"])
+	if err != nil {
+		return &parsed, fmt.Errorf("front-matter field (%s): %w", "favicon", err)
+	}
+	parsed.MetaData.Favicon = favicon
 
 	var publishAt *time.Time = nil
-	var err error
-	date := toString(metaData["date"])
+	date, err := toString(metaData["date"])
+	if err != nil {
+		return &parsed, fmt.Errorf("front-matter field (%s): %w", "date", err)
+	}
+
 	if date != "" {
 		nextDate, err := dateparse.ParseStrict(date)
 		if err != nil {
