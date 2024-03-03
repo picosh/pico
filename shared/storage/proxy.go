@@ -56,6 +56,22 @@ func GetMimeType(fpath string) string {
 		return "application/manifest+json"
 	} else if ext == ".xml" {
 		return "application/xml"
+	} else if ext == ".avif" {
+		return "image/avif"
+	} else if ext == ".heif" {
+		return "image/heif"
+	} else if ext == ".heic" {
+		return "image/heif"
+	} else if ext == ".opus" {
+		return "audio/opus"
+	} else if ext == ".wav" {
+		return "audio/wav"
+	} else if ext == ".mp3" {
+		return "audio/mpeg"
+	} else if ext == ".mp4" {
+		return "video/mp4"
+	} else if ext == ".mpeg" {
+		return "video/mpeg"
 	} else if ext == ".txt" {
 		return "text/plain"
 	}
