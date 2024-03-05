@@ -80,6 +80,7 @@ func NewConfigSite() *shared.ConfigSite {
 				".mp3",
 				".mp4",
 				".mpeg",
+				".wasm",
 			},
 			MaxSize:       maxSize,
 			MaxAssetSize:  maxAssetSize,

@@ -72,6 +72,8 @@ func GetMimeType(fpath string) string {
 		return "video/mp4"
 	} else if ext == ".mpeg" {
 		return "video/mpeg"
+	} else if ext == ".wasm" {
+		return "application/wasm"
 	} else if ext == ".txt" {
 		return "text/plain"
 	}
