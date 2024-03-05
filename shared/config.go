@@ -93,10 +93,10 @@ func (c *ConfigSite) HomeURL() string {
 
 func (c *ConfigSite) ReadURL() string {
 	if c.IsSubdomains() || c.IsCustomdomains() {
-		return fmt.Sprintf("%s://%s/read", c.Protocol, c.Domain)
+		return fmt.Sprintf("%s://%s", c.Protocol, c.Domain)
 	}
 
-	return "/read"
+	return "/"
 }
 
 func (c *ConfigSite) StaticPath(fname string) string {

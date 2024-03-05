@@ -646,7 +646,7 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 	feed := &feeds.Feed{
 		Id:          blogUrl,
 		Title:       headerTxt.Title,
-		Link:        &feeds.Link{Href: fmt.Sprintf("%s/rss", blogUrl)},
+		Link:        &feeds.Link{Href: blogUrl},
 		Description: headerTxt.Bio,
 		Author:      &feeds.Author{Name: username},
 		Created:     *user.CreatedAt,
