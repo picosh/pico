@@ -176,7 +176,6 @@ func ParseText(text string) (*ParsedText, error) {
 			Aliases: []string{},
 		},
 	}
-	var buf bytes.Buffer
 	hili := highlighting.NewHighlighting(
 		highlighting.WithFormatOptions(
 			html.WithLineNumbers(true),
@@ -206,11 +205,6 @@ func ParseText(text string) (*ParsedText, error) {
 	// we do the Parse/Render steps manually to get a chance to examine the AST
 	btext := []byte(text)
 	doc := md.Parser().Parse(gtext.NewReader(btext), parser.WithContext(context))
-	if err := md.Renderer().Render(&buf, btext, doc); err != nil {
-		return &parsed, err
-	}
-
-	parsed.Html = policy.Sanitize(buf.String())
 	metaData := meta.Get(context)
 
 	// title:
@@ -310,6 +304,14 @@ func ParseText(text string) (*ParsedText, error) {
 		return &parsed, err
 	}
 	parsed.MetaData.Tags = tags
+
+	// Rendering happens last to allow any of the previous steps to manipulate
+	// the AST.
+	var buf bytes.Buffer
+	if err := md.Renderer().Render(&buf, btext, doc); err != nil {
+		return &parsed, err
+	}
+	parsed.Html = policy.Sanitize(buf.String())
 
 	return &parsed, nil
 }
