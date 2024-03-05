@@ -232,7 +232,7 @@ func ParseText(text string) (*ParsedText, error) {
 			if ast.IsParagraph(n) {
 				return ast.WalkStop, nil
 			}
-			return ast.WalkStop, nil
+			return ast.WalkContinue, nil
 		})
 	}
 	// 3. else, set it to nothing (slug should get used later down the line)
