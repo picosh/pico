@@ -226,6 +226,8 @@ func ParseText(text string) (*ParsedText, error) {
 			if n.Kind() == ast.KindHeading {
 				if h := n.(*ast.Heading); h.Level == 1 {
 					parsed.MetaData.Title = string(h.Text(btext))
+					p := h.Parent()
+					p.RemoveChild(p, n)
 				}
 				return ast.WalkStop, nil
 			}
