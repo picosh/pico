@@ -216,7 +216,7 @@ func ParseText(text string) (*ParsedText, error) {
 	parsed.MetaData.Title = title
 	// 2. If an <h1> is found before a <p> or other heading is found, use that
 	if parsed.MetaData.Title == "" {
-		ast.Walk(doc, func (n ast.Node, entering bool) (ast.WalkStatus, error) {
+		err = ast.Walk(doc, func (n ast.Node, entering bool) (ast.WalkStatus, error) {
 			if n.Kind() == ast.KindHeading {
 				if h := n.(*ast.Heading); h.Level == 1 {
 					parsed.MetaData.Title = string(h.Text(btext))
@@ -230,6 +230,9 @@ func ParseText(text string) (*ParsedText, error) {
 			}
 			return ast.WalkContinue, nil
 		})
+		if err != nil {
+			panic(err) // unreachable
+		}
 	}
 	// 3. else, set it to nothing (slug should get used later down the line)
 	// this is implicit since it's already ""
