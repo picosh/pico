@@ -32,7 +32,7 @@ jobs:
       - name: publish to pgs
         uses: picosh/pgs-action@v3
         with:
-          user: hey
+          user: pico
           key: ${{ secrets.PRIVATE_KEY }}
           src: './public/'
           project: "git-pico-${{ steps.vars.outputs.sha_short }}"
