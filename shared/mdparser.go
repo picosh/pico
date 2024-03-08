@@ -3,6 +3,7 @@ package shared
 import (
 	"bytes"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 	ghtml "github.com/yuin/goldmark/renderer/html"
 	gtext "github.com/yuin/goldmark/text"
 	"go.abhg.dev/goldmark/anchor"
+	"go.abhg.dev/goldmark/hashtag"
 	yaml "gopkg.in/yaml.v2"
 )
 
@@ -187,6 +189,7 @@ func ParseText(text string) (*ParsedText, error) {
 			extension.GFM,
 			extension.Footnote,
 			meta.Meta,
+			&hashtag.Extender{}, // TODO: resolver to make them links
 			hili,
 			&anchor.Extender{
 				Position: anchor.Before,
@@ -289,6 +292,41 @@ func ParseText(text string) (*ParsedText, error) {
 	tags, err := toTags(metaData["tags"])
 	if err != nil {
 		return &parsed, err
+	}
+	// fill from hashtag ASTs as fallback
+	if len(tags) == 0 {
+		// collect all matching tags
+		err = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+			switch n.Kind() {
+			// ignore hashtags inside of these sections
+			case ast.KindBlockquote, ast.KindCodeBlock, ast.KindCodeSpan:
+				return ast.WalkSkipChildren, nil
+			// register hashtags
+			case hashtag.Kind:
+				t := n.(*hashtag.Node)
+				if entering { // only add each tag once
+					tags = append(tags, string(t.Tag))
+				}
+			}
+			// out-of-switch default
+			return ast.WalkContinue, nil
+		})
+		if err != nil {
+			panic(err)
+		}
+
+		// sort and deduplicate results
+		sort.Strings(tags)
+		e := 1
+		for i := 1; i < len(tags); i++ {
+			// this works because we're keeping tags[0]
+			if tags[i] == tags[i-1] {
+				continue
+			}
+			tags[e] = tags[i]
+			e++
+		}
+		tags = tags[:e]
 	}
 	parsed.MetaData.Tags = tags
 
