@@ -213,29 +213,13 @@ func ParseText(text string) (*ParsedText, error) {
 	if err != nil {
 		return &parsed, fmt.Errorf("front-matter field (%s): %w", "title", err)
 	}
-	parsed.MetaData.Title = title
 	// 2. If an <h1> is found before a <p> or other heading is found, use that
-	if parsed.MetaData.Title == "" {
-		err = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
-			if n.Kind() == ast.KindHeading {
-				if h := n.(*ast.Heading); h.Level == 1 {
-					parsed.MetaData.Title = string(h.Text(btext))
-					p := h.Parent()
-					p.RemoveChild(p, n)
-				}
-				return ast.WalkStop, nil
-			}
-			if ast.IsParagraph(n) {
-				return ast.WalkStop, nil
-			}
-			return ast.WalkContinue, nil
-		})
-		if err != nil {
-			panic(err) // unreachable
-		}
+	if title == "" {
+		title = AstTitle(doc, btext, true)
 	}
 	// 3. else, set it to nothing (slug should get used later down the line)
 	// this is implicit since it's already ""
+	parsed.MetaData.Title = title
 
 	description, err := toString(metaData["description"])
 	if err != nil {
@@ -317,4 +301,31 @@ func ParseText(text string) (*ParsedText, error) {
 	parsed.Html = policy.Sanitize(buf.String())
 
 	return &parsed, nil
+}
+
+// AstTitle extracts the title (if any) from a parsed markdown document.
+//
+// If "clean" is true, it will also remove the heading node from the AST.
+func AstTitle(doc ast.Node, src []byte, clean bool) string {
+	out := ""
+	err := ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		if n.Kind() == ast.KindHeading {
+			if h := n.(*ast.Heading); h.Level == 1 {
+				if clean {
+					p := h.Parent()
+					p.RemoveChild(p, n)
+				}
+				out = string(h.Text(src))
+			}
+			return ast.WalkStop, nil
+		}
+		if ast.IsParagraph(n) {
+			return ast.WalkStop, nil
+		}
+		return ast.WalkContinue, nil
+	})
+	if err != nil {
+		panic(err) // unreachable
+	}
+	return out
 }
