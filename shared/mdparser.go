@@ -289,44 +289,14 @@ func ParseText(text string) (*ParsedText, error) {
 	}
 	parsed.MetaData.Aliases = aliases
 
-	tags, err := toTags(metaData["tags"])
+	rtags := metaData["tags"]
+	tags, err := toTags(rtags)
 	if err != nil {
 		return &parsed, err
 	}
 	// fill from hashtag ASTs as fallback
-	if len(tags) == 0 {
-		// collect all matching tags
-		err = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
-			switch n.Kind() {
-			// ignore hashtags inside of these sections
-			case ast.KindBlockquote, ast.KindCodeBlock, ast.KindCodeSpan:
-				return ast.WalkSkipChildren, nil
-			// register hashtags
-			case hashtag.Kind:
-				t := n.(*hashtag.Node)
-				if entering { // only add each tag once
-					tags = append(tags, string(t.Tag))
-				}
-			}
-			// out-of-switch default
-			return ast.WalkContinue, nil
-		})
-		if err != nil {
-			panic(err)
-		}
-
-		// sort and deduplicate results
-		sort.Strings(tags)
-		e := 1
-		for i := 1; i < len(tags); i++ {
-			// this works because we're keeping tags[0]
-			if tags[i] == tags[i-1] {
-				continue
-			}
-			tags[e] = tags[i]
-			e++
-		}
-		tags = tags[:e]
+	if rtags == nil {
+		tags = AstTags(doc)
 	}
 	parsed.MetaData.Tags = tags
 
@@ -339,6 +309,41 @@ func ParseText(text string) (*ParsedText, error) {
 	parsed.Html = policy.Sanitize(buf.String())
 
 	return &parsed, nil
+}
+
+func AstTags(doc ast.Node) []string {
+	var tags []string
+	err := ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		switch n.Kind() {
+		// ignore hashtags inside of these sections
+		case ast.KindBlockquote, ast.KindCodeBlock, ast.KindCodeSpan:
+			return ast.WalkSkipChildren, nil
+		// register hashtags
+		case hashtag.Kind:
+			t := n.(*hashtag.Node)
+			if entering { // only add each tag once
+				tags = append(tags, string(t.Tag))
+			}
+		}
+		// out-of-switch default
+		return ast.WalkContinue, nil
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	// sort and deduplicate results
+	sort.Strings(tags)
+	e := 1
+	for i := 1; i < len(tags); i++ {
+		// this works because we're keeping tags[0]
+		if tags[i] == tags[i-1] {
+			continue
+		}
+		tags[e] = tags[i]
+		e++
+	}
+	return tags[:e]
 }
 
 // AstTitle extracts the title (if any) from a parsed markdown document.
