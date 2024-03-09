@@ -36,9 +36,6 @@
 		Content-Security-Policy "default-src 'self'; img-src * 'unsafe-inline'; style-src * 'unsafe-inline'"
 
 		X-XSS-Protection "1; mode=block"
-
-		Access-Control-Allow-Methods "POST, GET, OPTIONS, DELETE, PUT, PATCH"
-		Access-Control-Allow-Origin "*"
 	}
 
 	@caddymetrics {
