@@ -1222,7 +1222,7 @@ func (me *PsqlDB) FindFeaturesForUser(userID string) ([]*db.FeatureFlag, error) 
 		if err != nil {
 			return features, err
 		}
-		ff.Name = paymentHistoryID.String
+		ff.PaymentHistoryID = paymentHistoryID.String
 
 		features = append(features, ff)
 	}
