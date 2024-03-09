@@ -28,6 +28,7 @@
 }
 
 *.{$APP_DOMAIN}, {$APP_DOMAIN} {
+	import cors
 	reverse_proxy web:3000
 	tls {$APP_EMAIL} {
 		dns cloudflare {$CF_API_TOKEN}
