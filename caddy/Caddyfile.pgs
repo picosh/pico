@@ -37,8 +37,8 @@
 
 		X-XSS-Protection "1; mode=block"
 
-    Access-Control-Allow-Methods "POST, GET, OPTIONS, DELETE, PUT, PATCH"
-    Access-Control-Allow-Origin "*"
+		Access-Control-Allow-Methods "POST, GET, OPTIONS, DELETE, PUT, PATCH"
+		Access-Control-Allow-Origin "*"
 	}
 
 	@caddymetrics {
