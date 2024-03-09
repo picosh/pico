@@ -219,7 +219,7 @@ services:
       APP_DOMAIN: ${PGS_DOMAIN:-pgs.sh}
       APP_EMAIL: ${PGS_EMAIL:-hello@pico.sh}
     volumes:
-      - ${PGS_CADDYFILE}:/etc/caddy/Caddyfile
+      - ${PGS_CADDYFILE}:/etc/caddy/Caddyfile.pgs
       - ./data/pgs-caddy/data:/data
       - ./data/pgs-caddy/config:/config
     ports:
