@@ -76,7 +76,7 @@ func createHttpHandler(httpCtx *shared.HttpCtx) CtxHttpBridge {
 
 		routes := []shared.Route{
 			// special API endpoint for tunnel users accessing site
-			shared.NewRoute("GET", "/api/current_user", func(w http.ResponseWriter, r *http.Request) {
+			shared.NewCorsRoute("GET", "/api/current_user", func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
 				pico := &db.PicoApi{
 					UserID:    "",

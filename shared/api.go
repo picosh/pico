@@ -9,6 +9,16 @@ import (
 	"strings"
 )
 
+func CorsHeaders(w http.ResponseWriter) {
+	headers := w.Header()
+	headers.Add("Access-Control-Allow-Origin", "*")
+	headers.Add("Vary", "Origin")
+	headers.Add("Vary", "Access-Control-Request-Method")
+	headers.Add("Vary", "Access-Control-Request-Headers")
+	headers.Add("Access-Control-Allow-Headers", "Content-Type, Accept")
+	headers.Add("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, PATCH, DELETE")
+}
+
 func UnauthorizedHandler(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "You do not have access to this site", http.StatusUnauthorized)
 }

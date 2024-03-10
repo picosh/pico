@@ -15,9 +15,10 @@ import (
 )
 
 type Route struct {
-	Method  string
-	Regex   *regexp.Regexp
-	Handler http.HandlerFunc
+	Method      string
+	Regex       *regexp.Regexp
+	Handler     http.HandlerFunc
+	CorsEnabled bool
 }
 
 func NewRoute(method, pattern string, handler http.HandlerFunc) Route {
@@ -25,6 +26,16 @@ func NewRoute(method, pattern string, handler http.HandlerFunc) Route {
 		method,
 		regexp.MustCompile("^" + pattern + "$"),
 		handler,
+		false,
+	}
+}
+
+func NewCorsRoute(method, pattern string, handler http.HandlerFunc) Route {
+	return Route{
+		method,
+		regexp.MustCompile("^" + pattern + "$"),
+		handler,
+		true,
 	}
 }
 
@@ -65,10 +76,19 @@ func CreateServeBasic(routes []Route, ctx context.Context) ServeFn {
 		for _, route := range routes {
 			matches := route.Regex.FindStringSubmatch(r.URL.Path)
 			if len(matches) > 0 {
-				if r.Method != route.Method {
+				if r.Method == "OPTIONS" && route.CorsEnabled {
+					CorsHeaders(w)
+					w.WriteHeader(http.StatusOK)
+					return
+				} else if r.Method != route.Method {
 					allow = append(allow, route.Method)
 					continue
 				}
+
+				if route.CorsEnabled {
+					CorsHeaders(w)
+				}
+
 				finctx := context.WithValue(ctx, ctxKey{}, matches[1:])
 				route.Handler(w, r.WithContext(finctx))
 				return

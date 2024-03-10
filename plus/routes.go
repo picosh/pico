@@ -18,6 +18,7 @@ type registerPayload struct {
 func registerUser(httpCtx *shared.HttpCtx, ctx ssh.Context, pubkey string) http.HandlerFunc {
 	logger := httpCtx.Cfg.Logger
 	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		dbpool := shared.GetDB(r)
 		var payload registerPayload
 		body, _ := io.ReadAll(r.Body)
@@ -31,7 +32,6 @@ func registerUser(httpCtx *shared.HttpCtx, ctx ssh.Context, pubkey string) http.
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
 		pico := &db.PicoApi{
 			UserID:    user.ID,
 			UserName:  user.Name,
@@ -83,6 +83,7 @@ type rssTokenPayload struct {
 func findOrCreateRssToken(httpCtx *shared.HttpCtx, ctx ssh.Context, pubkey string) http.HandlerFunc {
 	logger := httpCtx.Cfg.Logger
 	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		dbpool := shared.GetDB(r)
 		user, err := dbpool.FindUserForKey("", pubkey)
 		if err != nil {
@@ -104,7 +105,6 @@ func findOrCreateRssToken(httpCtx *shared.HttpCtx, ctx ssh.Context, pubkey strin
 			}
 		}
 
-		w.Header().Set("Content-Type", "application/json")
 		err = json.NewEncoder(w).Encode(&rssTokenPayload{Token: rssToken})
 		if err != nil {
 			logger.Error(err.Error())
@@ -119,6 +119,7 @@ type pubkeysPayload struct {
 func getPublicKeys(httpCtx *shared.HttpCtx, ctx ssh.Context, pubkey string) http.HandlerFunc {
 	logger := httpCtx.Cfg.Logger
 	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		dbpool := shared.GetDB(r)
 		user, err := dbpool.FindUserForKey("", pubkey)
 		if err != nil {
@@ -132,7 +133,6 @@ func getPublicKeys(httpCtx *shared.HttpCtx, ctx ssh.Context, pubkey string) http
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
 		err = json.NewEncoder(w).Encode(&pubkeysPayload{Pubkeys: pubkeys})
 		if err != nil {
 			logger.Error(err.Error())
@@ -147,6 +147,7 @@ type tokensPayload struct {
 func getTokens(httpCtx *shared.HttpCtx, ctx ssh.Context, pubkey string) http.HandlerFunc {
 	logger := httpCtx.Cfg.Logger
 	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		dbpool := shared.GetDB(r)
 		user, err := dbpool.FindUserForKey("", pubkey)
 		if err != nil {
@@ -164,7 +165,6 @@ func getTokens(httpCtx *shared.HttpCtx, ctx ssh.Context, pubkey string) http.Han
 			tokens = []*db.Token{}
 		}
 
-		w.Header().Set("Content-Type", "application/json")
 		err = json.NewEncoder(w).Encode(&tokensPayload{Tokens: tokens})
 		if err != nil {
 			logger.Error(err.Error())
@@ -187,10 +187,10 @@ func CreateRoutes(httpCtx *shared.HttpCtx, ctx ssh.Context) []shared.Route {
 	}
 
 	return []shared.Route{
-		shared.NewRoute("POST", "/api/users", registerUser(httpCtx, ctx, pubkeyStr)),
-		shared.NewRoute("GET", "/api/features", getFeatures(httpCtx, ctx, pubkeyStr)),
-		shared.NewRoute("PUT", "/api/rss-token", findOrCreateRssToken(httpCtx, ctx, pubkeyStr)),
-		shared.NewRoute("GET", "/api/pubkeys", getPublicKeys(httpCtx, ctx, pubkeyStr)),
-		shared.NewRoute("GET", "/api/tokens", getTokens(httpCtx, ctx, pubkeyStr)),
+		shared.NewCorsRoute("POST", "/api/users", registerUser(httpCtx, ctx, pubkeyStr)),
+		shared.NewCorsRoute("GET", "/api/features", getFeatures(httpCtx, ctx, pubkeyStr)),
+		shared.NewCorsRoute("PUT", "/api/rss-token", findOrCreateRssToken(httpCtx, ctx, pubkeyStr)),
+		shared.NewCorsRoute("GET", "/api/pubkeys", getPublicKeys(httpCtx, ctx, pubkeyStr)),
+		shared.NewCorsRoute("GET", "/api/tokens", getTokens(httpCtx, ctx, pubkeyStr)),
 	}
 }
