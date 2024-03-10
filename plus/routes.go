@@ -91,12 +91,7 @@ func findOrCreateRssToken(httpCtx *shared.HttpCtx, ctx ssh.Context, pubkey strin
 			return
 		}
 
-		rssToken, err := dbpool.FindRssToken(user.ID)
-		if err != nil {
-			shared.JSONError(w, err.Error(), http.StatusUnprocessableEntity)
-			return
-		}
-
+		rssToken, _ := dbpool.FindRssToken(user.ID)
 		if rssToken == "" {
 			rssToken, err = dbpool.InsertToken(user.ID, "pico-rss")
 			if err != nil {
