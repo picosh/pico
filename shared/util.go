@@ -18,6 +18,7 @@ import (
 	"slices"
 
 	"github.com/charmbracelet/ssh"
+	gossh "golang.org/x/crypto/ssh"
 )
 
 var fnameRe = regexp.MustCompile(`[-_]+`)
@@ -64,6 +65,10 @@ func KeyText(s ssh.Session) (string, error) {
 func KeyForKeyText(pk ssh.PublicKey) (string, error) {
 	kb := base64.StdEncoding.EncodeToString(pk.Marshal())
 	return fmt.Sprintf("%s %s", pk.Type(), kb), nil
+}
+
+func KeyForSha256(pk ssh.PublicKey) string {
+	return gossh.FingerprintSHA256(pk)
 }
 
 func GetEnv(key string, defaultVal string) string {

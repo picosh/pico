@@ -7,6 +7,9 @@ import (
 	"net/http"
 	"os"
 	"strings"
+
+	"github.com/charmbracelet/ssh"
+	"github.com/picosh/pico/db"
 )
 
 func CorsHeaders(w http.ResponseWriter) {
@@ -31,6 +34,18 @@ func JSONError(w http.ResponseWriter, msg string, code int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	_ = json.NewEncoder(w).Encode(errPayload{Message: msg})
+}
+
+type UserApi struct {
+	*db.User
+	Fingerprint string `json:"fingerprint"`
+}
+
+func NewUserApi(user *db.User, pubkey ssh.PublicKey) *UserApi {
+	return &UserApi{
+		User:        user,
+		Fingerprint: KeyForSha256(pubkey),
+	}
 }
 
 func CheckHandler(w http.ResponseWriter, r *http.Request) {

@@ -15,7 +15,7 @@ type registerPayload struct {
 	Name string `json:"name"`
 }
 
-func registerUser(httpCtx *shared.HttpCtx, ctx ssh.Context, pubkey string) http.HandlerFunc {
+func registerUser(httpCtx *shared.HttpCtx, ctx ssh.Context, pubkey ssh.PublicKey, pubkeyStr string) http.HandlerFunc {
 	logger := httpCtx.Cfg.Logger
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -24,7 +24,7 @@ func registerUser(httpCtx *shared.HttpCtx, ctx ssh.Context, pubkey string) http.
 		body, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(body, &payload)
 
-		user, err := dbpool.RegisterUser(payload.Name, pubkey)
+		user, err := dbpool.RegisterUser(payload.Name, pubkeyStr)
 		if err != nil {
 			errMsg := fmt.Sprintf("error registering user: %s", err.Error())
 			logger.Info(errMsg)
@@ -32,12 +32,8 @@ func registerUser(httpCtx *shared.HttpCtx, ctx ssh.Context, pubkey string) http.
 			return
 		}
 
-		pico := &db.PicoApi{
-			UserID:    user.ID,
-			UserName:  user.Name,
-			PublicKey: pubkey,
-		}
-		err = json.NewEncoder(w).Encode(pico)
+		picoApi := shared.NewUserApi(user, pubkey)
+		err = json.NewEncoder(w).Encode(picoApi)
 		if err != nil {
 			logger.Error(err.Error())
 		}
@@ -128,9 +124,18 @@ func getPublicKeys(httpCtx *shared.HttpCtx, ctx ssh.Context, pubkey string) http
 			return
 		}
 
+		for _, pk := range pubkeys {
+			kk, _, _, _, err := ssh.ParseAuthorizedKey([]byte(pk.Key))
+			if err != nil {
+				logger.Error("could not parse public key", "err", err.Error())
+				continue
+			}
+			pk.Key = shared.KeyForSha256(kk)
+		}
+
 		err = json.NewEncoder(w).Encode(&pubkeysPayload{Pubkeys: pubkeys})
 		if err != nil {
-			logger.Error(err.Error())
+			logger.Error("json encode", "err", err.Error())
 		}
 	}
 }
@@ -182,7 +187,7 @@ func CreateRoutes(httpCtx *shared.HttpCtx, ctx ssh.Context) []shared.Route {
 	}
 
 	return []shared.Route{
-		shared.NewCorsRoute("POST", "/api/users", registerUser(httpCtx, ctx, pubkeyStr)),
+		shared.NewCorsRoute("POST", "/api/users", registerUser(httpCtx, ctx, pubkey, pubkeyStr)),
 		shared.NewCorsRoute("GET", "/api/features", getFeatures(httpCtx, ctx, pubkeyStr)),
 		shared.NewCorsRoute("PUT", "/api/rss-token", findOrCreateRssToken(httpCtx, ctx, pubkeyStr)),
 		shared.NewCorsRoute("GET", "/api/pubkeys", getPublicKeys(httpCtx, ctx, pubkeyStr)),

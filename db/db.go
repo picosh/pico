@@ -28,12 +28,6 @@ type User struct {
 	CreatedAt *time.Time `json:"created_at"`
 }
 
-type PicoApi struct {
-	UserID    string `json:"user_id"`
-	UserName  string `json:"username"`
-	PublicKey string `json:"pubkey"`
-}
-
 type PostData struct {
 	ImgPath    string     `json:"img_path"`
 	LastDigest *time.Time `json:"last_digest"`
