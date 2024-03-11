@@ -379,8 +379,8 @@ func CreateRoutes(httpCtx *shared.HttpCtx, ctx ssh.Context) []shared.Route {
 		shared.NewCorsRoute("POST", "/api/tokens", createToken(httpCtx, ctx, user)),
 		shared.NewCorsRoute("DELETE", "/api/tokens/(.+)", deleteToken(httpCtx, ctx, user)),
 		shared.NewCorsRoute("GET", "/api/projects", getProjects(httpCtx, ctx, user)),
-		shared.NewCorsRoute("GET", "/api/prose", getPosts(httpCtx, ctx, user, "prose")),
-		shared.NewCorsRoute("GET", "/api/pastes", getPosts(httpCtx, ctx, user, "pastes")),
-		shared.NewCorsRoute("GET", "/api/feeds", getPosts(httpCtx, ctx, user, "feeds")),
+		shared.NewCorsRoute("GET", "/api/posts/prose", getPosts(httpCtx, ctx, user, "prose")),
+		shared.NewCorsRoute("GET", "/api/posts/pastes", getPosts(httpCtx, ctx, user, "pastes")),
+		shared.NewCorsRoute("GET", "/api/posts/feeds", getPosts(httpCtx, ctx, user, "feeds")),
 	}
 }
