@@ -136,8 +136,8 @@ var (
 )
 
 const (
-	sqlSelectPublicKey         = `SELECT id, user_id, public_key, created_at FROM public_keys WHERE public_key = $1`
-	sqlSelectPublicKeys        = `SELECT id, user_id, public_key, created_at FROM public_keys WHERE user_id = $1`
+	sqlSelectPublicKey         = `SELECT id, user_id, name, public_key, created_at FROM public_keys WHERE public_key = $1`
+	sqlSelectPublicKeys        = `SELECT id, user_id, name, public_key, created_at FROM public_keys WHERE user_id = $1`
 	sqlSelectUser              = `SELECT id, name, created_at FROM app_users WHERE id = $1`
 	sqlSelectUserForName       = `SELECT id, name, created_at FROM app_users WHERE name = $1`
 	sqlSelectUserForNameAndKey = `SELECT app_users.id, app_users.name, app_users.created_at, public_keys.id as pk_id, public_keys.public_key, public_keys.created_at as pk_created_at FROM app_users LEFT JOIN public_keys ON public_keys.user_id = app_users.id WHERE app_users.name = $1 AND public_keys.public_key = $2`
@@ -419,6 +419,29 @@ func (me *PsqlDB) LinkUserKey(userID string, key string, tx *sql.Tx) error {
 	return err
 }
 
+func (me *PsqlDB) InsertPublicKey(userID, key, name string, tx *sql.Tx) (*db.PublicKey, error) {
+	pk, _ := me.FindPublicKeyForKey(key)
+	if pk != nil {
+		return nil, db.ErrPublicKeyTaken
+	}
+	query := `INSERT INTO public_keys (user_id, public_key, name) VALUES ($1, $2, $3)`
+	var err error
+	if tx != nil {
+		_, err = tx.Exec(query, userID, key, name)
+	} else {
+		_, err = me.Db.Exec(query, userID, key, name)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	pk, err = me.FindPublicKeyForKey(key)
+	if err != nil {
+		return nil, err
+	}
+	return pk, nil
+}
+
 func (me *PsqlDB) FindPublicKeyForKey(key string) (*db.PublicKey, error) {
 	var keys []*db.PublicKey
 	rs, err := me.Db.Query(sqlSelectPublicKey, key)
@@ -428,7 +451,7 @@ func (me *PsqlDB) FindPublicKeyForKey(key string) (*db.PublicKey, error) {
 
 	for rs.Next() {
 		pk := &db.PublicKey{}
-		err := rs.Scan(&pk.ID, &pk.UserID, &pk.Key, &pk.CreatedAt)
+		err := rs.Scan(&pk.ID, &pk.UserID, &pk.Name, &pk.Key, &pk.CreatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -463,7 +486,7 @@ func (me *PsqlDB) FindKeysForUser(user *db.User) ([]*db.PublicKey, error) {
 	}
 	for rs.Next() {
 		pk := &db.PublicKey{}
-		err := rs.Scan(&pk.ID, &pk.UserID, &pk.Key, &pk.CreatedAt)
+		err := rs.Scan(&pk.ID, &pk.UserID, &pk.Name, &pk.Key, &pk.CreatedAt)
 		if err != nil {
 			return keys, err
 		}

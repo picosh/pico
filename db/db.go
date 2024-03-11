@@ -17,6 +17,7 @@ var ErrPublicKeyTaken = errors.New("public key is already associated with anothe
 type PublicKey struct {
 	ID        string     `json:"id"`
 	UserID    string     `json:"user_id"`
+	Name      string     `json:"name"`
 	Key       string     `json:"key"`
 	CreatedAt *time.Time `json:"created_at"`
 }
@@ -280,6 +281,7 @@ type DB interface {
 	RegisterUser(name, pubkey string) (*User, error)
 	RemoveUsers(userIDs []string) error
 	LinkUserKey(userID string, pubkey string, tx *sql.Tx) error
+	InsertPublicKey(userID, pubkey, name string, tx *sql.Tx) (*PublicKey, error)
 	FindPublicKeyForKey(pubkey string) (*PublicKey, error)
 	FindKeysForUser(user *User) ([]*PublicKey, error)
 	RemoveKeys(pubkeyIDs []string) error

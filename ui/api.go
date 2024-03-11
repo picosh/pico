@@ -159,14 +159,9 @@ func createPubkey(httpCtx *shared.HttpCtx, ctx ssh.Context, user *db.User) http.
 		var payload createPubkeyPayload
 		body, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(body, &payload)
-		err := dbpool.LinkUserKey(user.ID, payload.Pubkey, nil)
+		pubkey, err := dbpool.InsertPublicKey(user.ID, payload.Pubkey, payload.Name, nil)
 		if err != nil {
 			shared.JSONError(w, err.Error(), http.StatusUnprocessableEntity)
-			return
-		}
-		pubkey, err := dbpool.FindPublicKeyForKey(payload.Pubkey)
-		if err != nil {
-			shared.JSONError(w, err.Error(), http.StatusNotFound)
 			return
 		}
 
