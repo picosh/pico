@@ -6,8 +6,8 @@ import (
 
 	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
-	"github.com/picosh/pico/plus"
 	"github.com/picosh/pico/shared"
+	"github.com/picosh/pico/ui"
 )
 
 func allowPerm(proj *db.Project) bool {
@@ -87,7 +87,7 @@ func createHttpHandler(httpCtx *shared.HttpCtx) CtxHttpBridge {
 		}
 
 		if subdomain == "pico-ui" || subdomain == "erock-ui" {
-			rts := plus.CreateRoutes(httpCtx, ctx)
+			rts := ui.CreateRoutes(httpCtx, ctx)
 			routes = append(routes, rts...)
 		}
 
