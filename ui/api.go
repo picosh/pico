@@ -333,13 +333,12 @@ func getPosts(httpCtx *shared.HttpCtx, ctx ssh.Context, user *db.User, space str
 		}
 
 		dbpool := shared.GetDB(r)
-		pages, err := dbpool.FindPostsForUser(&db.Pager{Num: 1000, Page: 0}, user.ID, space)
+		posts, err := dbpool.FindAllPostsForUser(user.ID, space)
 		if err != nil {
 			shared.JSONError(w, err.Error(), http.StatusUnprocessableEntity)
 			return
 		}
 
-		posts := pages.Data
 		if posts == nil {
 			posts = []*db.Post{}
 		}
