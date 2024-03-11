@@ -15,6 +15,14 @@ type registerPayload struct {
 	Name string `json:"name"`
 }
 
+func ensureUser(w http.ResponseWriter, user *db.User) bool {
+	if user == nil {
+		shared.JSONError(w, "User not found", http.StatusNotFound)
+		return false
+	}
+	return true
+}
+
 func registerUser(httpCtx *shared.HttpCtx, ctx ssh.Context, pubkey ssh.PublicKey, pubkeyStr string) http.HandlerFunc {
 	logger := httpCtx.Cfg.Logger
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -44,18 +52,15 @@ type featuresPayload struct {
 	Features []*db.FeatureFlag `json:"features"`
 }
 
-func getFeatures(httpCtx *shared.HttpCtx, ctx ssh.Context, pubkey string) http.HandlerFunc {
+func getFeatures(httpCtx *shared.HttpCtx, ctx ssh.Context, user *db.User) http.HandlerFunc {
 	logger := httpCtx.Cfg.Logger
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-
-		dbpool := shared.GetDB(r)
-		user, err := dbpool.FindUserForKey("", pubkey)
-		if err != nil {
-			shared.JSONError(w, "User not found", http.StatusNotFound)
+		if !ensureUser(w, user) {
 			return
 		}
 
+		dbpool := shared.GetDB(r)
 		features, err := dbpool.FindFeaturesForUser(user.ID)
 		if err != nil {
 			shared.JSONError(w, err.Error(), http.StatusUnprocessableEntity)
@@ -72,21 +77,20 @@ func getFeatures(httpCtx *shared.HttpCtx, ctx ssh.Context, pubkey string) http.H
 	}
 }
 
-type rssTokenPayload struct {
-	Token string `json:"token"`
+type tokenSecretPayload struct {
+	Secret string `json:"secret"`
 }
 
-func findOrCreateRssToken(httpCtx *shared.HttpCtx, ctx ssh.Context, pubkey string) http.HandlerFunc {
+func findOrCreateRssToken(httpCtx *shared.HttpCtx, ctx ssh.Context, user *db.User) http.HandlerFunc {
 	logger := httpCtx.Cfg.Logger
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		dbpool := shared.GetDB(r)
-		user, err := dbpool.FindUserForKey("", pubkey)
-		if err != nil {
-			shared.JSONError(w, "User not found", http.StatusUnprocessableEntity)
+		if !ensureUser(w, user) {
 			return
 		}
 
+		dbpool := shared.GetDB(r)
+		var err error
 		rssToken, _ := dbpool.FindRssToken(user.ID)
 		if rssToken == "" {
 			rssToken, err = dbpool.InsertToken(user.ID, "pico-rss")
@@ -96,7 +100,7 @@ func findOrCreateRssToken(httpCtx *shared.HttpCtx, ctx ssh.Context, pubkey strin
 			}
 		}
 
-		err = json.NewEncoder(w).Encode(&rssTokenPayload{Token: rssToken})
+		err = json.NewEncoder(w).Encode(&tokenSecretPayload{Secret: rssToken})
 		if err != nil {
 			logger.Error(err.Error())
 		}
@@ -107,17 +111,15 @@ type pubkeysPayload struct {
 	Pubkeys []*db.PublicKey `json:"pubkeys"`
 }
 
-func getPublicKeys(httpCtx *shared.HttpCtx, ctx ssh.Context, pubkey string) http.HandlerFunc {
+func getPublicKeys(httpCtx *shared.HttpCtx, ctx ssh.Context, user *db.User) http.HandlerFunc {
 	logger := httpCtx.Cfg.Logger
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		dbpool := shared.GetDB(r)
-		user, err := dbpool.FindUserForKey("", pubkey)
-		if err != nil {
-			shared.JSONError(w, "User not found", http.StatusUnprocessableEntity)
+		if !ensureUser(w, user) {
 			return
 		}
 
+		dbpool := shared.GetDB(r)
 		pubkeys, err := dbpool.FindKeysForUser(user)
 		if err != nil {
 			shared.JSONError(w, err.Error(), http.StatusUnprocessableEntity)
@@ -140,21 +142,74 @@ func getPublicKeys(httpCtx *shared.HttpCtx, ctx ssh.Context, pubkey string) http
 	}
 }
 
+type createPubkeyPayload struct {
+	Pubkey string `json:"pubkey"`
+	Name   string `json:"name"`
+}
+
+func createPubkey(httpCtx *shared.HttpCtx, ctx ssh.Context, user *db.User) http.HandlerFunc {
+	logger := httpCtx.Cfg.Logger
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if !ensureUser(w, user) {
+			return
+		}
+
+		dbpool := shared.GetDB(r)
+		var payload createPubkeyPayload
+		body, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(body, &payload)
+		err := dbpool.LinkUserKey(user.ID, payload.Pubkey, nil)
+		if err != nil {
+			shared.JSONError(w, err.Error(), http.StatusUnprocessableEntity)
+			return
+		}
+		pubkey, err := dbpool.FindPublicKeyForKey(payload.Pubkey)
+		if err != nil {
+			shared.JSONError(w, err.Error(), http.StatusNotFound)
+			return
+		}
+
+		err = json.NewEncoder(w).Encode(pubkey)
+		if err != nil {
+			logger.Error("json encode", "err", err.Error())
+		}
+	}
+}
+
+func deletePubkey(httpCtx *shared.HttpCtx, ctx ssh.Context, user *db.User) http.HandlerFunc {
+	logger := httpCtx.Cfg.Logger
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if !ensureUser(w, user) {
+			return
+		}
+		pubkeyID := shared.GetField(r, 0)
+
+		dbpool := shared.GetDB(r)
+		err := dbpool.RemoveKeys([]string{pubkeyID})
+		if err != nil {
+			logger.Error("could not remove pubkey", "err", err.Error())
+			shared.JSONError(w, err.Error(), http.StatusUnprocessableEntity)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
 type tokensPayload struct {
 	Tokens []*db.Token `json:"tokens"`
 }
 
-func getTokens(httpCtx *shared.HttpCtx, ctx ssh.Context, pubkey string) http.HandlerFunc {
+func getTokens(httpCtx *shared.HttpCtx, ctx ssh.Context, user *db.User) http.HandlerFunc {
 	logger := httpCtx.Cfg.Logger
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		dbpool := shared.GetDB(r)
-		user, err := dbpool.FindUserForKey("", pubkey)
-		if err != nil {
-			shared.JSONError(w, "User not found", http.StatusUnprocessableEntity)
+		if !ensureUser(w, user) {
 			return
 		}
 
+		dbpool := shared.GetDB(r)
 		tokens, err := dbpool.FindTokensForUser(user.ID)
 		if err != nil {
 			shared.JSONError(w, err.Error(), http.StatusUnprocessableEntity)
@@ -172,8 +227,138 @@ func getTokens(httpCtx *shared.HttpCtx, ctx ssh.Context, pubkey string) http.Han
 	}
 }
 
+type createTokenPayload struct {
+	Name string `json:"name"`
+}
+
+type createTokenResponsePayload struct {
+	Secret string    `json:"secret"`
+	Token  *db.Token `json:"token"`
+}
+
+func createToken(httpCtx *shared.HttpCtx, ctx ssh.Context, user *db.User) http.HandlerFunc {
+	logger := httpCtx.Cfg.Logger
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if !ensureUser(w, user) {
+			return
+		}
+
+		dbpool := shared.GetDB(r)
+		var payload createTokenPayload
+		body, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(body, &payload)
+		secret, err := dbpool.InsertToken(user.ID, payload.Name)
+		if err != nil {
+			shared.JSONError(w, err.Error(), http.StatusUnprocessableEntity)
+			return
+		}
+
+		// TODO: find token by name
+		tokens, err := dbpool.FindTokensForUser(user.ID)
+		if err != nil {
+			shared.JSONError(w, err.Error(), http.StatusUnprocessableEntity)
+		}
+
+		var token *db.Token
+		for _, tok := range tokens {
+			if tok.Name == payload.Name {
+				token = tok
+				break
+			}
+		}
+
+		err = json.NewEncoder(w).Encode(&createTokenResponsePayload{Secret: secret, Token: token})
+		if err != nil {
+			logger.Error("json encode", "err", err.Error())
+		}
+	}
+}
+
+func deleteToken(httpCtx *shared.HttpCtx, ctx ssh.Context, user *db.User) http.HandlerFunc {
+	logger := httpCtx.Cfg.Logger
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if !ensureUser(w, user) {
+			return
+		}
+		tokenID := shared.GetField(r, 0)
+
+		dbpool := shared.GetDB(r)
+		err := dbpool.RemoveToken(tokenID)
+		if err != nil {
+			logger.Error("could not remove token", "err", err.Error())
+			shared.JSONError(w, err.Error(), http.StatusUnprocessableEntity)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+type projectsPayload struct {
+	Projects []*db.Project `json:"projects"`
+}
+
+func getProjects(httpCtx *shared.HttpCtx, ctx ssh.Context, user *db.User) http.HandlerFunc {
+	logger := httpCtx.Cfg.Logger
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if !ensureUser(w, user) {
+			return
+		}
+
+		dbpool := shared.GetDB(r)
+		projects, err := dbpool.FindProjectsByUser(user.ID)
+		if err != nil {
+			shared.JSONError(w, err.Error(), http.StatusUnprocessableEntity)
+			return
+		}
+
+		if projects == nil {
+			projects = []*db.Project{}
+		}
+
+		err = json.NewEncoder(w).Encode(&projectsPayload{Projects: projects})
+		if err != nil {
+			logger.Error(err.Error())
+		}
+	}
+}
+
+type postsPayload struct {
+	Posts []*db.Post `json:"posts"`
+}
+
+func getPosts(httpCtx *shared.HttpCtx, ctx ssh.Context, user *db.User, space string) http.HandlerFunc {
+	logger := httpCtx.Cfg.Logger
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if !ensureUser(w, user) {
+			return
+		}
+
+		dbpool := shared.GetDB(r)
+		pages, err := dbpool.FindPostsForUser(&db.Pager{Num: 1000, Page: 0}, user.ID, space)
+		if err != nil {
+			shared.JSONError(w, err.Error(), http.StatusUnprocessableEntity)
+			return
+		}
+
+		posts := pages.Data
+		if posts == nil {
+			posts = []*db.Post{}
+		}
+
+		err = json.NewEncoder(w).Encode(&postsPayload{Posts: posts})
+		if err != nil {
+			logger.Error(err.Error())
+		}
+	}
+}
+
 func CreateRoutes(httpCtx *shared.HttpCtx, ctx ssh.Context) []shared.Route {
 	logger := httpCtx.Cfg.Logger
+	dbpool := httpCtx.Dbpool
 	pubkey, err := shared.GetPublicKeyCtx(ctx)
 	if err != nil {
 		logger.Error("could not get pubkey from ctx", "err", err.Error())
@@ -186,11 +371,21 @@ func CreateRoutes(httpCtx *shared.HttpCtx, ctx ssh.Context) []shared.Route {
 		return []shared.Route{}
 	}
 
+	user, _ := dbpool.FindUserForKey("", pubkeyStr)
+
 	return []shared.Route{
 		shared.NewCorsRoute("POST", "/api/users", registerUser(httpCtx, ctx, pubkey, pubkeyStr)),
-		shared.NewCorsRoute("GET", "/api/features", getFeatures(httpCtx, ctx, pubkeyStr)),
-		shared.NewCorsRoute("PUT", "/api/rss-token", findOrCreateRssToken(httpCtx, ctx, pubkeyStr)),
-		shared.NewCorsRoute("GET", "/api/pubkeys", getPublicKeys(httpCtx, ctx, pubkeyStr)),
-		shared.NewCorsRoute("GET", "/api/tokens", getTokens(httpCtx, ctx, pubkeyStr)),
+		shared.NewCorsRoute("GET", "/api/features", getFeatures(httpCtx, ctx, user)),
+		shared.NewCorsRoute("PUT", "/api/rss-token", findOrCreateRssToken(httpCtx, ctx, user)),
+		shared.NewCorsRoute("GET", "/api/pubkeys", getPublicKeys(httpCtx, ctx, user)),
+		shared.NewCorsRoute("POST", "/api/pubkeys", createPubkey(httpCtx, ctx, user)),
+		shared.NewCorsRoute("DELETE", "/api/pubkeys/(.+)", deletePubkey(httpCtx, ctx, user)),
+		shared.NewCorsRoute("GET", "/api/tokens", getTokens(httpCtx, ctx, user)),
+		shared.NewCorsRoute("POST", "/api/tokens", createToken(httpCtx, ctx, user)),
+		shared.NewCorsRoute("DELETE", "/api/tokens/(.+)", deleteToken(httpCtx, ctx, user)),
+		shared.NewCorsRoute("GET", "/api/projects", getProjects(httpCtx, ctx, user)),
+		shared.NewCorsRoute("GET", "/api/prose", getPosts(httpCtx, ctx, user, "prose")),
+		shared.NewCorsRoute("GET", "/api/pastes", getPosts(httpCtx, ctx, user, "pastes")),
+		shared.NewCorsRoute("GET", "/api/feeds", getPosts(httpCtx, ctx, user, "feeds")),
 	}
 }
