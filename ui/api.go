@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
@@ -350,6 +351,56 @@ func getPosts(httpCtx *shared.HttpCtx, ctx ssh.Context, user *db.User, space str
 	}
 }
 
+type objectsPayload struct {
+	Objects []*ProjectObject `json:"objects"`
+}
+
+type ProjectObject struct {
+	Name    string    `json:"name"`
+	Size    int64     `json:"size"`
+	ModTime time.Time `json:"mod_time"`
+}
+
+func getProjectObjects(httpCtx *shared.HttpCtx, ctx ssh.Context, user *db.User) http.HandlerFunc {
+	logger := httpCtx.Cfg.Logger
+	storage := httpCtx.Storage
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if !ensureUser(w, user) {
+			return
+		}
+
+		projectName := shared.GetField(r, 0)
+		bucketName := shared.GetAssetBucketName(user.ID)
+		bucket, err := storage.GetBucket(bucketName)
+		if err != nil {
+			logger.Info("bucket not found", "err", err.Error())
+			shared.JSONError(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		objects, err := storage.ListObjects(bucket, projectName, true)
+		if err != nil {
+			logger.Info("cannot fetch objects", "err", err.Error())
+			shared.JSONError(w, err.Error(), http.StatusUnprocessableEntity)
+			return
+		}
+
+		pobjs := []*ProjectObject{}
+		for _, obj := range objects {
+			pobjs = append(pobjs, &ProjectObject{
+				Name:    obj.Name(),
+				Size:    obj.Size(),
+				ModTime: obj.ModTime(),
+			})
+		}
+
+		err = json.NewEncoder(w).Encode(&objectsPayload{Objects: pobjs})
+		if err != nil {
+			logger.Error(err.Error())
+		}
+	}
+}
+
 func CreateRoutes(httpCtx *shared.HttpCtx, ctx ssh.Context) []shared.Route {
 	logger := httpCtx.Cfg.Logger
 	dbpool := httpCtx.Dbpool
@@ -378,6 +429,7 @@ func CreateRoutes(httpCtx *shared.HttpCtx, ctx ssh.Context) []shared.Route {
 		shared.NewCorsRoute("POST", "/api/tokens", createToken(httpCtx, ctx, user)),
 		shared.NewCorsRoute("DELETE", "/api/tokens/(.+)", deleteToken(httpCtx, ctx, user)),
 		shared.NewCorsRoute("GET", "/api/projects", getProjects(httpCtx, ctx, user)),
+		shared.NewCorsRoute("GET", "/api/projects/(.+)", getProjectObjects(httpCtx, ctx, user)),
 		shared.NewCorsRoute("GET", "/api/posts/prose", getPosts(httpCtx, ctx, user, "prose")),
 		shared.NewCorsRoute("GET", "/api/posts/pastes", getPosts(httpCtx, ctx, user, "pastes")),
 		shared.NewCorsRoute("GET", "/api/posts/feeds", getPosts(httpCtx, ctx, user, "feeds")),
