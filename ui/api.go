@@ -356,6 +356,7 @@ type objectsPayload struct {
 }
 
 type ProjectObject struct {
+	ID      string    `json:"id"`
 	Name    string    `json:"name"`
 	Size    int64     `json:"size"`
 	ModTime time.Time `json:"mod_time"`
@@ -388,6 +389,7 @@ func getProjectObjects(httpCtx *shared.HttpCtx, ctx ssh.Context, user *db.User) 
 		pobjs := []*ProjectObject{}
 		for _, obj := range objects {
 			pobjs = append(pobjs, &ProjectObject{
+				ID:      fmt.Sprintf("%s%s", projectName, obj.Name()),
 				Name:    obj.Name(),
 				Size:    obj.Size(),
 				ModTime: obj.ModTime(),
