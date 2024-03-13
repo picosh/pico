@@ -139,7 +139,7 @@ func serveMux(ctx ssh.Context) http.Handler {
 				return err
 			}
 
-			var newRepos []string
+			newRepos := []string{}
 
 			if repos, ok := data["repositories"].([]any); ok {
 				for _, repo := range repos {
