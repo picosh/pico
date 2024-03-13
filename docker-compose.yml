@@ -82,7 +82,9 @@ services:
     image: ghcr.io/picosh/pico/imgs-ssh:latest
     restart: always
     profiles:
-      - donotrun
+      - imgs
+      - services
+      - all
   pgs-web:
     image: ghcr.io/picosh/pico/pgs-web:latest
     restart: always

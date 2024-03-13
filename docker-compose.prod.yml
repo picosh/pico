@@ -210,6 +210,7 @@ services:
     volumes:
       - ./data/storage/data:/app/.storage
       - ./data/imgs-ssh/data:/app/ssh_data
+      - ./data/imgs-tmp:/tmp
     ports:
       - "${IMGS_SSH_V4:-22}:2222"
       - "${IMGS_SSH_V6:-[::1]:22}:2222"
