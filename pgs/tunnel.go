@@ -3,6 +3,7 @@ package pgs
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
@@ -16,13 +17,23 @@ func allowPerm(proj *db.Project) bool {
 
 type CtxHttpBridge = func(ssh.Context) http.Handler
 
+func getInfoFromUser(user string) (string, string) {
+	if strings.Contains(user, "__") {
+		results := strings.SplitN(user, "__", 1)
+		return results[0], results[1]
+	}
+
+	return "", user
+}
+
 func createHttpHandler(httpCtx *shared.HttpCtx) CtxHttpBridge {
 	return func(ctx ssh.Context) http.Handler {
-		subdomain := ctx.User()
 		dbh := httpCtx.Dbpool
 		logger := httpCtx.Cfg.Logger
+		asUser, subdomain := getInfoFromUser(ctx.User())
 		log := logger.With(
 			"subdomain", subdomain,
+			"impersonating", asUser,
 		)
 
 		pubkey, err := shared.GetPublicKeyCtx(ctx)
@@ -62,9 +73,19 @@ func createHttpHandler(httpCtx *shared.HttpCtx) CtxHttpBridge {
 
 		requester, _ := dbh.FindUserForKey("", pubkeyStr)
 		if requester != nil {
-			log = logger.With(
+			log = log.With(
 				"requester", requester.Name,
 			)
+		}
+
+		// impersonation logic
+		if asUser != "" {
+			isAdmin := dbh.HasFeatureForUser(requester.ID, "admin")
+			if !isAdmin {
+				log.Error("impersonation attempt failed")
+				return http.HandlerFunc(shared.UnauthorizedHandler)
+			}
+			requester, _ = dbh.FindUserForName(asUser)
 		}
 
 		if !HasProjectAccess(project, owner, requester, pubkey) {
