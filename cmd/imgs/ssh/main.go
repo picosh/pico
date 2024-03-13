@@ -1,7 +1,9 @@
 package main
 
-import "github.com/picosh/pico/prose"
+import (
+	"github.com/picosh/pico/imgs"
+)
 
 func main() {
-	prose.StartSshServer()
+	imgs.StartSshServer()
 }

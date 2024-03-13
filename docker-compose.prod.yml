@@ -31,6 +31,11 @@ services:
       - .env.prod
     volumes:
       - ./data/minio-data:/data
+  registry:
+    env_file:
+      - .env.prod
+    volumes:
+      - ./imgs/registry.yml:/etc/docker/registry/config.yml
   imgproxy:
     env_file:
       - .env.prod

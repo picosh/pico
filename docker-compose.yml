@@ -13,6 +13,16 @@ services:
     profiles:
       - db
       - all
+  registry:
+    image: registry
+    restart: always
+    profiles:
+      - imgs
+      - services
+      - all
+    environment:
+      REGISTRY_STORAGE_S3_ACCESSKEY: ${MINIO_ROOT_USER}
+      REGISTRY_STORAGE_S3_SECRETKEY: ${MINIO_ROOT_PASSWORD}
   imgproxy:
     image: darthsim/imgproxy:latest
     restart: always

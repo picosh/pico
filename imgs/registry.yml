@@ -1,0 +1,10 @@
+version: 0.1
+http:
+  addr: :5000
+storage:
+  s3:
+    region: us-east-1
+    bucket: imgs
+    regionendpoint: https://minio.pico.sh
+  redirect:
+    disable: true
