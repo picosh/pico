@@ -36,6 +36,8 @@ services:
       - .env.prod
     volumes:
       - ./imgs/registry.yml:/etc/docker/registry/config.yml
+    networks:
+      - imgs
   imgproxy:
     env_file:
       - .env.prod
