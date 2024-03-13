@@ -55,13 +55,13 @@ func CreatePProfRoutes(routes []Route) []Route {
 }
 
 type ServeFn func(http.ResponseWriter, *http.Request)
-type HttpCtx struct {
+type ApiConfig struct {
 	Cfg     *ConfigSite
 	Dbpool  db.DB
 	Storage storage.StorageServe
 }
 
-func (hc *HttpCtx) CreateCtx(prevCtx context.Context, subdomain string) context.Context {
+func (hc *ApiConfig) CreateCtx(prevCtx context.Context, subdomain string) context.Context {
 	loggerCtx := context.WithValue(prevCtx, ctxLoggerKey{}, hc.Cfg.Logger)
 	subdomainCtx := context.WithValue(loggerCtx, ctxSubdomainKey{}, subdomain)
 	dbCtx := context.WithValue(subdomainCtx, ctxDBKey{}, hc.Dbpool)
@@ -129,10 +129,10 @@ func findRouteConfig(r *http.Request, routes []Route, subdomainRoutes []Route, c
 	return curRoutes, subdomain
 }
 
-func CreateServe(routes []Route, subdomainRoutes []Route, httpCtx *HttpCtx) ServeFn {
+func CreateServe(routes []Route, subdomainRoutes []Route, apiConfig *ApiConfig) ServeFn {
 	return func(w http.ResponseWriter, r *http.Request) {
-		curRoutes, subdomain := findRouteConfig(r, routes, subdomainRoutes, httpCtx.Cfg)
-		ctx := httpCtx.CreateCtx(r.Context(), subdomain)
+		curRoutes, subdomain := findRouteConfig(r, routes, subdomainRoutes, apiConfig.Cfg)
+		ctx := apiConfig.CreateCtx(r.Context(), subdomain)
 		router := CreateServeBasic(curRoutes, ctx)
 		router(w, r)
 	}

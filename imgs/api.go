@@ -322,12 +322,12 @@ func StartApiServer() {
 	mainRoutes := createMainRoutes(staticRoutes)
 	subdomainRoutes := createSubdomainRoutes(staticRoutes)
 
-	httpCtx := &shared.HttpCtx{
+	apiConfig := &shared.ApiConfig{
 		Cfg:     cfg,
 		Dbpool:  db,
 		Storage: st,
 	}
-	handler := shared.CreateServe(mainRoutes, subdomainRoutes, httpCtx)
+	handler := shared.CreateServe(mainRoutes, subdomainRoutes, apiConfig)
 	router := http.HandlerFunc(handler)
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)

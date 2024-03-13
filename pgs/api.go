@@ -441,12 +441,12 @@ func StartApiServer() {
 		return
 	}
 
-	httpCtx := &shared.HttpCtx{
+	apiConfig := &shared.ApiConfig{
 		Cfg:     cfg,
 		Dbpool:  db,
 		Storage: st,
 	}
-	handler := shared.CreateServe(mainRoutes, createSubdomainRoutes(publicPerm), httpCtx)
+	handler := shared.CreateServe(mainRoutes, createSubdomainRoutes(publicPerm), apiConfig)
 	router := http.HandlerFunc(handler)
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)

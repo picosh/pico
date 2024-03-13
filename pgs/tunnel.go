@@ -19,17 +19,17 @@ type CtxHttpBridge = func(ssh.Context) http.Handler
 
 func getInfoFromUser(user string) (string, string) {
 	if strings.Contains(user, "__") {
-		results := strings.SplitN(user, "__", 1)
+		results := strings.SplitN(user, "__", 2)
 		return results[0], results[1]
 	}
 
 	return "", user
 }
 
-func createHttpHandler(httpCtx *shared.HttpCtx) CtxHttpBridge {
+func createHttpHandler(apiConfig *shared.ApiConfig) CtxHttpBridge {
 	return func(ctx ssh.Context) http.Handler {
-		dbh := httpCtx.Dbpool
-		logger := httpCtx.Cfg.Logger
+		dbh := apiConfig.Dbpool
+		logger := apiConfig.Cfg.Logger
 		asUser, subdomain := getInfoFromUser(ctx.User())
 		log := logger.With(
 			"subdomain", subdomain,
@@ -88,6 +88,8 @@ func createHttpHandler(httpCtx *shared.HttpCtx) CtxHttpBridge {
 			requester, _ = dbh.FindUserForName(asUser)
 		}
 
+		shared.SetUserCtx(ctx, requester)
+
 		if !HasProjectAccess(project, owner, requester, pubkey) {
 			log.Error("no access")
 			return http.HandlerFunc(shared.UnauthorizedHandler)
@@ -108,13 +110,13 @@ func createHttpHandler(httpCtx *shared.HttpCtx) CtxHttpBridge {
 		}
 
 		if subdomain == "pico-ui" || subdomain == "erock-ui" {
-			rts := ui.CreateRoutes(httpCtx, ctx)
+			rts := ui.CreateRoutes(apiConfig, ctx)
 			routes = append(routes, rts...)
 		}
 
 		subdomainRoutes := createSubdomainRoutes(allowPerm)
 		routes = append(routes, subdomainRoutes...)
-		finctx := httpCtx.CreateCtx(ctx, subdomain)
+		finctx := apiConfig.CreateCtx(ctx, subdomain)
 		httpHandler := shared.CreateServeBasic(routes, finctx)
 		httpRouter := http.HandlerFunc(httpHandler)
 		return httpRouter

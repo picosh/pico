@@ -64,12 +64,12 @@ func StartApiServer() {
 
 	mainRoutes := createMainRoutes(staticRoutes)
 
-	httpCtx := &shared.HttpCtx{
+	apiConfig := &shared.ApiConfig{
 		Cfg:     cfg,
 		Dbpool:  db,
 		Storage: st,
 	}
-	handler := shared.CreateServe(mainRoutes, []shared.Route{}, httpCtx)
+	handler := shared.CreateServe(mainRoutes, []shared.Route{}, apiConfig)
 	router := http.HandlerFunc(handler)
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)

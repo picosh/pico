@@ -86,7 +86,7 @@ func StartSshServer() {
 		st,
 	)
 
-	httpCtx := &shared.HttpCtx{
+	apiConfig := &shared.ApiConfig{
 		Cfg:     cfg,
 		Dbpool:  dbh,
 		Storage: st,
@@ -94,7 +94,7 @@ func StartSshServer() {
 
 	webTunnel := &ptun.WebTunnelHandler{
 		Logger:      logger,
-		HttpHandler: createHttpHandler(httpCtx),
+		HttpHandler: createHttpHandler(apiConfig),
 	}
 
 	s, err := wish.NewServer(
