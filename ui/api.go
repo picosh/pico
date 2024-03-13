@@ -371,7 +371,7 @@ func getProjectObjects(httpCtx *shared.HttpCtx, ctx ssh.Context, user *db.User) 
 			return
 		}
 
-		projectName := shared.GetField(r, 0)
+		projectName := shared.GetField(r, 0) + "/"
 		bucketName := shared.GetAssetBucketName(user.ID)
 		bucket, err := storage.GetBucket(bucketName)
 		if err != nil {
