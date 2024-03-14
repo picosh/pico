@@ -77,7 +77,7 @@ func CreateServeBasic(routes []Route, ctx context.Context) ServeFn {
 			matches := route.Regex.FindStringSubmatch(r.URL.Path)
 			if len(matches) > 0 {
 				if r.Method == "OPTIONS" && route.CorsEnabled {
-					CorsHeaders(w)
+					CorsHeaders(w.Header())
 					w.WriteHeader(http.StatusOK)
 					return
 				} else if r.Method != route.Method {
@@ -86,7 +86,7 @@ func CreateServeBasic(routes []Route, ctx context.Context) ServeFn {
 				}
 
 				if route.CorsEnabled {
-					CorsHeaders(w)
+					CorsHeaders(w.Header())
 				}
 
 				finctx := context.WithValue(ctx, ctxKey{}, matches[1:])

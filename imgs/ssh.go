@@ -23,6 +23,7 @@ import (
 	"github.com/charmbracelet/wish"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
+	"github.com/picosh/pico/shared"
 	"github.com/picosh/ptun"
 )
 
@@ -121,6 +122,7 @@ func serveMux(ctx ssh.Context) http.Handler {
 
 	proxy.ModifyResponse = func(r *http.Response) error {
 		log.Printf("%+v", r)
+		shared.CorsHeaders(r.Header)
 
 		if slug != "" && r.Request.Method == http.MethodGet && strings.HasSuffix(r.Request.URL.Path, "_catalog") {
 			b, err := io.ReadAll(r.Body)

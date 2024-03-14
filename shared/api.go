@@ -12,8 +12,7 @@ import (
 	"github.com/picosh/pico/db"
 )
 
-func CorsHeaders(w http.ResponseWriter) {
-	headers := w.Header()
+func CorsHeaders(headers http.Header) {
 	headers.Add("Access-Control-Allow-Origin", "*")
 	headers.Add("Vary", "Origin")
 	headers.Add("Vary", "Access-Control-Request-Method")

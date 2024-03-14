@@ -11,6 +11,13 @@ services:
     ports:
       - "9000:9000"
       - "9001:9001"
+  registry:
+    env_file:
+      - .env.example
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./imgs/registry.yml:/etc/docker/registry/config.yml
   imgproxy:
     env_file:
       - .env.example
