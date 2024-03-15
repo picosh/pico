@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -15,6 +16,7 @@ import (
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
+	stripe "github.com/stripe/stripe-go/v75"
 )
 
 type Client struct {
@@ -393,6 +395,65 @@ func rssHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func stripeWebhookHandler(w http.ResponseWriter, r *http.Request) {
+	client := getClient(r)
+	dbpool := client.Dbpool
+	logger := client.Logger
+	const MaxBodyBytes = int64(65536)
+	r.Body = http.MaxBytesReader(w, r.Body, MaxBodyBytes)
+	payload, err := io.ReadAll(r.Body)
+	if err != nil {
+		logger.Error("error reading request body", "err", err.Error())
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
+	}
+
+	event := stripe.Event{}
+
+	if err := json.Unmarshal(payload, &event); err != nil {
+		logger.Error("failed to parse webhook body JSON", "err", err.Error())
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	switch event.Type {
+	case "checkout.session.completed":
+		var checkout stripe.CheckoutSession
+		err := json.Unmarshal(event.Data.Raw, &checkout)
+		if err != nil {
+			logger.Error("error parsing webhook JSON", "err", err.Error())
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		customerID := checkout.Customer.ID
+		txId := checkout.PaymentIntent.ID
+		email := checkout.CustomerDetails.Email
+		created := checkout.Created
+		status := checkout.PaymentStatus
+
+		log := logger.With(
+			"customerID", customerID,
+			"email", email,
+			"created", created,
+			"payment status", status,
+		)
+		log.Info(
+			"stripe:checkout.session.completed",
+		)
+
+		err = dbpool.AddPicoPlusUser(customerID, "stripe", txId)
+		if err != nil {
+			log.Error("failed to add pico+ user", "err", err)
+		} else {
+			log.Info("successfully added pico+ user")
+		}
+	default:
+		logger.Info("unhandled event type", "type", event.Type)
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
 func createMainRoutes() []shared.Route {
 	fileServer := http.FileServer(http.Dir("auth/public"))
 
@@ -404,6 +465,7 @@ func createMainRoutes() []shared.Route {
 		shared.NewRoute("POST", "/key", keyHandler),
 		shared.NewRoute("GET", "/rss/(.+)", rssHandler),
 		shared.NewRoute("POST", "/redirect", redirectHandler),
+		shared.NewRoute("GET", "/webhook", stripeWebhookHandler),
 		shared.NewRoute("GET", "/main.css", fileServer.ServeHTTP),
 		shared.NewRoute("GET", "/card.png", fileServer.ServeHTTP),
 		shared.NewRoute("GET", "/favicon-16x16.png", fileServer.ServeHTTP),
