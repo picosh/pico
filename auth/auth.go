@@ -292,15 +292,14 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 
 func genFeedItem(now time.Time, expiresAt time.Time, warning time.Time, txt string) *feeds.Item {
 	if now.After(warning) {
-		realUrl := warning.Format("2006-01-02 15:04:05")
 		content := fmt.Sprintf(
 			"Your pico+ membership is going to expire on %s",
 			expiresAt.Format("2006-01-02 15:04:05"),
 		)
 		return &feeds.Item{
-			Id:          realUrl,
+			Id:          fmt.Sprintf("%d", warning.Unix()),
 			Title:       fmt.Sprintf("pico+ %s expiration notice", txt),
-			Link:        &feeds.Link{Href: realUrl},
+			Link:        &feeds.Link{Href: "https://pico.sh"},
 			Content:     content,
 			Created:     warning,
 			Updated:     warning,
@@ -344,6 +343,22 @@ func rssHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// still want to send an empty feed
 	} else {
+		createdAt := ff.CreatedAt
+		createdAtStr := createdAt.Format("2006-01-02 15:04:05")
+		id := fmt.Sprintf("pico-plus-activated-%d", createdAt.Unix())
+		content := `Thanks for joining pico+! You now have access to all our premium services for exactly one year.  We will send you pico+ expiration notifications through this RSS feed.  Go to <a href="https://pico.sh/getting-started#next-steps">pico.sh/getting-started#next-steps</a> to start using our services.`
+		plus := &feeds.Item{
+			Id:          id,
+			Title:       fmt.Sprintf("pico+ membership activated on %s", createdAtStr),
+			Link:        &feeds.Link{Href: "https://pico.sh"},
+			Content:     content,
+			Created:     *createdAt,
+			Updated:     *createdAt,
+			Description: content,
+			Author:      &feeds.Author{Name: "team pico"},
+		}
+		feedItems = append(feedItems, plus)
+
 		oneMonthWarning := ff.ExpiresAt.AddDate(0, -1, 0)
 		mo := genFeedItem(now, *ff.ExpiresAt, oneMonthWarning, "1-month")
 		if mo != nil {
