@@ -705,7 +705,7 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Could not generate atom rss feed", http.StatusInternalServerError)
 	}
 
-	w.Header().Add("Content-Type", "application/atom+xml")
+	w.Header().Add("Content-Type", "application/atom+xml; charset=utf-8")
 	_, err = w.Write([]byte(rss))
 	if err != nil {
 		logger.Error(err.Error())
@@ -786,7 +786,7 @@ func rssHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Could not generate atom rss feed", http.StatusInternalServerError)
 	}
 
-	w.Header().Add("Content-Type", "application/atom+xml")
+	w.Header().Add("Content-Type", "application/atom+xml; charset=utf-8")
 	_, err = w.Write([]byte(rss))
 	if err != nil {
 		logger.Error(err.Error())
