@@ -42,6 +42,7 @@ func registerUser(apiConfig *shared.ApiConfig, ctx ssh.Context, pubkey ssh.Publi
 		}
 
 		picoApi := shared.NewUserApi(user, pubkey)
+		shared.SetUserCtx(ctx, user)
 		err = json.NewEncoder(w).Encode(picoApi)
 		if err != nil {
 			logger.Error(err.Error())
