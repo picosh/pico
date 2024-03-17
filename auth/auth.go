@@ -425,30 +425,43 @@ func stripeWebhookHandler(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		customerID := checkout.Customer.ID
-		txId := checkout.PaymentIntent.ID
-		email := checkout.CustomerDetails.Email
+		username := checkout.ClientReferenceID
+		txId := ""
+		if checkout.PaymentIntent != nil {
+			txId = checkout.PaymentIntent.ID
+		}
+		email := ""
+		if checkout.CustomerDetails != nil {
+			email = checkout.CustomerDetails.Email
+		}
 		created := checkout.Created
 		status := checkout.PaymentStatus
 
 		log := logger.With(
-			"customerID", customerID,
+			"username", username,
 			"email", email,
 			"created", created,
-			"payment status", status,
+			"paymentStatus", status,
+			"txId", txId,
 		)
 		log.Info(
 			"stripe:checkout.session.completed",
 		)
 
-		err = dbpool.AddPicoPlusUser(customerID, "stripe", txId)
+		if username == "" {
+			log.Error("no `?client_reference_id={username}` found in URL, cannot add pico+ membership")
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		err = dbpool.AddPicoPlusUser(username, "stripe", txId)
 		if err != nil {
 			log.Error("failed to add pico+ user", "err", err)
 		} else {
 			log.Info("successfully added pico+ user")
 		}
 	default:
-		logger.Info("unhandled event type", "type", event.Type)
+		// logger.Info("unhandled event type", "type", event.Type)
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -465,7 +478,7 @@ func createMainRoutes() []shared.Route {
 		shared.NewRoute("POST", "/key", keyHandler),
 		shared.NewRoute("GET", "/rss/(.+)", rssHandler),
 		shared.NewRoute("POST", "/redirect", redirectHandler),
-		shared.NewRoute("GET", "/webhook", stripeWebhookHandler),
+		shared.NewRoute("POST", "/webhook", stripeWebhookHandler),
 		shared.NewRoute("GET", "/main.css", fileServer.ServeHTTP),
 		shared.NewRoute("GET", "/card.png", fileServer.ServeHTTP),
 		shared.NewRoute("GET", "/favicon-16x16.png", fileServer.ServeHTTP),
