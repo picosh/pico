@@ -1646,7 +1646,7 @@ func (me *PsqlDB) AddPicoPlusUser(username, paymentType, txId string) error {
 	}
 
 	imgsQuery := `INSERT INTO feature_flags (user_id, name, data, expires_at)
-	VALUES ($1, 'imgs', '{"storage_max":2000000000}'::jsonb, now() + '1 year'::interval);`
+	VALUES ($1, 'imgs', '{"storage_max":5000000000}'::jsonb, now() + '1 year'::interval);`
 	_, err = tx.Exec(imgsQuery, user.ID)
 	if err != nil {
 		return err
