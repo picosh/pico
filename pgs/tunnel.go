@@ -101,8 +101,14 @@ func createHttpHandler(apiConfig *shared.ApiConfig) CtxHttpBridge {
 			// special API endpoint for tunnel users accessing site
 			shared.NewCorsRoute("GET", "/api/current_user", func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
-				pico := shared.NewUserApi(requester, pubkey)
-				err := json.NewEncoder(w).Encode(pico)
+				user, err := shared.GetUserCtx(ctx)
+				if err != nil {
+					logger.Error("could not find user", "err", err.Error())
+					shared.JSONError(w, err.Error(), http.StatusNotFound)
+					return
+				}
+				pico := shared.NewUserApi(user, pubkey)
+				err = json.NewEncoder(w).Encode(pico)
 				if err != nil {
 					log.Error(err.Error())
 				}

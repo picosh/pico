@@ -54,10 +54,11 @@ type featuresPayload struct {
 	Features []*db.FeatureFlag `json:"features"`
 }
 
-func getFeatures(apiConfig *shared.ApiConfig, ctx ssh.Context, user *db.User) http.HandlerFunc {
+func getFeatures(apiConfig *shared.ApiConfig, ctx ssh.Context) http.HandlerFunc {
 	logger := apiConfig.Cfg.Logger
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		user, _ := shared.GetUserCtx(ctx)
 		if !ensureUser(w, user) {
 			return
 		}
@@ -83,10 +84,11 @@ type tokenSecretPayload struct {
 	Secret string `json:"secret"`
 }
 
-func findOrCreateRssToken(apiConfig *shared.ApiConfig, ctx ssh.Context, user *db.User) http.HandlerFunc {
+func findOrCreateRssToken(apiConfig *shared.ApiConfig, ctx ssh.Context) http.HandlerFunc {
 	logger := apiConfig.Cfg.Logger
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		user, _ := shared.GetUserCtx(ctx)
 		if !ensureUser(w, user) {
 			return
 		}
@@ -113,10 +115,11 @@ type pubkeysPayload struct {
 	Pubkeys []*db.PublicKey `json:"pubkeys"`
 }
 
-func getPublicKeys(httpCtx *shared.ApiConfig, ctx ssh.Context, user *db.User) http.HandlerFunc {
+func getPublicKeys(httpCtx *shared.ApiConfig, ctx ssh.Context) http.HandlerFunc {
 	logger := httpCtx.Cfg.Logger
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		user, _ := shared.GetUserCtx(ctx)
 		if !ensureUser(w, user) {
 			return
 		}
@@ -149,10 +152,11 @@ type createPubkeyPayload struct {
 	Name   string `json:"name"`
 }
 
-func createPubkey(httpCtx *shared.ApiConfig, ctx ssh.Context, user *db.User) http.HandlerFunc {
+func createPubkey(httpCtx *shared.ApiConfig, ctx ssh.Context) http.HandlerFunc {
 	logger := httpCtx.Cfg.Logger
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		user, _ := shared.GetUserCtx(ctx)
 		if !ensureUser(w, user) {
 			return
 		}
@@ -174,10 +178,11 @@ func createPubkey(httpCtx *shared.ApiConfig, ctx ssh.Context, user *db.User) htt
 	}
 }
 
-func deletePubkey(httpCtx *shared.ApiConfig, ctx ssh.Context, user *db.User) http.HandlerFunc {
+func deletePubkey(httpCtx *shared.ApiConfig, ctx ssh.Context) http.HandlerFunc {
 	logger := httpCtx.Cfg.Logger
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		user, _ := shared.GetUserCtx(ctx)
 		if !ensureUser(w, user) {
 			return
 		}
@@ -198,10 +203,11 @@ type tokensPayload struct {
 	Tokens []*db.Token `json:"tokens"`
 }
 
-func getTokens(httpCtx *shared.ApiConfig, ctx ssh.Context, user *db.User) http.HandlerFunc {
+func getTokens(httpCtx *shared.ApiConfig, ctx ssh.Context) http.HandlerFunc {
 	logger := httpCtx.Cfg.Logger
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		user, _ := shared.GetUserCtx(ctx)
 		if !ensureUser(w, user) {
 			return
 		}
@@ -233,10 +239,11 @@ type createTokenResponsePayload struct {
 	Token  *db.Token `json:"token"`
 }
 
-func createToken(httpCtx *shared.ApiConfig, ctx ssh.Context, user *db.User) http.HandlerFunc {
+func createToken(httpCtx *shared.ApiConfig, ctx ssh.Context) http.HandlerFunc {
 	logger := httpCtx.Cfg.Logger
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		user, _ := shared.GetUserCtx(ctx)
 		if !ensureUser(w, user) {
 			return
 		}
@@ -272,10 +279,11 @@ func createToken(httpCtx *shared.ApiConfig, ctx ssh.Context, user *db.User) http
 	}
 }
 
-func deleteToken(httpCtx *shared.ApiConfig, ctx ssh.Context, user *db.User) http.HandlerFunc {
+func deleteToken(httpCtx *shared.ApiConfig, ctx ssh.Context) http.HandlerFunc {
 	logger := httpCtx.Cfg.Logger
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		user, _ := shared.GetUserCtx(ctx)
 		if !ensureUser(w, user) {
 			return
 		}
@@ -296,10 +304,11 @@ type projectsPayload struct {
 	Projects []*db.Project `json:"projects"`
 }
 
-func getProjects(httpCtx *shared.ApiConfig, ctx ssh.Context, user *db.User) http.HandlerFunc {
+func getProjects(httpCtx *shared.ApiConfig, ctx ssh.Context) http.HandlerFunc {
 	logger := httpCtx.Cfg.Logger
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		user, _ := shared.GetUserCtx(ctx)
 		if !ensureUser(w, user) {
 			return
 		}
@@ -326,10 +335,11 @@ type postsPayload struct {
 	Posts []*db.Post `json:"posts"`
 }
 
-func getPosts(httpCtx *shared.ApiConfig, ctx ssh.Context, user *db.User, space string) http.HandlerFunc {
+func getPosts(httpCtx *shared.ApiConfig, ctx ssh.Context, space string) http.HandlerFunc {
 	logger := httpCtx.Cfg.Logger
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		user, _ := shared.GetUserCtx(ctx)
 		if !ensureUser(w, user) {
 			return
 		}
@@ -363,11 +373,12 @@ type ProjectObject struct {
 	ModTime time.Time `json:"mod_time"`
 }
 
-func getProjectObjects(apiConfig *shared.ApiConfig, ctx ssh.Context, user *db.User) http.HandlerFunc {
+func getProjectObjects(apiConfig *shared.ApiConfig, ctx ssh.Context) http.HandlerFunc {
 	logger := apiConfig.Cfg.Logger
 	storage := apiConfig.Storage
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		user, _ := shared.GetUserCtx(ctx)
 		if !ensureUser(w, user) {
 			return
 		}
@@ -418,26 +429,20 @@ func CreateRoutes(apiConfig *shared.ApiConfig, ctx ssh.Context) []shared.Route {
 		return []shared.Route{}
 	}
 
-	user, err := shared.GetUserCtx(ctx)
-	if err != nil {
-		logger.Error("could not convert key to text", "err", err.Error())
-		return []shared.Route{}
-	}
-
 	return []shared.Route{
 		shared.NewCorsRoute("POST", "/api/users", registerUser(apiConfig, ctx, pubkey, pubkeyStr)),
-		shared.NewCorsRoute("GET", "/api/features", getFeatures(apiConfig, ctx, user)),
-		shared.NewCorsRoute("PUT", "/api/rss-token", findOrCreateRssToken(apiConfig, ctx, user)),
-		shared.NewCorsRoute("GET", "/api/pubkeys", getPublicKeys(apiConfig, ctx, user)),
-		shared.NewCorsRoute("POST", "/api/pubkeys", createPubkey(apiConfig, ctx, user)),
-		shared.NewCorsRoute("DELETE", "/api/pubkeys/(.+)", deletePubkey(apiConfig, ctx, user)),
-		shared.NewCorsRoute("GET", "/api/tokens", getTokens(apiConfig, ctx, user)),
-		shared.NewCorsRoute("POST", "/api/tokens", createToken(apiConfig, ctx, user)),
-		shared.NewCorsRoute("DELETE", "/api/tokens/(.+)", deleteToken(apiConfig, ctx, user)),
-		shared.NewCorsRoute("GET", "/api/projects", getProjects(apiConfig, ctx, user)),
-		shared.NewCorsRoute("GET", "/api/projects/(.+)", getProjectObjects(apiConfig, ctx, user)),
-		shared.NewCorsRoute("GET", "/api/posts/prose", getPosts(apiConfig, ctx, user, "prose")),
-		shared.NewCorsRoute("GET", "/api/posts/pastes", getPosts(apiConfig, ctx, user, "pastes")),
-		shared.NewCorsRoute("GET", "/api/posts/feeds", getPosts(apiConfig, ctx, user, "feeds")),
+		shared.NewCorsRoute("GET", "/api/features", getFeatures(apiConfig, ctx)),
+		shared.NewCorsRoute("PUT", "/api/rss-token", findOrCreateRssToken(apiConfig, ctx)),
+		shared.NewCorsRoute("GET", "/api/pubkeys", getPublicKeys(apiConfig, ctx)),
+		shared.NewCorsRoute("POST", "/api/pubkeys", createPubkey(apiConfig, ctx)),
+		shared.NewCorsRoute("DELETE", "/api/pubkeys/(.+)", deletePubkey(apiConfig, ctx)),
+		shared.NewCorsRoute("GET", "/api/tokens", getTokens(apiConfig, ctx)),
+		shared.NewCorsRoute("POST", "/api/tokens", createToken(apiConfig, ctx)),
+		shared.NewCorsRoute("DELETE", "/api/tokens/(.+)", deleteToken(apiConfig, ctx)),
+		shared.NewCorsRoute("GET", "/api/projects", getProjects(apiConfig, ctx)),
+		shared.NewCorsRoute("GET", "/api/projects/(.+)", getProjectObjects(apiConfig, ctx)),
+		shared.NewCorsRoute("GET", "/api/posts/prose", getPosts(apiConfig, ctx, "prose")),
+		shared.NewCorsRoute("GET", "/api/posts/pastes", getPosts(apiConfig, ctx, "pastes")),
+		shared.NewCorsRoute("GET", "/api/posts/feeds", getPosts(apiConfig, ctx, "feeds")),
 	}
 }
