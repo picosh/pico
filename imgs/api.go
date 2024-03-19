@@ -201,7 +201,6 @@ func ImgRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-
 	// set default quality for web optimization
 	if opts.Quality == 0 {
 		opts.Quality = 80
