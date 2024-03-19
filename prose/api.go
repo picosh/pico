@@ -856,7 +856,7 @@ func createMainRoutes(staticRoutes []shared.Route) []shared.Route {
 		shared.NewRoute("GET", "/([^/]+)/_styles.css", blogStyleHandler),
 		shared.NewRoute("GET", "/raw/([^/]+)/(.+)", postRawHandler),
 		shared.NewRoute("GET", "/([^/]+)/(.+)/(.+)", imgs.ImgRequest),
-		shared.NewRoute("GET", "/([^/]+)/(.+).(?:jpg|jpeg|png|gif|webp|svg)$", imgs.ImgRequest),
+		shared.NewRoute("GET", "/([^/]+)/(.+.(?:jpg|jpeg|png|gif|webp|svg))$", imgs.ImgRequest),
 		shared.NewRoute("GET", "/([^/]+)/i", imgs.ImgsListHandler),
 		shared.NewRoute("GET", "/([^/]+)/(.+)", postHandler),
 	)
@@ -885,7 +885,7 @@ func createSubdomainRoutes(staticRoutes []shared.Route) []shared.Route {
 		routes,
 		shared.NewRoute("GET", "/raw/(.+)", postRawHandler),
 		shared.NewRoute("GET", "/([^/]+)/(.+)", imgs.ImgRequest),
-		shared.NewRoute("GET", "/(.+).(?:jpg|jpeg|png|gif|webp|svg)$", imgs.ImgRequest),
+		shared.NewRoute("GET", "/(.+.(?:jpg|jpeg|png|gif|webp|svg))$", imgs.ImgRequest),
 		shared.NewRoute("GET", "/i", imgs.ImgsListHandler),
 		shared.NewRoute("GET", "/(.+)", postHandler),
 	)
