@@ -80,6 +80,28 @@ func toBool(obj interface{}) (bool, error) {
 	}
 }
 
+// N = maxdepth - 1
+// -1: disable, 0: enable (no max), 1: enable (only top-level ##)
+func toToc(obj interface{}) (int, error) {
+	if obj == nil {
+		return -1, nil
+	}
+	switch val := obj.(type) {
+	case bool:
+		if val {
+			return 0, nil
+		}
+		return -1, nil
+	case int:
+		if val < -1 {
+			val = -1
+		}
+		return val, nil
+	default:
+		return -1, fmt.Errorf("incorrect type for value: %T, should be bool or int", val)
+	}
+}
+
 func toLinks(orderedMetaData yaml.MapSlice) ([]Link, error) {
 	var navData interface{}
 	for i := 0; i < len(orderedMetaData); i++ {
@@ -216,24 +238,6 @@ func ParseText(text string) (*ParsedText, error) {
 	doc := md.Parser().Parse(gtext.NewReader(btext), parser.WithContext(context))
 	metaData := meta.Get(context)
 
-	showToc, err := toBool(metaData["toc"])
-	if err != nil {
-		return &parsed, fmt.Errorf("front-matter field (%s): %w", "toc", err)
-	}
-	// we need to add an extension after parsing frontmatter
-	if showToc {
-		extenders = append(extenders, &toc.Extender{
-			Title:      "toc",
-			TitleDepth: 2,
-			Compact:    true,
-			TitleID:    "toc",
-			ListID:     "toc-list",
-		})
-		md = CreateGoldmark(extenders...)
-		context := parser.NewContext()
-		doc = md.Parser().Parse(gtext.NewReader(btext), parser.WithContext(context))
-	}
-
 	// title:
 	// 1. if specified in frontmatter, use that
 	title, err := toString(metaData["title"])
@@ -247,6 +251,15 @@ func ParseText(text string) (*ParsedText, error) {
 	// 3. else, set it to nothing (slug should get used later down the line)
 	// this is implicit since it's already ""
 	parsed.MetaData.Title = title
+
+	// only handle toc after the title is extracted (if it's getting extracted)
+	mtoc, err := toToc(metaData["toc"])
+	if err != nil {
+		return &parsed, fmt.Errorf("front-matter field (%s): %w", "toc", err)
+	}
+	if mtoc >= 0 {
+		AstToc(doc, btext, mtoc)
+	}
 
 	description, err := toString(metaData["description"])
 	if err != nil {
@@ -399,4 +412,37 @@ func AstTitle(doc ast.Node, src []byte, clean bool) string {
 		panic(err) // unreachable
 	}
 	return out
+}
+
+func AstToc(doc ast.Node, src []byte, mtoc int) {
+	var tree *toc.TOC
+	if mtoc >= 0 {
+		var err error
+		if mtoc > 0 {
+			tree, err = toc.Inspect(doc, src, toc.Compact(true), toc.MinDepth(2), toc.MaxDepth(mtoc + 1))
+		} else {
+			tree, err = toc.Inspect(doc, src, toc.Compact(true), toc.MinDepth(2))
+		}
+		if err != nil {
+			return // TODO: further processing?
+		}
+		if tree == nil {
+			return
+		}
+	}
+	list := toc.RenderList(tree)
+	if list == nil {
+		return // no headings
+	}
+
+	list.SetAttributeString("id", []byte("toc-list"))
+
+	// generate # toc
+	heading := ast.NewHeading(2)
+	heading.SetAttributeString("id", []byte("toc"))
+	heading.AppendChild(heading, ast.NewString([]byte("toc")))
+
+	// insert
+	doc.InsertBefore(doc, doc.FirstChild(), list)
+	doc.InsertBefore(doc, doc.FirstChild(), heading)
 }
