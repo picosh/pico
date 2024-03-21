@@ -56,6 +56,8 @@ func GetMimeType(fpath string) string {
 		return "application/manifest+json"
 	} else if ext == ".xml" {
 		return "application/xml"
+	} else if ext == ".xsl" {
+		return "application/xml"
 	} else if ext == ".avif" {
 		return "image/avif"
 	} else if ext == ".heif" {
