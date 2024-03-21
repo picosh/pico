@@ -171,6 +171,20 @@ func toTags(obj interface{}) ([]string, error) {
 	return arr, nil
 }
 
+func CreateGoldmark(extenders ...goldmark.Extender) goldmark.Markdown {
+	return goldmark.New(
+		goldmark.WithExtensions(
+			extenders...,
+		),
+		goldmark.WithParserOptions(
+			parser.WithAutoHeadingID(),
+		),
+		goldmark.WithRendererOptions(
+			ghtml.WithUnsafe(),
+		),
+	)
+}
+
 func ParseText(text string) (*ParsedText, error) {
 	parsed := ParsedText{
 		MetaData: &MetaData{
@@ -195,17 +209,7 @@ func ParseText(text string) (*ParsedText, error) {
 			Texter:   anchor.Text("#"),
 		},
 	}
-	md := goldmark.New(
-		goldmark.WithExtensions(
-			extenders...,
-		),
-		goldmark.WithParserOptions(
-			parser.WithAutoHeadingID(),
-		),
-		goldmark.WithRendererOptions(
-			ghtml.WithUnsafe(),
-		),
-	)
+	md := CreateGoldmark(extenders...)
 	context := parser.NewContext()
 	// we do the Parse/Render steps manually to get a chance to examine the AST
 	btext := []byte(text)
@@ -225,17 +229,7 @@ func ParseText(text string) (*ParsedText, error) {
 			TitleID:    "toc",
 			ListID:     "toc-list",
 		})
-		md = goldmark.New(
-			goldmark.WithExtensions(
-				extenders...,
-			),
-			goldmark.WithParserOptions(
-				parser.WithAutoHeadingID(),
-			),
-			goldmark.WithRendererOptions(
-				ghtml.WithUnsafe(),
-			),
-		)
+		md = CreateGoldmark(extenders...)
 		context := parser.NewContext()
 		doc = md.Parser().Parse(gtext.NewReader(btext), parser.WithContext(context))
 	}
