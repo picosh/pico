@@ -36,6 +36,7 @@ require (
 	github.com/yuin/goldmark-highlighting v0.0.0-20220208100518-594be1970594
 	github.com/yuin/goldmark-meta v1.1.0
 	go.abhg.dev/goldmark/anchor v0.1.1
+	go.abhg.dev/goldmark/hashtag v0.3.1
 	golang.org/x/crypto v0.18.0
 	gopkg.in/yaml.v2 v2.4.0
 )
@@ -116,7 +117,6 @@ require (
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/yusufpapurcu/wmi v1.2.3 // indirect
-	go.abhg.dev/goldmark/hashtag v0.3.1 // indirect
 	golang.org/x/exp v0.0.0-20231108232855-2478ac86f678 // indirect
 	golang.org/x/net v0.19.0 // indirect
 	golang.org/x/sync v0.6.0 // indirect

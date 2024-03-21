@@ -3,7 +3,6 @@ package shared
 import (
 	"bytes"
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 
@@ -189,7 +188,7 @@ func ParseText(text string) (*ParsedText, error) {
 			extension.GFM,
 			extension.Footnote,
 			meta.Meta,
-			&hashtag.Extender{}, // TODO: resolver to make them links
+			&hashtag.Extender{},
 			hili,
 			&anchor.Extender{
 				Position: anchor.Before,
@@ -329,21 +328,25 @@ func AstTags(doc ast.Node) []string {
 		return ast.WalkContinue, nil
 	})
 	if err != nil {
-		panic(err)
+		panic(err) // unreachable
 	}
 
 	// sort and deduplicate results
-	sort.Strings(tags)
-	e := 1
-	for i := 1; i < len(tags); i++ {
-		// this works because we're keeping tags[0]
-		if tags[i] == tags[i-1] {
-			continue
+	dedupe := removeDuplicateStr(tags)
+	return dedupe
+}
+
+// https://stackoverflow.com/a/66751055
+func removeDuplicateStr(strSlice []string) []string {
+	allKeys := make(map[string]bool)
+	list := []string{}
+	for _, item := range strSlice {
+		if _, value := allKeys[item]; !value {
+			allKeys[item] = true
+			list = append(list, item)
 		}
-		tags[e] = tags[i]
-		e++
 	}
-	return tags[:e]
+	return list
 }
 
 // AstTitle extracts the title (if any) from a parsed markdown document.
