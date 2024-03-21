@@ -59,6 +59,10 @@ table {
   height: auto;
 }
 
+#toc {
+  margin: 0;
+}
+
 .thumbnail-link {
   z-index: 1;
 }

@@ -19,6 +19,7 @@ import (
 	gtext "github.com/yuin/goldmark/text"
 	"go.abhg.dev/goldmark/anchor"
 	"go.abhg.dev/goldmark/hashtag"
+	"go.abhg.dev/goldmark/toc"
 	yaml "gopkg.in/yaml.v2"
 )
 
@@ -183,17 +184,20 @@ func ParseText(text string) (*ParsedText, error) {
 			html.WithClasses(true),
 		),
 	)
+	extenders := []goldmark.Extender{
+		extension.GFM,
+		extension.Footnote,
+		meta.Meta,
+		&hashtag.Extender{},
+		hili,
+		&anchor.Extender{
+			Position: anchor.Before,
+			Texter:   anchor.Text("#"),
+		},
+	}
 	md := goldmark.New(
 		goldmark.WithExtensions(
-			extension.GFM,
-			extension.Footnote,
-			meta.Meta,
-			&hashtag.Extender{},
-			hili,
-			&anchor.Extender{
-				Position: anchor.Before,
-				Texter:   anchor.Text("#"),
-			},
+			extenders...,
 		),
 		goldmark.WithParserOptions(
 			parser.WithAutoHeadingID(),
@@ -203,11 +207,38 @@ func ParseText(text string) (*ParsedText, error) {
 		),
 	)
 	context := parser.NewContext()
-
 	// we do the Parse/Render steps manually to get a chance to examine the AST
 	btext := []byte(text)
 	doc := md.Parser().Parse(gtext.NewReader(btext), parser.WithContext(context))
 	metaData := meta.Get(context)
+
+	showToc, err := toBool(metaData["toc"])
+	if err != nil {
+		return &parsed, fmt.Errorf("front-matter field (%s): %w", "toc", err)
+	}
+	// we need to add an extension after parsing frontmatter
+	if showToc {
+		extenders = append(extenders, &toc.Extender{
+			Title:      "toc",
+			TitleDepth: 2,
+			Compact:    true,
+			TitleID:    "toc",
+			ListID:     "toc-list",
+		})
+		md = goldmark.New(
+			goldmark.WithExtensions(
+				extenders...,
+			),
+			goldmark.WithParserOptions(
+				parser.WithAutoHeadingID(),
+			),
+			goldmark.WithRendererOptions(
+				ghtml.WithUnsafe(),
+			),
+		)
+		context := parser.NewContext()
+		doc = md.Parser().Parse(gtext.NewReader(btext), parser.WithContext(context))
+	}
 
 	// title:
 	// 1. if specified in frontmatter, use that

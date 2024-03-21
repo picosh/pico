@@ -38,6 +38,7 @@ require (
 	github.com/yuin/goldmark-meta v1.1.0
 	go.abhg.dev/goldmark/anchor v0.1.1
 	go.abhg.dev/goldmark/hashtag v0.3.1
+	go.abhg.dev/goldmark/toc v0.10.0
 	golang.org/x/crypto v0.18.0
 	gopkg.in/yaml.v2 v2.4.0
 )
