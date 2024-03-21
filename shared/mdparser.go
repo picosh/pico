@@ -18,6 +18,7 @@ import (
 	ghtml "github.com/yuin/goldmark/renderer/html"
 	gtext "github.com/yuin/goldmark/text"
 	"go.abhg.dev/goldmark/anchor"
+	"go.abhg.dev/goldmark/hashtag"
 	yaml "gopkg.in/yaml.v2"
 )
 
@@ -187,6 +188,7 @@ func ParseText(text string) (*ParsedText, error) {
 			extension.GFM,
 			extension.Footnote,
 			meta.Meta,
+			&hashtag.Extender{},
 			hili,
 			&anchor.Extender{
 				Position: anchor.Before,
@@ -286,9 +288,14 @@ func ParseText(text string) (*ParsedText, error) {
 	}
 	parsed.MetaData.Aliases = aliases
 
-	tags, err := toTags(metaData["tags"])
+	rtags := metaData["tags"]
+	tags, err := toTags(rtags)
 	if err != nil {
 		return &parsed, err
+	}
+	// fill from hashtag ASTs as fallback
+	if rtags == nil {
+		tags = AstTags(doc)
 	}
 	parsed.MetaData.Tags = tags
 
@@ -301,6 +308,45 @@ func ParseText(text string) (*ParsedText, error) {
 	parsed.Html = policy.Sanitize(buf.String())
 
 	return &parsed, nil
+}
+
+func AstTags(doc ast.Node) []string {
+	var tags []string
+	err := ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		switch n.Kind() {
+		// ignore hashtags inside of these sections
+		case ast.KindBlockquote, ast.KindCodeBlock, ast.KindCodeSpan:
+			return ast.WalkSkipChildren, nil
+		// register hashtags
+		case hashtag.Kind:
+			t := n.(*hashtag.Node)
+			if entering { // only add each tag once
+				tags = append(tags, string(t.Tag))
+			}
+		}
+		// out-of-switch default
+		return ast.WalkContinue, nil
+	})
+	if err != nil {
+		panic(err) // unreachable
+	}
+
+	// sort and deduplicate results
+	dedupe := removeDuplicateStr(tags)
+	return dedupe
+}
+
+// https://stackoverflow.com/a/66751055
+func removeDuplicateStr(strSlice []string) []string {
+	allKeys := make(map[string]bool)
+	list := []string{}
+	for _, item := range strSlice {
+		if _, value := allKeys[item]; !value {
+			allKeys[item] = true
+			list = append(list, item)
+		}
+	}
+	return list
 }
 
 // AstTitle extracts the title (if any) from a parsed markdown document.
