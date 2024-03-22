@@ -446,7 +446,7 @@ func AstToc(doc ast.Node, src []byte, mtoc int) error {
 	// generate # toc
 	heading := ast.NewHeading(2)
 	heading.SetAttributeString("id", []byte("toc"))
-	heading.AppendChild(heading, ast.NewString([]byte("toc")))
+	heading.AppendChild(heading, ast.NewString([]byte("Table of Contents")))
 
 	// insert
 	doc.InsertBefore(doc, doc.FirstChild(), list)
