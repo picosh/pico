@@ -80,8 +80,11 @@ func toBool(obj interface{}) (bool, error) {
 	}
 }
 
-// N = maxdepth - 1
-// -1: disable, 0: enable (no max), 1: enable (only top-level ##)
+// The toc frontmatter can take a boolean or an integer.
+//
+// A value of -1 or false means "do not generate a toc".
+// A value of 0 or true means "generate a toc with no depth limit".
+// A value of >0 means "generate a toc with a depth limit of $value past title".
 func toToc(obj interface{}) (int, error) {
 	if obj == nil {
 		return -1, nil
@@ -258,7 +261,10 @@ func ParseText(text string) (*ParsedText, error) {
 		return &parsed, fmt.Errorf("front-matter field (%s): %w", "toc", err)
 	}
 	if mtoc >= 0 {
-		AstToc(doc, btext, mtoc)
+		err = AstToc(doc, btext, mtoc)
+		if err != nil {
+			return &parsed, fmt.Errorf("error generating toc: %w", err)
+		}
 	}
 
 	description, err := toString(metaData["description"])
@@ -414,25 +420,25 @@ func AstTitle(doc ast.Node, src []byte, clean bool) string {
 	return out
 }
 
-func AstToc(doc ast.Node, src []byte, mtoc int) {
+func AstToc(doc ast.Node, src []byte, mtoc int) error {
 	var tree *toc.TOC
 	if mtoc >= 0 {
 		var err error
 		if mtoc > 0 {
-			tree, err = toc.Inspect(doc, src, toc.Compact(true), toc.MinDepth(2), toc.MaxDepth(mtoc + 1))
+			tree, err = toc.Inspect(doc, src, toc.Compact(true), toc.MinDepth(2), toc.MaxDepth(mtoc+1))
 		} else {
 			tree, err = toc.Inspect(doc, src, toc.Compact(true), toc.MinDepth(2))
 		}
 		if err != nil {
-			return // TODO: further processing?
+			return err
 		}
 		if tree == nil {
-			return
+			return nil // no headings?
 		}
 	}
 	list := toc.RenderList(tree)
 	if list == nil {
-		return // no headings
+		return nil // no headings
 	}
 
 	list.SetAttributeString("id", []byte("toc-list"))
@@ -445,4 +451,5 @@ func AstToc(doc ast.Node, src []byte, mtoc int) {
 	// insert
 	doc.InsertBefore(doc, doc.FirstChild(), list)
 	doc.InsertBefore(doc, doc.FirstChild(), heading)
+	return nil
 }
