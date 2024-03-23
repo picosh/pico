@@ -1225,7 +1225,12 @@ func (me *PsqlDB) FindFeatureForUser(userID string, feature string) (*db.Feature
 
 func (me *PsqlDB) FindFeaturesForUser(userID string) ([]*db.FeatureFlag, error) {
 	var features []*db.FeatureFlag
-	query := "SELECT id, user_id, payment_history_id, name, data, created_at, expires_at FROM feature_flags WHERE user_id=$1"
+	// https://stackoverflow.com/a/16920077
+	query := `SELECT DISTINCT ON (name)
+			id, user_id, payment_history_id, name, data, created_at, expires_at
+		FROM feature_flags
+		WHERE user_id=$1
+		ORDER BY name, expires_at DESC;`
 	rs, err := me.Db.Query(query, userID)
 	if err != nil {
 		return features, err
@@ -1606,6 +1611,16 @@ func (me *PsqlDB) FindTokensForUser(userID string) ([]*db.Token, error) {
 	return keys, nil
 }
 
+func (me *PsqlDB) createFeatureExpiresAt(userID, name string) time.Time {
+	ff, _ := me.FindFeatureForUser(userID, name)
+	t := time.Now()
+	extendDate := t.AddDate(1, 0, 0)
+	if ff != nil {
+		extendDate = ff.ExpiresAt.AddDate(1, 0, 0)
+	}
+	return extendDate
+}
+
 func (me *PsqlDB) AddPicoPlusUser(username, paymentType, txId string) error {
 	user, err := me.FindUserForName(username)
 	if err != nil {
@@ -1638,30 +1653,34 @@ func (me *PsqlDB) AddPicoPlusUser(username, paymentType, txId string) error {
 		}
 	}
 
+	pgs := me.createFeatureExpiresAt(user.ID, "pgs")
 	pgsQuery := `INSERT INTO feature_flags (user_id, name, data, expires_at)
-	VALUES ($1, 'pgs', '{"storage_max":10000000000, "file_max":50000000}'::jsonb, now() + '1 year'::interval);`
-	_, err = tx.Exec(pgsQuery, user.ID)
+	VALUES ($1, 'pgs', '{"storage_max":10000000000, "file_max":50000000}'::jsonb, $2);`
+	_, err = tx.Exec(pgsQuery, user.ID, pgs)
 	if err != nil {
 		return err
 	}
 
+	imgs := me.createFeatureExpiresAt(user.ID, "imgs")
 	imgsQuery := `INSERT INTO feature_flags (user_id, name, data, expires_at)
-	VALUES ($1, 'imgs', '{"storage_max":5000000000}'::jsonb, now() + '1 year'::interval);`
-	_, err = tx.Exec(imgsQuery, user.ID)
+	VALUES ($1, 'imgs', '{"storage_max":5000000000}'::jsonb, $2);`
+	_, err = tx.Exec(imgsQuery, user.ID, imgs)
 	if err != nil {
 		return err
 	}
 
+	prose := me.createFeatureExpiresAt(user.ID, "prose")
 	proseQuery := `INSERT INTO feature_flags (user_id, name, data, expires_at)
-	VALUES ($1, 'prose', '{"storage_max":1000000000, "file_max":50000000}'::jsonb, now() + '1 year'::interval);`
-	_, err = tx.Exec(proseQuery, user.ID)
+	VALUES ($1, 'prose', '{"storage_max":1000000000, "file_max":50000000}'::jsonb, $2);`
+	_, err = tx.Exec(proseQuery, user.ID, prose)
 	if err != nil {
 		return err
 	}
 
+	tuns := me.createFeatureExpiresAt(user.ID, "tuns")
 	tunsQuery := `INSERT INTO feature_flags (user_id, name, expires_at)
-	VALUES ($1, 'tuns', now() + '1 year'::interval);`
-	_, err = tx.Exec(tunsQuery, user.ID)
+	VALUES ($1, 'tuns', $2);`
+	_, err = tx.Exec(tunsQuery, user.ID, tuns)
 	if err != nil {
 		return err
 	}
