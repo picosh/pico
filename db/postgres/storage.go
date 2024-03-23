@@ -1613,12 +1613,11 @@ func (me *PsqlDB) FindTokensForUser(userID string) ([]*db.Token, error) {
 
 func (me *PsqlDB) createFeatureExpiresAt(userID, name string) time.Time {
 	ff, _ := me.FindFeatureForUser(userID, name)
-	t := time.Now()
-	extendDate := t.AddDate(1, 0, 0)
-	if ff != nil {
-		extendDate = ff.ExpiresAt.AddDate(1, 0, 0)
+	if ff == nil {
+		t := time.Now()
+		return t.AddDate(1, 0, 0)
 	}
-	return extendDate
+	return ff.ExpiresAt.AddDate(1, 0, 0)
 }
 
 func (me *PsqlDB) AddPicoPlusUser(username, paymentType, txId string) error {
