@@ -442,6 +442,25 @@ func (me *PsqlDB) InsertPublicKey(userID, key, name string, tx *sql.Tx) (*db.Pub
 	return pk, nil
 }
 
+func (me *PsqlDB) UpdatePublicKey(key, name string) (*db.PublicKey, error) {
+	pk, err := me.FindPublicKeyForKey(key)
+	if err != nil {
+		return nil, err
+	}
+
+	query := `UPDATE public_keys SET name=$1 WHERE id=$2;`
+	_, err = me.Db.Exec(query, name, pk.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	pk, err = me.FindPublicKeyForKey(key)
+	if err != nil {
+		return nil, err
+	}
+	return pk, nil
+}
+
 func (me *PsqlDB) FindPublicKeyForKey(key string) (*db.PublicKey, error) {
 	var keys []*db.PublicKey
 	rs, err := me.Db.Query(sqlSelectPublicKey, key)
@@ -1647,7 +1666,6 @@ func (me *PsqlDB) AddPicoPlusUser(username, paymentType, txId string) error {
 			data,
 		)
 		if err != nil {
-			fmt.Println(err)
 			return err
 		}
 	}

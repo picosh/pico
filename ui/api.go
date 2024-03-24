@@ -186,16 +186,78 @@ func deletePubkey(httpCtx *shared.ApiConfig, ctx ssh.Context) http.HandlerFunc {
 		if !ensureUser(w, user) {
 			return
 		}
+		dbpool := shared.GetDB(r)
 		pubkeyID := shared.GetField(r, 0)
 
-		dbpool := shared.GetDB(r)
-		err := dbpool.RemoveKeys([]string{pubkeyID})
+		ownedKeys, err := dbpool.FindKeysForUser(user)
+		if err != nil {
+			logger.Error("could not query for pubkeys", "err", err.Error())
+			shared.JSONError(w, err.Error(), http.StatusUnprocessableEntity)
+			return
+		}
+
+		found := false
+		for _, key := range ownedKeys {
+			if key.ID == pubkeyID {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			logger.Error("user trying to delete key they do not own")
+			shared.JSONError(w, "user trying to delete key they do not own", http.StatusUnauthorized)
+			return
+		}
+
+		err = dbpool.RemoveKeys([]string{pubkeyID})
 		if err != nil {
 			logger.Error("could not remove pubkey", "err", err.Error())
 			shared.JSONError(w, err.Error(), http.StatusUnprocessableEntity)
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func patchPubkey(httpCtx *shared.ApiConfig, ctx ssh.Context) http.HandlerFunc {
+	logger := httpCtx.Cfg.Logger
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		user, _ := shared.GetUserCtx(ctx)
+		if !ensureUser(w, user) {
+			return
+		}
+
+		dbpool := shared.GetDB(r)
+		var payload createPubkeyPayload
+		body, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(body, &payload)
+
+		auth, err := dbpool.FindUserForKey("", payload.Pubkey)
+		if err != nil {
+			logger.Error("could not find user with pubkey provided", "err", err.Error())
+			shared.JSONError(w, err.Error(), http.StatusUnprocessableEntity)
+			return
+		}
+
+		if auth.ID != user.ID {
+			logger.Error("user trying to update pubkey they do not own")
+			shared.JSONError(w, "user trying to update pubkey they do not own", http.StatusUnauthorized)
+			return
+		}
+
+		pubkey, err := dbpool.UpdatePublicKey(payload.Pubkey, payload.Name)
+		if err != nil {
+			logger.Error("could not update pubkey", "err", err.Error())
+			shared.JSONError(w, err.Error(), http.StatusUnprocessableEntity)
+			return
+		}
+
+		err = json.NewEncoder(w).Encode(pubkey)
+		if err != nil {
+			logger.Error("json encode", "err", err.Error())
+		}
 	}
 }
 
@@ -287,10 +349,31 @@ func deleteToken(httpCtx *shared.ApiConfig, ctx ssh.Context) http.HandlerFunc {
 		if !ensureUser(w, user) {
 			return
 		}
+		dbpool := shared.GetDB(r)
 		tokenID := shared.GetField(r, 0)
 
-		dbpool := shared.GetDB(r)
-		err := dbpool.RemoveToken(tokenID)
+		toks, err := dbpool.FindTokensForUser(user.ID)
+		if err != nil {
+			logger.Error("could not query for user tokens", "err", err.Error())
+			shared.JSONError(w, err.Error(), http.StatusUnprocessableEntity)
+			return
+		}
+
+		found := false
+		for _, tok := range toks {
+			if tok.ID == tokenID {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			logger.Error("user trying to delete token they do not own")
+			shared.JSONError(w, "user trying to delete token they do not own", http.StatusUnauthorized)
+			return
+		}
+
+		err = dbpool.RemoveToken(tokenID)
 		if err != nil {
 			logger.Error("could not remove token", "err", err.Error())
 			shared.JSONError(w, err.Error(), http.StatusUnprocessableEntity)
@@ -436,6 +519,7 @@ func CreateRoutes(apiConfig *shared.ApiConfig, ctx ssh.Context) []shared.Route {
 		shared.NewCorsRoute("GET", "/api/pubkeys", getPublicKeys(apiConfig, ctx)),
 		shared.NewCorsRoute("POST", "/api/pubkeys", createPubkey(apiConfig, ctx)),
 		shared.NewCorsRoute("DELETE", "/api/pubkeys/(.+)", deletePubkey(apiConfig, ctx)),
+		shared.NewCorsRoute("PATCH", "/api/pubkeys", patchPubkey(apiConfig, ctx)),
 		shared.NewCorsRoute("GET", "/api/tokens", getTokens(apiConfig, ctx)),
 		shared.NewCorsRoute("POST", "/api/tokens", createToken(apiConfig, ctx)),
 		shared.NewCorsRoute("DELETE", "/api/tokens/(.+)", deleteToken(apiConfig, ctx)),
