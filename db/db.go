@@ -281,9 +281,10 @@ type DB interface {
 	RegisterUser(name, pubkey string) (*User, error)
 	RemoveUsers(userIDs []string) error
 	LinkUserKey(userID string, pubkey string, tx *sql.Tx) error
-	UpdatePublicKey(pubkey, name string) (*PublicKey, error)
+	UpdatePublicKey(pubkeyID, name string) (*PublicKey, error)
 	InsertPublicKey(userID, pubkey, name string, tx *sql.Tx) (*PublicKey, error)
 	FindPublicKeyForKey(pubkey string) (*PublicKey, error)
+	FindPublicKey(pubkeyID string) (*PublicKey, error)
 	FindKeysForUser(user *User) ([]*PublicKey, error)
 	RemoveKeys(pubkeyIDs []string) error
 

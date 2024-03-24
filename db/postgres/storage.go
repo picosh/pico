@@ -442,8 +442,8 @@ func (me *PsqlDB) InsertPublicKey(userID, key, name string, tx *sql.Tx) (*db.Pub
 	return pk, nil
 }
 
-func (me *PsqlDB) UpdatePublicKey(key, name string) (*db.PublicKey, error) {
-	pk, err := me.FindPublicKeyForKey(key)
+func (me *PsqlDB) UpdatePublicKey(pubkeyID, name string) (*db.PublicKey, error) {
+	pk, err := me.FindPublicKey(pubkeyID)
 	if err != nil {
 		return nil, err
 	}
@@ -454,7 +454,7 @@ func (me *PsqlDB) UpdatePublicKey(key, name string) (*db.PublicKey, error) {
 		return nil, err
 	}
 
-	pk, err = me.FindPublicKeyForKey(key)
+	pk, err = me.FindPublicKey(pubkeyID)
 	if err != nil {
 		return nil, err
 	}
@@ -492,6 +492,34 @@ func (me *PsqlDB) FindPublicKeyForKey(key string) (*db.PublicKey, error) {
 	// username when using ssh.  So instead of `ssh <domain>` it should be `ssh user@<domain>`
 	if len(keys) > 1 {
 		return nil, &db.ErrMultiplePublicKeys{}
+	}
+
+	return keys[0], nil
+}
+
+func (me *PsqlDB) FindPublicKey(pubkeyID string) (*db.PublicKey, error) {
+	var keys []*db.PublicKey
+	rs, err := me.Db.Query(`SELECT id, user_id, name, public_key, created_at FROM public_keys WHERE id = $1`, pubkeyID)
+	if err != nil {
+		return nil, err
+	}
+
+	for rs.Next() {
+		pk := &db.PublicKey{}
+		err := rs.Scan(&pk.ID, &pk.UserID, &pk.Name, &pk.Key, &pk.CreatedAt)
+		if err != nil {
+			return nil, err
+		}
+
+		keys = append(keys, pk)
+	}
+
+	if rs.Err() != nil {
+		return nil, rs.Err()
+	}
+
+	if len(keys) == 0 {
+		return nil, errors.New("no public keys found for key provided")
 	}
 
 	return keys[0], nil

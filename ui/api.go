@@ -115,6 +115,14 @@ type pubkeysPayload struct {
 	Pubkeys []*db.PublicKey `json:"pubkeys"`
 }
 
+func toFingerprint(pubkey string) (string, error) {
+	kk, _, _, _, err := ssh.ParseAuthorizedKey([]byte(pubkey))
+	if err != nil {
+		return "", err
+	}
+	return shared.KeyForSha256(kk), nil
+}
+
 func getPublicKeys(httpCtx *shared.ApiConfig, ctx ssh.Context) http.HandlerFunc {
 	logger := httpCtx.Cfg.Logger
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -132,12 +140,12 @@ func getPublicKeys(httpCtx *shared.ApiConfig, ctx ssh.Context) http.HandlerFunc 
 		}
 
 		for _, pk := range pubkeys {
-			kk, _, _, _, err := ssh.ParseAuthorizedKey([]byte(pk.Key))
+			fingerprint, err := toFingerprint(pk.Key)
 			if err != nil {
 				logger.Error("could not parse public key", "err", err.Error())
 				continue
 			}
-			pk.Key = shared.KeyForSha256(kk)
+			pk.Key = fingerprint
 		}
 
 		err = json.NewEncoder(w).Encode(&pubkeysPayload{Pubkeys: pubkeys})
@@ -171,6 +179,12 @@ func createPubkey(httpCtx *shared.ApiConfig, ctx ssh.Context) http.HandlerFunc {
 			return
 		}
 
+		fingerprint, err := toFingerprint(pubkey.Key)
+		if err != nil {
+			shared.JSONError(w, err.Error(), http.StatusUnprocessableEntity)
+			return
+		}
+		pubkey.Key = fingerprint
 		err = json.NewEncoder(w).Encode(pubkey)
 		if err != nil {
 			logger.Error("json encode", "err", err.Error())
@@ -230,29 +244,38 @@ func patchPubkey(httpCtx *shared.ApiConfig, ctx ssh.Context) http.HandlerFunc {
 		}
 
 		dbpool := shared.GetDB(r)
+		pubkeyID := shared.GetField(r, 0)
+
 		var payload createPubkeyPayload
 		body, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(body, &payload)
 
-		auth, err := dbpool.FindUserForKey("", payload.Pubkey)
+		auth, err := dbpool.FindPublicKey(pubkeyID)
 		if err != nil {
 			logger.Error("could not find user with pubkey provided", "err", err.Error())
 			shared.JSONError(w, err.Error(), http.StatusUnprocessableEntity)
 			return
 		}
 
-		if auth.ID != user.ID {
+		if auth.UserID != user.ID {
 			logger.Error("user trying to update pubkey they do not own")
 			shared.JSONError(w, "user trying to update pubkey they do not own", http.StatusUnauthorized)
 			return
 		}
 
-		pubkey, err := dbpool.UpdatePublicKey(payload.Pubkey, payload.Name)
+		pubkey, err := dbpool.UpdatePublicKey(pubkeyID, payload.Name)
 		if err != nil {
 			logger.Error("could not update pubkey", "err", err.Error())
 			shared.JSONError(w, err.Error(), http.StatusUnprocessableEntity)
 			return
 		}
+
+		fingerprint, err := toFingerprint(pubkey.Key)
+		if err != nil {
+			shared.JSONError(w, err.Error(), http.StatusUnprocessableEntity)
+			return
+		}
+		pubkey.Key = fingerprint
 
 		err = json.NewEncoder(w).Encode(pubkey)
 		if err != nil {
@@ -519,7 +542,7 @@ func CreateRoutes(apiConfig *shared.ApiConfig, ctx ssh.Context) []shared.Route {
 		shared.NewCorsRoute("GET", "/api/pubkeys", getPublicKeys(apiConfig, ctx)),
 		shared.NewCorsRoute("POST", "/api/pubkeys", createPubkey(apiConfig, ctx)),
 		shared.NewCorsRoute("DELETE", "/api/pubkeys/(.+)", deletePubkey(apiConfig, ctx)),
-		shared.NewCorsRoute("PATCH", "/api/pubkeys", patchPubkey(apiConfig, ctx)),
+		shared.NewCorsRoute("PATCH", "/api/pubkeys/(.+)", patchPubkey(apiConfig, ctx)),
 		shared.NewCorsRoute("GET", "/api/tokens", getTokens(apiConfig, ctx)),
 		shared.NewCorsRoute("POST", "/api/tokens", createToken(apiConfig, ctx)),
 		shared.NewCorsRoute("DELETE", "/api/tokens/(.+)", deleteToken(apiConfig, ctx)),
