@@ -2,6 +2,7 @@ package prose
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -116,10 +117,6 @@ func GetPostTitle(post *db.Post) string {
 
 func GetBlogName(username string) string {
 	return fmt.Sprintf("%s's blog", username)
-}
-
-func isRequestTrackable(r *http.Request) bool {
-	return true
 }
 
 func blogStyleHandler(w http.ResponseWriter, r *http.Request) {
@@ -260,6 +257,17 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 		postCollection = append(postCollection, p)
 	}
 
+	// track visit
+	ch := shared.GetAnalyticsQueue(r)
+	view, err := shared.AnalyticsVisitFromRequest(r, user.ID)
+	if err == nil {
+		ch <- view
+	} else {
+		if !errors.Is(err, shared.ErrAnalyticsDisabled) {
+			logger.Error("could not record analytics view", "err", err)
+		}
+	}
+
 	data := BlogPageData{
 		Site:      *cfg.GetSiteData(),
 		PageTitle: headerTxt.Title,
@@ -324,6 +332,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	username := shared.GetUsernameFromRequest(r)
 	subdomain := shared.GetSubdomain(r)
 	cfg := shared.GetCfg(r)
+	ch := shared.GetAnalyticsQueue(r)
 
 	var slug string
 	if !cfg.IsSubdomains() || subdomain == "" {
@@ -399,11 +408,14 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			ogImageCard = parsedText.ImageCard
 		}
 
-		// validate and fire off analytic event
-		if isRequestTrackable(r) {
-			_, err := dbpool.AddViewCount(post.ID)
-			if err != nil {
-				logger.Error(err.Error())
+		// track visit
+		view, err := shared.AnalyticsVisitFromRequest(r, user.ID)
+		if err == nil {
+			view.PostID = post.ID
+			ch <- view
+		} else {
+			if !errors.Is(err, shared.ErrAnalyticsDisabled) {
+				logger.Error("could not record analytics view", "err", err)
 			}
 		}
 
@@ -895,8 +907,8 @@ func createSubdomainRoutes(staticRoutes []shared.Route) []shared.Route {
 
 func StartApiServer() {
 	cfg := NewConfigSite()
-	db := postgres.NewDB(cfg.ConfigCms.DbURL, cfg.Logger)
-	defer db.Close()
+	dbpool := postgres.NewDB(cfg.ConfigCms.DbURL, cfg.Logger)
+	defer dbpool.Close()
 	logger := cfg.Logger
 
 	var st storage.StorageServe
@@ -920,10 +932,13 @@ func StartApiServer() {
 	mainRoutes := createMainRoutes(staticRoutes)
 	subdomainRoutes := createSubdomainRoutes(staticRoutes)
 
+	ch := make(chan *db.AnalyticsVisits)
+	go shared.AnalyticsCollect(ch, dbpool, logger)
 	apiConfig := &shared.ApiConfig{
-		Cfg:     cfg,
-		Dbpool:  db,
-		Storage: st,
+		Cfg:            cfg,
+		Dbpool:         dbpool,
+		Storage:        st,
+		AnalyticsQueue: ch,
 	}
 	handler := shared.CreateServe(mainRoutes, subdomainRoutes, apiConfig)
 	router := http.HandlerFunc(handler)

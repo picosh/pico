@@ -1,6 +1,7 @@
 package pgs
 
 import (
+	"errors"
 	"fmt"
 	"html/template"
 	"io"
@@ -34,6 +35,7 @@ type AssetHandler struct {
 	UserID         string
 	Bucket         sst.Bucket
 	ImgProcessOpts *storage.ImgProcessOpts
+	ProjectID      string
 }
 
 func checkHandler(w http.ResponseWriter, r *http.Request) {
@@ -216,6 +218,18 @@ func (h *AssetHandler) handle(w http.ResponseWriter, r *http.Request) {
 			"bucket", h.Bucket.Name,
 			"routes", strings.Join(attempts, ", "),
 		)
+		// track 404s
+		ch := shared.GetAnalyticsQueue(r)
+		view, err := shared.AnalyticsVisitFromRequest(r, h.UserID)
+		if err == nil {
+			view.ProjectID = h.ProjectID
+			view.Status = http.StatusNotFound
+			ch <- view
+		} else {
+			if !errors.Is(err, shared.ErrAnalyticsDisabled) {
+				h.Logger.Error("could not record analytics view", "err", err)
+			}
+		}
 		http.Error(w, "404 not found", http.StatusNotFound)
 		return
 	}
@@ -259,6 +273,23 @@ func (h *AssetHandler) handle(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("content-type", contentType)
 	}
 
+	finContentType := w.Header().Get("content-type")
+
+	// only track pages, not individual assets
+	if finContentType == "text/html" {
+		// track visit
+		ch := shared.GetAnalyticsQueue(r)
+		view, err := shared.AnalyticsVisitFromRequest(r, h.UserID)
+		if err == nil {
+			view.ProjectID = h.ProjectID
+			ch <- view
+		} else {
+			if !errors.Is(err, shared.ErrAnalyticsDisabled) {
+				h.Logger.Error("could not record analytics view", "err", err)
+			}
+		}
+	}
+
 	h.Logger.Info(
 		"serving asset",
 		"host", r.Host,
@@ -266,7 +297,7 @@ func (h *AssetHandler) handle(w http.ResponseWriter, r *http.Request) {
 		"bucket", h.Bucket.Name,
 		"asset", assetFilepath,
 		"status", status,
-		"contentType", w.Header().Get("content-type"),
+		"contentType", finContentType,
 	)
 
 	w.WriteHeader(status)
@@ -317,6 +348,7 @@ func ServeAsset(fname string, opts *storage.ImgProcessOpts, fromImgs bool, hasPe
 		return
 	}
 
+	projectID := ""
 	// TODO: this could probably be cleaned up more
 	// imgs wont have a project directory
 	projectDir := ""
@@ -336,6 +368,7 @@ func ServeAsset(fname string, opts *storage.ImgProcessOpts, fromImgs bool, hasPe
 			return
 		}
 
+		projectID = project.ID
 		projectDir = project.ProjectDir
 		if !hasPerm(project) {
 			http.Error(w, "You do not have access to this site", http.StatusUnauthorized)
@@ -361,6 +394,7 @@ func ServeAsset(fname string, opts *storage.ImgProcessOpts, fromImgs bool, hasPe
 		Logger:         logger,
 		Bucket:         bucket,
 		ImgProcessOpts: opts,
+		ProjectID:      projectID,
 	}
 
 	asset.handle(w, r)
@@ -425,8 +459,8 @@ func StartApiServer() {
 	cfg := NewConfigSite()
 	logger := cfg.Logger
 
-	db := postgres.NewDB(cfg.DbURL, cfg.Logger)
-	defer db.Close()
+	dbpool := postgres.NewDB(cfg.DbURL, cfg.Logger)
+	defer dbpool.Close()
 
 	var st storage.StorageServe
 	var err error
@@ -441,10 +475,13 @@ func StartApiServer() {
 		return
 	}
 
+	ch := make(chan *db.AnalyticsVisits)
+	go shared.AnalyticsCollect(ch, dbpool, logger)
 	apiConfig := &shared.ApiConfig{
-		Cfg:     cfg,
-		Dbpool:  db,
-		Storage: st,
+		Cfg:            cfg,
+		Dbpool:         dbpool,
+		Storage:        st,
+		AnalyticsQueue: ch,
 	}
 	handler := shared.CreateServe(mainRoutes, createSubdomainRoutes(publicPerm), apiConfig)
 	router := http.HandlerFunc(handler)

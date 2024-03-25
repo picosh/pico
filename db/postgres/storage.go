@@ -998,13 +998,172 @@ func (me *PsqlDB) Close() error {
 	return me.Db.Close()
 }
 
-func (me *PsqlDB) AddViewCount(postID string) (int, error) {
-	views := 0
-	err := me.Db.QueryRow(sqlIncrementViews, postID).Scan(&views)
-	if err != nil {
-		return views, err
+func newNullString(s string) sql.NullString {
+	if len(s) == 0 {
+		return sql.NullString{}
 	}
-	return views, nil
+	return sql.NullString{
+		String: s,
+		Valid:  true,
+	}
+}
+
+func (me *PsqlDB) InsertVisit(view *db.AnalyticsVisits) error {
+	_, err := me.Db.Exec(
+		`INSERT INTO analytics_visits (user_id, project_id, post_id, host, path, ip_address, user_agent, referer, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);`,
+		view.UserID,
+		newNullString(view.ProjectID),
+		newNullString(view.PostID),
+		view.Host,
+		view.Path,
+		view.IpAddress,
+		view.UserAgent,
+		view.Referer,
+		view.Status,
+	)
+	return err
+}
+
+func (me *PsqlDB) visitUnique(fkID, by, interval string, origin time.Time) ([]*db.VisitInterval, error) {
+	uniqueVisitors := fmt.Sprintf(`SELECT
+		post_id,
+		project_id,
+		date_trunc('%s', created_at) as interval_start,
+        count(DISTINCT ip_address) as unique_visitors
+	FROM analytics_visits
+	WHERE %s=$1 AND created_at >= $2
+	GROUP BY post_id, project_id, interval_start`, interval, by)
+
+	intervals := []*db.VisitInterval{}
+	rs, err := me.Db.Query(uniqueVisitors, fkID, origin)
+	if err != nil {
+		return nil, err
+	}
+
+	for rs.Next() {
+		interval := &db.VisitInterval{}
+		var postID sql.NullString
+		var projectID sql.NullString
+		err := rs.Scan(
+			&postID,
+			&projectID,
+			&interval.Interval,
+			&interval.Visitors,
+		)
+		if err != nil {
+			return nil, err
+		}
+		interval.PostID = postID.String
+		interval.ProjectID = projectID.String
+
+		intervals = append(intervals, interval)
+	}
+	if rs.Err() != nil {
+		return nil, rs.Err()
+	}
+	return intervals, nil
+}
+
+func (me *PsqlDB) visitReferer(fkID, by string, origin time.Time) ([]*db.VisitUrl, error) {
+	topUrls := fmt.Sprintf(`SELECT
+		referer,
+		post_id,
+		project_id,
+		count(*) as referer_count
+	FROM analytics_visits
+	WHERE %s=$1 AND created_at >= $2
+	GROUP BY referer, post_id, project_id
+	LIMIT 10`, by)
+
+	intervals := []*db.VisitUrl{}
+	rs, err := me.Db.Query(topUrls, fkID, origin)
+	if err != nil {
+		return nil, err
+	}
+
+	for rs.Next() {
+		interval := &db.VisitUrl{}
+		var postID sql.NullString
+		var projectID sql.NullString
+		err := rs.Scan(
+			&interval.Url,
+			&postID,
+			&projectID,
+			&interval.Count,
+		)
+		if err != nil {
+			return nil, err
+		}
+		interval.PostID = postID.String
+		interval.ProjectID = projectID.String
+
+		intervals = append(intervals, interval)
+	}
+	if rs.Err() != nil {
+		return nil, rs.Err()
+	}
+	return intervals, nil
+}
+
+func (me *PsqlDB) visitUrl(fkID, by string, origin time.Time) ([]*db.VisitUrl, error) {
+	topUrls := fmt.Sprintf(`SELECT
+		path,
+		post_id,
+		project_id,
+		count(*) as path_count
+	FROM analytics_visits
+	WHERE %s=$1 AND created_at >= $2
+	GROUP BY path, post_id, project_id
+	LIMIT 10`, by)
+
+	intervals := []*db.VisitUrl{}
+	rs, err := me.Db.Query(topUrls, fkID, origin)
+	if err != nil {
+		return nil, err
+	}
+
+	for rs.Next() {
+		interval := &db.VisitUrl{}
+		var postID sql.NullString
+		var projectID sql.NullString
+		err := rs.Scan(
+			&interval.Url,
+			&postID,
+			&projectID,
+			&interval.Count,
+		)
+		if err != nil {
+			return nil, err
+		}
+		interval.PostID = postID.String
+		interval.ProjectID = projectID.String
+
+		intervals = append(intervals, interval)
+	}
+	if rs.Err() != nil {
+		return nil, rs.Err()
+	}
+	return intervals, nil
+}
+
+func (me *PsqlDB) VisitSummary(fkID, by, interval string, origin time.Time) (*db.SummaryVisits, error) {
+	visitors, err := me.visitUnique(fkID, by, interval, origin)
+	if err != nil {
+		return nil, err
+	}
+	urls, err := me.visitUrl(fkID, by, origin)
+	if err != nil {
+		return nil, err
+	}
+	refs, err := me.visitReferer(fkID, by, origin)
+	if err != nil {
+		return nil, err
+	}
+	return &db.SummaryVisits{
+		Intervals:   visitors,
+		TopUrls:     urls,
+		TopReferers: refs,
+	}, nil
 }
 
 func (me *PsqlDB) FindUsers() ([]*db.User, error) {
