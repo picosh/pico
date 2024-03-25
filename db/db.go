@@ -154,11 +154,30 @@ type PostAnalytics struct {
 
 type AnalyticsVisits struct {
 	ID        string
+	UserID    string
 	ProjectID string
 	PostID    string
 	Url       string
 	IpAddress string
 	UserAgent string
+}
+
+type VisitInterval struct {
+	PostID    string
+	ProjectID string
+	Interval  *time.Time
+	Visitors  int
+}
+
+type VisitUrl struct {
+	ProjectID string
+	Url       string
+	Count     int
+}
+
+type SummaryVisits struct {
+	Intervals []*VisitInterval
+	TopUrls   []*VisitUrl
 }
 
 type Pager struct {
@@ -337,6 +356,7 @@ type DB interface {
 	ReplaceAliasesForPost(aliases []string, postID string) error
 
 	InsertView(view *AnalyticsVisits) error
+	VisitSummary(fkID, by, interval, origin string) (*SummaryVisits, error)
 
 	AddPicoPlusUser(username string, paymentType, txId string) error
 	FindFeatureForUser(userID string, feature string) (*FeatureFlag, error)

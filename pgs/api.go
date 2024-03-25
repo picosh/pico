@@ -338,7 +338,7 @@ func ServeAsset(fname string, opts *storage.ImgProcessOpts, fromImgs bool, hasPe
 		}
 
 		// track visit
-		view, err := shared.AnalyticsVisitFromRequest(r)
+		view, err := shared.AnalyticsVisitFromRequest(r, user.ID)
 		if err != nil {
 			logger.Error("could not record analytics view", "err", err)
 		}

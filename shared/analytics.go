@@ -52,7 +52,7 @@ func cleanUserAgent(ua string) string {
 	return ua
 }
 
-func AnalyticsVisitFromRequest(r *http.Request) (*db.AnalyticsVisits, error) {
+func AnalyticsVisitFromRequest(r *http.Request, userID string) (*db.AnalyticsVisits, error) {
 	err := trackableRequest(r)
 	if err != nil {
 		return nil, err
@@ -64,6 +64,7 @@ func AnalyticsVisitFromRequest(r *http.Request) (*db.AnalyticsVisits, error) {
 	}
 
 	return &db.AnalyticsVisits{
+		UserID:    userID,
 		Url:       cleanUrl(r.URL),
 		IpAddress: ipAddress,
 		UserAgent: cleanUserAgent(r.UserAgent()),
