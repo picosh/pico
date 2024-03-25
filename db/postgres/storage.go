@@ -1023,7 +1023,7 @@ func (me *PsqlDB) InsertView(view *db.AnalyticsVisits) error {
 	return err
 }
 
-func (me *PsqlDB) uniqueVisitors(fkID, by, interval string, origin time.Time) ([]*db.VisitInterval, error) {
+func (me *PsqlDB) visitUnique(fkID, by, interval string, origin time.Time) ([]*db.VisitInterval, error) {
 	uniqueVisitors := fmt.Sprintf(`SELECT
 		post_id,
 		project_id,
@@ -1048,6 +1048,47 @@ func (me *PsqlDB) uniqueVisitors(fkID, by, interval string, origin time.Time) ([
 			&projectID,
 			&interval.Interval,
 			&interval.Visitors,
+		)
+		if err != nil {
+			return nil, err
+		}
+		interval.PostID = postID.String
+		interval.ProjectID = projectID.String
+
+		intervals = append(intervals, interval)
+	}
+	if rs.Err() != nil {
+		return nil, rs.Err()
+	}
+	return intervals, nil
+}
+
+func (me *PsqlDB) visitReferer(fkID, by string, origin time.Time) ([]*db.VisitUrl, error) {
+	topUrls := fmt.Sprintf(`SELECT
+		referer,
+		post_id,
+		project_id,
+		count(*) as referer_count
+	FROM analytics_visits
+	WHERE %s=$1 AND created_at >= $2
+	GROUP BY referer, post_id, project_id
+	LIMIT 10`, by)
+
+	intervals := []*db.VisitUrl{}
+	rs, err := me.Db.Query(topUrls, fkID, origin)
+	if err != nil {
+		return nil, err
+	}
+
+	for rs.Next() {
+		interval := &db.VisitUrl{}
+		var postID sql.NullString
+		var projectID sql.NullString
+		err := rs.Scan(
+			&interval.Url,
+			&postID,
+			&projectID,
+			&interval.Count,
 		)
 		if err != nil {
 			return nil, err
@@ -1105,7 +1146,7 @@ func (me *PsqlDB) visitUrl(fkID, by string, origin time.Time) ([]*db.VisitUrl, e
 }
 
 func (me *PsqlDB) VisitSummary(fkID, by, interval string, origin time.Time) (*db.SummaryVisits, error) {
-	visitors, err := me.uniqueVisitors(fkID, by, interval, origin)
+	visitors, err := me.visitUnique(fkID, by, interval, origin)
 	if err != nil {
 		return nil, err
 	}
@@ -1113,9 +1154,14 @@ func (me *PsqlDB) VisitSummary(fkID, by, interval string, origin time.Time) (*db
 	if err != nil {
 		return nil, err
 	}
+	refs, err := me.visitReferer(fkID, by, origin)
+	if err != nil {
+		return nil, err
+	}
 	return &db.SummaryVisits{
-		Intervals: visitors,
-		TopUrls:   urls,
+		Intervals:   visitors,
+		TopUrls:     urls,
+		TopReferers: refs,
 	}, nil
 }
 

@@ -179,8 +179,9 @@ type VisitUrl struct {
 }
 
 type SummaryVisits struct {
-	Intervals []*VisitInterval
-	TopUrls   []*VisitUrl
+	Intervals   []*VisitInterval
+	TopUrls     []*VisitUrl
+	TopReferers []*VisitUrl
 }
 
 type Pager struct {

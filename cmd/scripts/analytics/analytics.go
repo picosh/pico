@@ -23,6 +23,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
 	for _, s := range stats.Intervals {
 		logger.Info(
 			"interval",
@@ -32,9 +33,20 @@ func main() {
 			"projectID", s.ProjectID,
 		)
 	}
+
 	for _, url := range stats.TopUrls {
 		logger.Info(
-			"urls",
+			"url",
+			"path", url.Url,
+			"count", url.Count,
+			"postID", url.PostID,
+			"projectID", url.ProjectID,
+		)
+	}
+
+	for _, url := range stats.TopReferers {
+		logger.Info(
+			"referer",
 			"path", url.Url,
 			"count", url.Count,
 			"postID", url.PostID,
