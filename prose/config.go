@@ -22,6 +22,10 @@ func NewConfigSite() *shared.ConfigSite {
 	useImgProxy := shared.GetEnv("USE_IMGPROXY", "1")
 	maxSize := uint64(500 * shared.MB)
 	maxImgSize := int64(10 * shared.MB)
+	secret := shared.GetEnv("PICO_SECRET", "")
+	if secret == "" {
+		panic("must provide PICO_SECRET environment variable")
+	}
 
 	intro := "To get started, enter a username.\n"
 	intro += "To learn next steps go to our docs at https://pico.sh/prose\n"
@@ -31,6 +35,7 @@ func NewConfigSite() *shared.ConfigSite {
 		SubdomainsEnabled:    subdomains == "1",
 		CustomdomainsEnabled: customdomains == "1",
 		UseImgProxy:          useImgProxy == "1",
+		Secret:               secret,
 		ConfigCms: config.ConfigCms{
 			Domain:      domain,
 			Email:       email,

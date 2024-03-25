@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS analytics_visits (
   post_id uuid,
   host varchar(253),
   path varchar(2048),
-  ip_address varchar(46),
+  ip_address varchar(256),
   user_agent varchar(1000),
   referer varchar(253),
   status int4,

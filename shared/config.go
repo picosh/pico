@@ -32,6 +32,7 @@ type ConfigSite struct {
 	CustomdomainsEnabled bool
 	SendgridKey          string
 	UseImgProxy          bool
+	Secret               string
 }
 
 type CreateURL struct {

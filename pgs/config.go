@@ -23,6 +23,10 @@ func NewConfigSite() *shared.ConfigSite {
 	minioPass := shared.GetEnv("MINIO_ROOT_PASSWORD", "")
 	dbURL := shared.GetEnv("DATABASE_URL", "")
 	useImgProxy := shared.GetEnv("USE_IMGPROXY", "1")
+	secret := shared.GetEnv("PICO_SECRET", "")
+	if secret == "" {
+		panic("must provide PICO_SECRET environment variable")
+	}
 
 	intro := "To create an account, enter a username.\n"
 	intro += "After that, go to https://pico.sh/getting-started#next-steps"
@@ -32,6 +36,7 @@ func NewConfigSite() *shared.ConfigSite {
 		SubdomainsEnabled:    subdomains == "1",
 		CustomdomainsEnabled: customdomains == "1",
 		UseImgProxy:          useImgProxy == "1",
+		Secret:               secret,
 		ConfigCms: config.ConfigCms{
 			Domain:      domain,
 			Email:       email,

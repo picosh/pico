@@ -259,7 +259,7 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 
 	// track visit
 	ch := shared.GetAnalyticsQueue(r)
-	view, err := shared.AnalyticsVisitFromRequest(r, user.ID)
+	view, err := shared.AnalyticsVisitFromRequest(r, user.ID, cfg.Secret)
 	if err == nil {
 		ch <- view
 	} else {
@@ -409,7 +409,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// track visit
-		view, err := shared.AnalyticsVisitFromRequest(r, user.ID)
+		view, err := shared.AnalyticsVisitFromRequest(r, user.ID, cfg.Secret)
 		if err == nil {
 			view.PostID = post.ID
 			ch <- view

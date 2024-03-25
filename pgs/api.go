@@ -220,7 +220,7 @@ func (h *AssetHandler) handle(w http.ResponseWriter, r *http.Request) {
 		)
 		// track 404s
 		ch := shared.GetAnalyticsQueue(r)
-		view, err := shared.AnalyticsVisitFromRequest(r, h.UserID)
+		view, err := shared.AnalyticsVisitFromRequest(r, h.UserID, h.Cfg.Secret)
 		if err == nil {
 			view.ProjectID = h.ProjectID
 			view.Status = http.StatusNotFound
@@ -279,7 +279,7 @@ func (h *AssetHandler) handle(w http.ResponseWriter, r *http.Request) {
 	if finContentType == "text/html" {
 		// track visit
 		ch := shared.GetAnalyticsQueue(r)
-		view, err := shared.AnalyticsVisitFromRequest(r, h.UserID)
+		view, err := shared.AnalyticsVisitFromRequest(r, h.UserID, h.Cfg.Secret)
 		if err == nil {
 			view.ProjectID = h.ProjectID
 			ch <- view

@@ -1,6 +1,9 @@
 package shared
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -12,6 +15,13 @@ import (
 	"github.com/simplesurance/go-ip-anonymizer/ipanonymizer"
 	"github.com/x-way/crawlerdetect"
 )
+
+func hmacString(secret, data string) string {
+	hmacer := hmac.New(sha256.New, []byte(secret))
+	hmacer.Write([]byte(data))
+	dataHmac := hmacer.Sum(nil)
+	return hex.EncodeToString(dataHmac)
+}
 
 func trackableRequest(r *http.Request) error {
 	agent := r.UserAgent()
@@ -65,7 +75,7 @@ func cleanReferer(ref string) (string, error) {
 
 var ErrAnalyticsDisabled = errors.New("owner does not have site analytics enabled")
 
-func AnalyticsVisitFromRequest(r *http.Request, userID string) (*db.AnalyticsVisits, error) {
+func AnalyticsVisitFromRequest(r *http.Request, userID string, secret string) (*db.AnalyticsVisits, error) {
 	dbpool := GetDB(r)
 	if !dbpool.HasFeatureForUser(userID, "analytics") {
 		return nil, ErrAnalyticsDisabled
@@ -91,7 +101,7 @@ func AnalyticsVisitFromRequest(r *http.Request, userID string) (*db.AnalyticsVis
 		UserID:    userID,
 		Host:      host,
 		Path:      path,
-		IpAddress: ipAddress,
+		IpAddress: hmacString(secret, ipAddress),
 		UserAgent: cleanUserAgent(r.UserAgent()),
 		Referer:   referer,
 		Status:    http.StatusOK,
