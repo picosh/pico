@@ -1008,9 +1008,9 @@ func newNullString(s string) sql.NullString {
 	}
 }
 
-func (me *PsqlDB) InsertView(view *db.AnalyticsVisits) error {
+func (me *PsqlDB) InsertVisit(view *db.AnalyticsVisits) error {
 	_, err := me.Db.Exec(
-		`INSERT INTO analytics_visits (user_id, project_id, post_id, host, path, ip_address, user_agent, referer) VALUES ($1, $2, $3, $4, $5, $6, $7, $8);`,
+		`INSERT INTO analytics_visits (user_id, project_id, post_id, host, path, ip_address, user_agent, referer, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);`,
 		view.UserID,
 		newNullString(view.ProjectID),
 		newNullString(view.PostID),
@@ -1019,6 +1019,7 @@ func (me *PsqlDB) InsertView(view *db.AnalyticsVisits) error {
 		view.IpAddress,
 		view.UserAgent,
 		view.Referer,
+		view.Status,
 	)
 	return err
 }

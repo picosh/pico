@@ -162,6 +162,7 @@ type AnalyticsVisits struct {
 	IpAddress string
 	UserAgent string
 	Referer   string
+	Status    int
 }
 
 type VisitInterval struct {
@@ -359,7 +360,7 @@ type DB interface {
 
 	ReplaceAliasesForPost(aliases []string, postID string) error
 
-	InsertView(view *AnalyticsVisits) error
+	InsertVisit(view *AnalyticsVisits) error
 	VisitSummary(fkID, by, interval string, origin time.Time) (*SummaryVisits, error)
 
 	AddPicoPlusUser(username string, paymentType, txId string) error

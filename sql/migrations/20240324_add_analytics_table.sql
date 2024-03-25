@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS analytics_visits (
   ip_address varchar(46),
   user_agent varchar(1000),
   referer varchar(253),
+  status int4,
   created_at timestamp without time zone NOT NULL DEFAULT NOW(),
   CONSTRAINT analytics_visits_pkey PRIMARY KEY (id),
   CONSTRAINT fk_visits_user

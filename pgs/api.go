@@ -218,6 +218,18 @@ func (h *AssetHandler) handle(w http.ResponseWriter, r *http.Request) {
 			"bucket", h.Bucket.Name,
 			"routes", strings.Join(attempts, ", "),
 		)
+		// track 404s
+		ch := shared.GetAnalyticsQueue(r)
+		view, err := shared.AnalyticsVisitFromRequest(r, h.UserID)
+		if err == nil {
+			view.ProjectID = h.ProjectID
+			view.Status = http.StatusNotFound
+			ch <- view
+		} else {
+			if !errors.Is(err, shared.ErrAnalyticsDisabled) {
+				h.Logger.Error("could not record analytics view", "err", err)
+			}
+		}
 		http.Error(w, "404 not found", http.StatusNotFound)
 		return
 	}

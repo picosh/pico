@@ -94,12 +94,13 @@ func AnalyticsVisitFromRequest(r *http.Request, userID string) (*db.AnalyticsVis
 		IpAddress: ipAddress,
 		UserAgent: cleanUserAgent(r.UserAgent()),
 		Referer:   referer,
+		Status:    http.StatusOK,
 	}, nil
 }
 
 func AnalyticsCollect(ch chan *db.AnalyticsVisits, dbpool db.DB, logger *slog.Logger) {
 	for view := range ch {
-		err := dbpool.InsertView(view)
+		err := dbpool.InsertVisit(view)
 		if err != nil {
 			logger.Error("could not insert view record", "err", err)
 		}
