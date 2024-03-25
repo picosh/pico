@@ -2,6 +2,7 @@ package prose
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -398,11 +399,14 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 
 		// track visit
 		view, err := shared.AnalyticsVisitFromRequest(r, user.ID)
-		if err != nil {
-			logger.Error("could not record analytics view", "err", err)
+		if err == nil {
+			view.PostID = post.ID
+			ch <- view
+		} else {
+			if !errors.Is(err, shared.ErrAnalyticsDisabled) {
+				logger.Error("could not record analytics view", "err", err)
+			}
 		}
-		view.PostID = post.ID
-		ch <- view
 
 		unlisted := false
 		if post.Hidden || post.PublishAt.After(time.Now()) {

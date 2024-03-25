@@ -1,6 +1,7 @@
 package pgs
 
 import (
+	"errors"
 	"fmt"
 	"html/template"
 	"io"
@@ -34,6 +35,7 @@ type AssetHandler struct {
 	UserID         string
 	Bucket         sst.Bucket
 	ImgProcessOpts *storage.ImgProcessOpts
+	ProjectID      string
 }
 
 func checkHandler(w http.ResponseWriter, r *http.Request) {
@@ -259,6 +261,23 @@ func (h *AssetHandler) handle(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("content-type", contentType)
 	}
 
+	finContentType := w.Header().Get("content-type")
+
+	// only track pages, not individual assets
+	if finContentType == "text/html" {
+		// track visit
+		ch := shared.GetAnalyticsQueue(r)
+		view, err := shared.AnalyticsVisitFromRequest(r, h.UserID)
+		if err == nil {
+			view.ProjectID = h.ProjectID
+			ch <- view
+		} else {
+			if !errors.Is(err, shared.ErrAnalyticsDisabled) {
+				h.Logger.Error("could not record analytics view", "err", err)
+			}
+		}
+	}
+
 	h.Logger.Info(
 		"serving asset",
 		"host", r.Host,
@@ -266,7 +285,7 @@ func (h *AssetHandler) handle(w http.ResponseWriter, r *http.Request) {
 		"bucket", h.Bucket.Name,
 		"asset", assetFilepath,
 		"status", status,
-		"contentType", w.Header().Get("content-type"),
+		"contentType", finContentType,
 	)
 
 	w.WriteHeader(status)
@@ -302,7 +321,6 @@ func ServeAsset(fname string, opts *storage.ImgProcessOpts, fromImgs bool, hasPe
 	dbpool := shared.GetDB(r)
 	st := shared.GetStorage(r)
 	logger := shared.GetLogger(r)
-	ch := shared.GetAnalyticsQueue(r)
 
 	props, err := getProjectFromSubdomain(subdomain)
 	if err != nil {
@@ -318,6 +336,7 @@ func ServeAsset(fname string, opts *storage.ImgProcessOpts, fromImgs bool, hasPe
 		return
 	}
 
+	projectID := ""
 	// TODO: this could probably be cleaned up more
 	// imgs wont have a project directory
 	projectDir := ""
@@ -337,14 +356,7 @@ func ServeAsset(fname string, opts *storage.ImgProcessOpts, fromImgs bool, hasPe
 			return
 		}
 
-		// track visit
-		view, err := shared.AnalyticsVisitFromRequest(r, user.ID)
-		if err != nil {
-			logger.Error("could not record analytics view", "err", err)
-		}
-		view.ProjectID = project.ID
-		ch <- view
-
+		projectID = project.ID
 		projectDir = project.ProjectDir
 		if !hasPerm(project) {
 			http.Error(w, "You do not have access to this site", http.StatusUnauthorized)
@@ -370,6 +382,7 @@ func ServeAsset(fname string, opts *storage.ImgProcessOpts, fromImgs bool, hasPe
 		Logger:         logger,
 		Bucket:         bucket,
 		ImgProcessOpts: opts,
+		ProjectID:      projectID,
 	}
 
 	asset.handle(w, r)

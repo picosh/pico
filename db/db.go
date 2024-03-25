@@ -157,9 +157,11 @@ type AnalyticsVisits struct {
 	UserID    string
 	ProjectID string
 	PostID    string
-	Url       string
+	Host      string
+	Path      string
 	IpAddress string
 	UserAgent string
+	Referer   string
 }
 
 type VisitInterval struct {
@@ -170,6 +172,7 @@ type VisitInterval struct {
 }
 
 type VisitUrl struct {
+	PostID    string
 	ProjectID string
 	Url       string
 	Count     int
@@ -356,7 +359,7 @@ type DB interface {
 	ReplaceAliasesForPost(aliases []string, postID string) error
 
 	InsertView(view *AnalyticsVisits) error
-	VisitSummary(fkID, by, interval, origin string) (*SummaryVisits, error)
+	VisitSummary(fkID, by, interval string, origin time.Time) (*SummaryVisits, error)
 
 	AddPicoPlusUser(username string, paymentType, txId string) error
 	FindFeatureForUser(userID string, feature string) (*FeatureFlag, error)
