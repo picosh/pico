@@ -152,6 +152,15 @@ type PostAnalytics struct {
 	UpdateAt *time.Time
 }
 
+type AnalyticsVisits struct {
+	ID        string
+	ProjectID string
+	PostID    string
+	Url       string
+	IpAddress string
+	UserAgent string
+}
+
 type Pager struct {
 	Num  int
 	Page int
@@ -327,7 +336,7 @@ type DB interface {
 
 	ReplaceAliasesForPost(aliases []string, postID string) error
 
-	AddViewCount(postID string) (int, error)
+	InsertView(view *AnalyticsVisits) error
 
 	AddPicoPlusUser(username string, paymentType, txId string) error
 	FindFeatureForUser(userID string, feature string) (*FeatureFlag, error)

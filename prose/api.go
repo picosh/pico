@@ -118,10 +118,6 @@ func GetBlogName(username string) string {
 	return fmt.Sprintf("%s's blog", username)
 }
 
-func isRequestTrackable(r *http.Request) bool {
-	return true
-}
-
 func blogStyleHandler(w http.ResponseWriter, r *http.Request) {
 	username := shared.GetUsernameFromRequest(r)
 	dbpool := shared.GetDB(r)
@@ -324,6 +320,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	username := shared.GetUsernameFromRequest(r)
 	subdomain := shared.GetSubdomain(r)
 	cfg := shared.GetCfg(r)
+	ch := shared.GetAnalyticsQueue(r)
 
 	var slug string
 	if !cfg.IsSubdomains() || subdomain == "" {
@@ -399,13 +396,13 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			ogImageCard = parsedText.ImageCard
 		}
 
-		// validate and fire off analytic event
-		if isRequestTrackable(r) {
-			_, err := dbpool.AddViewCount(post.ID)
-			if err != nil {
-				logger.Error(err.Error())
-			}
+		// track visit
+		view, err := shared.AnalyticsVisitFromRequest(r)
+		if err != nil {
+			logger.Error("could not record analytics view", "err", err)
 		}
+		view.PostID = post.ID
+		ch <- view
 
 		unlisted := false
 		if post.Hidden || post.PublishAt.After(time.Now()) {
@@ -895,8 +892,8 @@ func createSubdomainRoutes(staticRoutes []shared.Route) []shared.Route {
 
 func StartApiServer() {
 	cfg := NewConfigSite()
-	db := postgres.NewDB(cfg.ConfigCms.DbURL, cfg.Logger)
-	defer db.Close()
+	dbpool := postgres.NewDB(cfg.ConfigCms.DbURL, cfg.Logger)
+	defer dbpool.Close()
 	logger := cfg.Logger
 
 	var st storage.StorageServe
@@ -920,10 +917,13 @@ func StartApiServer() {
 	mainRoutes := createMainRoutes(staticRoutes)
 	subdomainRoutes := createSubdomainRoutes(staticRoutes)
 
+	ch := make(chan *db.AnalyticsVisits)
+	go shared.AnalyticsCollect(ch, dbpool, logger)
 	apiConfig := &shared.ApiConfig{
-		Cfg:     cfg,
-		Dbpool:  db,
-		Storage: st,
+		Cfg:            cfg,
+		Dbpool:         dbpool,
+		Storage:        st,
+		AnalyticsQueue: ch,
 	}
 	handler := shared.CreateServe(mainRoutes, subdomainRoutes, apiConfig)
 	router := http.HandlerFunc(handler)

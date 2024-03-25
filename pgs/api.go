@@ -302,6 +302,7 @@ func ServeAsset(fname string, opts *storage.ImgProcessOpts, fromImgs bool, hasPe
 	dbpool := shared.GetDB(r)
 	st := shared.GetStorage(r)
 	logger := shared.GetLogger(r)
+	ch := shared.GetAnalyticsQueue(r)
 
 	props, err := getProjectFromSubdomain(subdomain)
 	if err != nil {
@@ -335,6 +336,14 @@ func ServeAsset(fname string, opts *storage.ImgProcessOpts, fromImgs bool, hasPe
 			http.Error(w, "project not found", http.StatusNotFound)
 			return
 		}
+
+		// track visit
+		view, err := shared.AnalyticsVisitFromRequest(r)
+		if err != nil {
+			logger.Error("could not record analytics view", "err", err)
+		}
+		view.ProjectID = project.ID
+		ch <- view
 
 		projectDir = project.ProjectDir
 		if !hasPerm(project) {
@@ -425,8 +434,8 @@ func StartApiServer() {
 	cfg := NewConfigSite()
 	logger := cfg.Logger
 
-	db := postgres.NewDB(cfg.DbURL, cfg.Logger)
-	defer db.Close()
+	dbpool := postgres.NewDB(cfg.DbURL, cfg.Logger)
+	defer dbpool.Close()
 
 	var st storage.StorageServe
 	var err error
@@ -441,10 +450,13 @@ func StartApiServer() {
 		return
 	}
 
+	ch := make(chan *db.AnalyticsVisits)
+	go shared.AnalyticsCollect(ch, dbpool, logger)
 	apiConfig := &shared.ApiConfig{
-		Cfg:     cfg,
-		Dbpool:  db,
-		Storage: st,
+		Cfg:            cfg,
+		Dbpool:         dbpool,
+		Storage:        st,
+		AnalyticsQueue: ch,
 	}
 	handler := shared.CreateServe(mainRoutes, createSubdomainRoutes(publicPerm), apiConfig)
 	router := http.HandlerFunc(handler)

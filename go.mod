@@ -32,7 +32,9 @@ require (
 	github.com/picosh/ptun v0.0.0-20240313192814-d0ca401937fe
 	github.com/picosh/send v0.0.0-20240217194807-77b972121e63
 	github.com/sendgrid/sendgrid-go v3.13.0+incompatible
+	github.com/simplesurance/go-ip-anonymizer v0.0.0-20200429124537-35a880f8e87d
 	github.com/stripe/stripe-go/v75 v75.11.0
+	github.com/x-way/crawlerdetect v0.2.20
 	github.com/yuin/goldmark v1.6.0
 	github.com/yuin/goldmark-highlighting v0.0.0-20220208100518-594be1970594
 	github.com/yuin/goldmark-meta v1.1.0

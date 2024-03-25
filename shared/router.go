@@ -56,18 +56,20 @@ func CreatePProfRoutes(routes []Route) []Route {
 
 type ServeFn func(http.ResponseWriter, *http.Request)
 type ApiConfig struct {
-	Cfg     *ConfigSite
-	Dbpool  db.DB
-	Storage storage.StorageServe
+	Cfg            *ConfigSite
+	Dbpool         db.DB
+	Storage        storage.StorageServe
+	AnalyticsQueue chan *db.AnalyticsVisits
 }
 
 func (hc *ApiConfig) CreateCtx(prevCtx context.Context, subdomain string) context.Context {
-	loggerCtx := context.WithValue(prevCtx, ctxLoggerKey{}, hc.Cfg.Logger)
-	subdomainCtx := context.WithValue(loggerCtx, ctxSubdomainKey{}, subdomain)
-	dbCtx := context.WithValue(subdomainCtx, ctxDBKey{}, hc.Dbpool)
-	storageCtx := context.WithValue(dbCtx, ctxStorageKey{}, hc.Storage)
-	cfgCtx := context.WithValue(storageCtx, ctxCfg{}, hc.Cfg)
-	return cfgCtx
+	ctx := context.WithValue(prevCtx, ctxLoggerKey{}, hc.Cfg.Logger)
+	ctx = context.WithValue(ctx, ctxSubdomainKey{}, subdomain)
+	ctx = context.WithValue(ctx, ctxDBKey{}, hc.Dbpool)
+	ctx = context.WithValue(ctx, ctxStorageKey{}, hc.Storage)
+	ctx = context.WithValue(ctx, ctxCfg{}, hc.Cfg)
+	ctx = context.WithValue(ctx, ctxAnalyticsQueue{}, hc.AnalyticsQueue)
+	return ctx
 }
 
 func CreateServeBasic(routes []Route, ctx context.Context) ServeFn {
@@ -144,6 +146,7 @@ type ctxKey struct{}
 type ctxLoggerKey struct{}
 type ctxSubdomainKey struct{}
 type ctxCfg struct{}
+type ctxAnalyticsQueue struct{}
 
 func GetCfg(r *http.Request) *ConfigSite {
 	return r.Context().Value(ctxCfg{}).(*ConfigSite)
@@ -185,4 +188,8 @@ func GetCustomDomain(host string, space string) string {
 	}
 
 	return ""
+}
+
+func GetAnalyticsQueue(r *http.Request) chan *db.AnalyticsVisits {
+	return r.Context().Value(ctxAnalyticsQueue{}).(chan *db.AnalyticsVisits)
 }

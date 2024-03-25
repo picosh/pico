@@ -998,6 +998,28 @@ func (me *PsqlDB) Close() error {
 	return me.Db.Close()
 }
 
+func newNullString(s string) sql.NullString {
+	if len(s) == 0 {
+		return sql.NullString{}
+	}
+	return sql.NullString{
+		String: s,
+		Valid:  true,
+	}
+}
+
+func (me *PsqlDB) InsertView(view *db.AnalyticsVisits) error {
+	_, err := me.Db.Exec(
+		`INSERT INTO analytics_visits (project_id, post_id, url, ip_address, user_agent) VALUES ($1, $2, $3, $4, $5);`,
+		newNullString(view.ProjectID),
+		newNullString(view.PostID),
+		view.Url,
+		view.IpAddress,
+		view.UserAgent,
+	)
+	return err
+}
+
 func (me *PsqlDB) AddViewCount(postID string) (int, error) {
 	views := 0
 	err := me.Db.QueryRow(sqlIncrementViews, postID).Scan(&views)
