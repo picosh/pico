@@ -257,6 +257,17 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 		postCollection = append(postCollection, p)
 	}
 
+	// track visit
+	ch := shared.GetAnalyticsQueue(r)
+	view, err := shared.AnalyticsVisitFromRequest(r, user.ID)
+	if err == nil {
+		ch <- view
+	} else {
+		if !errors.Is(err, shared.ErrAnalyticsDisabled) {
+			logger.Error("could not record analytics view", "err", err)
+		}
+	}
+
 	data := BlogPageData{
 		Site:      *cfg.GetSiteData(),
 		PageTitle: headerTxt.Title,
