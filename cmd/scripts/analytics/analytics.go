@@ -3,22 +3,27 @@ package main
 import (
 	"log/slog"
 	"os"
-	"time"
 
+	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
+	"github.com/picosh/pico/shared"
 )
 
 func main() {
 	logger := slog.Default()
 	DbURL := os.Getenv("DATABASE_URL")
 	dbpool := postgres.NewDB(DbURL, logger)
-	now := time.Now()
+
+	args := os.Args
+	userID := args[1]
 
 	stats, err := dbpool.VisitSummary(
-		"5dabf12d-f0d7-44f1-9557-32a043ffac37",
-		"user_id",
-		"day",
-		now.AddDate(0, 0, -now.Day()+1),
+		&db.SummarOpts{
+			FkID:     userID,
+			By:       "user_id",
+			Interval: "day",
+			Origin:   shared.StartOfMonth(),
+		},
 	)
 	if err != nil {
 		panic(err)

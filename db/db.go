@@ -145,6 +145,13 @@ type Analytics struct {
 	UsersWithPost  int
 }
 
+type SummarOpts struct {
+	FkID     string
+	By       string
+	Interval string
+	Origin   time.Time
+}
+
 type PostAnalytics struct {
 	ID       string
 	PostID   string
@@ -166,23 +173,23 @@ type AnalyticsVisits struct {
 }
 
 type VisitInterval struct {
-	PostID    string
-	ProjectID string
-	Interval  *time.Time
-	Visitors  int
+	PostID    string     `json:"post_id"`
+	ProjectID string     `json:"project_id"`
+	Interval  *time.Time `json:"interval"`
+	Visitors  int        `json:"visitors"`
 }
 
 type VisitUrl struct {
-	PostID    string
-	ProjectID string
-	Url       string
-	Count     int
+	PostID    string `json:"post_id"`
+	ProjectID string `json:"project_id"`
+	Url       string `json:"url"`
+	Count     int    `json:"count"`
 }
 
 type SummaryVisits struct {
-	Intervals   []*VisitInterval
-	TopUrls     []*VisitUrl
-	TopReferers []*VisitUrl
+	Intervals   []*VisitInterval `json:"intervals"`
+	TopUrls     []*VisitUrl      `json:"top_urls"`
+	TopReferers []*VisitUrl      `json:"top_referers"`
 }
 
 type Pager struct {
@@ -361,7 +368,7 @@ type DB interface {
 	ReplaceAliasesForPost(aliases []string, postID string) error
 
 	InsertVisit(view *AnalyticsVisits) error
-	VisitSummary(fkID, by, interval string, origin time.Time) (*SummaryVisits, error)
+	VisitSummary(opts *SummarOpts) (*SummaryVisits, error)
 
 	AddPicoPlusUser(username string, paymentType, txId string) error
 	FindFeatureForUser(userID string, feature string) (*FeatureFlag, error)

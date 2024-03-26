@@ -152,3 +152,13 @@ func Shasum(data []byte) string {
 func BytesToGB(size int) float32 {
 	return (((float32(size) / 1024) / 1024) / 1024)
 }
+
+func StartOfMonth() time.Time {
+	now := time.Now()
+	return now.AddDate(0, 0, -now.Day()+1)
+}
+
+func StartOfYear() time.Time {
+	now := time.Now()
+	return now.AddDate(-1, 0, 0)
+}

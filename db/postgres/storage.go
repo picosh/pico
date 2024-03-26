@@ -1146,16 +1146,16 @@ func (me *PsqlDB) visitUrl(fkID, by string, origin time.Time) ([]*db.VisitUrl, e
 	return intervals, nil
 }
 
-func (me *PsqlDB) VisitSummary(fkID, by, interval string, origin time.Time) (*db.SummaryVisits, error) {
-	visitors, err := me.visitUnique(fkID, by, interval, origin)
+func (me *PsqlDB) VisitSummary(opts *db.SummarOpts) (*db.SummaryVisits, error) {
+	visitors, err := me.visitUnique(opts.FkID, opts.By, opts.Interval, opts.Origin)
 	if err != nil {
 		return nil, err
 	}
-	urls, err := me.visitUrl(fkID, by, origin)
+	urls, err := me.visitUrl(opts.FkID, opts.By, opts.Origin)
 	if err != nil {
 		return nil, err
 	}
-	refs, err := me.visitReferer(fkID, by, origin)
+	refs, err := me.visitReferer(opts.FkID, opts.By, opts.Origin)
 	if err != nil {
 		return nil, err
 	}

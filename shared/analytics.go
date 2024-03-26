@@ -38,21 +38,25 @@ func trackableRequest(r *http.Request) error {
 func cleanIpAddress(ip string) (string, error) {
 	host, _, err := net.SplitHostPort(ip)
 	if err != nil {
-		return "", err
+		host = ip
 	}
-	// /16 IPv4 subnet mask
+	// /24 IPv4 subnet mask
 	// /64 IPv6 subnet mask
 	anonymizer := ipanonymizer.NewWithMask(
-		net.CIDRMask(16, 32),
+		net.CIDRMask(24, 32),
 		net.CIDRMask(64, 128),
 	)
 	anonIp, err := anonymizer.IPString(host)
 	return anonIp, err
 }
 
-func cleanUrl(curl *url.URL) (string, string) {
+func cleanUrl(r *http.Request) (string, string) {
+	host := r.Header.Get("x-forwarded-host")
+	if host == "" {
+		host = r.URL.Host
+	}
 	// we don't want query params in the url for security reasons
-	return curl.Host, curl.Path
+	return host, r.URL.Path
 }
 
 func cleanUserAgent(ua string) string {
@@ -86,11 +90,16 @@ func AnalyticsVisitFromRequest(r *http.Request, userID string, secret string) (*
 		return nil, err
 	}
 
-	ipAddress, err := cleanIpAddress(r.RemoteAddr)
+	// https://caddyserver.com/docs/caddyfile/directives/reverse_proxy#defaults
+	ipOrig := r.Header.Get("x-forwarded-for")
+	if ipOrig == "" {
+		ipOrig = r.RemoteAddr
+	}
+	ipAddress, err := cleanIpAddress(ipOrig)
 	if err != nil {
 		return nil, err
 	}
-	host, path := cleanUrl(r.URL)
+	host, path := cleanUrl(r)
 
 	referer, err := cleanReferer(r.Referer())
 	if err != nil {

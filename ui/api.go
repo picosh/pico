@@ -521,6 +521,38 @@ func getProjectObjects(apiConfig *shared.ApiConfig, ctx ssh.Context) http.Handle
 	}
 }
 
+func getAnalytics(apiConfig *shared.ApiConfig, ctx ssh.Context, sumtype string) http.HandlerFunc {
+	logger := apiConfig.Cfg.Logger
+	dbpool := apiConfig.Dbpool
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		user, _ := shared.GetUserCtx(ctx)
+		if !ensureUser(w, user) {
+			return
+		}
+
+		year := &db.SummarOpts{FkID: user.ID, By: "user_id", Interval: "month", Origin: shared.StartOfYear()}
+		month := &db.SummarOpts{FkID: user.ID, By: "user_id", Interval: "day", Origin: shared.StartOfMonth()}
+
+		opts := year
+		if sumtype == "month" {
+			opts = month
+		}
+
+		summary, err := dbpool.VisitSummary(opts)
+		if err != nil {
+			logger.Info("cannot fetch analytics", "err", err.Error())
+			shared.JSONError(w, err.Error(), http.StatusUnprocessableEntity)
+			return
+		}
+
+		err = json.NewEncoder(w).Encode(&summary)
+		if err != nil {
+			logger.Error(err.Error())
+		}
+	}
+}
+
 func CreateRoutes(apiConfig *shared.ApiConfig, ctx ssh.Context) []shared.Route {
 	logger := apiConfig.Cfg.Logger
 	pubkey, err := shared.GetPublicKeyCtx(ctx)
@@ -551,5 +583,7 @@ func CreateRoutes(apiConfig *shared.ApiConfig, ctx ssh.Context) []shared.Route {
 		shared.NewCorsRoute("GET", "/api/posts/prose", getPosts(apiConfig, ctx, "prose")),
 		shared.NewCorsRoute("GET", "/api/posts/pastes", getPosts(apiConfig, ctx, "pastes")),
 		shared.NewCorsRoute("GET", "/api/posts/feeds", getPosts(apiConfig, ctx, "feeds")),
+		shared.NewCorsRoute("GET", "/api/analytics/year", getAnalytics(apiConfig, ctx, "year")),
+		shared.NewCorsRoute("GET", "/api/analytics", getAnalytics(apiConfig, ctx, "month")),
 	}
 }
