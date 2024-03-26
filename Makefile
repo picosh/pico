@@ -9,6 +9,11 @@ DOCKER_CMD?=docker
 DOCKER_BUILDX_BUILD?=$(DOCKER_CMD) buildx build --push --platform $(DOCKER_PLATFORM)
 WRITE?=0
 
+smol:
+	curl https://pico.sh/smol.css -o ./prose/public/smol.css
+	curl https://pico.sh/smol.css -o ./pastes/public/smol.css
+.PHONY: smol
+
 css:
 	cp ./syntax.css pastes/public/syntax.css
 	cp ./syntax.css prose/public/syntax.css

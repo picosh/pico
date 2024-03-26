@@ -114,7 +114,7 @@ func (c *ConfigSite) BlogURL(username string) string {
 
 func (c *ConfigSite) CssURL(username string) string {
 	if c.IsSubdomains() || c.IsCustomdomains() {
-		return fmt.Sprintf("%s://%s.%s/_styles.css", c.Protocol, username, c.Domain)
+		return "/_styles.css"
 	}
 
 	return fmt.Sprintf("/%s/styles.css", username)
