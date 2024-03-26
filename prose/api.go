@@ -828,7 +828,7 @@ func serveFile(file string, contentType string) http.HandlerFunc {
 func createStaticRoutes() []shared.Route {
 	return []shared.Route{
 		shared.NewRoute("GET", "/main.css", serveFile("main.css", "text/css")),
-		shared.NewRoute("GET", "/prose.css", serveFile("prose.css", "text/css")),
+		shared.NewRoute("GET", "/smol.css", serveFile("smol.css", "text/css")),
 		shared.NewRoute("GET", "/syntax.css", serveFile("syntax.css", "text/css")),
 		shared.NewRoute("GET", "/card.png", serveFile("card.png", "image/png")),
 		shared.NewRoute("GET", "/favicon-16x16.png", serveFile("favicon-16x16.png", "image/png")),
