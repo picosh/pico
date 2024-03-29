@@ -1024,18 +1024,50 @@ func (me *PsqlDB) InsertVisit(view *db.AnalyticsVisits) error {
 	return err
 }
 
-func (me *PsqlDB) visitUnique(fkID, by, interval string, origin time.Time) ([]*db.VisitInterval, error) {
+func (me *PsqlDB) visitUniqueBlog(opts *db.SummaryOpts) ([]*db.VisitInterval, error) {
+	uniqueVisitors := fmt.Sprintf(`SELECT
+		date_trunc('%s', created_at) as interval_start,
+        count(DISTINCT ip_address) as unique_visitors
+	FROM analytics_visits
+	WHERE %s=$1 AND created_at >= $2 %s
+	GROUP BY interval_start`, opts.Interval, opts.By, opts.Where)
+
+	intervals := []*db.VisitInterval{}
+	rs, err := me.Db.Query(uniqueVisitors, opts.FkID, opts.Origin)
+	if err != nil {
+		return nil, err
+	}
+
+	for rs.Next() {
+		interval := &db.VisitInterval{}
+		err := rs.Scan(
+			&interval.Interval,
+			&interval.Visitors,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		intervals = append(intervals, interval)
+	}
+	if rs.Err() != nil {
+		return nil, rs.Err()
+	}
+	return intervals, nil
+}
+
+func (me *PsqlDB) visitUnique(opts *db.SummaryOpts) ([]*db.VisitInterval, error) {
 	uniqueVisitors := fmt.Sprintf(`SELECT
 		post_id,
 		project_id,
 		date_trunc('%s', created_at) as interval_start,
         count(DISTINCT ip_address) as unique_visitors
 	FROM analytics_visits
-	WHERE %s=$1 AND created_at >= $2
-	GROUP BY post_id, project_id, interval_start`, interval, by)
+	WHERE %s=$1 AND created_at >= $2 %s
+	GROUP BY post_id, project_id, interval_start`, opts.Interval, opts.By, opts.Where)
 
 	intervals := []*db.VisitInterval{}
-	rs, err := me.Db.Query(uniqueVisitors, fkID, origin)
+	rs, err := me.Db.Query(uniqueVisitors, opts.FkID, opts.Origin)
 	if err != nil {
 		return nil, err
 	}
@@ -1064,38 +1096,30 @@ func (me *PsqlDB) visitUnique(fkID, by, interval string, origin time.Time) ([]*d
 	return intervals, nil
 }
 
-func (me *PsqlDB) visitReferer(fkID, by string, origin time.Time) ([]*db.VisitUrl, error) {
+func (me *PsqlDB) visitReferer(opts *db.SummaryOpts) ([]*db.VisitUrl, error) {
 	topUrls := fmt.Sprintf(`SELECT
 		referer,
-		post_id,
-		project_id,
 		count(*) as referer_count
 	FROM analytics_visits
-	WHERE %s=$1 AND created_at >= $2
-	GROUP BY referer, post_id, project_id
-	LIMIT 10`, by)
+	WHERE %s=$1 AND created_at >= $2 AND referer <> '' %s
+	GROUP BY referer
+	LIMIT 10`, opts.By, opts.Where)
 
 	intervals := []*db.VisitUrl{}
-	rs, err := me.Db.Query(topUrls, fkID, origin)
+	rs, err := me.Db.Query(topUrls, opts.FkID, opts.Origin)
 	if err != nil {
 		return nil, err
 	}
 
 	for rs.Next() {
 		interval := &db.VisitUrl{}
-		var postID sql.NullString
-		var projectID sql.NullString
 		err := rs.Scan(
 			&interval.Url,
-			&postID,
-			&projectID,
 			&interval.Count,
 		)
 		if err != nil {
 			return nil, err
 		}
-		interval.PostID = postID.String
-		interval.ProjectID = projectID.String
 
 		intervals = append(intervals, interval)
 	}
@@ -1105,38 +1129,30 @@ func (me *PsqlDB) visitReferer(fkID, by string, origin time.Time) ([]*db.VisitUr
 	return intervals, nil
 }
 
-func (me *PsqlDB) visitUrl(fkID, by string, origin time.Time) ([]*db.VisitUrl, error) {
+func (me *PsqlDB) visitUrl(opts *db.SummaryOpts) ([]*db.VisitUrl, error) {
 	topUrls := fmt.Sprintf(`SELECT
 		path,
-		post_id,
-		project_id,
 		count(*) as path_count
 	FROM analytics_visits
-	WHERE %s=$1 AND created_at >= $2
-	GROUP BY path, post_id, project_id
-	LIMIT 10`, by)
+	WHERE %s=$1 AND created_at >= $2 AND path <> '' %s
+	GROUP BY path
+	LIMIT 10`, opts.By, opts.Where)
 
 	intervals := []*db.VisitUrl{}
-	rs, err := me.Db.Query(topUrls, fkID, origin)
+	rs, err := me.Db.Query(topUrls, opts.FkID, opts.Origin)
 	if err != nil {
 		return nil, err
 	}
 
 	for rs.Next() {
 		interval := &db.VisitUrl{}
-		var postID sql.NullString
-		var projectID sql.NullString
 		err := rs.Scan(
 			&interval.Url,
-			&postID,
-			&projectID,
 			&interval.Count,
 		)
 		if err != nil {
 			return nil, err
 		}
-		interval.PostID = postID.String
-		interval.ProjectID = projectID.String
 
 		intervals = append(intervals, interval)
 	}
@@ -1146,16 +1162,26 @@ func (me *PsqlDB) visitUrl(fkID, by string, origin time.Time) ([]*db.VisitUrl, e
 	return intervals, nil
 }
 
-func (me *PsqlDB) VisitSummary(opts *db.SummarOpts) (*db.SummaryVisits, error) {
-	visitors, err := me.visitUnique(opts.FkID, opts.By, opts.Interval, opts.Origin)
+func (me *PsqlDB) VisitSummary(opts *db.SummaryOpts) (*db.SummaryVisits, error) {
+	var visitors []*db.VisitInterval
+	var err error
+	if opts.Where == "" {
+		visitors, err = me.visitUnique(opts)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		visitors, err = me.visitUniqueBlog(opts)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	urls, err := me.visitUrl(opts)
 	if err != nil {
 		return nil, err
 	}
-	urls, err := me.visitUrl(opts.FkID, opts.By, opts.Origin)
-	if err != nil {
-		return nil, err
-	}
-	refs, err := me.visitReferer(opts.FkID, opts.By, opts.Origin)
+	refs, err := me.visitReferer(opts)
 	if err != nil {
 		return nil, err
 	}

@@ -521,7 +521,7 @@ func getProjectObjects(apiConfig *shared.ApiConfig, ctx ssh.Context) http.Handle
 	}
 }
 
-func getAnalytics(apiConfig *shared.ApiConfig, ctx ssh.Context, sumtype string) http.HandlerFunc {
+func getAnalytics(apiConfig *shared.ApiConfig, ctx ssh.Context, sumtype, bytype, where string) http.HandlerFunc {
 	logger := apiConfig.Cfg.Logger
 	dbpool := apiConfig.Dbpool
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -531,8 +531,18 @@ func getAnalytics(apiConfig *shared.ApiConfig, ctx ssh.Context, sumtype string) 
 			return
 		}
 
-		year := &db.SummarOpts{FkID: user.ID, By: "user_id", Interval: "month", Origin: shared.StartOfYear()}
-		month := &db.SummarOpts{FkID: user.ID, By: "user_id", Interval: "day", Origin: shared.StartOfMonth()}
+		fkID := user.ID
+		by := "user_id"
+		if bytype == "project" {
+			fkID = shared.GetField(r, 0)
+			by = "project_id"
+		} else if bytype == "post" {
+			fkID = shared.GetField(r, 0)
+			by = "post_id"
+		}
+
+		year := &db.SummaryOpts{FkID: fkID, By: by, Interval: "month", Origin: shared.StartOfYear(), Where: where}
+		month := &db.SummaryOpts{FkID: fkID, By: by, Interval: "day", Origin: shared.StartOfMonth(), Where: where}
 
 		opts := year
 		if sumtype == "month" {
@@ -578,12 +588,18 @@ func CreateRoutes(apiConfig *shared.ApiConfig, ctx ssh.Context) []shared.Route {
 		shared.NewCorsRoute("GET", "/api/tokens", getTokens(apiConfig, ctx)),
 		shared.NewCorsRoute("POST", "/api/tokens", createToken(apiConfig, ctx)),
 		shared.NewCorsRoute("DELETE", "/api/tokens/(.+)", deleteToken(apiConfig, ctx)),
-		shared.NewCorsRoute("GET", "/api/projects", getProjects(apiConfig, ctx)),
+		shared.NewCorsRoute("GET", "/api/projects/(.+)/analytics", getAnalytics(apiConfig, ctx, "month", "project", "")),
+		shared.NewCorsRoute("GET", "/api/projects/(.+)/analytics/year", getAnalytics(apiConfig, ctx, "year", "project", "")),
 		shared.NewCorsRoute("GET", "/api/projects/(.+)", getProjectObjects(apiConfig, ctx)),
+		shared.NewCorsRoute("GET", "/api/projects", getProjects(apiConfig, ctx)),
+		shared.NewCorsRoute("GET", "/api/posts/analytics/year", getAnalytics(apiConfig, ctx, "year", "user", "AND post_id IS NOT NULL OR (post_id IS NULL AND project_id IS NULL)")),
+		shared.NewCorsRoute("GET", "/api/posts/analytics", getAnalytics(apiConfig, ctx, "month", "user", "AND post_id IS NOT NULL OR (post_id IS NULL AND project_id IS NULL)")),
+		shared.NewCorsRoute("GET", "/api/posts/(.+)/analytics", getAnalytics(apiConfig, ctx, "month", "post", "")),
+		shared.NewCorsRoute("GET", "/api/posts/(.+)/analytics/year", getAnalytics(apiConfig, ctx, "year", "post", "")),
 		shared.NewCorsRoute("GET", "/api/posts/prose", getPosts(apiConfig, ctx, "prose")),
 		shared.NewCorsRoute("GET", "/api/posts/pastes", getPosts(apiConfig, ctx, "pastes")),
 		shared.NewCorsRoute("GET", "/api/posts/feeds", getPosts(apiConfig, ctx, "feeds")),
-		shared.NewCorsRoute("GET", "/api/analytics/year", getAnalytics(apiConfig, ctx, "year")),
-		shared.NewCorsRoute("GET", "/api/analytics", getAnalytics(apiConfig, ctx, "month")),
+		shared.NewCorsRoute("GET", "/api/analytics/year", getAnalytics(apiConfig, ctx, "year", "user", "")),
+		shared.NewCorsRoute("GET", "/api/analytics", getAnalytics(apiConfig, ctx, "month", "user", "")),
 	}
 }

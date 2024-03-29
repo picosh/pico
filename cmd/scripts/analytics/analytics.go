@@ -18,11 +18,12 @@ func main() {
 	userID := args[1]
 
 	stats, err := dbpool.VisitSummary(
-		&db.SummarOpts{
+		&db.SummaryOpts{
 			FkID:     userID,
 			By:       "user_id",
 			Interval: "day",
 			Origin:   shared.StartOfMonth(),
+			Where:    "AND post_id IS NOT NULL OR (post_id IS NULL AND project_id IS NULL)",
 		},
 	)
 	if err != nil {

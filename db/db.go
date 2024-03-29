@@ -145,11 +145,12 @@ type Analytics struct {
 	UsersWithPost  int
 }
 
-type SummarOpts struct {
+type SummaryOpts struct {
 	FkID     string
 	By       string
 	Interval string
 	Origin   time.Time
+	Where    string
 }
 
 type PostAnalytics struct {
@@ -368,7 +369,7 @@ type DB interface {
 	ReplaceAliasesForPost(aliases []string, postID string) error
 
 	InsertVisit(view *AnalyticsVisits) error
-	VisitSummary(opts *SummarOpts) (*SummaryVisits, error)
+	VisitSummary(opts *SummaryOpts) (*SummaryVisits, error)
 
 	AddPicoPlusUser(username string, paymentType, txId string) error
 	FindFeatureForUser(userID string, feature string) (*FeatureFlag, error)
