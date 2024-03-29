@@ -1842,6 +1842,31 @@ func (me *PsqlDB) FindTokensForUser(userID string) ([]*db.Token, error) {
 	return keys, nil
 }
 
+func (me *PsqlDB) InsertFeature(userID, name string, expiresAt time.Time) (*db.FeatureFlag, error) {
+	var featureID string
+	err := me.Db.QueryRow(
+		`INSERT INTO feature_flags (user_id, name, expires_at) VALUES ($1, $2, $3) RETURNING id;`,
+		userID,
+		name,
+		expiresAt,
+	).Scan(&featureID)
+	if err != nil {
+		return nil, err
+	}
+
+	feature, err := me.FindFeatureForUser(userID, name)
+	if err != nil {
+		return nil, err
+	}
+
+	return feature, nil
+}
+
+func (me *PsqlDB) RemoveFeature(userID string, name string) error {
+	_, err := me.Db.Exec(`DELETE FROM feature_flags WHERE user_id = $1 AND name = $2`, userID, name)
+	return err
+}
+
 func (me *PsqlDB) createFeatureExpiresAt(userID, name string) time.Time {
 	ff, _ := me.FindFeatureForUser(userID, name)
 	if ff == nil {

@@ -376,6 +376,8 @@ type DB interface {
 	FindFeaturesForUser(userID string) ([]*FeatureFlag, error)
 	HasFeatureForUser(userID string, feature string) bool
 	FindTotalSizeForUser(userID string) (int, error)
+	InsertFeature(userID, name string, expiresAt time.Time) (*FeatureFlag, error)
+	RemoveFeature(userID, names string) error
 
 	InsertFeedItems(postID string, items []*FeedItem) error
 	FindFeedItemsByPostID(postID string) ([]*FeedItem, error)

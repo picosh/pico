@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/ssh"
@@ -479,6 +481,85 @@ type ProjectObject struct {
 	ModTime time.Time `json:"mod_time"`
 }
 
+type createFeaturePayload struct {
+	Name string `json:"name"`
+}
+
+var featureAllowList = []string{
+	"analytics",
+}
+
+func createFeature(httpCtx *shared.ApiConfig, ctx ssh.Context) http.HandlerFunc {
+	logger := httpCtx.Cfg.Logger
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		user, _ := shared.GetUserCtx(ctx)
+		if !ensureUser(w, user) {
+			return
+		}
+
+		dbpool := shared.GetDB(r)
+		var payload createFeaturePayload
+		body, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(body, &payload)
+
+		// only allow the user to add certain features to their account
+		if !slices.Contains(featureAllowList, payload.Name) {
+			err := fmt.Errorf(
+				"(%s) is not in feature allowlist (%s)",
+				payload.Name,
+				strings.Join(featureAllowList, ", "),
+			)
+			shared.JSONError(w, err.Error(), http.StatusUnprocessableEntity)
+			return
+		}
+
+		now := time.Now()
+		expiresAt := now.AddDate(100, 0, 0)
+		feature, err := dbpool.InsertFeature(user.ID, payload.Name, expiresAt)
+		if err != nil {
+			shared.JSONError(w, err.Error(), http.StatusUnprocessableEntity)
+			return
+		}
+
+		err = json.NewEncoder(w).Encode(feature)
+		if err != nil {
+			logger.Error("json encode", "err", err.Error())
+		}
+	}
+}
+
+func deleteFeature(httpCtx *shared.ApiConfig, ctx ssh.Context) http.HandlerFunc {
+	logger := httpCtx.Cfg.Logger
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		user, _ := shared.GetUserCtx(ctx)
+		if !ensureUser(w, user) {
+			return
+		}
+		dbpool := shared.GetDB(r)
+		featureName := shared.GetField(r, 0)
+
+		if !slices.Contains(featureAllowList, featureName) {
+			err := fmt.Errorf(
+				"(%s) is not in feature allowlist (%s)",
+				featureName,
+				strings.Join(featureAllowList, ", "),
+			)
+			shared.JSONError(w, err.Error(), http.StatusUnprocessableEntity)
+			return
+		}
+
+		err := dbpool.RemoveFeature(user.ID, featureName)
+		if err != nil {
+			logger.Error("could not remove features", "err", err.Error())
+			shared.JSONError(w, err.Error(), http.StatusUnprocessableEntity)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
 func getProjectObjects(apiConfig *shared.ApiConfig, ctx ssh.Context) http.HandlerFunc {
 	logger := apiConfig.Cfg.Logger
 	storage := apiConfig.Storage
@@ -584,6 +665,8 @@ func CreateRoutes(apiConfig *shared.ApiConfig, ctx ssh.Context) []shared.Route {
 		shared.NewCorsRoute("GET", "/api/pubkeys", getPublicKeys(apiConfig, ctx)),
 		shared.NewCorsRoute("POST", "/api/pubkeys", createPubkey(apiConfig, ctx)),
 		shared.NewCorsRoute("DELETE", "/api/pubkeys/(.+)", deletePubkey(apiConfig, ctx)),
+		shared.NewCorsRoute("POST", "/api/features", createFeature(apiConfig, ctx)),
+		shared.NewCorsRoute("DELETE", "/api/features/(.+)", deleteFeature(apiConfig, ctx)),
 		shared.NewCorsRoute("PATCH", "/api/pubkeys/(.+)", patchPubkey(apiConfig, ctx)),
 		shared.NewCorsRoute("GET", "/api/tokens", getTokens(apiConfig, ctx)),
 		shared.NewCorsRoute("POST", "/api/tokens", createToken(apiConfig, ctx)),
