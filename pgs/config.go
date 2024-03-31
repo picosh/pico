@@ -87,6 +87,7 @@ func NewConfigSite() *shared.ConfigSite {
 				".mpeg",
 				".wasm",
 				".xsl",
+				".opml",
 			},
 			MaxSize:       maxSize,
 			MaxAssetSize:  maxAssetSize,

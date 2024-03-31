@@ -76,6 +76,8 @@ func GetMimeType(fpath string) string {
 		return "video/mpeg"
 	} else if ext == ".wasm" {
 		return "application/wasm"
+	} else if ext == ".opml" {
+		return "text/x-opml"
 	} else if ext == ".txt" {
 		return "text/plain"
 	}
