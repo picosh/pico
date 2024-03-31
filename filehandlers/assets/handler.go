@@ -347,7 +347,7 @@ func (h *UploadAssetHandler) validateAsset(data *FileData) (bool, error) {
 	}
 
 	// ".well-known" is a special case
-	if strings.Contains(fname, "/.well-known/") {
+	if strings.Contains(data.Filepath, "/.well-known/") {
 		if shared.IsTextFile(string(data.Text)) {
 			return true, nil
 		} else {
