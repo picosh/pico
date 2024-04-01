@@ -153,9 +153,11 @@ func BytesToGB(size int) float32 {
 	return (((float32(size) / 1024) / 1024) / 1024)
 }
 
+// https://stackoverflow.com/a/46964105
 func StartOfMonth() time.Time {
 	now := time.Now()
-	return now.AddDate(0, 0, -now.Day()+1)
+	firstday := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+	return firstday
 }
 
 func StartOfYear() time.Time {
