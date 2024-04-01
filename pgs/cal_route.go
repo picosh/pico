@@ -21,6 +21,10 @@ type HttpReply struct {
 func expandRoute(projectName, fp string, status int) []*HttpReply {
 	mimeType := storage.GetMimeType(fp)
 	fname := filepath.Base(fp)
+	// keep trailing slash because it conveys information
+	if strings.HasSuffix(fp, "/") {
+		fname = fname + "/"
+	}
 	fdir := filepath.Dir(fp)
 	fext := filepath.Ext(fp)
 	routes := []*HttpReply{}
@@ -33,21 +37,36 @@ func expandRoute(projectName, fp string, status int) []*HttpReply {
 		return routes
 	}
 
-	if fname != "" && fname != "/" {
-		// we need to accommodate routes that are just directories
-		// and point the user to the index.html of each root dir.
-		nameRoute := shared.GetAssetFileName(&utils.FileEntry{
-			Filepath: filepath.Join(
-				projectName,
-				fdir,
-				fmt.Sprintf("%s.html", fname),
-			),
-		})
+	if !strings.HasSuffix(fname, "/") {
+		if fname != "" {
+			// we need to accommodate routes that are just directories
+			// and point the user to the index.html of each root dir.
+			nameRoute := shared.GetAssetFileName(&utils.FileEntry{
+				Filepath: filepath.Join(
+					projectName,
+					fdir,
+					fmt.Sprintf("%s.html", fname),
+				),
+			})
 
-		routes = append(
-			routes,
-			&HttpReply{Filepath: nameRoute, Status: status},
-		)
+			routes = append(
+				routes,
+				&HttpReply{Filepath: nameRoute, Status: status},
+			)
+		}
+
+		if fext == "" {
+			redirectRoute := shared.GetAssetFileName(&utils.FileEntry{
+				Filepath: filepath.Join(projectName, fp) + "/",
+			})
+			routes = append(
+				routes,
+				&HttpReply{Filepath: redirectRoute, Status: http.StatusMovedPermanently},
+			)
+			// 301 is always actived so anything after this branch will never
+			// be executed ... so return early
+			return routes
+		}
 	}
 
 	dirRoute := shared.GetAssetFileName(&utils.FileEntry{
