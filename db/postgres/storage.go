@@ -1029,7 +1029,7 @@ func (me *PsqlDB) visitUniqueBlog(opts *db.SummaryOpts) ([]*db.VisitInterval, er
 		date_trunc('%s', created_at) as interval_start,
         count(DISTINCT ip_address) as unique_visitors
 	FROM analytics_visits
-	WHERE %s=$1 AND created_at >= $2 %s
+	WHERE %s=$1 AND created_at >= $2 AND status <> 404 %s
 	GROUP BY interval_start`, opts.Interval, opts.By, opts.Where)
 
 	intervals := []*db.VisitInterval{}
@@ -1063,7 +1063,7 @@ func (me *PsqlDB) visitUnique(opts *db.SummaryOpts) ([]*db.VisitInterval, error)
 		date_trunc('%s', created_at) as interval_start,
         count(DISTINCT ip_address) as unique_visitors
 	FROM analytics_visits
-	WHERE %s=$1 AND created_at >= $2 %s
+	WHERE %s=$1 AND created_at >= $2 AND status <> 404 %s
 	GROUP BY post_id, project_id, interval_start`, opts.Interval, opts.By, opts.Where)
 
 	intervals := []*db.VisitInterval{}
@@ -1099,10 +1099,11 @@ func (me *PsqlDB) visitUnique(opts *db.SummaryOpts) ([]*db.VisitInterval, error)
 func (me *PsqlDB) visitReferer(opts *db.SummaryOpts) ([]*db.VisitUrl, error) {
 	topUrls := fmt.Sprintf(`SELECT
 		referer,
-		count(*) as referer_count
+		count(DISTINCT ip_address) as referer_count
 	FROM analytics_visits
-	WHERE %s=$1 AND created_at >= $2 AND referer <> '' %s
+	WHERE %s=$1 AND created_at >= $2 AND referer <> '' AND status <> 404 %s
 	GROUP BY referer
+	ORDER BY referer_count DESC
 	LIMIT 10`, opts.By, opts.Where)
 
 	intervals := []*db.VisitUrl{}
@@ -1132,10 +1133,13 @@ func (me *PsqlDB) visitReferer(opts *db.SummaryOpts) ([]*db.VisitUrl, error) {
 func (me *PsqlDB) visitUrl(opts *db.SummaryOpts) ([]*db.VisitUrl, error) {
 	topUrls := fmt.Sprintf(`SELECT
 		path,
-		count(*) as path_count
+		count(DISTINCT ip_address) as path_count,
+		post_id,
+		project_id
 	FROM analytics_visits
-	WHERE %s=$1 AND created_at >= $2 AND path <> '' %s
-	GROUP BY path
+	WHERE %s=$1 AND created_at >= $2 AND path <> '' AND status <> 404 %s
+	GROUP BY path, post_id, project_id
+	ORDER BY path_count DESC
 	LIMIT 10`, opts.By, opts.Where)
 
 	intervals := []*db.VisitUrl{}
@@ -1146,13 +1150,19 @@ func (me *PsqlDB) visitUrl(opts *db.SummaryOpts) ([]*db.VisitUrl, error) {
 
 	for rs.Next() {
 		interval := &db.VisitUrl{}
+		var postID sql.NullString
+		var projectID sql.NullString
 		err := rs.Scan(
 			&interval.Url,
 			&interval.Count,
+			&postID,
+			&projectID,
 		)
 		if err != nil {
 			return nil, err
 		}
+		interval.PostID = postID.String
+		interval.ProjectID = projectID.String
 
 		intervals = append(intervals, interval)
 	}

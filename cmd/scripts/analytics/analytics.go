@@ -15,15 +15,16 @@ func main() {
 	dbpool := postgres.NewDB(DbURL, logger)
 
 	args := os.Args
-	userID := args[1]
+	fkID := args[1]
 
 	stats, err := dbpool.VisitSummary(
 		&db.SummaryOpts{
-			FkID:     userID,
+			FkID: fkID,
+			// By:   "post_id",
 			By:       "user_id",
 			Interval: "day",
 			Origin:   shared.StartOfMonth(),
-			Where:    "AND post_id IS NOT NULL OR (post_id IS NULL AND project_id IS NULL)",
+			// Where:    "AND (post_id IS NOT NULL OR (post_id IS NULL AND project_id IS NULL))",
 		},
 	)
 	if err != nil {
@@ -43,7 +44,7 @@ func main() {
 	for _, url := range stats.TopUrls {
 		logger.Info(
 			"url",
-			"path", url.Url,
+			"url", url.Url,
 			"count", url.Count,
 			"postID", url.PostID,
 			"projectID", url.ProjectID,
@@ -53,7 +54,7 @@ func main() {
 	for _, url := range stats.TopReferers {
 		logger.Info(
 			"referer",
-			"path", url.Url,
+			"url", url.Url,
 			"count", url.Count,
 			"postID", url.PostID,
 			"projectID", url.ProjectID,
