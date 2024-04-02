@@ -64,21 +64,6 @@ func expandRoute(projectName, fp string, status int) []*HttpReply {
 			routes,
 			&HttpReply{Filepath: nameRoute, Status: status},
 		)
-
-		// filename without extension mean we might have a directory
-		// so add a trailing slash with a 301
-		if fext == "" {
-			redirectRoute := shared.GetAssetFileName(&utils.FileEntry{
-				Filepath: fp + "/",
-			})
-			routes = append(
-				routes,
-				&HttpReply{Filepath: redirectRoute, Status: http.StatusMovedPermanently},
-			)
-			// 301 is always actived so anything after this branch will never
-			// be executed ... so return early
-			return routes
-		}
 	}
 
 	return routes
@@ -91,8 +76,9 @@ func hasProtocol(url string) bool {
 
 func calcRoutes(projectName, fp string, userRedirects []*RedirectRule) []*HttpReply {
 	rts := expandRoute(projectName, fp, http.StatusOK)
+	fext := filepath.Ext(fp)
 	// add route as-is without expansion if there is a file ext
-	if fp != "" && filepath.Ext(fp) != "" {
+	if fp != "" && fext != "" {
 		defRoute := shared.GetAssetFileName(&utils.FileEntry{
 			Filepath: filepath.Join(projectName, fp),
 		})
@@ -143,6 +129,21 @@ func calcRoutes(projectName, fp string, userRedirects []*RedirectRule) []*HttpRe
 			// quit after first match
 			break
 		}
+	}
+
+	// filename without extension mean we might have a directory
+	// so add a trailing slash with a 301
+	if !strings.HasSuffix(fp, "/") && fp != "" && fext == "" {
+		redirectRoute := shared.GetAssetFileName(&utils.FileEntry{
+			Filepath: fp + "/",
+		})
+		rts = append(
+			rts,
+			&HttpReply{Filepath: redirectRoute, Status: http.StatusMovedPermanently},
+		)
+		// 301 is always actived so anything after this branch will never
+		// be executed ... so return early
+		// return rts
 	}
 
 	notFound := &HttpReply{

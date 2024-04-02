@@ -110,8 +110,28 @@ func TestCalcRoutes(t *testing.T) {
 			),
 			Expected: []*HttpReply{
 				{Filepath: "test/wow.html", Status: 200},
-				{Filepath: "/wow/", Status: 301},
 				{Filepath: "test/index.html", Status: 301},
+				{Filepath: "/wow/", Status: 301},
+				{Filepath: "test/404.html", Status: 404},
+			},
+		},
+		{
+			Name: "redirectToPico",
+			Actual: calcRoutes(
+				"test",
+				"/tester1",
+				[]*RedirectRule{
+					{
+						From:   "/tester1",
+						To:     "https://pico.sh",
+						Status: 301,
+					},
+				},
+			),
+			Expected: []*HttpReply{
+				{Filepath: "test/tester1.html", Status: 200},
+				{Filepath: "https://pico.sh", Status: 301},
+				{Filepath: "/tester1/", Status: 301},
 				{Filepath: "test/404.html", Status: 404},
 			},
 		},
@@ -162,6 +182,7 @@ func TestCalcRoutes(t *testing.T) {
 			),
 			Expected: []*HttpReply{
 				{Filepath: "test/index.html", Status: 301},
+				{Filepath: "/wow/", Status: 301},
 				{Filepath: "test/404.html", Status: 404},
 			},
 		},
@@ -199,8 +220,8 @@ func TestCalcRoutes(t *testing.T) {
 			),
 			Expected: []*HttpReply{
 				{Filepath: "test/wow.html", Status: 200},
-				{Filepath: "/wow/", Status: 301},
 				{Filepath: "https://pico.sh", Status: 301},
+				{Filepath: "/wow/", Status: 301},
 				{Filepath: "test/404.html", Status: 404},
 			},
 		},
