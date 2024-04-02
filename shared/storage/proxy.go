@@ -78,6 +78,10 @@ func GetMimeType(fpath string) string {
 		return "application/wasm"
 	} else if ext == ".opml" {
 		return "text/x-opml"
+	} else if ext == ".eot" {
+		return "application/vnd.ms-fontobject"
+	} else if ext == ".yml" || ext == ".yaml" {
+		return "text/x-yaml"
 	} else if ext == ".txt" {
 		return "text/plain"
 	}
