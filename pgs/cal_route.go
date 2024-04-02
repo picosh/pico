@@ -19,12 +19,11 @@ type HttpReply struct {
 }
 
 func expandRoute(projectName, fp string, status int) []*HttpReply {
+	if fp == "" {
+		fp = "/"
+	}
 	mimeType := storage.GetMimeType(fp)
 	fname := filepath.Base(fp)
-	// keep trailing slash because it conveys information
-	if strings.HasSuffix(fp, "/") {
-		fname = fname + "/"
-	}
 	fdir := filepath.Dir(fp)
 	fext := filepath.Ext(fp)
 	routes := []*HttpReply{}
@@ -37,27 +36,40 @@ func expandRoute(projectName, fp string, status int) []*HttpReply {
 		return routes
 	}
 
-	if !strings.HasSuffix(fname, "/") {
-		if fname != "" {
-			// we need to accommodate routes that are just directories
-			// and point the user to the index.html of each root dir.
-			nameRoute := shared.GetAssetFileName(&utils.FileEntry{
-				Filepath: filepath.Join(
-					projectName,
-					fdir,
-					fmt.Sprintf("%s.html", fname),
-				),
-			})
+	// we know it's a directory so send the index.html for it
+	if strings.HasSuffix(fp, "/") {
+		dirRoute := shared.GetAssetFileName(&utils.FileEntry{
+			Filepath: filepath.Join(projectName, fp, "index.html"),
+		})
 
-			routes = append(
-				routes,
-				&HttpReply{Filepath: nameRoute, Status: status},
-			)
+		routes = append(
+			routes,
+			&HttpReply{Filepath: dirRoute, Status: status},
+		)
+	} else {
+		if fname == "." {
+			return routes
 		}
 
+		// pretty urls where we just append .html to base of fp
+		nameRoute := shared.GetAssetFileName(&utils.FileEntry{
+			Filepath: filepath.Join(
+				projectName,
+				fdir,
+				fmt.Sprintf("%s.html", fname),
+			),
+		})
+
+		routes = append(
+			routes,
+			&HttpReply{Filepath: nameRoute, Status: status},
+		)
+
+		// filename without extension mean we might have a directory
+		// so add a trailing slash with a 301
 		if fext == "" {
 			redirectRoute := shared.GetAssetFileName(&utils.FileEntry{
-				Filepath: filepath.Join(projectName, fp) + "/",
+				Filepath: fp + "/",
 			})
 			routes = append(
 				routes,
@@ -68,15 +80,6 @@ func expandRoute(projectName, fp string, status int) []*HttpReply {
 			return routes
 		}
 	}
-
-	dirRoute := shared.GetAssetFileName(&utils.FileEntry{
-		Filepath: filepath.Join(projectName, fp, "index.html"),
-	})
-
-	routes = append(
-		routes,
-		&HttpReply{Filepath: dirRoute, Status: status},
-	)
 
 	return routes
 }
