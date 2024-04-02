@@ -90,16 +90,9 @@ func hasProtocol(url string) bool {
 }
 
 func calcRoutes(projectName, fp string, userRedirects []*RedirectRule) []*HttpReply {
-	notFound := &HttpReply{
-		Filepath: filepath.Join(projectName, "404.html"),
-		Status:   http.StatusNotFound,
-	}
-
 	rts := expandRoute(projectName, fp, http.StatusOK)
-
-	fext := filepath.Ext(fp)
 	// add route as-is without expansion if there is a file ext
-	if fp != "" && fext != "" {
+	if fp != "" && filepath.Ext(fp) != "" {
 		defRoute := shared.GetAssetFileName(&utils.FileEntry{
 			Filepath: filepath.Join(projectName, fp),
 		})
@@ -150,6 +143,11 @@ func calcRoutes(projectName, fp string, userRedirects []*RedirectRule) []*HttpRe
 			// quit after first match
 			break
 		}
+	}
+
+	notFound := &HttpReply{
+		Filepath: filepath.Join(projectName, "404.html"),
+		Status:   http.StatusNotFound,
 	}
 
 	rts = append(rts,
