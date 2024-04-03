@@ -19,6 +19,9 @@ type HttpReply struct {
 }
 
 func expandRoute(projectName, fp string, status int) []*HttpReply {
+	if fp == "" {
+		fp = "/"
+	}
 	mimeType := storage.GetMimeType(fp)
 	fname := filepath.Base(fp)
 	fdir := filepath.Dir(fp)
@@ -33,9 +36,22 @@ func expandRoute(projectName, fp string, status int) []*HttpReply {
 		return routes
 	}
 
-	if fname != "" && fname != "/" {
-		// we need to accommodate routes that are just directories
-		// and point the user to the index.html of each root dir.
+	// we know it's a directory so send the index.html for it
+	if strings.HasSuffix(fp, "/") {
+		dirRoute := shared.GetAssetFileName(&utils.FileEntry{
+			Filepath: filepath.Join(projectName, fp, "index.html"),
+		})
+
+		routes = append(
+			routes,
+			&HttpReply{Filepath: dirRoute, Status: status},
+		)
+	} else {
+		if fname == "." {
+			return routes
+		}
+
+		// pretty urls where we just append .html to base of fp
 		nameRoute := shared.GetAssetFileName(&utils.FileEntry{
 			Filepath: filepath.Join(
 				projectName,
@@ -50,15 +66,6 @@ func expandRoute(projectName, fp string, status int) []*HttpReply {
 		)
 	}
 
-	dirRoute := shared.GetAssetFileName(&utils.FileEntry{
-		Filepath: filepath.Join(projectName, fp, "index.html"),
-	})
-
-	routes = append(
-		routes,
-		&HttpReply{Filepath: dirRoute, Status: status},
-	)
-
 	return routes
 }
 
@@ -68,13 +75,7 @@ func hasProtocol(url string) bool {
 }
 
 func calcRoutes(projectName, fp string, userRedirects []*RedirectRule) []*HttpReply {
-	notFound := &HttpReply{
-		Filepath: filepath.Join(projectName, "404.html"),
-		Status:   http.StatusNotFound,
-	}
-
 	rts := expandRoute(projectName, fp, http.StatusOK)
-
 	fext := filepath.Ext(fp)
 	// add route as-is without expansion if there is a file ext
 	if fp != "" && fext != "" {
@@ -128,6 +129,26 @@ func calcRoutes(projectName, fp string, userRedirects []*RedirectRule) []*HttpRe
 			// quit after first match
 			break
 		}
+	}
+
+	// filename without extension mean we might have a directory
+	// so add a trailing slash with a 301
+	if !strings.HasSuffix(fp, "/") && fp != "" && fext == "" {
+		redirectRoute := shared.GetAssetFileName(&utils.FileEntry{
+			Filepath: fp + "/",
+		})
+		rts = append(
+			rts,
+			&HttpReply{Filepath: redirectRoute, Status: http.StatusMovedPermanently},
+		)
+		// 301 is always actived so anything after this branch will never
+		// be executed ... so return early
+		// return rts
+	}
+
+	notFound := &HttpReply{
+		Filepath: filepath.Join(projectName, "404.html"),
+		Status:   http.StatusNotFound,
 	}
 
 	rts = append(rts,
