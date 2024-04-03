@@ -347,7 +347,7 @@ func (h *UploadAssetHandler) validateAsset(data *FileData) (bool, error) {
 	}
 
 	// deny git folder from accidentally being uploaded
-	if strings.Contains(fname, "/.git/") {
+	if strings.Contains(data.Filepath, "/.git/") {
 		return false, fmt.Errorf("(%s) .git folder not allowed", fname)
 	}
 
