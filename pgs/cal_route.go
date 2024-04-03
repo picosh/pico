@@ -69,9 +69,8 @@ func expandRoute(projectName, fp string, status int) []*HttpReply {
 	return routes
 }
 
-func hasProtocol(url string) bool {
-	isFullUrl := strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://")
-	return isFullUrl
+func checkIsRedirect(status int) bool {
+	return status >= 300 && status <= 399
 }
 
 func calcRoutes(projectName, fp string, userRedirects []*RedirectRule) []*HttpReply {
@@ -92,33 +91,31 @@ func calcRoutes(projectName, fp string, userRedirects []*RedirectRule) []*HttpRe
 
 	// user routes
 	for _, redirect := range userRedirects {
+		// this doesn't make sense and it forbidden
+		if redirect.From == redirect.To {
+			continue
+		}
 		rr := regexp.MustCompile(redirect.From)
 		match := rr.FindStringSubmatch(fp)
 		if len(match) > 0 {
-			userReply := []*HttpReply{}
-			ruleRoute := redirect.To
-
-			// special case for redirects that include http(s)://
-			isFullUrl := hasProtocol(redirect.To)
-			if !isFullUrl {
-				ruleRoute = shared.GetAssetFileName(&utils.FileEntry{
-					Filepath: filepath.Join(projectName, redirect.To),
-				})
+			isRedirect := checkIsRedirect(redirect.Status)
+			if !isRedirect {
+				// wipe redirect rules to prevent infinite loops
+				// as such we only support a single hop for user defined redirects
+				redirectRoutes := calcRoutes(projectName, redirect.To, []*RedirectRule{})
+				rts = append(rts, redirectRoutes...)
+				return rts
 			}
 
+			userReply := []*HttpReply{}
 			var rule *HttpReply
-			if redirect.To != "" && redirect.To != "/" {
+			if redirect.To != "" {
 				rule = &HttpReply{
-					Filepath: ruleRoute,
+					Filepath: redirect.To,
 					Status:   redirect.Status,
 					Query:    redirect.Query,
 				}
 				userReply = append(userReply, rule)
-			}
-
-			if !isFullUrl {
-				expandedRoutes := expandRoute(projectName, redirect.To, redirect.Status)
-				userReply = append(userReply, expandedRoutes...)
 			}
 
 			if redirect.Force {

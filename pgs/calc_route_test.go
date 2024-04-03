@@ -1,7 +1,6 @@
 package pgs
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -103,14 +102,14 @@ func TestCalcRoutes(t *testing.T) {
 				[]*RedirectRule{
 					{
 						From:   "/wow",
-						To:     "index.html",
+						To:     "/index.html",
 						Status: 301,
 					},
 				},
 			),
 			Expected: []*HttpReply{
 				{Filepath: "test/wow.html", Status: 200},
-				{Filepath: "test/index.html", Status: 301},
+				{Filepath: "/index.html", Status: 301},
 				{Filepath: "/wow/", Status: 301},
 				{Filepath: "test/404.html", Status: 404},
 			},
@@ -162,7 +161,7 @@ func TestCalcRoutes(t *testing.T) {
 			),
 			Expected: []*HttpReply{
 				{Filepath: "test/wow/index.html", Status: 200},
-				{Filepath: "test/index.html", Status: 301},
+				{Filepath: "/", Status: 301},
 				{Filepath: "test/404.html", Status: 404},
 			},
 		},
@@ -181,7 +180,7 @@ func TestCalcRoutes(t *testing.T) {
 				},
 			),
 			Expected: []*HttpReply{
-				{Filepath: "test/index.html", Status: 301},
+				{Filepath: "/", Status: 301},
 				{Filepath: "/wow/", Status: 301},
 				{Filepath: "test/404.html", Status: 404},
 			},
@@ -225,11 +224,69 @@ func TestCalcRoutes(t *testing.T) {
 				{Filepath: "test/404.html", Status: 404},
 			},
 		},
+		{
+			Name: "redirectDirectory",
+			Actual: calcRoutes(
+				"public",
+				"/stata2",
+				[]*RedirectRule{
+					{
+						From:   "/stata2",
+						To:     "/workshop-stata2",
+						Status: 301,
+					},
+				},
+			),
+			Expected: []*HttpReply{
+				{Filepath: "public/stata2.html", Status: 200},
+				{Filepath: "/workshop-stata2", Status: 301},
+				{Filepath: "/stata2/", Status: 301},
+				{Filepath: "public/404.html", Status: 404},
+			},
+		},
+		{
+			Name: "redirectSubDirectory",
+			Actual: calcRoutes(
+				"public",
+				"/folder2",
+				[]*RedirectRule{
+					{
+						From:   "/folder2",
+						To:     "/folder",
+						Status: 200,
+					},
+				},
+			),
+			Expected: []*HttpReply{
+				{Filepath: "public/folder2.html", Status: 200},
+				{Filepath: "public/folder.html", Status: 200},
+				{Filepath: "/folder/", Status: 301},
+				{Filepath: "public/404.html", Status: 404},
+			},
+		},
+		{
+			Name: "redirectFromAndToSame",
+			Actual: calcRoutes(
+				"public",
+				"/folder2",
+				[]*RedirectRule{
+					{
+						From:   "/folder2",
+						To:     "/folder2",
+						Status: 200,
+					},
+				},
+			),
+			Expected: []*HttpReply{
+				{Filepath: "public/folder2.html", Status: 200},
+				{Filepath: "/folder2/", Status: 301},
+				{Filepath: "public/404.html", Status: 404},
+			},
+		},
 	}
 
 	for _, fixture := range fixtures {
 		t.Run(fixture.Name, func(t *testing.T) {
-			fmt.Println(fixture.Actual[0].Filepath)
 			if cmp.Equal(fixture.Actual, fixture.Expected) == false {
 				t.Fatalf(cmp.Diff(fixture.Expected, fixture.Actual))
 			}

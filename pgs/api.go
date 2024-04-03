@@ -179,7 +179,7 @@ func (h *AssetHandler) handle(w http.ResponseWriter, r *http.Request) {
 	status := http.StatusOK
 	attempts := []string{}
 	for _, fp := range routes {
-		if hasProtocol(fp.Filepath) || fp.Status == http.StatusMovedPermanently {
+		if checkIsRedirect(fp.Status) {
 			h.Logger.Info(
 				"redirecting request",
 				"bucket", h.Bucket.Name,
@@ -304,7 +304,7 @@ func (h *AssetHandler) handle(w http.ResponseWriter, r *http.Request) {
 	_, err = io.Copy(w, contents)
 
 	if err != nil {
-		h.Logger.Error(err.Error())
+		h.Logger.Error("io copy", "err", err.Error())
 	}
 }
 
