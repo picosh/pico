@@ -75,19 +75,15 @@ func calcRoutes(projectName, fp string, userRedirects []*RedirectRule) []*HttpRe
 
 	rts := expandRoute(projectName, fp, http.StatusOK)
 
-	fext := filepath.Ext(fp)
-	// add route as-is without expansion if there is a file ext
-	if fp != "" && fext != "" {
-		defRoute := shared.GetAssetFileName(&utils.FileEntry{
-			Filepath: filepath.Join(projectName, fp),
-		})
+	defRoute := shared.GetAssetFileName(&utils.FileEntry{
+		Filepath: filepath.Join(projectName, fp),
+	})
 
-		rts = append(rts,
-			&HttpReply{
-				Filepath: defRoute, Status: http.StatusOK,
-			},
-		)
-	}
+	rts = append(rts,
+		&HttpReply{
+			Filepath: defRoute, Status: http.StatusOK,
+		},
+	)
 
 	// user routes
 	for _, redirect := range userRedirects {
