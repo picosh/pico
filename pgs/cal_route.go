@@ -95,7 +95,12 @@ func calcRoutes(projectName, fp string, userRedirects []*RedirectRule) []*HttpRe
 		if redirect.From == redirect.To {
 			continue
 		}
-		rr := regexp.MustCompile(redirect.From)
+
+		from := redirect.From
+		if !strings.HasSuffix(redirect.From, "*") {
+			from = strings.TrimSuffix(redirect.From, "/") + "/?"
+		}
+		rr := regexp.MustCompile(from)
 		match := rr.FindStringSubmatch(fp)
 		if len(match) > 0 {
 			isRedirect := checkIsRedirect(redirect.Status)

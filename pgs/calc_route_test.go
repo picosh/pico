@@ -228,19 +228,19 @@ func TestCalcRoutes(t *testing.T) {
 			Name: "redirectDirectory",
 			Actual: calcRoutes(
 				"public",
-				"/stata2",
+				"/xyz",
 				[]*RedirectRule{
 					{
-						From:   "/stata2",
-						To:     "/workshop-stata2",
+						From:   "/xyz",
+						To:     "/wrk-xyz",
 						Status: 301,
 					},
 				},
 			),
 			Expected: []*HttpReply{
-				{Filepath: "public/stata2.html", Status: 200},
-				{Filepath: "/workshop-stata2", Status: 301},
-				{Filepath: "/stata2/", Status: 301},
+				{Filepath: "public/xyz.html", Status: 200},
+				{Filepath: "/wrk-xyz", Status: 301},
+				{Filepath: "/xyz/", Status: 301},
 				{Filepath: "public/404.html", Status: 404},
 			},
 		},
@@ -280,6 +280,45 @@ func TestCalcRoutes(t *testing.T) {
 			Expected: []*HttpReply{
 				{Filepath: "public/folder2.html", Status: 200},
 				{Filepath: "/folder2/", Status: 301},
+				{Filepath: "public/404.html", Status: 404},
+			},
+		},
+		{
+			Name: "redirectNoTrailingSlash",
+			Actual: calcRoutes(
+				"public",
+				"/space/",
+				[]*RedirectRule{
+					{
+						From:   "/space",
+						To:     "/frontier/",
+						Status: 301,
+					},
+				},
+			),
+			Expected: []*HttpReply{
+				{Filepath: "public/space/index.html", Status: 200},
+				{Filepath: "/frontier/", Status: 301},
+				{Filepath: "public/404.html", Status: 404},
+			},
+		},
+		{
+			Name: "redirectWithTrailingSlash",
+			Actual: calcRoutes(
+				"public",
+				"/space",
+				[]*RedirectRule{
+					{
+						From:   "/space/",
+						To:     "/frontier/",
+						Status: 301,
+					},
+				},
+			),
+			Expected: []*HttpReply{
+				{Filepath: "public/space.html", Status: 200},
+				{Filepath: "/frontier/", Status: 301},
+				{Filepath: "/space/", Status: 301},
 				{Filepath: "public/404.html", Status: 404},
 			},
 		},
