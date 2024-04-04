@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -360,14 +361,17 @@ func (h *UploadAssetHandler) validateAsset(data *FileData) (bool, error) {
 		return true, nil
 	}
 
-	if !shared.IsExtAllowed(fname, h.Cfg.AllowedExt) {
-		extStr := strings.Join(h.Cfg.AllowedExt, ",")
-		err := fmt.Errorf(
-			"ERROR: (%s) invalid file, format must be (%s), skipping",
-			fname,
-			extStr,
-		)
-		return false, err
+	dotFileRe := regexp.MustCompile(`/\..+`)
+	// TODO: let user control this list somehow
+	denylist := []*regexp.Regexp{dotFileRe}
+	for _, denyRe := range denylist {
+		if denyRe.MatchString(data.Filepath) {
+			err := fmt.Errorf(
+				"ERROR: (%s) file rejected, https://pico.sh/pgs#file-denylist",
+				data.Filepath,
+			)
+			return false, err
+		}
 	}
 
 	return true, nil
