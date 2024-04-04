@@ -152,6 +152,11 @@ func createRssHandler(by string) http.HandlerFunc {
 	}
 }
 
+func hasProtocol(url string) bool {
+	isFullUrl := strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://")
+	return isFullUrl
+}
+
 func (h *AssetHandler) handle(w http.ResponseWriter, r *http.Request) {
 	var redirects []*RedirectRule
 	redirectFp, _, _, err := h.Storage.GetObject(h.Bucket, filepath.Join(h.ProjectDir, "_redirects"))
@@ -180,6 +185,15 @@ func (h *AssetHandler) handle(w http.ResponseWriter, r *http.Request) {
 	attempts := []string{}
 	for _, fp := range routes {
 		if checkIsRedirect(fp.Status) {
+			// hack: check to see if there's an index file in the requested directory
+			// before redirecting, this saves a hop that will just end up a 404
+			if !hasProtocol(fp.Filepath) && strings.HasSuffix(fp.Filepath, "/") {
+				next := filepath.Join(h.ProjectDir, fp.Filepath, "index.html")
+				_, _, _, err := h.Storage.GetObject(h.Bucket, next)
+				if err != nil {
+					continue
+				}
+			}
 			h.Logger.Info(
 				"redirecting request",
 				"bucket", h.Bucket.Name,

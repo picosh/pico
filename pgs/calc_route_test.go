@@ -19,6 +19,7 @@ func TestCalcRoutes(t *testing.T) {
 			Actual: calcRoutes("test", "/index.html", []*RedirectRule{}),
 			Expected: []*HttpReply{
 				{Filepath: "test/index.html", Status: 200},
+				{Filepath: "/index.html/", Status: 301},
 				{Filepath: "test/404.html", Status: 404},
 			},
 		},
@@ -27,6 +28,7 @@ func TestCalcRoutes(t *testing.T) {
 			Actual: calcRoutes("test", "/index.txt", []*RedirectRule{}),
 			Expected: []*HttpReply{
 				{Filepath: "test/index.txt", Status: 200},
+				{Filepath: "/index.txt/", Status: 301},
 				{Filepath: "test/404.html", Status: 404},
 			},
 		},
@@ -35,6 +37,7 @@ func TestCalcRoutes(t *testing.T) {
 			Actual: calcRoutes("test", "/wow.html", []*RedirectRule{}),
 			Expected: []*HttpReply{
 				{Filepath: "test/wow.html", Status: 200},
+				{Filepath: "/wow.html/", Status: 301},
 				{Filepath: "test/404.html", Status: 404},
 			},
 		},
@@ -43,6 +46,7 @@ func TestCalcRoutes(t *testing.T) {
 			Actual: calcRoutes("test", "/nice/index.html", []*RedirectRule{}),
 			Expected: []*HttpReply{
 				{Filepath: "test/nice/index.html", Status: 200},
+				{Filepath: "/nice/index.html/", Status: 301},
 				{Filepath: "test/404.html", Status: 404},
 			},
 		},
@@ -51,6 +55,7 @@ func TestCalcRoutes(t *testing.T) {
 			Actual: calcRoutes("test", "/nice/wow.html", []*RedirectRule{}),
 			Expected: []*HttpReply{
 				{Filepath: "test/nice/wow.html", Status: 200},
+				{Filepath: "/nice/wow.html/", Status: 301},
 				{Filepath: "test/404.html", Status: 404},
 			},
 		},
@@ -84,6 +89,7 @@ func TestCalcRoutes(t *testing.T) {
 			Expected: []*HttpReply{
 				{Filepath: "test/nice.html", Status: 200},
 				{Filepath: "test/index.html", Status: 200},
+				{Filepath: "/index.html/", Status: 301},
 				{Filepath: "test/404.html", Status: 404},
 			},
 		},
@@ -92,6 +98,7 @@ func TestCalcRoutes(t *testing.T) {
 			Actual: calcRoutes("test", "/index.xml", []*RedirectRule{}),
 			Expected: []*HttpReply{
 				{Filepath: "test/index.xml", Status: 200},
+				{Filepath: "/index.xml/", Status: 301},
 				{Filepath: "test/404.html", Status: 404},
 			},
 		},
@@ -204,6 +211,7 @@ func TestCalcRoutes(t *testing.T) {
 			Expected: []*HttpReply{
 				{Filepath: "test/wow.html", Status: 200},
 				{Filepath: "https://pico.sh", Status: 301},
+				{Filepath: "/wow.html/", Status: 301},
 				{Filepath: "test/404.html", Status: 404},
 			},
 		},
@@ -328,6 +336,20 @@ func TestCalcRoutes(t *testing.T) {
 				{Filepath: "public/space.html", Status: 200},
 				{Filepath: "/frontier/", Status: 301},
 				{Filepath: "/space/", Status: 301},
+				{Filepath: "public/404.html", Status: 404},
+			},
+		},
+		{
+			Name: "directoryWithExtension",
+			Actual: calcRoutes(
+				"public",
+				"/space.nvim",
+				[]*RedirectRule{},
+			),
+			Expected: []*HttpReply{
+				{Filepath: "public/space.nvim", Status: 200},
+				{Filepath: "public/space.nvim.html", Status: 200},
+				{Filepath: "/space.nvim/", Status: 301},
 				{Filepath: "public/404.html", Status: 404},
 			},
 		},
