@@ -20,12 +20,8 @@ css:
 .PHONY: css
 
 lint:
-	$(DOCKER_CMD) run --rm -v $(shell pwd):/app -w /app golangci/golangci-lint:latest run -E goimports -E godot --timeout 10m
-.PHONY: lint
-
-lint-dev:
 	golangci-lint run -E goimports -E godot --timeout 10m
-.PHONY: lint-dev
+.PHONY: lint
 
 bp-setup:
 	$(DOCKER_CMD) buildx ls | grep pico || $(DOCKER_CMD) buildx create --name pico
