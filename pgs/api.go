@@ -51,14 +51,18 @@ func checkHandler(w http.ResponseWriter, r *http.Request) {
 			subdomain := shared.GetCustomDomain(hostDomain, cfg.Space)
 			props, err := getProjectFromSubdomain(subdomain)
 			if err != nil {
-				logger.Error(err.Error())
+				logger.Error(
+					"could not get project from subdomain",
+					"subdomain", subdomain,
+					"err", err.Error(),
+				)
 				w.WriteHeader(http.StatusNotFound)
 				return
 			}
 
 			u, err := dbpool.FindUserForName(props.Username)
 			if err != nil {
-				logger.Error(err.Error())
+				logger.Error("could not find user", "err", err.Error())
 				w.WriteHeader(http.StatusNotFound)
 				return
 			}
@@ -69,7 +73,12 @@ func checkHandler(w http.ResponseWriter, r *http.Request) {
 			)
 			p, err := dbpool.FindProjectByName(u.ID, props.ProjectName)
 			if err != nil {
-				logger.Error(err.Error())
+				logger.Error(
+					"could not find project for user",
+					"user", u.Name,
+					"project", props.ProjectName,
+					"err", err.Error(),
+				)
 				w.WriteHeader(http.StatusNotFound)
 				return
 			}
@@ -96,7 +105,7 @@ func createRssHandler(by string) http.HandlerFunc {
 
 		pager, err := dbpool.FindAllProjects(&db.Pager{Num: 100, Page: 0}, by)
 		if err != nil {
-			logger.Error(err.Error())
+			logger.Error("could not find projects", "err", err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -140,14 +149,14 @@ func createRssHandler(by string) http.HandlerFunc {
 
 		rss, err := feed.ToAtom()
 		if err != nil {
-			logger.Error(err.Error())
+			logger.Error("could not convert feed to atom", "err", err.Error())
 			http.Error(w, "Could not generate atom rss feed", http.StatusInternalServerError)
 		}
 
 		w.Header().Add("Content-Type", "application/atom+xml")
 		_, err = w.Write([]byte(rss))
 		if err != nil {
-			logger.Error(err.Error())
+			logger.Error("http write failed", "err", err.Error())
 		}
 	}
 }
@@ -165,14 +174,14 @@ func (h *AssetHandler) handle(w http.ResponseWriter, r *http.Request) {
 		buf := new(strings.Builder)
 		_, err := io.Copy(buf, redirectFp)
 		if err != nil {
-			h.Logger.Error(err.Error())
+			h.Logger.Error("io copy", "err", err.Error())
 			http.Error(w, "cannot read _redirects file", http.StatusInternalServerError)
 			return
 		}
 
 		redirects, err = parseRedirectText(buf.String())
 		if err != nil {
-			h.Logger.Error(err.Error())
+			h.Logger.Error("could not parse redirect text", "err", err.Error())
 		}
 	}
 
@@ -260,14 +269,14 @@ func (h *AssetHandler) handle(w http.ResponseWriter, r *http.Request) {
 		buf := new(strings.Builder)
 		_, err := io.Copy(buf, headersFp)
 		if err != nil {
-			h.Logger.Error(err.Error())
+			h.Logger.Error("io copy", "err", err.Error())
 			http.Error(w, "cannot read _headers file", http.StatusInternalServerError)
 			return
 		}
 
 		headers, err = parseHeaderText(buf.String())
 		if err != nil {
-			h.Logger.Error(err.Error())
+			h.Logger.Error("could not parse header text", "err", err.Error())
 		}
 	}
 
@@ -424,7 +433,7 @@ func ImgAssetRequest(hasPerm HasPerm) http.HandlerFunc {
 		opts, err := storage.UriToImgProcessOpts(imgOpts)
 		if err != nil {
 			errMsg := fmt.Sprintf("error processing img options: %s", err.Error())
-			logger.Info(errMsg)
+			logger.Error("error processing img options", "err", errMsg)
 			http.Error(w, errMsg, http.StatusUnprocessableEntity)
 		}
 
@@ -485,7 +494,7 @@ func StartApiServer() {
 	}
 
 	if err != nil {
-		logger.Error(err.Error())
+		logger.Error("could not connect to minio", "err", err.Error())
 		return
 	}
 
@@ -507,5 +516,9 @@ func StartApiServer() {
 		"domain", cfg.Domain,
 		"email", cfg.Email,
 	)
-	logger.Error(http.ListenAndServe(portStr, router).Error())
+	err = http.ListenAndServe(portStr, router)
+	logger.Error(
+		"listen and serve",
+		"err", err.Error(),
+	)
 }
