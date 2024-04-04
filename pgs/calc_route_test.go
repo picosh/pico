@@ -66,6 +66,7 @@ func TestCalcRoutes(t *testing.T) {
 			Name:   "trailing-slash",
 			Actual: calcRoutes("test", "/folder", []*RedirectRule{}),
 			Expected: []*HttpReply{
+				{Filepath: "test/folder", Status: 200},
 				{Filepath: "test/folder.html", Status: 200},
 				{Filepath: "/folder/", Status: 301},
 				{Filepath: "test/404.html", Status: 404},
@@ -108,6 +109,7 @@ func TestCalcRoutes(t *testing.T) {
 				},
 			),
 			Expected: []*HttpReply{
+				{Filepath: "test/wow", Status: 200},
 				{Filepath: "test/wow.html", Status: 200},
 				{Filepath: "/index.html", Status: 301},
 				{Filepath: "/wow/", Status: 301},
@@ -128,6 +130,7 @@ func TestCalcRoutes(t *testing.T) {
 				},
 			),
 			Expected: []*HttpReply{
+				{Filepath: "test/tester1", Status: 200},
 				{Filepath: "test/tester1.html", Status: 200},
 				{Filepath: "https://pico.sh", Status: 301},
 				{Filepath: "/tester1/", Status: 301},
@@ -218,6 +221,7 @@ func TestCalcRoutes(t *testing.T) {
 				},
 			),
 			Expected: []*HttpReply{
+				{Filepath: "test/wow", Status: 200},
 				{Filepath: "test/wow.html", Status: 200},
 				{Filepath: "https://pico.sh", Status: 301},
 				{Filepath: "/wow/", Status: 301},
@@ -238,6 +242,7 @@ func TestCalcRoutes(t *testing.T) {
 				},
 			),
 			Expected: []*HttpReply{
+				{Filepath: "public/xyz", Status: 200},
 				{Filepath: "public/xyz.html", Status: 200},
 				{Filepath: "/wrk-xyz", Status: 301},
 				{Filepath: "/xyz/", Status: 301},
@@ -258,7 +263,9 @@ func TestCalcRoutes(t *testing.T) {
 				},
 			),
 			Expected: []*HttpReply{
+				{Filepath: "public/folder2", Status: 200},
 				{Filepath: "public/folder2.html", Status: 200},
+				{Filepath: "public/folder", Status: 200},
 				{Filepath: "public/folder.html", Status: 200},
 				{Filepath: "/folder/", Status: 301},
 				{Filepath: "public/404.html", Status: 404},
@@ -278,6 +285,7 @@ func TestCalcRoutes(t *testing.T) {
 				},
 			),
 			Expected: []*HttpReply{
+				{Filepath: "public/folder2", Status: 200},
 				{Filepath: "public/folder2.html", Status: 200},
 				{Filepath: "/folder2/", Status: 301},
 				{Filepath: "public/404.html", Status: 404},
@@ -316,6 +324,7 @@ func TestCalcRoutes(t *testing.T) {
 				},
 			),
 			Expected: []*HttpReply{
+				{Filepath: "public/space", Status: 200},
 				{Filepath: "public/space.html", Status: 200},
 				{Filepath: "/frontier/", Status: 301},
 				{Filepath: "/space/", Status: 301},

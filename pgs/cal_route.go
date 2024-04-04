@@ -74,20 +74,17 @@ func checkIsRedirect(status int) bool {
 }
 
 func calcRoutes(projectName, fp string, userRedirects []*RedirectRule) []*HttpReply {
-	rts := expandRoute(projectName, fp, http.StatusOK)
 	fext := filepath.Ext(fp)
-	// add route as-is without expansion if there is a file ext
-	if fp != "" && fext != "" {
+	rts := []*HttpReply{}
+	// add route as-is without expansion
+	if fp != "" && !strings.HasSuffix(fp, "/") {
 		defRoute := shared.GetAssetFileName(&utils.FileEntry{
 			Filepath: filepath.Join(projectName, fp),
 		})
-
-		rts = append(rts,
-			&HttpReply{
-				Filepath: defRoute, Status: http.StatusOK,
-			},
-		)
+		rts = append(rts, &HttpReply{Filepath: defRoute, Status: http.StatusOK})
 	}
+	expts := expandRoute(projectName, fp, http.StatusOK)
+	rts = append(rts, expts...)
 
 	// user routes
 	for _, redirect := range userRedirects {
@@ -135,7 +132,7 @@ func calcRoutes(projectName, fp string, userRedirects []*RedirectRule) []*HttpRe
 
 	// filename without extension mean we might have a directory
 	// so add a trailing slash with a 301
-	if !strings.HasSuffix(fp, "/") && fp != "" && fext == "" {
+	if fp != "" && !strings.HasSuffix(fp, "/") && fext == "" {
 		redirectRoute := shared.GetAssetFileName(&utils.FileEntry{
 			Filepath: fp + "/",
 		})
