@@ -3,6 +3,7 @@ package pgs
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -73,6 +74,66 @@ func checkIsRedirect(status int) bool {
 	return status >= 300 && status <= 399
 }
 
+func correlatePlaceholder(orig, pattern string) string {
+	origList := strings.Split(orig, "/")
+	patternList := strings.Split(pattern, "/")
+	nextList := []string{}
+	for idx, item := range patternList {
+		if strings.HasPrefix(item, ":") {
+			nextList = append(nextList, origList[idx])
+		} else if item == origList[idx] {
+			nextList = append(nextList, origList[idx])
+		}
+	}
+	return filepath.Join(nextList...)
+}
+
+func genRedirectRoute(actual string, fromStr string, to string) string {
+	if to == "/" {
+		return to
+	}
+	actualList := strings.Split(actual, "/")
+	fromList := strings.Split(fromStr, "/")
+	prefix := ""
+	var toList []string
+	if hasProtocol(to) {
+		u, _ := url.Parse(to)
+		if u.Path == "" {
+			return to
+		}
+		toList = strings.Split(u.Path, "/")
+		prefix = u.Scheme + "://" + u.Host
+	} else {
+		toList = strings.Split(to, "/")
+	}
+
+	mapper := map[string]string{}
+	for idx, item := range fromList {
+		if strings.HasPrefix(item, ":") {
+			mapper[item] = actualList[idx]
+		}
+		if item == "*" {
+			mapper[":splat"] = actualList[idx]
+		}
+	}
+
+	fin := []string{"/"}
+
+	for _, item := range toList {
+		if mapper[item] != "" {
+			fin = append(fin, mapper[item])
+		} else {
+			fin = append(fin, item)
+		}
+	}
+
+	result := prefix + filepath.Join(fin...)
+	if strings.HasSuffix(to, "/") {
+		result += "/"
+	}
+	return result
+}
+
 func calcRoutes(projectName, fp string, userRedirects []*RedirectRule) []*HttpReply {
 	rts := []*HttpReply{}
 	// add route as-is without expansion
@@ -87,32 +148,33 @@ func calcRoutes(projectName, fp string, userRedirects []*RedirectRule) []*HttpRe
 
 	// user routes
 	for _, redirect := range userRedirects {
-		// this doesn't make sense and it forbidden
+		// this doesn't make sense so it is forbidden
 		if redirect.From == redirect.To {
 			continue
 		}
 
-		from := redirect.From
-		if !strings.HasSuffix(redirect.From, "*") {
-			from = strings.TrimSuffix(redirect.From, "/") + "/?"
-		}
-		rr := regexp.MustCompile(from)
+		// hack: make suffix `/` optional when matching
+		from := filepath.Clean(redirect.From)
+		fromMatcher := correlatePlaceholder(fp, from)
+		rr := regexp.MustCompile(fromMatcher)
 		match := rr.FindStringSubmatch(fp)
 		if len(match) > 0 {
 			isRedirect := checkIsRedirect(redirect.Status)
-			if !isRedirect {
+			if !isRedirect && !hasProtocol(redirect.To) {
+				route := genRedirectRoute(fp, from, redirect.To)
 				// wipe redirect rules to prevent infinite loops
 				// as such we only support a single hop for user defined redirects
-				redirectRoutes := calcRoutes(projectName, redirect.To, []*RedirectRule{})
+				redirectRoutes := calcRoutes(projectName, route, []*RedirectRule{})
 				rts = append(rts, redirectRoutes...)
 				return rts
 			}
 
+			route := genRedirectRoute(fp, from, redirect.To)
 			userReply := []*HttpReply{}
 			var rule *HttpReply
 			if redirect.To != "" {
 				rule = &HttpReply{
-					Filepath: redirect.To,
+					Filepath: route,
 					Status:   redirect.Status,
 					Query:    redirect.Query,
 				}
@@ -124,8 +186,14 @@ func calcRoutes(projectName, fp string, userRedirects []*RedirectRule) []*HttpRe
 			} else {
 				rts = append(rts, userReply...)
 			}
-			// quit after first match
-			break
+
+			if hasProtocol(redirect.To) {
+				// redirecting to another site so we should bail early
+				return rts
+			} else {
+				// quit after first match
+				break
+			}
 		}
 	}
 
