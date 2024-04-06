@@ -31,6 +31,7 @@ require (
 	github.com/picosh/pobj v0.0.0-20240218150308-1dc70e819bbf
 	github.com/picosh/ptun v0.0.0-20240313192814-d0ca401937fe
 	github.com/picosh/send v0.0.0-20240217194807-77b972121e63
+	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06
 	github.com/sendgrid/sendgrid-go v3.13.0+incompatible
 	github.com/simplesurance/go-ip-anonymizer v0.0.0-20200429124537-35a880f8e87d
 	github.com/stripe/stripe-go/v75 v75.11.0

@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
@@ -20,11 +19,30 @@ import (
 	"github.com/picosh/pobj"
 	sst "github.com/picosh/pobj/storage"
 	"github.com/picosh/send/send/utils"
+	"github.com/sabhiram/go-gitignore"
 )
 
 type ctxBucketKey struct{}
 type ctxStorageSizeKey struct{}
 type ctxProjectKey struct{}
+type ctxDenylistKey struct{}
+
+type DenyList struct {
+	Denylist string
+}
+
+func getDenylist(s ssh.Session) *DenyList {
+	v := s.Context().Value(ctxDenylistKey{})
+	if v == nil {
+		return nil
+	}
+	denylist := s.Context().Value(ctxDenylistKey{}).(*DenyList)
+	return denylist
+}
+
+func setDenylist(s ssh.Session, denylist string) {
+	s.Context().SetValue(ctxDenylistKey{}, &DenyList{Denylist: denylist})
+}
 
 func getProject(s ssh.Session) *db.Project {
 	v := s.Context().Value(ctxProjectKey{})
@@ -33,6 +51,10 @@ func getProject(s ssh.Session) *db.Project {
 	}
 	project := s.Context().Value(ctxProjectKey{}).(*db.Project)
 	return project
+}
+
+func setProject(s ssh.Session, project *db.Project) {
+	s.Context().SetValue(ctxProjectKey{}, project)
 }
 
 func getBucket(s ssh.Session) (sst.Bucket, error) {
@@ -59,6 +81,11 @@ func incrementStorageSize(s ssh.Session, fileSize int64) uint64 {
 	return nextStorageSize
 }
 
+func shouldIgnoreFile(fp, ignoreStr string) bool {
+	object := ignore.CompileIgnoreLines(strings.Split(ignoreStr, "\n")...)
+	return object.MatchesPath(fp)
+}
+
 type FileData struct {
 	*utils.FileEntry
 	Text          []byte
@@ -67,6 +94,8 @@ type FileData struct {
 	StorageSize   uint64
 	FeatureFlag   *db.FeatureFlag
 	DeltaFileSize int64
+	Project       *db.Project
+	DenyList      string
 }
 
 type UploadAssetHandler struct {
@@ -224,12 +253,34 @@ func (h *UploadAssetHandler) Validate(s ssh.Session) error {
 	return nil
 }
 
+func (h *UploadAssetHandler) findDenylist(bucket sst.Bucket, project *db.Project, logger *slog.Logger) (string, error) {
+	fp, _, _, err := h.Storage.GetObject(bucket, filepath.Join(project.ProjectDir, "_pgs_ignore"))
+	if err != nil {
+		return "", fmt.Errorf("_pgs_ignore not found")
+	}
+
+	defer fp.Close()
+	buf := new(strings.Builder)
+	_, err = io.Copy(buf, fp)
+	if err != nil {
+		logger.Error("io copy", "err", err.Error())
+		return "", err
+	}
+
+	str := buf.String()
+	return str, nil
+}
+
 func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (string, error) {
 	user, err := futil.GetUser(s)
 	if err != nil {
-		h.Cfg.Logger.Error(err.Error())
+		h.Cfg.Logger.Error("user not found in ctx", "err", err.Error())
 		return "", err
 	}
+	logger := h.GetLogger().With(
+		"user", user.Name,
+		"file", entry.Filepath,
+	)
 
 	var origText []byte
 	if b, err := io.ReadAll(entry.Reader); err == nil {
@@ -242,35 +293,36 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 
 	bucket, err := getBucket(s)
 	if err != nil {
-		h.Cfg.Logger.Error(err.Error())
+		logger.Error("could not find bucket in ctx", "err", err.Error())
 		return "", err
 	}
 
-	hasProject := getProject(s)
+	project := getProject(s)
 	projectName := shared.GetProjectName(entry)
+	logger = logger.With("project", projectName)
 
 	// find, create, or update project if we haven't already done it
-	if hasProject == nil {
-		project, err := h.DBPool.FindProjectByName(user.ID, projectName)
+	if project == nil {
+		project, err = h.DBPool.FindProjectByName(user.ID, projectName)
 		if err == nil {
 			err = h.DBPool.UpdateProject(user.ID, projectName)
 			if err != nil {
-				h.Cfg.Logger.Error("could not update project", "err", err.Error())
+				logger.Error("could not update project", "err", err.Error())
 				return "", err
 			}
 		} else {
 			_, err = h.DBPool.InsertProject(user.ID, projectName, projectName)
 			if err != nil {
-				h.Cfg.Logger.Error("could not create project", "err", err.Error())
+				logger.Error("could not create project", "err", err.Error())
 				return "", err
 			}
 			project, err = h.DBPool.FindProjectByName(user.ID, projectName)
 			if err != nil {
-				h.Cfg.Logger.Error("could not find project", "err", err.Error())
+				logger.Error("could not find project", "err", err.Error())
 				return "", err
 			}
 		}
-		s.Context().SetValue(ctxProjectKey{}, project)
+		setProject(s, project)
 	}
 
 	storageSize := getStorageSize(s)
@@ -284,6 +336,17 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 	curFileSize, _ := h.Storage.GetObjectSize(bucket, assetFilename)
 	deltaFileSize := curFileSize - entry.Size
 
+	denylist := getDenylist(s)
+	if denylist == nil {
+		dlist, err := h.findDenylist(bucket, project, logger)
+		if err != nil {
+			logger.Info("failed to get denylist, setting default (.*)", "err", err.Error())
+			dlist = ".*"
+		}
+		setDenylist(s, dlist)
+		denylist = &DenyList{Denylist: dlist}
+	}
+
 	data := &FileData{
 		FileEntry:     entry,
 		User:          user,
@@ -292,10 +355,18 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 		StorageSize:   storageSize,
 		FeatureFlag:   featureFlag,
 		DeltaFileSize: deltaFileSize,
+		DenyList:      denylist.Denylist,
+		Project:       project,
 	}
+
+	valid, err := h.validateAsset(data)
+	if !valid {
+		return "", err
+	}
+
 	err = h.writeAsset(data)
 	if err != nil {
-		h.Cfg.Logger.Error(err.Error())
+		logger.Error(err.Error())
 		return "", err
 	}
 	nextStorageSize := incrementStorageSize(s, deltaFileSize)
@@ -356,37 +427,28 @@ func (h *UploadAssetHandler) validateAsset(data *FileData) (bool, error) {
 		}
 	}
 
-	// special file we use for custom routing
-	if fname == "_redirects" || fname == "_headers" || fname == "LICENSE" {
+	// special files we use for custom routing
+	if fname == "_pgs_ignore" || fname == "_redirects" || fname == "_headers" {
 		return true, nil
 	}
 
-	dotFileRe := regexp.MustCompile(`/\..+`)
-	// TODO: let user control this list somehow
-	denylist := []*regexp.Regexp{dotFileRe}
-	for _, denyRe := range denylist {
-		if denyRe.MatchString(data.Filepath) {
-			err := fmt.Errorf(
-				"ERROR: (%s) file rejected, https://pico.sh/pgs#file-denylist",
-				data.Filepath,
-			)
-			return false, err
-		}
+	fpath := strings.Replace(data.Filepath, "/"+projectName, "", 1)
+	if shouldIgnoreFile(fpath, data.DenyList) {
+		err := fmt.Errorf(
+			"ERROR: (%s) file rejected, https://pico.sh/pgs#file-denylist",
+			data.Filepath,
+		)
+		return false, err
 	}
 
 	return true, nil
 }
 
 func (h *UploadAssetHandler) writeAsset(data *FileData) error {
-	valid, err := h.validateAsset(data)
-	if !valid {
-		return err
-	}
-
-	assetFilename := shared.GetAssetFileName(data.FileEntry)
+	assetFilepath := shared.GetAssetFileName(data.FileEntry)
 
 	if data.Size == 0 {
-		err = h.Storage.DeleteObject(data.Bucket, assetFilename)
+		err := h.Storage.DeleteObject(data.Bucket, assetFilepath)
 		if err != nil {
 			return err
 		}
@@ -397,12 +459,12 @@ func (h *UploadAssetHandler) writeAsset(data *FileData) error {
 			"uploading file to bucket",
 			"user", data.User.Name,
 			"bucket", data.Bucket.Name,
-			"filename", assetFilename,
+			"filename", assetFilepath,
 		)
 
 		_, err := h.Storage.PutObject(
 			data.Bucket,
-			assetFilename,
+			assetFilepath,
 			utils.NopReaderAtCloser(reader),
 			data.FileEntry,
 		)
