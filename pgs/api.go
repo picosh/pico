@@ -35,7 +35,7 @@ type AssetHandler struct {
 	UserID         string
 	Bucket         sst.Bucket
 	ImgProcessOpts *storage.ImgProcessOpts
-	ProjectID      string
+	Project        *db.Project
 }
 
 func checkHandler(w http.ResponseWriter, r *http.Request) {
@@ -166,25 +166,69 @@ func hasProtocol(url string) bool {
 	return isFullUrl
 }
 
-func (h *AssetHandler) handle(w http.ResponseWriter, r *http.Request) {
+func (h *AssetHandler) findRedirects() ([]*RedirectRule, error) {
 	var redirects []*RedirectRule
-	redirectFp, _, _, err := h.Storage.GetObject(h.Bucket, filepath.Join(h.ProjectDir, "_redirects"))
-	if err == nil {
-		defer redirectFp.Close()
-		buf := new(strings.Builder)
-		_, err := io.Copy(buf, redirectFp)
-		if err != nil {
-			h.Logger.Error("io copy", "err", err.Error())
-			http.Error(w, "cannot read _redirects file", http.StatusInternalServerError)
-			return
-		}
+	str := ""
 
-		redirects, err = parseRedirectText(buf.String())
-		if err != nil {
-			h.Logger.Error("could not parse redirect text", "err", err.Error())
+	if h.Project != nil && h.Project.Config.Redirects != "" {
+		str = h.Project.Config.Redirects
+	} else {
+		// backwards compat: some people already have a _redirects file so just use that
+		redirectFp, _, _, err := h.Storage.GetObject(h.Bucket, filepath.Join(h.ProjectDir, "_redirects"))
+		if err == nil {
+			defer redirectFp.Close()
+			buf := new(strings.Builder)
+			_, err := io.Copy(buf, redirectFp)
+			if err != nil {
+				h.Logger.Error("io copy", "err", err.Error())
+				return redirects, err
+			}
+			str = buf.String()
 		}
 	}
 
+	redirects, err := parseRedirectText(str)
+	if err != nil {
+		h.Logger.Error("could not parse redirect text", "err", err.Error())
+	}
+
+	return redirects, nil
+}
+
+func (h *AssetHandler) findHeaders() ([]*HeaderRule, error) {
+	var headers []*HeaderRule
+	str := ""
+
+	if h.Project != nil && h.Project.Config.Headers != "" {
+		str = h.Project.Config.Headers
+	} else {
+		// backwards compat: some people already have a _headers file so just use that
+		headersFp, _, _, err := h.Storage.GetObject(h.Bucket, filepath.Join(h.ProjectDir, "_headers"))
+		if err == nil {
+			defer headersFp.Close()
+			buf := new(strings.Builder)
+			_, err := io.Copy(buf, headersFp)
+			if err != nil {
+				h.Logger.Error("io copy", "err", err.Error())
+				return headers, err
+			}
+			str = buf.String()
+		}
+	}
+
+	headers, err := parseHeaderText(str)
+	if err != nil {
+		h.Logger.Error("could not parse header text", "err", err.Error())
+	}
+
+	return headers, nil
+}
+
+func (h *AssetHandler) handle(w http.ResponseWriter, r *http.Request) {
+	redirects, err := h.findRedirects()
+	if err != nil {
+		http.Error(w, "cannot read _redirects file", http.StatusInternalServerError)
+	}
 	routes := calcRoutes(h.ProjectDir, h.Filepath, redirects)
 
 	var contents io.ReadCloser
@@ -245,7 +289,9 @@ func (h *AssetHandler) handle(w http.ResponseWriter, r *http.Request) {
 		ch := shared.GetAnalyticsQueue(r)
 		view, err := shared.AnalyticsVisitFromRequest(r, h.UserID, h.Cfg.Secret)
 		if err == nil {
-			view.ProjectID = h.ProjectID
+			if h.Project != nil {
+				view.ProjectID = h.Project.ID
+			}
 			view.Status = http.StatusNotFound
 			ch <- view
 		} else {
@@ -262,22 +308,9 @@ func (h *AssetHandler) handle(w http.ResponseWriter, r *http.Request) {
 		contentType = storage.GetMimeType(assetFilepath)
 	}
 
-	var headers []*HeaderRule
-	headersFp, _, _, err := h.Storage.GetObject(h.Bucket, filepath.Join(h.ProjectDir, "_headers"))
-	if err == nil {
-		defer headersFp.Close()
-		buf := new(strings.Builder)
-		_, err := io.Copy(buf, headersFp)
-		if err != nil {
-			h.Logger.Error("io copy", "err", err.Error())
-			http.Error(w, "cannot read _headers file", http.StatusInternalServerError)
-			return
-		}
-
-		headers, err = parseHeaderText(buf.String())
-		if err != nil {
-			h.Logger.Error("could not parse header text", "err", err.Error())
-		}
+	headers, err := h.findHeaders()
+	if err != nil {
+		http.Error(w, "cannot read _headers file", http.StatusInternalServerError)
 	}
 
 	userHeaders := []*HeaderLine{}
@@ -304,7 +337,9 @@ func (h *AssetHandler) handle(w http.ResponseWriter, r *http.Request) {
 		ch := shared.GetAnalyticsQueue(r)
 		view, err := shared.AnalyticsVisitFromRequest(r, h.UserID, h.Cfg.Secret)
 		if err == nil {
-			view.ProjectID = h.ProjectID
+			if h.Project != nil {
+				view.ProjectID = h.Project.ID
+			}
 			ch <- view
 		} else {
 			if !errors.Is(err, shared.ErrAnalyticsDisabled) {
@@ -371,28 +406,30 @@ func ServeAsset(fname string, opts *storage.ImgProcessOpts, fromImgs bool, hasPe
 		return
 	}
 
-	projectID := ""
-	// TODO: this could probably be cleaned up more
-	// imgs wont have a project directory
-	projectDir := ""
+	var project *db.Project
 	var bucket sst.Bucket
 	// imgs has a different bucket directory
 	if fromImgs {
 		bucket, err = st.GetBucket(shared.GetImgsBucketName(user.ID))
 	} else {
 		bucket, err = st.GetBucket(shared.GetAssetBucketName(user.ID))
-		project, err := dbpool.FindProjectByName(user.ID, props.ProjectName)
 		if err != nil {
-			logger.Info(
-				"project not found",
-				"projectName", props.ProjectName,
+			logger.Error(
+				"bucket not found",
 			)
 			http.Error(w, "project not found", http.StatusNotFound)
 			return
 		}
 
-		projectID = project.ID
-		projectDir = project.ProjectDir
+		project, err = dbpool.FindProjectByName(user.ID, props.ProjectName)
+		if err != nil {
+			logger.Error(
+				"project not found",
+			)
+			http.Error(w, "project not found", http.StatusNotFound)
+			return
+		}
+
 		if !hasPerm(project) {
 			http.Error(w, "You do not have access to this site", http.StatusUnauthorized)
 			return
@@ -409,7 +446,6 @@ func ServeAsset(fname string, opts *storage.ImgProcessOpts, fromImgs bool, hasPe
 		Username:       props.Username,
 		UserID:         user.ID,
 		Subdomain:      subdomain,
-		ProjectDir:     projectDir,
 		Filepath:       fname,
 		Cfg:            cfg,
 		Dbpool:         dbpool,
@@ -417,7 +453,7 @@ func ServeAsset(fname string, opts *storage.ImgProcessOpts, fromImgs bool, hasPe
 		Logger:         logger,
 		Bucket:         bucket,
 		ImgProcessOpts: opts,
-		ProjectID:      projectID,
+		Project:        project,
 	}
 
 	asset.handle(w, r)

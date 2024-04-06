@@ -52,14 +52,15 @@ func (p *PostData) Scan(value interface{}) error {
 }
 
 type Project struct {
-	ID         string     `json:"id"`
-	UserID     string     `json:"user_id"`
-	Name       string     `json:"name"`
-	ProjectDir string     `json:"project_dir"`
-	Username   string     `json:"username"`
-	Acl        ProjectAcl `json:"acl"`
-	CreatedAt  *time.Time `json:"created_at"`
-	UpdatedAt  *time.Time `json:"updated_at"`
+	ID         string        `json:"id"`
+	UserID     string        `json:"user_id"`
+	Name       string        `json:"name"`
+	ProjectDir string        `json:"project_dir"`
+	Username   string        `json:"username"`
+	Acl        ProjectAcl    `json:"acl"`
+	Config     ProjectConfig `json:"config"`
+	CreatedAt  *time.Time    `json:"created_at"`
+	UpdatedAt  *time.Time    `json:"updated_at"`
 }
 
 type ProjectAcl struct {
@@ -76,6 +77,29 @@ func (p ProjectAcl) Value() (driver.Value, error) {
 // Make the Attrs struct implement the sql.Scanner interface. This method
 // simply decodes a JSON-encoded value into the struct fields.
 func (p *ProjectAcl) Scan(value interface{}) error {
+	b, ok := value.([]byte)
+	if !ok {
+		return errors.New("type assertion to []byte failed")
+	}
+
+	return json.Unmarshal(b, &p)
+}
+
+type ProjectConfig struct {
+	Headers   string   `json:"headers"`
+	Redirects string   `json:"redirects"`
+	Denylist  []string `json:"denylist"`
+}
+
+// Make the Attrs struct implement the driver.Valuer interface. This method
+// simply returns the JSON-encoded representation of the struct.
+func (p ProjectConfig) Value() (driver.Value, error) {
+	return json.Marshal(p)
+}
+
+// Make the Attrs struct implement the sql.Scanner interface. This method
+// simply decodes a JSON-encoded value into the struct fields.
+func (p *ProjectConfig) Scan(value interface{}) error {
 	b, ok := value.([]byte)
 	if !ok {
 		return errors.New("type assertion to []byte failed")
@@ -384,6 +408,7 @@ type DB interface {
 	InsertProject(userID, name, projectDir string) (string, error)
 	UpdateProject(userID, name string) error
 	UpdateProjectAcl(userID, name string, acl ProjectAcl) error
+	UpdateProjectConfig(userID, name string, config ProjectConfig) error
 	LinkToProject(userID, projectID, projectDir string, commit bool) error
 	RemoveProject(projectID string) error
 	FindProjectByName(userID, name string) (*Project, error)

@@ -25,6 +25,20 @@ import (
 type ctxBucketKey struct{}
 type ctxStorageSizeKey struct{}
 type ctxProjectKey struct{}
+type ctxDenylistKey struct{}
+
+func getDenylist(s ssh.Session) []*regexp.Regexp {
+	v := s.Context().Value(ctxDenylistKey{})
+	if v == nil {
+		return nil
+	}
+	denylist := s.Context().Value(ctxDenylistKey{}).([]*regexp.Regexp)
+	return denylist
+}
+
+func setDenylist(s ssh.Session, denylist []*regexp.Regexp) {
+	s.Context().SetValue(ctxProjectKey{}, denylist)
+}
 
 func getProject(s ssh.Session) *db.Project {
 	v := s.Context().Value(ctxProjectKey{})
@@ -33,6 +47,10 @@ func getProject(s ssh.Session) *db.Project {
 	}
 	project := s.Context().Value(ctxProjectKey{}).(*db.Project)
 	return project
+}
+
+func setProject(s ssh.Session, project *db.Project) {
+	s.Context().SetValue(ctxProjectKey{}, project)
 }
 
 func getBucket(s ssh.Session) (sst.Bucket, error) {
@@ -67,6 +85,8 @@ type FileData struct {
 	StorageSize   uint64
 	FeatureFlag   *db.FeatureFlag
 	DeltaFileSize int64
+	Project       *db.Project
+	DenyList      []*regexp.Regexp
 }
 
 type UploadAssetHandler struct {
@@ -227,9 +247,13 @@ func (h *UploadAssetHandler) Validate(s ssh.Session) error {
 func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (string, error) {
 	user, err := futil.GetUser(s)
 	if err != nil {
-		h.Cfg.Logger.Error(err.Error())
+		h.Cfg.Logger.Error("user not found in ctx", "err", err.Error())
 		return "", err
 	}
+	logger := h.GetLogger().With(
+		"user", user.Name,
+		"file", entry.Filepath,
+	)
 
 	var origText []byte
 	if b, err := io.ReadAll(entry.Reader); err == nil {
@@ -242,35 +266,36 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 
 	bucket, err := getBucket(s)
 	if err != nil {
-		h.Cfg.Logger.Error(err.Error())
+		logger.Error("could not find bucket in ctx", "err", err.Error())
 		return "", err
 	}
 
-	hasProject := getProject(s)
+	project := getProject(s)
 	projectName := shared.GetProjectName(entry)
+	logger = logger.With("project", projectName)
 
 	// find, create, or update project if we haven't already done it
-	if hasProject == nil {
-		project, err := h.DBPool.FindProjectByName(user.ID, projectName)
+	if project == nil {
+		project, err = h.DBPool.FindProjectByName(user.ID, projectName)
 		if err == nil {
 			err = h.DBPool.UpdateProject(user.ID, projectName)
 			if err != nil {
-				h.Cfg.Logger.Error("could not update project", "err", err.Error())
+				logger.Error("could not update project", "err", err.Error())
 				return "", err
 			}
 		} else {
 			_, err = h.DBPool.InsertProject(user.ID, projectName, projectName)
 			if err != nil {
-				h.Cfg.Logger.Error("could not create project", "err", err.Error())
+				logger.Error("could not create project", "err", err.Error())
 				return "", err
 			}
 			project, err = h.DBPool.FindProjectByName(user.ID, projectName)
 			if err != nil {
-				h.Cfg.Logger.Error("could not find project", "err", err.Error())
+				logger.Error("could not find project", "err", err.Error())
 				return "", err
 			}
 		}
-		s.Context().SetValue(ctxProjectKey{}, project)
+		setProject(s, project)
 	}
 
 	storageSize := getStorageSize(s)
@@ -284,6 +309,22 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 	curFileSize, _ := h.Storage.GetObjectSize(bucket, assetFilename)
 	deltaFileSize := curFileSize - entry.Size
 
+	denylist := getDenylist(s)
+	if len(denylist) == 0 {
+		for _, dd := range project.Config.Denylist {
+			rr, err := regexp.Compile(dd)
+			if err != nil {
+				logger.Error(
+					"invalid regex for denylist",
+					"err", err.Error(),
+				)
+				continue
+			}
+			denylist = append(denylist, rr)
+		}
+		setDenylist(s, denylist)
+	}
+
 	data := &FileData{
 		FileEntry:     entry,
 		User:          user,
@@ -292,10 +333,18 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 		StorageSize:   storageSize,
 		FeatureFlag:   featureFlag,
 		DeltaFileSize: deltaFileSize,
+		DenyList:      denylist,
+		Project:       project,
 	}
+
+	valid, err := h.validateAsset(data)
+	if !valid {
+		return "", err
+	}
+
 	err = h.writeAsset(data)
 	if err != nil {
-		h.Cfg.Logger.Error(err.Error())
+		logger.Error(err.Error())
 		return "", err
 	}
 	nextStorageSize := incrementStorageSize(s, deltaFileSize)
@@ -361,10 +410,7 @@ func (h *UploadAssetHandler) validateAsset(data *FileData) (bool, error) {
 		return true, nil
 	}
 
-	dotFileRe := regexp.MustCompile(`/\..+`)
-	// TODO: let user control this list somehow
-	denylist := []*regexp.Regexp{dotFileRe}
-	for _, denyRe := range denylist {
+	for _, denyRe := range data.DenyList {
 		if denyRe.MatchString(data.Filepath) {
 			err := fmt.Errorf(
 				"ERROR: (%s) file rejected, https://pico.sh/pgs#file-denylist",
@@ -378,15 +424,32 @@ func (h *UploadAssetHandler) validateAsset(data *FileData) (bool, error) {
 }
 
 func (h *UploadAssetHandler) writeAsset(data *FileData) error {
-	valid, err := h.validateAsset(data)
-	if !valid {
-		return err
-	}
+	assetFilepath := shared.GetAssetFileName(data.FileEntry)
+	fname := filepath.Base(assetFilepath)
 
-	assetFilename := shared.GetAssetFileName(data.FileEntry)
-
-	if data.Size == 0 {
-		err = h.Storage.DeleteObject(data.Bucket, assetFilename)
+	if fname == "_headers" {
+		config := data.Project.Config
+		config.Headers = string(data.Text)
+		err := h.DBPool.UpdateProjectConfig(data.User.ID, data.Project.Name, config)
+		if err != nil {
+			return err
+		}
+	} else if fname == "_redirects" {
+		config := data.Project.Config
+		config.Redirects = string(data.Text)
+		err := h.DBPool.UpdateProjectConfig(data.User.ID, data.Project.Name, config)
+		if err != nil {
+			return err
+		}
+	} else if fname == "_pgs_ignore" {
+		config := data.Project.Config
+		config.Denylist = strings.Split(string(data.Text), "\n")
+		err := h.DBPool.UpdateProjectConfig(data.User.ID, data.Project.Name, config)
+		if err != nil {
+			return err
+		}
+	} else if data.Size == 0 {
+		err := h.Storage.DeleteObject(data.Bucket, assetFilepath)
 		if err != nil {
 			return err
 		}
@@ -397,12 +460,12 @@ func (h *UploadAssetHandler) writeAsset(data *FileData) error {
 			"uploading file to bucket",
 			"user", data.User.Name,
 			"bucket", data.Bucket.Name,
-			"filename", assetFilename,
+			"filename", assetFilepath,
 		)
 
 		_, err := h.Storage.PutObject(
 			data.Bucket,
-			assetFilename,
+			assetFilepath,
 			utils.NopReaderAtCloser(reader),
 			data.FileEntry,
 		)

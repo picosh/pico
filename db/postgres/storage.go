@@ -247,6 +247,7 @@ const (
 
 	sqlInsertProject        = `INSERT INTO projects (user_id, name, project_dir) VALUES ($1, $2, $3) RETURNING id;`
 	sqlUpdateProject        = `UPDATE projects SET updated_at = $3 WHERE user_id = $1 AND name = $2;`
+	sqlUpdateProjectConfig  = `UPDATE projects SET config = $3, updated_at = $4 WHERE user_id = $1 AND name = $2;`
 	sqlUpdateProjectAcl     = `UPDATE projects SET acl = $3, updated_at = $4 WHERE user_id = $1 AND name = $2;`
 	sqlFindProjectByName    = `SELECT id, user_id, name, project_dir, acl, created_at, updated_at FROM projects WHERE user_id = $1 AND name = $2;`
 	sqlSelectProjectCount   = `SELECT count(id) FROM projects`
@@ -1585,6 +1586,11 @@ func (me *PsqlDB) UpdateProject(userID, name string) error {
 
 func (me *PsqlDB) UpdateProjectAcl(userID, name string, acl db.ProjectAcl) error {
 	_, err := me.Db.Exec(sqlUpdateProjectAcl, userID, name, acl, time.Now())
+	return err
+}
+
+func (me *PsqlDB) UpdateProjectConfig(userID, name string, config db.ProjectConfig) error {
+	_, err := me.Db.Exec(sqlUpdateProjectAcl, userID, name, config, time.Now())
 	return err
 }
 
