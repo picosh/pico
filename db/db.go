@@ -124,7 +124,6 @@ type Post struct {
 	Hidden      bool       `json:"hidden"`
 	Views       int        `json:"views"`
 	Space       string     `json:"space"`
-	Score       string     `json:"score"`
 	Shasum      string     `json:"shasum"`
 	FileSize    int        `json:"file_size"`
 	MimeType    string     `json:"mime_type"`

@@ -37,7 +37,6 @@ type PostItemData struct {
 	UpdatedAtISO   string
 	UpdatedTimeAgo string
 	Padding        string
-	Score          string
 }
 
 type BlogPageData struct {
@@ -584,7 +583,6 @@ func readHandler(w http.ResponseWriter, r *http.Request) {
 			PublishAtISO:   post.PublishAt.Format(time.RFC3339),
 			UpdatedTimeAgo: shared.TimeAgo(post.UpdatedAt),
 			UpdatedAtISO:   post.UpdatedAt.Format(time.RFC3339),
-			Score:          post.Score,
 		}
 		data.Posts = append(data.Posts, item)
 	}

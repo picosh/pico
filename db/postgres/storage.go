@@ -108,8 +108,7 @@ var (
 		publish_at,
 		app_users.name as username,
 		posts.updated_at,
-		posts.mime_type,
-		0 AS "score"
+		posts.mime_type
 	FROM posts
 	LEFT JOIN app_users ON app_users.id = posts.user_id
 	LEFT JOIN post_tags ON post_tags.post_id = posts.id
@@ -181,8 +180,7 @@ const (
 		publish_at,
 		app_users.name as username,
 		posts.updated_at,
-		posts.mime_type,
-		0 AS "score"
+		posts.mime_type
 	FROM posts
 	LEFT JOIN app_users ON app_users.id = posts.user_id
 	WHERE hidden = FALSE AND publish_at::date <= CURRENT_DATE AND cur_space = $3
@@ -200,21 +198,14 @@ const (
 		publish_at,
 		app_users.name as username,
 		posts.updated_at,
-		posts.mime_type,
-		(
-			LOG(2.0, COALESCE(NULLIF(posts.views, 0), 1)) / (
-				EXTRACT(
-					EPOCH FROM (STATEMENT_TIMESTAMP() - posts.publish_at)
-				) / (14 * 8600)
-			)
-		) AS "score"
+		posts.mime_type
 	FROM posts
 	LEFT JOIN app_users ON app_users.id = posts.user_id
 	WHERE
 		hidden = FALSE AND
 		publish_at::date <= CURRENT_DATE AND
 		cur_space = $3
-	ORDER BY score DESC
+	ORDER BY publish_at DESC
 	LIMIT $1 OFFSET $2`
 
 	sqlSelectPopularTags = `
@@ -772,7 +763,6 @@ func (me *PsqlDB) postPager(rs *sql.Rows, pageNum int, space string, tag string)
 			&post.Username,
 			&post.UpdatedAt,
 			&post.MimeType,
-			&post.Score,
 		)
 		if err != nil {
 			return nil, err
