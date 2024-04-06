@@ -167,26 +167,21 @@ func hasProtocol(url string) bool {
 }
 
 func (h *AssetHandler) findRedirects() ([]*RedirectRule, error) {
-	var redirects []*RedirectRule
-	str := ""
-
-	if h.Project != nil && h.Project.Config.Redirects != "" {
-		str = h.Project.Config.Redirects
-	} else {
-		// backwards compat: some people already have a _redirects file so just use that
-		redirectFp, _, _, err := h.Storage.GetObject(h.Bucket, filepath.Join(h.ProjectDir, "_redirects"))
-		if err == nil {
-			defer redirectFp.Close()
-			buf := new(strings.Builder)
-			_, err := io.Copy(buf, redirectFp)
-			if err != nil {
-				h.Logger.Error("io copy", "err", err.Error())
-				return redirects, err
-			}
-			str = buf.String()
-		}
+	// backwards compat: some people already have a _redirects file so just use that
+	redirectFp, _, _, err := h.Storage.GetObject(h.Bucket, filepath.Join(h.ProjectDir, "_redirects"))
+	if err != nil {
+		return []*RedirectRule{}, nil
 	}
 
+	defer redirectFp.Close()
+	buf := new(strings.Builder)
+	_, err = io.Copy(buf, redirectFp)
+	if err != nil {
+		h.Logger.Error("io copy", "err", err.Error())
+		return []*RedirectRule{}, err
+	}
+
+	str := buf.String()
 	redirects, err := parseRedirectText(str)
 	if err != nil {
 		h.Logger.Error("could not parse redirect text", "err", err.Error())
@@ -196,26 +191,19 @@ func (h *AssetHandler) findRedirects() ([]*RedirectRule, error) {
 }
 
 func (h *AssetHandler) findHeaders() ([]*HeaderRule, error) {
-	var headers []*HeaderRule
-	str := ""
-
-	if h.Project != nil && h.Project.Config.Headers != "" {
-		str = h.Project.Config.Headers
-	} else {
-		// backwards compat: some people already have a _headers file so just use that
-		headersFp, _, _, err := h.Storage.GetObject(h.Bucket, filepath.Join(h.ProjectDir, "_headers"))
-		if err == nil {
-			defer headersFp.Close()
-			buf := new(strings.Builder)
-			_, err := io.Copy(buf, headersFp)
-			if err != nil {
-				h.Logger.Error("io copy", "err", err.Error())
-				return headers, err
-			}
-			str = buf.String()
-		}
+	headersFp, _, _, err := h.Storage.GetObject(h.Bucket, filepath.Join(h.ProjectDir, "_headers"))
+	if err != nil {
+		return []*HeaderRule{}, nil
 	}
 
+	defer headersFp.Close()
+	buf := new(strings.Builder)
+	_, err = io.Copy(buf, headersFp)
+	if err != nil {
+		h.Logger.Error("io copy", "err", err.Error())
+		return []*HeaderRule{}, err
+	}
+	str := buf.String()
 	headers, err := parseHeaderText(str)
 	if err != nil {
 		h.Logger.Error("could not parse header text", "err", err.Error())

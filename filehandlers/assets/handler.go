@@ -27,17 +27,21 @@ type ctxStorageSizeKey struct{}
 type ctxProjectKey struct{}
 type ctxDenylistKey struct{}
 
-func getDenylist(s ssh.Session) []*regexp.Regexp {
+type DenyList struct {
+	Denylist []*regexp.Regexp
+}
+
+func getDenylist(s ssh.Session) *DenyList {
 	v := s.Context().Value(ctxDenylistKey{})
 	if v == nil {
 		return nil
 	}
-	denylist := s.Context().Value(ctxDenylistKey{}).([]*regexp.Regexp)
+	denylist := s.Context().Value(ctxDenylistKey{}).(*DenyList)
 	return denylist
 }
 
 func setDenylist(s ssh.Session, denylist []*regexp.Regexp) {
-	s.Context().SetValue(ctxProjectKey{}, denylist)
+	s.Context().SetValue(ctxProjectKey{}, &DenyList{Denylist: denylist})
 }
 
 func getProject(s ssh.Session) *db.Project {
@@ -244,6 +248,45 @@ func (h *UploadAssetHandler) Validate(s ssh.Session) error {
 	return nil
 }
 
+func (h *UploadAssetHandler) findDenylist(bucket sst.Bucket, project *db.Project, logger *slog.Logger) ([]*regexp.Regexp, error) {
+	denylist := []*regexp.Regexp{}
+	fp, _, _, err := h.Storage.GetObject(bucket, filepath.Join(project.ProjectDir, "_pgs_ignore"))
+	if err != nil {
+		return denylist, fmt.Errorf("_pgs_ignore not found")
+	}
+
+	defer fp.Close()
+	buf := new(strings.Builder)
+	_, err = io.Copy(buf, fp)
+	if err != nil {
+		logger.Error("io copy", "err", err.Error())
+		return denylist, err
+	}
+
+	str := buf.String()
+	items := strings.Split(str, "\n")
+	for _, dd := range items {
+		deny := strings.TrimSpace(dd)
+		if deny == "" {
+			continue
+		}
+		if deny == "!" {
+			return denylist, nil
+		}
+		rr, err := regexp.Compile(deny)
+		if err != nil {
+			logger.Error(
+				"invalid regex for denylist",
+				"err", err.Error(),
+			)
+			continue
+		}
+		denylist = append(denylist, rr)
+	}
+
+	return denylist, nil
+}
+
 func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (string, error) {
 	user, err := futil.GetUser(s)
 	if err != nil {
@@ -310,19 +353,15 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 	deltaFileSize := curFileSize - entry.Size
 
 	denylist := getDenylist(s)
-	if len(denylist) == 0 {
-		for _, dd := range project.Config.Denylist {
-			rr, err := regexp.Compile(dd)
-			if err != nil {
-				logger.Error(
-					"invalid regex for denylist",
-					"err", err.Error(),
-				)
-				continue
-			}
-			denylist = append(denylist, rr)
+	if denylist == nil {
+		dlist, err := h.findDenylist(bucket, project, logger)
+		if err != nil {
+			logger.Info("failed to get denylist, setting default", "err", err.Error())
+			defRe := regexp.MustCompile(`/\..+`)
+			dlist = []*regexp.Regexp{defRe}
 		}
-		setDenylist(s, denylist)
+		setDenylist(s, dlist)
+		denylist = &DenyList{Denylist: dlist}
 	}
 
 	data := &FileData{
@@ -333,7 +372,7 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 		StorageSize:   storageSize,
 		FeatureFlag:   featureFlag,
 		DeltaFileSize: deltaFileSize,
-		DenyList:      denylist,
+		DenyList:      denylist.Denylist,
 		Project:       project,
 	}
 
@@ -406,7 +445,7 @@ func (h *UploadAssetHandler) validateAsset(data *FileData) (bool, error) {
 	}
 
 	// special file we use for custom routing
-	if fname == "_redirects" || fname == "_headers" || fname == "LICENSE" {
+	if fname == "_pgs_ignore" || fname == "_redirects" || fname == "_headers" {
 		return true, nil
 	}
 
@@ -425,30 +464,8 @@ func (h *UploadAssetHandler) validateAsset(data *FileData) (bool, error) {
 
 func (h *UploadAssetHandler) writeAsset(data *FileData) error {
 	assetFilepath := shared.GetAssetFileName(data.FileEntry)
-	fname := filepath.Base(assetFilepath)
 
-	if fname == "_headers" {
-		config := data.Project.Config
-		config.Headers = string(data.Text)
-		err := h.DBPool.UpdateProjectConfig(data.User.ID, data.Project.Name, config)
-		if err != nil {
-			return err
-		}
-	} else if fname == "_redirects" {
-		config := data.Project.Config
-		config.Redirects = string(data.Text)
-		err := h.DBPool.UpdateProjectConfig(data.User.ID, data.Project.Name, config)
-		if err != nil {
-			return err
-		}
-	} else if fname == "_pgs_ignore" {
-		config := data.Project.Config
-		config.Denylist = strings.Split(string(data.Text), "\n")
-		err := h.DBPool.UpdateProjectConfig(data.User.ID, data.Project.Name, config)
-		if err != nil {
-			return err
-		}
-	} else if data.Size == 0 {
+	if data.Size == 0 {
 		err := h.Storage.DeleteObject(data.Bucket, assetFilepath)
 		if err != nil {
 			return err
