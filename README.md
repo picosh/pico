@@ -4,7 +4,7 @@ Read our docs at [pico.sh](https://pico.sh).
 
 ## development
 
-- `golang` >= 1.21.0
+- `golang` >= 1.22.0
 - `direnv` to load environment vars
 
 ```bash
