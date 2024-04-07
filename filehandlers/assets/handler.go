@@ -19,7 +19,7 @@ import (
 	"github.com/picosh/pobj"
 	sst "github.com/picosh/pobj/storage"
 	"github.com/picosh/send/send/utils"
-	"github.com/sabhiram/go-gitignore"
+	ignore "github.com/sabhiram/go-gitignore"
 )
 
 type ctxBucketKey struct{}
