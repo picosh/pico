@@ -14,7 +14,7 @@ import (
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
-	"github.com/picosh/pico/wish/cms/ui/common"
+	"github.com/picosh/pico/tui/common"
 )
 
 func styleRows(styles common.Styles) func(row, col int) lipgloss.Style {

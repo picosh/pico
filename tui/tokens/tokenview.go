@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/picosh/pico/db"
-	"github.com/picosh/pico/wish/cms/ui/common"
+	"github.com/picosh/pico/tui/common"
 )
 
 type styledKey struct {

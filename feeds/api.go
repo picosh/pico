@@ -77,7 +77,6 @@ func StartApiServer() {
 		"Starting server on port",
 		"port", cfg.Port,
 		"domain", cfg.Domain,
-		"email", cfg.Email,
 	)
 
 	logger.Error(http.ListenAndServe(portStr, router).Error())

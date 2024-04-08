@@ -12,7 +12,7 @@ import (
 	"github.com/picosh/pico/db"
 	uploadassets "github.com/picosh/pico/filehandlers/assets"
 	"github.com/picosh/pico/shared"
-	"github.com/picosh/pico/wish/cms/ui/common"
+	"github.com/picosh/pico/tui/common"
 	"github.com/picosh/send/send/utils"
 )
 

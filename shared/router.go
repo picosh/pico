@@ -111,7 +111,7 @@ func findRouteConfig(r *http.Request, routes []Route, subdomainRoutes []Route, c
 
 	if cfg.IsCustomdomains() || cfg.IsSubdomains() {
 		hostDomain := strings.ToLower(strings.Split(r.Host, ":")[0])
-		appDomain := strings.ToLower(strings.Split(cfg.ConfigCms.Domain, ":")[0])
+		appDomain := strings.ToLower(strings.Split(cfg.Domain, ":")[0])
 
 		if hostDomain != appDomain {
 			if strings.Contains(hostDomain, appDomain) {

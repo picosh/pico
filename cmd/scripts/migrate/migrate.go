@@ -9,7 +9,7 @@ import (
 
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
-	"github.com/picosh/pico/wish/cms/config"
+	"github.com/picosh/pico/shared"
 )
 
 func findPosts(dbpool *sql.DB) ([]*db.Post, error) {
@@ -101,17 +101,17 @@ type ConflictData struct {
 func main() {
 	logger := slog.Default()
 
-	listsCfg := config.NewConfigCms()
+	listsCfg := shared.NewConfigSite()
 	listsCfg.Logger = logger
 	listsCfg.DbURL = os.Getenv("LISTS_DB_URL")
 	listsDb := postgres.NewDB(listsCfg.DbURL, listsCfg.Logger)
 
-	proseCfg := config.NewConfigCms()
+	proseCfg := shared.NewConfigSite()
 	proseCfg.DbURL = os.Getenv("PROSE_DB_URL")
 	proseCfg.Logger = logger
 	proseDb := postgres.NewDB(proseCfg.DbURL, proseCfg.Logger)
 
-	picoCfg := config.NewConfigCms()
+	picoCfg := shared.NewConfigSite()
 	picoCfg.Logger = logger
 	picoCfg.DbURL = os.Getenv("PICO_DB_URL")
 	picoDb := postgres.NewDB(picoCfg.DbURL, picoCfg.Logger)

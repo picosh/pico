@@ -1,20 +1,20 @@
 {{template "base" .}}
 
-{{define "title"}}{{.Site.Domain}} -- {{.Site.Description}}{{end}}
+{{define "title"}}{{.Site.Domain}} -- A zero-install static site hosting service for hackers{{end}}
 
 {{define "meta"}}
-<meta name="description" content="{{.Site.Description}}" />
+<meta name="description" content="A zero-install static site hosting service for hackers" />
 
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="{{.Site.Domain}}">
 <meta property="og:url" content="https://{{.Site.Domain}}">
 <meta property="og:title" content="{{.Site.Domain}}">
-<meta property="og:description" content="{{.Site.Description}}">
+<meta property="og:description" content="A zero-install static site hosting service for hackers">
 
 <meta name="twitter:card" content="summary" />
 <meta property="twitter:url" content="https://{{.Site.Domain}}">
 <meta property="twitter:title" content="{{.Site.Domain}}">
-<meta property="twitter:description" content="{{.Site.Description}}">
+<meta property="twitter:description" content="A zero-install static site hosting service for hackers">
 <meta name="twitter:image" content="https://{{.Site.Domain}}/card.png" />
 <meta name="twitter:image:src" content="https://{{.Site.Domain}}/card.png" />
 

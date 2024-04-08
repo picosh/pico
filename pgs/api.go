@@ -45,7 +45,7 @@ func checkHandler(w http.ResponseWriter, r *http.Request) {
 
 	if cfg.IsCustomdomains() {
 		hostDomain := r.URL.Query().Get("domain")
-		appDomain := strings.Split(cfg.ConfigCms.Domain, ":")[0]
+		appDomain := strings.Split(cfg.Domain, ":")[0]
 
 		if !strings.Contains(hostDomain, appDomain) {
 			subdomain := shared.GetCustomDomain(hostDomain, cfg.Space)
@@ -514,7 +514,6 @@ func StartApiServer() {
 		"Starting server on port",
 		"port", cfg.Port,
 		"domain", cfg.Domain,
-		"email", cfg.Email,
 	)
 	err = http.ListenAndServe(portStr, router)
 	logger.Error(

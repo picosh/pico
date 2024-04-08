@@ -11,14 +11,12 @@ import (
 	"github.com/charmbracelet/promwish"
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
-	bm "github.com/charmbracelet/wish/bubbletea"
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/filehandlers"
 	uploadimgs "github.com/picosh/pico/filehandlers/imgs"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
 	wsh "github.com/picosh/pico/wish"
-	"github.com/picosh/pico/wish/cms"
 	"github.com/picosh/send/list"
 	"github.com/picosh/send/pipe"
 	"github.com/picosh/send/proxy"
@@ -42,7 +40,7 @@ func createRouter(handler *filehandlers.FileHandlerRouter) proxy.Router {
 			scp.Middleware(handler),
 			wishrsync.Middleware(handler),
 			auth.Middleware(handler),
-			wsh.PtyMdw(bm.Middleware(cms.Middleware(&handler.Cfg.ConfigCms, handler.Cfg))),
+			wsh.PtyMdw(wsh.DeprecatedNotice()),
 			wsh.LogMiddleware(handler.GetLogger()),
 		}
 	}

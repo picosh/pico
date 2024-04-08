@@ -9,15 +9,13 @@ import (
 	"os"
 	"path"
 	"strings"
-
-	"github.com/picosh/pico/wish/cms/config"
 )
 
+var DefaultEmail = "hello@pico.sh"
+
 type SitePageData struct {
-	Domain      template.URL
-	HomeURL     template.URL
-	Email       string
-	Description string
+	Domain  template.URL
+	HomeURL template.URL
 }
 
 type PageData struct {
@@ -25,14 +23,27 @@ type PageData struct {
 }
 
 type ConfigSite struct {
-	config.ConfigCms
-	config.ConfigURL
-	Debug                bool
-	SubdomainsEnabled    bool
-	CustomdomainsEnabled bool
-	SendgridKey          string
-	UseImgProxy          bool
-	Secret               string
+	Debug        bool
+	SendgridKey  string
+	Secret       string
+	Domain       string
+	Port         string
+	Protocol     string
+	DbURL        string
+	StorageDir   string
+	MinioURL     string
+	MinioUser    string
+	MinioPass    string
+	Space        string
+	AllowedExt   []string
+	HiddenPosts  []string
+	MaxSize      uint64
+	MaxAssetSize int64
+	Logger       *slog.Logger
+}
+
+func NewConfigSite() *ConfigSite {
+	return &ConfigSite{}
 }
 
 type CreateURL struct {
@@ -69,19 +80,17 @@ func CreateURLFromRequest(cfg *ConfigSite, r *http.Request) *CreateURL {
 
 func (c *ConfigSite) GetSiteData() *SitePageData {
 	return &SitePageData{
-		Domain:      template.URL(c.Domain),
-		HomeURL:     template.URL(c.HomeURL()),
-		Email:       c.Email,
-		Description: c.Description,
+		Domain:  template.URL(c.Domain),
+		HomeURL: template.URL(c.HomeURL()),
 	}
 }
 
 func (c *ConfigSite) IsSubdomains() bool {
-	return c.SubdomainsEnabled
+	return true
 }
 
 func (c *ConfigSite) IsCustomdomains() bool {
-	return c.CustomdomainsEnabled
+	return true
 }
 
 func (c *ConfigSite) HomeURL() string {

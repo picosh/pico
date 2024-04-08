@@ -53,7 +53,7 @@ func CheckHandler(w http.ResponseWriter, r *http.Request) {
 
 	if cfg.IsCustomdomains() {
 		hostDomain := r.URL.Query().Get("domain")
-		appDomain := strings.Split(cfg.ConfigCms.Domain, ":")[0]
+		appDomain := strings.Split(cfg.Domain, ":")[0]
 
 		if !strings.Contains(hostDomain, appDomain) {
 			subdomain := GetCustomDomain(hostDomain, cfg.Space)

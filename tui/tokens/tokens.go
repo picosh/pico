@@ -1,15 +1,12 @@
 package tokens
 
 import (
-	"fmt"
-
 	pager "github.com/charmbracelet/bubbles/paginator"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/picosh/pico/db"
-	"github.com/picosh/pico/wish/cms/config"
-	"github.com/picosh/pico/wish/cms/ui/common"
-	"github.com/picosh/pico/wish/cms/ui/createtoken"
+	"github.com/picosh/pico/tui/common"
+	"github.com/picosh/pico/tui/createtoken"
 )
 
 const keysPerPage = 4
@@ -45,7 +42,6 @@ type (
 
 // Model is the Tea state model for this user interface.
 type Model struct {
-	cfg            *config.ConfigCms
 	dbpool         db.DB
 	user           *db.User
 	styles         common.Styles
@@ -80,14 +76,13 @@ func (m *Model) UpdatePaging(msg tea.Msg) {
 }
 
 // NewModel creates a new model with defaults.
-func NewModel(styles common.Styles, cfg *config.ConfigCms, dbpool db.DB, user *db.User) Model {
+func NewModel(styles common.Styles, dbpool db.DB, user *db.User) Model {
 	p := pager.New()
 	p.PerPage = keysPerPage
 	p.Type = pager.Dots
 	p.InactiveDot = styles.InactivePagination.Render("•")
 
 	return Model{
-		cfg:            cfg,
 		dbpool:         dbpool,
 		user:           user,
 		styles:         styles,
@@ -207,7 +202,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch m.state {
 	case stateNormal:
-		m.createKey = createtoken.NewModel(m.styles, m.cfg, m.dbpool, m.user)
+		m.createKey = createtoken.NewModel(m.styles, m.dbpool, m.user)
 	case stateDeletingKey:
 		// If an item is being confirmed for delete, any key (other than the key
 		// used for confirmation above) cancels the deletion
@@ -240,7 +235,7 @@ func updateChildren(msg tea.Msg, m Model) (Model, tea.Cmd) {
 		m.createKey = createKeyModel
 		cmd = newCmd
 		if m.createKey.Done {
-			m.createKey = createtoken.NewModel(m.styles, m.cfg, m.dbpool, m.user) // reset the state
+			m.createKey = createtoken.NewModel(m.styles, m.dbpool, m.user) // reset the state
 			m.state = stateNormal
 		} else if m.createKey.Quit {
 			m.state = stateQuitting
@@ -264,7 +259,7 @@ func (m Model) View() string {
 	case stateLoading:
 		s = m.spinner.View() + " Loading...\n\n"
 	case stateQuitting:
-		s = fmt.Sprintf("Thanks for using %s!\n", m.cfg.Domain)
+		s = "Thanks for using pico.sh!\n"
 	case stateCreateKey:
 		s = m.createKey.View()
 	default:

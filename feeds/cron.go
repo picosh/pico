@@ -383,7 +383,7 @@ func (f *Fetcher) SendEmail(username, email string, subject string, msg *MsgBody
 		return fmt.Errorf("(%s) does not have an email associated with their feed post", username)
 	}
 
-	from := mail.NewEmail("team pico", f.cfg.Email)
+	from := mail.NewEmail("team pico", shared.DefaultEmail)
 	to := mail.NewEmail(username, email)
 
 	// f.cfg.Logger.Infof("message body (%s)", plainTextContent)

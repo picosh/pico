@@ -16,6 +16,7 @@ import (
 	uploadassets "github.com/picosh/pico/filehandlers/assets"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
+	"github.com/picosh/pico/tui"
 	wsh "github.com/picosh/pico/wish"
 	"github.com/picosh/ptun"
 	"github.com/picosh/send/list"
@@ -40,7 +41,7 @@ func createRouter(cfg *shared.ConfigSite, handler *uploadassets.UploadAssetHandl
 			scp.Middleware(handler),
 			wishrsync.Middleware(handler),
 			auth.Middleware(handler),
-			wsh.PtyMdw(bm.Middleware(CmsMiddleware(&cfg.ConfigCms, cfg))),
+			wsh.PtyMdw(bm.Middleware(tui.CmsMiddleware(cfg))),
 			WishMiddleware(handler),
 			wsh.LogMiddleware(handler.GetLogger()),
 		}

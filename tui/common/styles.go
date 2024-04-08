@@ -109,7 +109,8 @@ type Styles struct {
 	CliPadding,
 	CliBorder,
 	CliHeader,
-	App lipgloss.Style
+	App,
+	RoundedBorder lipgloss.Style
 	Renderer *lipgloss.Renderer
 }
 
@@ -152,7 +153,7 @@ func DefaultStyles(renderer *lipgloss.Renderer) Styles {
 	s.SelectedMenuItem = renderer.NewStyle().Foreground(Fuschia)
 	s.Logo = renderer.NewStyle().
 		Foreground(Cream).
-		Background(lipgloss.Color("#5A56E0")).
+		Background(Indigo).
 		Padding(0, 1)
 	s.BlurredButtonStyle = renderer.NewStyle().
 		Foreground(Cream).
@@ -172,6 +173,11 @@ func DefaultStyles(renderer *lipgloss.Renderer) Styles {
 	s.CliPadding = renderer.NewStyle().Padding(0, 1)
 	s.CliHeader = s.CliPadding.Copy().Foreground(Indigo).Bold(true)
 	s.CliBorder = renderer.NewStyle().Foreground(lipgloss.Color("238"))
+	s.RoundedBorder = renderer.
+		NewStyle().
+		Padding(0, 1).
+		BorderForeground(Indigo).
+		Border(lipgloss.RoundedBorder(), true, true)
 
 	return s
 }

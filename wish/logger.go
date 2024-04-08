@@ -16,28 +16,20 @@ func LogMiddleware(logger *slog.Logger) wish.Middleware {
 
 			logger.Info(
 				"connect",
-				"user",
-				s.User(),
-				"ip",
-				s.RemoteAddr().String(),
-				"pty",
-				ok,
-				"term",
-				pty.Term,
-				"windowWidth",
-				pty.Window.Width,
-				"windowHeight",
-				pty.Window.Height,
+				"user", s.User(),
+				"ip", s.RemoteAddr().String(),
+				"pty", ok,
+				"term", pty.Term,
+				"windowWidth", pty.Window.Width,
+				"windowHeight", pty.Window.Height,
 			)
 
 			sh(s)
 
 			logger.Info(
 				"disconnect",
-				"ip",
-				s.RemoteAddr().String(),
-				"duration",
-				time.Since(ct),
+				"ip", s.RemoteAddr().String(),
+				"duration", time.Since(ct),
 			)
 		}
 	}

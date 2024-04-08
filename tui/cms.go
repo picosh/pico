@@ -1,4 +1,4 @@
-package pgs
+package tui
 
 import (
 	"errors"
@@ -15,13 +15,11 @@ import (
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
-	"github.com/picosh/pico/shared/storage"
-	"github.com/picosh/pico/wish/cms/config"
-	"github.com/picosh/pico/wish/cms/ui/account"
-	"github.com/picosh/pico/wish/cms/ui/common"
-	"github.com/picosh/pico/wish/cms/ui/info"
-	"github.com/picosh/pico/wish/cms/ui/keys"
-	"github.com/picosh/pico/wish/cms/ui/tokens"
+	"github.com/picosh/pico/tui/account"
+	"github.com/picosh/pico/tui/common"
+	"github.com/picosh/pico/tui/info"
+	"github.com/picosh/pico/tui/keys"
+	"github.com/picosh/pico/tui/tokens"
 )
 
 type status int
@@ -72,7 +70,7 @@ func NewSpinner(styles common.Styles) spinner.Model {
 
 type GotDBMsg db.DB
 
-func CmsMiddleware(cfg *config.ConfigCms, urls config.ConfigURL) bm.Handler {
+func CmsMiddleware(cfg *shared.ConfigSite) bm.Handler {
 	return func(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 		logger := cfg.Logger
 
@@ -91,13 +89,6 @@ func CmsMiddleware(cfg *config.ConfigCms, urls config.ConfigURL) bm.Handler {
 
 		dbpool := postgres.NewDB(cfg.DbURL, cfg.Logger)
 
-		var st storage.StorageServe
-		if cfg.MinioURL == "" {
-			st, err = storage.NewStorageFS(cfg.StorageDir)
-		} else {
-			st, err = storage.NewStorageMinio(cfg.MinioURL, cfg.MinioUser, cfg.MinioPass)
-		}
-
 		if err != nil {
 			logger.Error(err.Error())
 		}
@@ -108,10 +99,8 @@ func CmsMiddleware(cfg *config.ConfigCms, urls config.ConfigURL) bm.Handler {
 
 		m := model{
 			cfg:        cfg,
-			urls:       urls,
 			publicKey:  key,
 			dbpool:     dbpool,
-			st:         st,
 			sshUser:    sshUser,
 			status:     statusInit,
 			menuChoice: unsetChoice,
@@ -139,11 +128,9 @@ func CmsMiddleware(cfg *config.ConfigCms, urls config.ConfigURL) bm.Handler {
 
 // Just a generic tea.Model to demo terminal information of ssh.
 type model struct {
-	cfg             *config.ConfigCms
-	urls            config.ConfigURL
+	cfg             *shared.ConfigSite
 	publicKey       string
 	dbpool          db.DB
-	st              storage.StorageServe
 	user            *db.User
 	plusFeatureFlag *db.FeatureFlag
 	err             error
@@ -247,18 +234,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.status = statusReady
 		m.info.User = msg
 		m.user = msg
-		m.info = info.NewModel(m.styles, m.cfg, m.urls, m.user, m.plusFeatureFlag)
-		m.keys = keys.NewModel(m.styles, m.cfg, m.dbpool, m.user)
-		m.tokens = tokens.NewModel(m.styles, m.cfg, m.dbpool, m.user)
-		m.createAccount = account.NewCreateModel(m.styles, m.cfg, m.dbpool, m.publicKey)
+		m.info = info.NewModel(m.styles, m.user, m.plusFeatureFlag)
+		m.keys = keys.NewModel(m.styles, m.cfg.Logger, m.dbpool, m.user)
+		m.tokens = tokens.NewModel(m.styles, m.dbpool, m.user)
+		m.createAccount = account.NewCreateModel(m.styles, m.dbpool, m.publicKey)
 	}
 
 	switch m.status {
 	case statusInit:
-		m.info = info.NewModel(m.styles, m.cfg, m.urls, m.user, m.plusFeatureFlag)
-		m.keys = keys.NewModel(m.styles, m.cfg, m.dbpool, m.user)
-		m.tokens = tokens.NewModel(m.styles, m.cfg, m.dbpool, m.user)
-		m.createAccount = account.NewCreateModel(m.styles, m.cfg, m.dbpool, m.publicKey)
+		m.info = info.NewModel(m.styles, m.user, m.plusFeatureFlag)
+		m.keys = keys.NewModel(m.styles, m.cfg.Logger, m.dbpool, m.user)
+		m.tokens = tokens.NewModel(m.styles, m.dbpool, m.user)
+		m.createAccount = account.NewCreateModel(m.styles, m.dbpool, m.publicKey)
 		if m.user == nil {
 			m.status = statusNoAccount
 		} else {
@@ -288,7 +275,7 @@ func updateChildren(msg tea.Msg, m model) (model, tea.Cmd) {
 		cmd = newCmd
 
 		if m.keys.Exit {
-			m.keys = keys.NewModel(m.styles, m.cfg, m.dbpool, m.user)
+			m.keys = keys.NewModel(m.styles, m.cfg.Logger, m.dbpool, m.user)
 			m.status = statusReady
 		} else if m.keys.Quit {
 			m.status = statusQuitting
@@ -304,7 +291,7 @@ func updateChildren(msg tea.Msg, m model) (model, tea.Cmd) {
 		cmd = newCmd
 
 		if m.tokens.Exit {
-			m.tokens = tokens.NewModel(m.styles, m.cfg, m.dbpool, m.user)
+			m.tokens = tokens.NewModel(m.styles, m.dbpool, m.user)
 			m.status = statusReady
 		} else if m.tokens.Quit {
 			m.status = statusQuitting
@@ -313,7 +300,7 @@ func updateChildren(msg tea.Msg, m model) (model, tea.Cmd) {
 	case statusNoAccount:
 		m.createAccount, cmd = account.Update(msg, m.createAccount)
 		if m.createAccount.Done {
-			m.createAccount = account.NewCreateModel(m.styles, m.cfg, m.dbpool, m.publicKey) // reset the state
+			m.createAccount = account.NewCreateModel(m.styles, m.dbpool, m.publicKey) // reset the state
 			m.status = statusReady
 		} else if m.createAccount.Quit {
 			m.status = statusQuitting

@@ -2,48 +2,30 @@ package pastes
 
 import (
 	"github.com/picosh/pico/shared"
-	"github.com/picosh/pico/wish/cms/config"
 )
 
 func NewConfigSite() *shared.ConfigSite {
 	debug := shared.GetEnv("PASTES_DEBUG", "0")
 	domain := shared.GetEnv("PASTES_DOMAIN", "pastes.sh")
-	email := shared.GetEnv("PASTES_EMAIL", "hello@pastes.sh")
-	subdomains := shared.GetEnv("PASTES_SUBDOMAINS", "0")
-	customdomains := shared.GetEnv("PASTES_CUSTOMDOMAINS", "0")
 	port := shared.GetEnv("PASTES_WEB_PORT", "3000")
 	dbURL := shared.GetEnv("DATABASE_URL", "")
 	protocol := shared.GetEnv("PASTES_PROTOCOL", "https")
-	allowRegister := shared.GetEnv("PASTES_ALLOW_REGISTER", "1")
 	storageDir := shared.GetEnv("IMGS_STORAGE_DIR", ".storage")
 	minioURL := shared.GetEnv("MINIO_URL", "")
 	minioUser := shared.GetEnv("MINIO_ROOT_USER", "")
 	minioPass := shared.GetEnv("MINIO_ROOT_PASSWORD", "")
-	useImgProxy := shared.GetEnv("USE_IMGPROXY", "1")
-
-	intro := "To get started, enter a username.\n"
-	intro += "To learn next steps go to our docs at https://pico.sh/pastes\n"
 
 	return &shared.ConfigSite{
-		Debug:                debug == "1",
-		SubdomainsEnabled:    subdomains == "1",
-		CustomdomainsEnabled: customdomains == "1",
-		UseImgProxy:          useImgProxy == "1",
-		ConfigCms: config.ConfigCms{
-			Domain:        domain,
-			Port:          port,
-			Protocol:      protocol,
-			Email:         email,
-			DbURL:         dbURL,
-			StorageDir:    storageDir,
-			MinioURL:      minioURL,
-			MinioUser:     minioUser,
-			MinioPass:     minioPass,
-			Description:   "A pastebin for hackers.",
-			IntroText:     intro,
-			Space:         "pastes",
-			Logger:        shared.CreateLogger(debug == "1"),
-			AllowRegister: allowRegister == "1",
-		},
+		Debug:      debug == "1",
+		Domain:     domain,
+		Port:       port,
+		Protocol:   protocol,
+		DbURL:      dbURL,
+		StorageDir: storageDir,
+		MinioURL:   minioURL,
+		MinioUser:  minioUser,
+		MinioPass:  minioPass,
+		Space:      "pastes",
+		Logger:     shared.CreateLogger(debug == "1"),
 	}
 }

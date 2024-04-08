@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/picosh/pico/db"
-	"github.com/picosh/pico/wish/cms/ui/common"
+	"github.com/picosh/pico/tui/common"
 	"golang.org/x/crypto/ssh"
 )
 

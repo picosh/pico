@@ -905,7 +905,7 @@ func createSubdomainRoutes(staticRoutes []shared.Route) []shared.Route {
 
 func StartApiServer() {
 	cfg := NewConfigSite()
-	dbpool := postgres.NewDB(cfg.ConfigCms.DbURL, cfg.Logger)
+	dbpool := postgres.NewDB(cfg.DbURL, cfg.Logger)
 	defer dbpool.Close()
 	logger := cfg.Logger
 
@@ -946,7 +946,6 @@ func StartApiServer() {
 		"Starting server on port",
 		"port", cfg.Port,
 		"domain", cfg.Domain,
-		"email", cfg.Email,
 	)
 
 	logger.Error(http.ListenAndServe(portStr, router).Error())

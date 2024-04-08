@@ -1,10 +1,29 @@
 {{template "base" .}}
 
-{{define "title"}}discover prose -- {{.Site.Domain}}{{end}}
+{{define "title"}}prose.sh -- A blog platform for hackers{{end}}
 
 {{define "meta"}}
-<meta name="description" content="discover interesting posts" />
+<meta name="description" content="A blog platform for hackers" />
 <link rel="alternate" href="/rss" type="application/rss+xml" title="RSS feed for prose.sh" />
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="{{.Site.Domain}}">
+<meta property="og:url" content="https://{{.Site.Domain}}">
+<meta property="og:title" content="{{.Site.Domain}}">
+<meta property="og:description" content="A blog platform for hackers">
+
+<meta name="twitter:card" content="summary" />
+<meta property="twitter:url" content="https://{{.Site.Domain}}">
+<meta property="twitter:title" content="{{.Site.Domain}}">
+<meta property="twitter:description" content="A blog platform for hackers">
+<meta name="twitter:image" content="https://{{.Site.Domain}}/card.png" />
+<meta name="twitter:image:src" content="https://{{.Site.Domain}}/card.png" />
+
+<meta property="og:image:width" content="300" />
+<meta property="og:image:height" content="300" />
+<meta itemprop="image" content="https://{{.Site.Domain}}/card.png" />
+<meta property="og:image" content="https://{{.Site.Domain}}/card.png" />
 {{end}}
 
 {{define "attrs"}}{{end}}

@@ -10,7 +10,6 @@ import (
 	"github.com/picosh/pico/pgs"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
-	"github.com/picosh/pico/wish/cms/config"
 )
 
 func bail(err error) {
@@ -35,7 +34,7 @@ func main() {
 	}
 	logger := slog.Default()
 
-	picoCfg := config.NewConfigCms()
+	picoCfg := shared.NewConfigSite()
 	picoCfg.Logger = logger
 	picoCfg.DbURL = os.Getenv("DATABASE_URL")
 	picoCfg.MinioURL = os.Getenv("MINIO_URL")

@@ -3,8 +3,7 @@ package info
 import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/picosh/pico/db"
-	"github.com/picosh/pico/wish/cms/config"
-	"github.com/picosh/pico/wish/cms/ui/common"
+	"github.com/picosh/pico/tui/common"
 )
 
 type errMsg struct {
@@ -18,8 +17,6 @@ func (e errMsg) Error() string {
 
 // Model stores the state of the info user interface.
 type Model struct {
-	cfg             *config.ConfigCms
-	urls            config.ConfigURL
 	Quit            bool // signals it's time to exit the whole application
 	Err             error
 	User            *db.User
@@ -28,13 +25,11 @@ type Model struct {
 }
 
 // NewModel returns a new Model in its initial state.
-func NewModel(styles common.Styles, cfg *config.ConfigCms, urls config.ConfigURL, user *db.User, ff *db.FeatureFlag) Model {
+func NewModel(styles common.Styles, user *db.User, ff *db.FeatureFlag) Model {
 	return Model{
 		Quit:            false,
 		User:            user,
 		styles:          styles,
-		cfg:             cfg,
-		urls:            urls,
 		PlusFeatureFlag: ff,
 	}
 }

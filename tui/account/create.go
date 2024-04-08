@@ -1,16 +1,15 @@
-package createkey
+package account
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	input "github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/picosh/pico/db"
-	"github.com/picosh/pico/wish/cms/config"
-	"github.com/picosh/pico/wish/cms/ui/common"
-	"golang.org/x/crypto/ssh"
+	"github.com/picosh/pico/tui/common"
 )
 
 type state int
@@ -20,6 +19,7 @@ const (
 	submitting
 )
 
+// index specifies the UI element that's in focus.
 type index int
 
 const (
@@ -28,35 +28,40 @@ const (
 	cancelButton
 )
 
-type KeySetMsg string
+type CreateAccountMsg *db.User
 
-type KeyInvalidMsg struct{}
-type KeyTakenMsg struct{}
+// NameTakenMsg is sent when the requested username has already been taken.
+type NameTakenMsg struct{}
 
-type errMsg struct {
-	err error
-}
+// NameInvalidMsg is sent when the requested username has failed validation.
+type NameInvalidMsg struct{}
+
+type errMsg struct{ err error }
 
 func (e errMsg) Error() string { return e.err.Error() }
 
-type Model struct {
-	Done bool
-	Quit bool
+var deny = strings.Join(db.DenyList, ", ")
+var helpMsg = fmt.Sprintf("Names can only contain plain letters and numbers and must be less than 50 characters. No emjois. No names from deny list: %s", deny)
 
-	dbpool  db.DB
-	user    *db.User
-	styles  common.Styles
-	state   state
-	newKey  string
-	index   index
-	errMsg  string
-	input   input.Model
-	spinner spinner.Model
+// Model holds the state of the username UI.
+type CreateModel struct {
+	Done bool // true when it's time to exit this view
+	Quit bool // true when the user wants to quit the whole program
+
+	dbpool    db.DB
+	publicKey string
+	styles    common.Styles
+	state     state
+	newName   string
+	index     index
+	errMsg    string
+	input     input.Model
+	spinner   spinner.Model
 }
 
 // updateFocus updates the focused states in the model based on the current
 // focus index.
-func (m *Model) updateFocus() {
+func (m *CreateModel) updateFocus() {
 	if m.index == textInput && !m.input.Focused() {
 		m.input.Focus()
 		m.input.Prompt = m.styles.FocusedPrompt.String()
@@ -67,7 +72,7 @@ func (m *Model) updateFocus() {
 }
 
 // Move the focus index one unit forward.
-func (m *Model) indexForward() {
+func (m *CreateModel) indexForward() {
 	m.index++
 	if m.index > cancelButton {
 		m.index = textInput
@@ -77,7 +82,7 @@ func (m *Model) indexForward() {
 }
 
 // Move the focus index one unit backwards.
-func (m *Model) indexBackward() {
+func (m *CreateModel) indexBackward() {
 	m.index--
 	if m.index < textInput {
 		m.index = cancelButton
@@ -87,44 +92,49 @@ func (m *Model) indexBackward() {
 }
 
 // NewModel returns a new username model in its initial state.
-func NewModel(styles common.Styles, cfg *config.ConfigCms, dbpool db.DB, user *db.User) Model {
+func NewCreateModel(styles common.Styles, dbpool db.DB, publicKey string) CreateModel {
 	im := input.New()
 	im.Cursor.Style = styles.Cursor
-	im.Placeholder = "ssh-ed25519 AAAA..."
+	im.Placeholder = "enter username"
 	im.Prompt = styles.FocusedPrompt.String()
-	im.CharLimit = 2049
+	im.CharLimit = 50
 	im.Focus()
 
-	return Model{
-		Done:    false,
-		Quit:    false,
-		dbpool:  dbpool,
-		user:    user,
-		styles:  styles,
-		state:   ready,
-		newKey:  "",
-		index:   textInput,
-		errMsg:  "",
-		input:   im,
-		spinner: common.NewSpinner(styles),
+	return CreateModel{
+		Done:      false,
+		Quit:      false,
+		dbpool:    dbpool,
+		styles:    styles,
+		state:     ready,
+		newName:   "",
+		index:     textInput,
+		errMsg:    "",
+		input:     im,
+		spinner:   common.NewSpinner(styles),
+		publicKey: publicKey,
 	}
 }
 
 // Init is the Bubble Tea initialization function.
-func (m Model) Init() tea.Cmd {
+func Init(styles common.Styles, dbpool db.DB, publicKey string) func() (CreateModel, tea.Cmd) {
+	return func() (CreateModel, tea.Cmd) {
+		m := NewCreateModel(styles, dbpool, publicKey)
+		return m, InitialCmd()
+	}
+}
+
+// InitialCmd returns the initial command.
+func InitialCmd() tea.Cmd {
 	return input.Blink
 }
 
 // Update is the Bubble Tea update loop.
-func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func Update(msg tea.Msg, m CreateModel) (CreateModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.Type {
-		case tea.KeyCtrlC: // quit
+		case tea.KeyCtrlC, tea.KeyEscape:
 			m.Quit = true
-			return m, nil
-		case tea.KeyEscape: // exit this mini-app
-			m.Done = true
 			return m, nil
 
 		default:
@@ -160,14 +170,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				case okButton: // Submit the form
 					m.state = submitting
 					m.errMsg = ""
-					m.newKey = strings.TrimSpace(m.input.Value())
+					m.newName = strings.TrimSpace(m.input.Value())
 
 					return m, tea.Batch(
-						addPublicKey(m), // fire off the command, too
+						createAccount(m), // fire off the command, too
 						m.spinner.Tick,
 					)
-				case cancelButton: // Exit this mini-app
-					m.Done = true
+				case cancelButton: // Exit
+					m.Quit = true
 					return m, nil
 				}
 			}
@@ -184,19 +194,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-	case KeyInvalidMsg:
+	case NameTakenMsg:
 		m.state = ready
-		head := m.styles.Error.Render("Invalid public key. ")
-		helpMsg := "Public keys must but in the correct format"
-		body := m.styles.Subtle.Render(helpMsg)
-		m.errMsg = m.styles.Wrap.Render(head + body)
+		m.errMsg = m.styles.Subtle.Render("Sorry, ") +
+			m.styles.Error.Render(m.newName) +
+			m.styles.Subtle.Render(" is taken.")
 
 		return m, nil
 
-	case KeyTakenMsg:
+	case NameInvalidMsg:
 		m.state = ready
-		head := m.styles.Error.Render("Invalid public key. ")
-		helpMsg := "Public key is associated with another user"
+		head := m.styles.Error.Render("Invalid name. ")
 		body := m.styles.Subtle.Render(helpMsg)
 		m.errMsg = m.styles.Wrap.Render(head + body)
 
@@ -225,8 +233,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // View renders current view from the model.
-func (m Model) View() string {
-	s := "Enter a new public key\n\n"
+func View(m CreateModel) string {
+	intro := "To create an account, enter a username.\n"
+	intro += "After that, go to https://pico.sh/getting-started#next-steps"
+	s := fmt.Sprintf("%s\n\n%s\n", "hacker labs", intro)
+	s += fmt.Sprintf("Public Key: %s\n\n", m.publicKey)
 	s += m.input.View() + "\n\n"
 
 	if m.state == submitting {
@@ -238,53 +249,35 @@ func (m Model) View() string {
 			s += "\n\n" + m.errMsg
 		}
 	}
+	s += fmt.Sprintf("\n\n%s\n", helpMsg)
 
 	return s
 }
 
-func spinnerView(m Model) string {
-	return m.spinner.View() + " Submitting..."
+func spinnerView(m CreateModel) string {
+	return m.spinner.View() + " Creating account..."
 }
 
-func IsPublicKeyValid(key string) bool {
-	if len(key) == 0 {
-		return false
-	}
-
-	_, _, _, _, err := ssh.ParseAuthorizedKey([]byte(key))
-	return err == nil
-}
-
-func sanitizeKey(key string) string {
-	// comments are removed when using our ssh app so
-	// we need to be sure to remove them from the public key
-	parts := strings.Split(key, " ")
-	keep := []string{}
-	for i, part := range parts {
-		if i == 2 {
-			break
-		}
-		keep = append(keep, strings.Trim(part, " "))
-	}
-
-	return strings.Join(keep, " ")
-}
-
-func addPublicKey(m Model) tea.Cmd {
+func createAccount(m CreateModel) tea.Cmd {
 	return func() tea.Msg {
-		if !IsPublicKeyValid(m.newKey) {
-			return KeyInvalidMsg{}
+		if m.newName == "" {
+			return NameInvalidMsg{}
 		}
 
-		key := sanitizeKey(m.newKey)
-		err := m.dbpool.LinkUserKey(m.user.ID, key, nil)
+		user, err := m.dbpool.RegisterUser(m.newName, m.publicKey)
+		fmt.Println(err)
 		if err != nil {
-			if errors.Is(err, db.ErrPublicKeyTaken) {
-				return KeyTakenMsg{}
+			if errors.Is(err, db.ErrNameTaken) {
+				return NameTakenMsg{}
+			} else if errors.Is(err, db.ErrNameInvalid) {
+				return NameInvalidMsg{}
+			} else if errors.Is(err, db.ErrNameDenied) {
+				return NameInvalidMsg{}
+			} else {
+				return errMsg{err}
 			}
-			return errMsg{err}
 		}
 
-		return KeySetMsg(m.newKey)
+		return CreateAccountMsg(user)
 	}
 }

@@ -1,15 +1,14 @@
 package keys
 
 import (
-	"fmt"
+	"log/slog"
 
 	pager "github.com/charmbracelet/bubbles/paginator"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/picosh/pico/db"
-	"github.com/picosh/pico/wish/cms/config"
-	"github.com/picosh/pico/wish/cms/ui/common"
-	"github.com/picosh/pico/wish/cms/ui/createkey"
+	"github.com/picosh/pico/tui/common"
+	"github.com/picosh/pico/tui/createkey"
 )
 
 const keysPerPage = 4
@@ -47,7 +46,7 @@ type (
 
 // Model is the Tea state model for this user interface.
 type Model struct {
-	cfg            *config.ConfigCms
+	logger         *slog.Logger
 	dbpool         db.DB
 	user           *db.User
 	styles         common.Styles
@@ -82,14 +81,14 @@ func (m *Model) UpdatePaging(msg tea.Msg) {
 }
 
 // NewModel creates a new model with defaults.
-func NewModel(styles common.Styles, cfg *config.ConfigCms, dbpool db.DB, user *db.User) Model {
+func NewModel(styles common.Styles, logger *slog.Logger, dbpool db.DB, user *db.User) Model {
 	p := pager.New()
 	p.PerPage = keysPerPage
 	p.Type = pager.Dots
 	p.InactiveDot = styles.InactivePagination.Render("•")
 
 	return Model{
-		cfg:            cfg,
+		logger:         logger,
 		dbpool:         dbpool,
 		user:           user,
 		styles:         styles,
@@ -236,7 +235,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch m.state {
 	case stateNormal:
-		m.createKey = createkey.NewModel(m.styles, m.cfg, m.dbpool, m.user)
+		m.createKey = createkey.NewModel(m.styles, m.dbpool, m.user)
 	case stateDeletingKey:
 		// If an item is being confirmed for delete, any key (other than the key
 		// used for confirmation above) cancels the deletion
@@ -269,7 +268,7 @@ func updateChildren(msg tea.Msg, m Model) (Model, tea.Cmd) {
 		m.createKey = createKeyModel
 		cmd = newCmd
 		if m.createKey.Done {
-			m.createKey = createkey.NewModel(m.styles, m.cfg, m.dbpool, m.user) // reset the state
+			m.createKey = createkey.NewModel(m.styles, m.dbpool, m.user) // reset the state
 			m.state = stateNormal
 		} else if m.createKey.Quit {
 			m.state = stateQuitting
@@ -293,11 +292,11 @@ func (m Model) View() string {
 	case stateLoading:
 		s = m.spinner.View() + " Loading...\n\n"
 	case stateQuitting:
-		s = fmt.Sprintf("Thanks for using %s!\n", m.cfg.Domain)
+		s = "Thanks for using pico.sh!\n"
 	case stateCreateKey:
 		s = m.createKey.View()
 	default:
-		s = fmt.Sprintf("Here are the keys linked to your %s account.\n\n", m.cfg.Domain)
+		s = "Here are the keys linked to your pico.sh account.\n\n"
 
 		// Keys
 		s += keysView(m)
@@ -409,7 +408,7 @@ func unlinkKey(m Model) tea.Cmd {
 func deleteAccount(m Model) tea.Cmd {
 	return func() tea.Msg {
 		id := m.keys[m.getSelectedIndex()].UserID
-		m.cfg.Logger.Info("user requested account deletion", "user", m.user.Name, "id", id)
+		m.logger.Info("user requested account deletion", "user", m.user.Name, "id", id)
 		err := m.dbpool.RemoveUsers([]string{id})
 		if err != nil {
 			return errMsg{err}

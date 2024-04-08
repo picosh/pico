@@ -1,15 +1,15 @@
-package createtoken
+package createkey
 
 import (
-	"fmt"
+	"errors"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	input "github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/picosh/pico/db"
-	"github.com/picosh/pico/wish/cms/config"
-	"github.com/picosh/pico/wish/cms/ui/common"
+	"github.com/picosh/pico/tui/common"
+	"golang.org/x/crypto/ssh"
 )
 
 type state int
@@ -17,7 +17,6 @@ type state int
 const (
 	ready state = iota
 	submitting
-	submitted
 )
 
 type index int
@@ -28,11 +27,10 @@ const (
 	cancelButton
 )
 
-type TokenDismissed int
+type KeySetMsg string
 
-type TokenSetMsg struct {
-	token string
-}
+type KeyInvalidMsg struct{}
+type KeyTakenMsg struct{}
 
 type errMsg struct {
 	err error
@@ -44,16 +42,15 @@ type Model struct {
 	Done bool
 	Quit bool
 
-	dbpool    db.DB
-	user      *db.User
-	styles    common.Styles
-	state     state
-	tokenName string
-	token     string
-	index     index
-	errMsg    string
-	input     input.Model
-	spinner   spinner.Model
+	dbpool  db.DB
+	user    *db.User
+	styles  common.Styles
+	state   state
+	newKey  string
+	index   index
+	errMsg  string
+	input   input.Model
+	spinner spinner.Model
 }
 
 // updateFocus updates the focused states in the model based on the current
@@ -89,27 +86,26 @@ func (m *Model) indexBackward() {
 }
 
 // NewModel returns a new username model in its initial state.
-func NewModel(styles common.Styles, cfg *config.ConfigCms, dbpool db.DB, user *db.User) Model {
+func NewModel(styles common.Styles, dbpool db.DB, user *db.User) Model {
 	im := input.New()
 	im.Cursor.Style = styles.Cursor
-	im.Placeholder = "A name used for your reference"
+	im.Placeholder = "ssh-ed25519 AAAA..."
 	im.Prompt = styles.FocusedPrompt.String()
-	im.CharLimit = 256
+	im.CharLimit = 2049
 	im.Focus()
 
 	return Model{
-		Done:      false,
-		Quit:      false,
-		dbpool:    dbpool,
-		user:      user,
-		styles:    styles,
-		state:     ready,
-		tokenName: "",
-		token:     "",
-		index:     textInput,
-		errMsg:    "",
-		input:     im,
-		spinner:   common.NewSpinner(styles),
+		Done:    false,
+		Quit:    false,
+		dbpool:  dbpool,
+		user:    user,
+		styles:  styles,
+		state:   ready,
+		newKey:  "",
+		index:   textInput,
+		errMsg:  "",
+		input:   im,
+		spinner: common.NewSpinner(styles),
 	}
 }
 
@@ -125,10 +121,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.Type {
 		case tea.KeyCtrlC: // quit
 			m.Quit = true
-			return m, dismiss
+			return m, nil
 		case tea.KeyEscape: // exit this mini-app
 			m.Done = true
-			return m, dismiss
+			return m, nil
 
 		default:
 			// Ignore keys if we're submitting
@@ -161,23 +157,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				case textInput:
 					fallthrough
 				case okButton: // Submit the form
-					// form already submitted so ok button exits
-					if m.state == submitted {
-						m.Done = true
-						return m, dismiss
-					}
-
 					m.state = submitting
 					m.errMsg = ""
-					m.tokenName = strings.TrimSpace(m.input.Value())
+					m.newKey = strings.TrimSpace(m.input.Value())
 
 					return m, tea.Batch(
-						addToken(m), // fire off the command, too
+						addPublicKey(m), // fire off the command, too
 						m.spinner.Tick,
 					)
 				case cancelButton: // Exit this mini-app
 					m.Done = true
-					return m, dismiss
+					return m, nil
 				}
 			}
 
@@ -193,9 +183,22 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-	case TokenSetMsg:
-		m.state = submitted
-		m.token = msg.token
+	case KeyInvalidMsg:
+		m.state = ready
+		head := m.styles.Error.Render("Invalid public key. ")
+		helpMsg := "Public keys must but in the correct format"
+		body := m.styles.Subtle.Render(helpMsg)
+		m.errMsg = m.styles.Wrap.Render(head + body)
+
+		return m, nil
+
+	case KeyTakenMsg:
+		m.state = ready
+		head := m.styles.Error.Render("Invalid public key. ")
+		helpMsg := "Public key is associated with another user"
+		body := m.styles.Subtle.Render(helpMsg)
+		m.errMsg = m.styles.Wrap.Render(head + body)
+
 		return m, nil
 
 	case errMsg:
@@ -222,15 +225,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // View renders current view from the model.
 func (m Model) View() string {
-	s := "Enter a name for your token\n\n"
+	s := "Enter a new public key\n\n"
 	s += m.input.View() + "\n\n"
 
 	if m.state == submitting {
 		s += spinnerView(m)
-	} else if m.state == submitted {
-		s = fmt.Sprintf("Save this token:\n%s\n\n", m.token)
-		s += "After you exit this screen you will *not* be able to see it again.\n\n"
-		s += common.OKButtonView(m.styles, m.index == 1, true)
 	} else {
 		s += common.OKButtonView(m.styles, m.index == 1, true)
 		s += " " + common.CancelButtonView(m.styles, m.index == 2, false)
@@ -246,15 +245,45 @@ func spinnerView(m Model) string {
 	return m.spinner.View() + " Submitting..."
 }
 
-func dismiss() tea.Msg { return TokenDismissed(1) }
+func IsPublicKeyValid(key string) bool {
+	if len(key) == 0 {
+		return false
+	}
 
-func addToken(m Model) tea.Cmd {
+	_, _, _, _, err := ssh.ParseAuthorizedKey([]byte(key))
+	return err == nil
+}
+
+func sanitizeKey(key string) string {
+	// comments are removed when using our ssh app so
+	// we need to be sure to remove them from the public key
+	parts := strings.Split(key, " ")
+	keep := []string{}
+	for i, part := range parts {
+		if i == 2 {
+			break
+		}
+		keep = append(keep, strings.Trim(part, " "))
+	}
+
+	return strings.Join(keep, " ")
+}
+
+func addPublicKey(m Model) tea.Cmd {
 	return func() tea.Msg {
-		token, err := m.dbpool.InsertToken(m.user.ID, m.tokenName)
+		if !IsPublicKeyValid(m.newKey) {
+			return KeyInvalidMsg{}
+		}
+
+		key := sanitizeKey(m.newKey)
+		err := m.dbpool.LinkUserKey(m.user.ID, key, nil)
 		if err != nil {
+			if errors.Is(err, db.ErrPublicKeyTaken) {
+				return KeyTakenMsg{}
+			}
 			return errMsg{err}
 		}
 
-		return TokenSetMsg{token}
+		return KeySetMsg(m.newKey)
 	}
 }

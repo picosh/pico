@@ -6,12 +6,11 @@ import (
 
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
-	"github.com/picosh/pico/wish/cms/config"
 )
 
 func main() {
 	logger := slog.Default()
-	picoCfg := config.NewConfigCms()
+	picoCfg := shared.NewConfigSite()
 	picoCfg.Logger = logger
 	picoCfg.DbURL = os.Getenv("DATABASE_URL")
 	picoDb := postgres.NewDB(picoCfg.DbURL, picoCfg.Logger)
