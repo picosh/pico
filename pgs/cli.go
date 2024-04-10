@@ -17,20 +17,6 @@ import (
 	"github.com/picosh/pico/tui/common"
 )
 
-func styleRows(styles common.Styles) func(row, col int) lipgloss.Style {
-	return func(row, col int) lipgloss.Style {
-		if row == 0 {
-			return styles.CliHeader
-		}
-
-		even := row%2 == 0
-		if even {
-			return styles.CliPadding.Copy().Foreground(lipgloss.Color("245"))
-		}
-		return styles.CliPadding.Copy().Foreground(lipgloss.Color("252"))
-	}
-}
-
 func projectTable(styles common.Styles, projects []*db.Project) *table.Table {
 	headers := []string{
 		"Name",
@@ -58,17 +44,14 @@ func projectTable(styles common.Styles, projects []*db.Project) *table.Table {
 	}
 
 	t := table.New().
-		Border(lipgloss.NormalBorder()).
-		BorderStyle(styles.CliBorder).
 		Headers(headers...).
-		Rows(data...).
-		StyleFunc(styleRows(styles))
+		Rows(data...)
 	return t
 }
 
 func getHelpText(styles common.Styles, userName string) string {
-	helpStr := "Commands: [help, stats, ls, rm, link, unlink, prune, retain, depends, acl]\n\n"
-	helpStr += styles.Note.Render("NOTICE:") + " *must* append with `--write` for the changes to persist.\n\n"
+	helpStr := "Commands: [help, stats, ls, rm, link, unlink, prune, retain, depends, acl]\n"
+	helpStr += styles.Note.Render("NOTICE:") + " *must* append with `--write` for the changes to persist.\n"
 
 	projectName := "projA"
 	headers := []string{"Cmd", "Description"}
@@ -116,11 +99,9 @@ func getHelpText(styles common.Styles, userName string) string {
 	}
 
 	t := table.New().
-		Border(lipgloss.NormalBorder()).
-		BorderStyle(styles.CliBorder).
+		Border(lipgloss.HiddenBorder()).
 		Headers(headers...).
-		Rows(data...).
-		StyleFunc(styleRows(styles))
+		Rows(data...)
 
 	helpStr += t.String()
 	return helpStr
@@ -271,11 +252,9 @@ func (c *Cmd) stats(cfgMaxSize uint64) error {
 	}
 
 	t := table.New().
-		Border(lipgloss.NormalBorder()).
-		BorderStyle(c.Styles.CliBorder).
+		Border(lipgloss.HiddenBorder()).
 		Headers(headers...).
-		Rows(data).
-		StyleFunc(styleRows(c.Styles))
+		Rows(data)
 	c.output(t.String())
 
 	return nil
