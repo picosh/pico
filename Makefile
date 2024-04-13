@@ -140,3 +140,11 @@ restore:
 	$(DOCKER_CMD) exec -it $(DB_CONTAINER) /bin/bash
 	# psql postgres -U postgres -d pico < /backup.sql
 .PHONY: restore
+
+registry-clean:
+	# https://github.com/distribution/distribution/issues/3200#issuecomment-671062638
+	# NOTICE: if using s3 you need an empty file inside:
+	#   - `imgs/docker/registry/v2/repositories` and
+	#   - `imgs/docker/registry/v2/blobs`
+	docker compose exec registry bin/registry garbage-collect /etc/docker/registry/config.yml --delete-untagged
+.PHONY: registry-clean
