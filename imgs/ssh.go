@@ -83,7 +83,7 @@ func serveMux(ctx ssh.Context) http.Handler {
 
 	proxy := httputil.NewSingleHostReverseProxy(&url.URL{
 		Scheme: "http",
-		Host:   "registry:5000",
+		Host:   "0.0.0.0:5000",
 	})
 
 	oldDirector := proxy.Director
@@ -232,11 +232,16 @@ func StartSshServer() {
 	dbUrl := os.Getenv("DATABASE_URL")
 	logger := slog.Default()
 	dbh := postgres.NewDB(dbUrl, logger)
+	handler := &CliHandler{
+		Logger: logger,
+		DBPool: dbh,
+	}
 
 	s, err := wish.NewServer(
 		wish.WithAddress(fmt.Sprintf("%s:%s", host, port)),
 		wish.WithHostKeyPath("ssh_data/term_info_ed25519"),
 		wish.WithPublicKeyAuth(AuthHandler(dbh, logger)),
+		wish.WithMiddleware(WishMiddleware(handler)),
 		ptun.WithWebTunnel(ptun.NewWebTunnelHandler(serveMux, logger)),
 	)
 
