@@ -4,13 +4,16 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"path/filepath"
 	"strings"
 
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared"
+	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pico/tui/common"
+	sst "github.com/picosh/pobj/storage"
 	"github.com/picosh/send/send/utils"
 )
 
@@ -57,6 +60,7 @@ type Cmd struct {
 	Dbpool  db.DB
 	Write   bool
 	Styles  common.Styles
+	Storage sst.ObjectStorage
 }
 
 func (c *Cmd) output(out string) {
@@ -90,6 +94,43 @@ func (c *Cmd) help() {
 }
 
 func (c *Cmd) rm(repo string) error {
+	bucket, err := c.Storage.GetBucket("imgs")
+	if err != nil {
+		return err
+	}
+
+	fp := filepath.Join("docker/registry/v2/repositories", c.User.Name, repo)
+
+	fileList, err := c.Storage.ListObjects(bucket, fp, true)
+	if err != nil {
+		return err
+	}
+
+	if len(fileList) == 0 {
+		c.output(fmt.Sprintf("repo not found (%s)", repo))
+		return nil
+	}
+	c.output(fmt.Sprintf("found (%d) objects for repo (%s), removing", len(fileList), repo))
+
+	for _, obj := range fileList {
+		fname := filepath.Join(fp, obj.Name())
+		intent := fmt.Sprintf("deleted (%s)", obj.Name())
+		c.Log.Info(
+			"attempting to delete file",
+			"user", c.User.Name,
+			"bucket", bucket.Name,
+			"repo", repo,
+			"filename", fname,
+		)
+		if c.Write {
+			err := c.Storage.DeleteObject(bucket, fname)
+			if err != nil {
+				return err
+			}
+		}
+		c.output(intent)
+	}
+
 	return nil
 }
 
@@ -98,13 +139,15 @@ func (c *Cmd) ls() error {
 }
 
 type CliHandler struct {
-	DBPool db.DB
-	Logger *slog.Logger
+	DBPool  db.DB
+	Logger  *slog.Logger
+	Storage storage.StorageServe
 }
 
 func WishMiddleware(handler *CliHandler) wish.Middleware {
 	dbpool := handler.DBPool
 	log := handler.Logger
+	st := handler.Storage
 
 	return func(next ssh.Handler) ssh.Handler {
 		return func(sesh ssh.Session) {
@@ -122,6 +165,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				Log:     log,
 				Dbpool:  dbpool,
 				Write:   false,
+				Storage: st,
 			}
 
 			if len(args) == 0 {

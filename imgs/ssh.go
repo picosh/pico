@@ -24,6 +24,7 @@ import (
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
+	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/ptun"
 )
 
@@ -124,7 +125,7 @@ func serveMux(ctx ssh.Context) http.Handler {
 		log.Printf("%+v", r)
 		shared.CorsHeaders(r.Header)
 
-		if slug != "" && r.Request.Method == http.MethodGet && strings.HasSuffix(r.Request.URL.Path, "_catalog") {
+		if r.Request.Method == http.MethodGet && strings.HasSuffix(r.Request.URL.Path, "_catalog") {
 			b, err := io.ReadAll(r.Body)
 			if err != nil {
 				return err
@@ -165,7 +166,7 @@ func serveMux(ctx ssh.Context) http.Handler {
 			r.Body = io.NopCloser(jsonBuf)
 		}
 
-		if slug != "" && r.Request.Method == http.MethodGet && (strings.Contains(r.Request.URL.Path, "/tags/") || strings.Contains(r.Request.URL.Path, "/manifests/")) {
+		if r.Request.Method == http.MethodGet && (strings.Contains(r.Request.URL.Path, "/tags/") || strings.Contains(r.Request.URL.Path, "/manifests/")) {
 			splitPath := strings.Split(r.Request.URL.Path, "/")
 
 			if len(splitPath) > 1 {
@@ -208,7 +209,7 @@ func serveMux(ctx ssh.Context) http.Handler {
 		}
 
 		locationHeader := r.Header.Get("location")
-		if slug != "" && strings.Contains(locationHeader, fmt.Sprintf("/v2/%s", slug)) {
+		if strings.Contains(locationHeader, fmt.Sprintf("/v2/%s", slug)) {
 			r.Header.Set("location", strings.ReplaceAll(locationHeader, fmt.Sprintf("/v2/%s", slug), "/v2"))
 		}
 
@@ -232,9 +233,22 @@ func StartSshServer() {
 	dbUrl := os.Getenv("DATABASE_URL")
 	logger := slog.Default()
 	dbh := postgres.NewDB(dbUrl, logger)
+	minioURL := shared.GetEnv("MINIO_URL", "")
+	minioUser := shared.GetEnv("MINIO_ROOT_USER", "")
+	minioPass := shared.GetEnv("MINIO_ROOT_PASSWORD", "")
+	storageDir := shared.GetEnv("IMGS_STORAGE_DIR", ".storage")
+	var st storage.StorageServe
+	var err error
+	fmt.Println(minioURL)
+	if minioURL == "" {
+		st, err = storage.NewStorageFS(storageDir)
+	} else {
+		st, err = storage.NewStorageMinio(minioURL, minioUser, minioPass)
+	}
 	handler := &CliHandler{
-		Logger: logger,
-		DBPool: dbh,
+		Logger:  logger,
+		DBPool:  dbh,
+		Storage: st,
 	}
 
 	s, err := wish.NewServer(
