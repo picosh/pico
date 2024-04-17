@@ -1,6 +1,6 @@
 module github.com/picosh/pico
 
-go 1.22.0
+go 1.21.9
 
 // replace github.com/picosh/ptun => /home/erock/dev/pico/ptun
 replace github.com/charmbracelet/bubbletea => github.com/charmbracelet/bubbletea v0.24.2
@@ -28,8 +28,8 @@ require (
 	github.com/muesli/reflow v0.3.0
 	github.com/muesli/termenv v0.15.2
 	github.com/neurosnap/go-exif-remove v0.0.0-20221010134343-50d1e3c35577
-	github.com/picosh/pobj v0.0.0-20240218150308-1dc70e819bbf
-	github.com/picosh/ptun v0.0.0-20240313192814-d0ca401937fe
+	github.com/picosh/pobj v0.0.0-20240417140600-2071618b61c5
+	github.com/picosh/ptun v0.0.0-20240417140706-811cc2b70d9a
 	github.com/picosh/send v0.0.0-20240217194807-77b972121e63
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06
 	github.com/sendgrid/sendgrid-go v3.13.0+incompatible
@@ -111,6 +111,7 @@ require (
 	github.com/prometheus/procfs v0.12.0 // indirect
 	github.com/prometheus/prom2json v1.3.3 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
+	github.com/rogpeppe/go-internal v1.11.0 // indirect
 	github.com/rs/xid v1.5.0 // indirect
 	github.com/safchain/ethtool v0.3.0 // indirect
 	github.com/secure-io/sio-go v0.3.1 // indirect
