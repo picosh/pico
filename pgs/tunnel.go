@@ -1,6 +1,7 @@
 package pgs
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -122,7 +123,8 @@ func createHttpHandler(apiConfig *shared.ApiConfig) CtxHttpBridge {
 
 		subdomainRoutes := createSubdomainRoutes(allowPerm)
 		routes = append(routes, subdomainRoutes...)
-		finctx := apiConfig.CreateCtx(ctx, subdomain)
+		finctx := apiConfig.CreateCtx(context.Background(), subdomain)
+		finctx = context.WithValue(finctx, shared.CtxSshKey{}, ctx)
 		httpHandler := shared.CreateServeBasic(routes, finctx)
 		httpRouter := http.HandlerFunc(httpHandler)
 		return httpRouter

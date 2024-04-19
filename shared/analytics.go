@@ -95,6 +95,13 @@ func AnalyticsVisitFromRequest(r *http.Request, userID string, secret string) (*
 	if ipOrig == "" {
 		ipOrig = r.RemoteAddr
 	}
+	// probably means this is a web tunnel
+	if ipOrig == "" || ipOrig == "@" {
+		sshCtx, err := GetSshCtx(r)
+		if err == nil {
+			ipOrig = sshCtx.RemoteAddr().String()
+		}
+	}
 	ipAddress, err := cleanIpAddress(ipOrig)
 	if err != nil {
 		return nil, err

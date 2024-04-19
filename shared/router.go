@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared/storage"
 )
@@ -147,6 +148,15 @@ type ctxLoggerKey struct{}
 type ctxSubdomainKey struct{}
 type ctxCfg struct{}
 type ctxAnalyticsQueue struct{}
+type CtxSshKey struct{}
+
+func GetSshCtx(r *http.Request) (ssh.Context, error) {
+	payload, ok := r.Context().Value(CtxSshKey{}).(ssh.Context)
+	if payload == nil || !ok {
+		return payload, fmt.Errorf("sshCtx not set on `r.Context()` for connection")
+	}
+	return payload, nil
+}
 
 func GetCfg(r *http.Request) *ConfigSite {
 	return r.Context().Value(ctxCfg{}).(*ConfigSite)

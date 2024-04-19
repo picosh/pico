@@ -12,6 +12,7 @@ import (
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
 	bm "github.com/charmbracelet/wish/bubbletea"
+	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
 	uploadassets "github.com/picosh/pico/filehandlers/assets"
 	"github.com/picosh/pico/shared"
@@ -65,8 +66,8 @@ func StartSshServer() {
 	promPort := shared.GetEnv("PGS_PROM_PORT", "9222")
 	cfg := NewConfigSite()
 	logger := cfg.Logger
-	dbh := postgres.NewDB(cfg.DbURL, cfg.Logger)
-	defer dbh.Close()
+	dbpool := postgres.NewDB(cfg.DbURL, cfg.Logger)
+	defer dbpool.Close()
 
 	var st storage.StorageServe
 	var err error
@@ -82,15 +83,18 @@ func StartSshServer() {
 	}
 
 	handler := uploadassets.NewUploadAssetHandler(
-		dbh,
+		dbpool,
 		cfg,
 		st,
 	)
 
+	ch := make(chan *db.AnalyticsVisits)
+	go shared.AnalyticsCollect(ch, dbpool, logger)
 	apiConfig := &shared.ApiConfig{
-		Cfg:     cfg,
-		Dbpool:  dbh,
-		Storage: st,
+		Cfg:            cfg,
+		Dbpool:         dbpool,
+		Storage:        st,
+		AnalyticsQueue: ch,
 	}
 
 	webTunnel := &ptun.WebTunnelHandler{
