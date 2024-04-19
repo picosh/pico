@@ -1,9 +1,12 @@
 package imgs
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
+	"net/http"
 	"path/filepath"
 	"strings"
 
@@ -54,13 +57,14 @@ func flagCheck(cmd *flag.FlagSet, posArg string, cmdArgs []string) bool {
 }
 
 type Cmd struct {
-	User    *db.User
-	Session shared.CmdSession
-	Log     *slog.Logger
-	Dbpool  db.DB
-	Write   bool
-	Styles  common.Styles
-	Storage sst.ObjectStorage
+	User        *db.User
+	Session     shared.CmdSession
+	Log         *slog.Logger
+	Dbpool      db.DB
+	Write       bool
+	Styles      common.Styles
+	Storage     sst.ObjectStorage
+	RegistryUrl string
 }
 
 func (c *Cmd) output(out string) {
@@ -134,14 +138,49 @@ func (c *Cmd) rm(repo string) error {
 	return nil
 }
 
+type RegistryCatalog struct {
+	Repos []string `json:"repositories"`
+}
+
 func (c *Cmd) ls() error {
+	res, err := http.Get(
+		fmt.Sprintf("http://%s/v2/_catalog", c.RegistryUrl),
+	)
+	if err != nil {
+		return err
+	}
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return err
+	}
+
+	var data RegistryCatalog
+	err = json.Unmarshal(body, &data)
+
+	if err != nil {
+		return err
+	}
+
+	if len(data.Repos) == 0 {
+		c.output("You don't have any repos on imgs.sh")
+		return nil
+	}
+
+	out := "repos\n"
+	out += "-----\n"
+	for _, repo := range data.Repos {
+		out += fmt.Sprintf("%s\n", repo)
+	}
+	c.output(out)
 	return nil
 }
 
 type CliHandler struct {
-	DBPool  db.DB
-	Logger  *slog.Logger
-	Storage storage.StorageServe
+	DBPool      db.DB
+	Logger      *slog.Logger
+	Storage     storage.StorageServe
+	RegistryUrl string
 }
 
 func WishMiddleware(handler *CliHandler) wish.Middleware {
@@ -160,12 +199,13 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 			args := sesh.Command()
 
 			opts := Cmd{
-				Session: sesh,
-				User:    user,
-				Log:     log,
-				Dbpool:  dbpool,
-				Write:   false,
-				Storage: st,
+				Session:     sesh,
+				User:        user,
+				Log:         log,
+				Dbpool:      dbpool,
+				Write:       false,
+				Storage:     st,
+				RegistryUrl: handler.RegistryUrl,
 			}
 
 			if len(args) == 0 {

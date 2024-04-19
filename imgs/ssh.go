@@ -73,152 +73,154 @@ func (e *ErrorHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, e.Err.Error(), http.StatusInternalServerError)
 }
 
-func serveMux(ctx ssh.Context) http.Handler {
-	router := http.NewServeMux()
+func createServeMux(handler *CliHandler) func(ctx ssh.Context) http.Handler {
+	return func(ctx ssh.Context) http.Handler {
+		router := http.NewServeMux()
 
-	slug := ""
-	user, err := getUserCtx(ctx)
-	if err == nil && user != nil {
-		slug = user.Name
-	}
-
-	proxy := httputil.NewSingleHostReverseProxy(&url.URL{
-		Scheme: "http",
-		Host:   "0.0.0.0:5000",
-	})
-
-	oldDirector := proxy.Director
-
-	proxy.Director = func(r *http.Request) {
-		log.Printf("%+v", r)
-		oldDirector(r)
-
-		if strings.HasSuffix(r.URL.Path, "_catalog") || r.URL.Path == "/v2" || r.URL.Path == "/v2/" {
-			return
+		slug := ""
+		user, err := getUserCtx(ctx)
+		if err == nil && user != nil {
+			slug = user.Name
 		}
 
-		fullPath := strings.TrimPrefix(r.URL.Path, "/v2")
+		proxy := httputil.NewSingleHostReverseProxy(&url.URL{
+			Scheme: "http",
+			Host:   handler.RegistryUrl,
+		})
 
-		newPath, err := url.JoinPath("/v2", slug, fullPath)
-		if err != nil {
-			return
-		}
+		oldDirector := proxy.Director
 
-		r.URL.Path = newPath
+		proxy.Director = func(r *http.Request) {
+			log.Printf("%+v", r)
+			oldDirector(r)
 
-		query := r.URL.Query()
+			if strings.HasSuffix(r.URL.Path, "_catalog") || r.URL.Path == "/v2" || r.URL.Path == "/v2/" {
+				return
+			}
 
-		if query.Has("from") {
-			joinedFrom, err := url.JoinPath(slug, query.Get("from"))
+			fullPath := strings.TrimPrefix(r.URL.Path, "/v2")
+
+			newPath, err := url.JoinPath("/v2", slug, fullPath)
 			if err != nil {
 				return
 			}
-			query.Set("from", joinedFrom)
 
-			r.URL.RawQuery = query.Encode()
-		}
+			r.URL.Path = newPath
 
-		log.Printf("%+v", r)
-	}
+			query := r.URL.Query()
 
-	proxy.ModifyResponse = func(r *http.Response) error {
-		log.Printf("%+v", r)
-		shared.CorsHeaders(r.Header)
-
-		if r.Request.Method == http.MethodGet && strings.HasSuffix(r.Request.URL.Path, "_catalog") {
-			b, err := io.ReadAll(r.Body)
-			if err != nil {
-				return err
-			}
-
-			err = r.Body.Close()
-			if err != nil {
-				return err
-			}
-
-			var data map[string]any
-			err = json.Unmarshal(b, &data)
-			if err != nil {
-				return err
-			}
-
-			newRepos := []string{}
-
-			if repos, ok := data["repositories"].([]any); ok {
-				for _, repo := range repos {
-					if repoStr, ok := repo.(string); ok && strings.HasPrefix(repoStr, slug) {
-						newRepos = append(newRepos, strings.Replace(repoStr, fmt.Sprintf("%s/", slug), "", 1))
-					}
+			if query.Has("from") {
+				joinedFrom, err := url.JoinPath(slug, query.Get("from"))
+				if err != nil {
+					return
 				}
+				query.Set("from", joinedFrom)
+
+				r.URL.RawQuery = query.Encode()
 			}
 
-			data["repositories"] = newRepos
-
-			newB, err := json.Marshal(data)
-			if err != nil {
-				return err
-			}
-
-			jsonBuf := bytes.NewBuffer(newB)
-
-			r.ContentLength = int64(jsonBuf.Len())
-			r.Header.Set("Content-Length", strconv.FormatInt(r.ContentLength, 10))
-			r.Body = io.NopCloser(jsonBuf)
+			log.Printf("%+v", r)
 		}
 
-		if r.Request.Method == http.MethodGet && (strings.Contains(r.Request.URL.Path, "/tags/") || strings.Contains(r.Request.URL.Path, "/manifests/")) {
-			splitPath := strings.Split(r.Request.URL.Path, "/")
+		proxy.ModifyResponse = func(r *http.Response) error {
+			log.Printf("%+v", r)
+			shared.CorsHeaders(r.Header)
 
-			if len(splitPath) > 1 {
-				ele := splitPath[len(splitPath)-2]
-				if ele == "tags" || ele == "manifests" {
-					b, err := io.ReadAll(r.Body)
-					if err != nil {
-						return err
-					}
+			if r.Request.Method == http.MethodGet && strings.HasSuffix(r.Request.URL.Path, "_catalog") {
+				b, err := io.ReadAll(r.Body)
+				if err != nil {
+					return err
+				}
 
-					err = r.Body.Close()
-					if err != nil {
-						return err
-					}
+				err = r.Body.Close()
+				if err != nil {
+					return err
+				}
 
-					var data map[string]any
-					err = json.Unmarshal(b, &data)
-					if err != nil {
-						return err
-					}
+				var data map[string]any
+				err = json.Unmarshal(b, &data)
+				if err != nil {
+					return err
+				}
 
-					if name, ok := data["name"].(string); ok {
-						if strings.HasPrefix(name, slug) {
-							data["name"] = strings.Replace(name, fmt.Sprintf("%s/", slug), "", 1)
+				newRepos := []string{}
+
+				if repos, ok := data["repositories"].([]any); ok {
+					for _, repo := range repos {
+						if repoStr, ok := repo.(string); ok && strings.HasPrefix(repoStr, slug) {
+							newRepos = append(newRepos, strings.Replace(repoStr, fmt.Sprintf("%s/", slug), "", 1))
 						}
 					}
+				}
 
-					newB, err := json.Marshal(data)
-					if err != nil {
-						return err
+				data["repositories"] = newRepos
+
+				newB, err := json.Marshal(data)
+				if err != nil {
+					return err
+				}
+
+				jsonBuf := bytes.NewBuffer(newB)
+
+				r.ContentLength = int64(jsonBuf.Len())
+				r.Header.Set("Content-Length", strconv.FormatInt(r.ContentLength, 10))
+				r.Body = io.NopCloser(jsonBuf)
+			}
+
+			if r.Request.Method == http.MethodGet && (strings.Contains(r.Request.URL.Path, "/tags/") || strings.Contains(r.Request.URL.Path, "/manifests/")) {
+				splitPath := strings.Split(r.Request.URL.Path, "/")
+
+				if len(splitPath) > 1 {
+					ele := splitPath[len(splitPath)-2]
+					if ele == "tags" || ele == "manifests" {
+						b, err := io.ReadAll(r.Body)
+						if err != nil {
+							return err
+						}
+
+						err = r.Body.Close()
+						if err != nil {
+							return err
+						}
+
+						var data map[string]any
+						err = json.Unmarshal(b, &data)
+						if err != nil {
+							return err
+						}
+
+						if name, ok := data["name"].(string); ok {
+							if strings.HasPrefix(name, slug) {
+								data["name"] = strings.Replace(name, fmt.Sprintf("%s/", slug), "", 1)
+							}
+						}
+
+						newB, err := json.Marshal(data)
+						if err != nil {
+							return err
+						}
+
+						jsonBuf := bytes.NewBuffer(newB)
+
+						r.ContentLength = int64(jsonBuf.Len())
+						r.Header.Set("Content-Length", strconv.FormatInt(r.ContentLength, 10))
+						r.Body = io.NopCloser(jsonBuf)
 					}
-
-					jsonBuf := bytes.NewBuffer(newB)
-
-					r.ContentLength = int64(jsonBuf.Len())
-					r.Header.Set("Content-Length", strconv.FormatInt(r.ContentLength, 10))
-					r.Body = io.NopCloser(jsonBuf)
 				}
 			}
+
+			locationHeader := r.Header.Get("location")
+			if strings.Contains(locationHeader, fmt.Sprintf("/v2/%s", slug)) {
+				r.Header.Set("location", strings.ReplaceAll(locationHeader, fmt.Sprintf("/v2/%s", slug), "/v2"))
+			}
+
+			return nil
 		}
 
-		locationHeader := r.Header.Get("location")
-		if strings.Contains(locationHeader, fmt.Sprintf("/v2/%s", slug)) {
-			r.Header.Set("location", strings.ReplaceAll(locationHeader, fmt.Sprintf("/v2/%s", slug), "/v2"))
-		}
+		router.HandleFunc("/", proxy.ServeHTTP)
 
-		return nil
+		return router
 	}
-
-	router.HandleFunc("/", proxy.ServeHTTP)
-
-	return router
 }
 
 func StartSshServer() {
@@ -233,6 +235,7 @@ func StartSshServer() {
 	dbUrl := os.Getenv("DATABASE_URL")
 	logger := slog.Default()
 	dbh := postgres.NewDB(dbUrl, logger)
+	registryUrl := shared.GetEnv("REGISTRY_URL", "registry:5000")
 	minioURL := shared.GetEnv("MINIO_URL", "")
 	minioUser := shared.GetEnv("MINIO_ROOT_USER", "")
 	minioPass := shared.GetEnv("MINIO_ROOT_PASSWORD", "")
@@ -249,9 +252,10 @@ func StartSshServer() {
 	}
 
 	handler := &CliHandler{
-		Logger:  logger,
-		DBPool:  dbh,
-		Storage: st,
+		Logger:      logger,
+		DBPool:      dbh,
+		Storage:     st,
+		RegistryUrl: registryUrl,
 	}
 
 	s, err := wish.NewServer(
@@ -259,7 +263,7 @@ func StartSshServer() {
 		wish.WithHostKeyPath("ssh_data/term_info_ed25519"),
 		wish.WithPublicKeyAuth(AuthHandler(dbh, logger)),
 		wish.WithMiddleware(WishMiddleware(handler)),
-		ptun.WithWebTunnel(ptun.NewWebTunnelHandler(serveMux, logger)),
+		ptun.WithWebTunnel(ptun.NewWebTunnelHandler(createServeMux(handler), logger)),
 	)
 
 	if err != nil {
