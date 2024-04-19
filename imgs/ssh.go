@@ -239,12 +239,15 @@ func StartSshServer() {
 	storageDir := shared.GetEnv("IMGS_STORAGE_DIR", ".storage")
 	var st storage.StorageServe
 	var err error
-	fmt.Println(minioURL)
 	if minioURL == "" {
 		st, err = storage.NewStorageFS(storageDir)
 	} else {
 		st, err = storage.NewStorageMinio(minioURL, minioUser, minioPass)
 	}
+	if err != nil {
+		panic(err)
+	}
+
 	handler := &CliHandler{
 		Logger:  logger,
 		DBPool:  dbh,
