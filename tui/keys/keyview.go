@@ -72,14 +72,16 @@ func (f fingerprint) state(s keyState, styles common.Styles) string {
 }
 
 type styledKey struct {
-	styles      common.Styles
-	date        string
-	fingerprint fingerprint
-	gutter      string
-	keyLabel    string
-	dateLabel   string
-	dateVal     string
-	note        string
+	styles       common.Styles
+	date         string
+	fingerprint  fingerprint
+	gutter       string
+	keyLabel     string
+	dateLabel    string
+	commentLabel string
+	commentVal   string
+	dateVal      string
+	note         string
 }
 
 func (m Model) newStyledKey(styles common.Styles, key *db.PublicKey, active bool) styledKey {
@@ -96,14 +98,16 @@ func (m Model) newStyledKey(styles common.Styles, key *db.PublicKey, active bool
 
 	// Default state
 	return styledKey{
-		styles:      styles,
-		date:        date,
-		fingerprint: fingerprint{fp},
-		gutter:      " ",
-		keyLabel:    "Key:",
-		dateLabel:   "Added:",
-		dateVal:     styles.LabelDim.Render(date),
-		note:        note,
+		styles:       styles,
+		date:         date,
+		fingerprint:  fingerprint{fp},
+		gutter:       " ",
+		keyLabel:     "Key:",
+		dateLabel:    "Added:",
+		commentLabel: "Comment:",
+		commentVal:   key.Name,
+		dateVal:      styles.LabelDim.Render(date),
+		note:         note,
 	}
 }
 
@@ -112,6 +116,7 @@ func (k *styledKey) selected() {
 	k.gutter = common.VerticalLine(k.styles.Renderer, common.StateSelected)
 	k.keyLabel = k.styles.Label.Render("Key:")
 	k.dateLabel = k.styles.Label.Render("Added:")
+	k.commentLabel = k.styles.Label.Render("Comment:")
 }
 
 // Deleting state.
@@ -119,6 +124,7 @@ func (k *styledKey) deleting() {
 	k.gutter = common.VerticalLine(k.styles.Renderer, common.StateDeleting)
 	k.keyLabel = k.styles.Delete.Render("Key:")
 	k.dateLabel = k.styles.Delete.Render("Added:")
+	k.commentLabel = k.styles.Delete.Render("Comment:")
 	k.dateVal = k.styles.DeleteDim.Render(k.date)
 }
 
@@ -130,8 +136,9 @@ func (k styledKey) render(state keyState) string {
 		k.deleting()
 	}
 	return fmt.Sprintf(
-		"%s %s %s\n%s %s %s %s\n\n",
+		"%s %s %s\n%s %s %s\n%s %s %s %s\n\n",
 		k.gutter, k.keyLabel, k.fingerprint.state(state, k.styles),
-		k.gutter, k.dateLabel, k.dateVal, k.note,
+		k.gutter, k.dateLabel, k.dateVal,
+		k.gutter, k.commentLabel, k.commentVal, k.note,
 	)
 }

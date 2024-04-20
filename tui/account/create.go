@@ -8,7 +8,9 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	input "github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
+	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/tui/common"
 )
 
@@ -49,7 +51,7 @@ type CreateModel struct {
 	Quit bool // true when the user wants to quit the whole program
 
 	dbpool    db.DB
-	publicKey string
+	publicKey ssh.PublicKey
 	styles    common.Styles
 	state     state
 	newName   string
@@ -92,7 +94,7 @@ func (m *CreateModel) indexBackward() {
 }
 
 // NewModel returns a new username model in its initial state.
-func NewCreateModel(styles common.Styles, dbpool db.DB, publicKey string) CreateModel {
+func NewCreateModel(styles common.Styles, dbpool db.DB, publicKey ssh.PublicKey) CreateModel {
 	im := input.New()
 	im.Cursor.Style = styles.Cursor
 	im.Placeholder = "enter username"
@@ -116,7 +118,7 @@ func NewCreateModel(styles common.Styles, dbpool db.DB, publicKey string) Create
 }
 
 // Init is the Bubble Tea initialization function.
-func Init(styles common.Styles, dbpool db.DB, publicKey string) func() (CreateModel, tea.Cmd) {
+func Init(styles common.Styles, dbpool db.DB, publicKey ssh.PublicKey) func() (CreateModel, tea.Cmd) {
 	return func() (CreateModel, tea.Cmd) {
 		m := NewCreateModel(styles, dbpool, publicKey)
 		return m, InitialCmd()
@@ -264,8 +266,12 @@ func createAccount(m CreateModel) tea.Cmd {
 			return NameInvalidMsg{}
 		}
 
-		user, err := m.dbpool.RegisterUser(m.newName, m.publicKey)
-		fmt.Println(err)
+		key, err := shared.KeyForKeyText(m.publicKey)
+		if err != nil {
+			return errMsg{err}
+		}
+
+		user, err := m.dbpool.RegisterUser(m.newName, key)
 		if err != nil {
 			if errors.Is(err, db.ErrNameTaken) {
 				return NameTakenMsg{}

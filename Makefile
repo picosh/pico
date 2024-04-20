@@ -36,6 +36,10 @@ bp-auth: bp-setup
 	$(DOCKER_BUILDX_BUILD) -t ghcr.io/picosh/pico/auth-web:$(DOCKER_TAG) --build-arg APP=auth --target release-web .
 .PHONY: bp-auth
 
+bp-pico: bp-setup
+	$(DOCKER_BUILDX_BUILD) -t ghcr.io/picosh/pico/pico-ssh:$(DOCKER_TAG) --build-arg APP=pico --target release-ssh .
+.PHONY: bp-auth
+
 bp-bouncer: bp-setup
 	$(DOCKER_BUILDX_BUILD) -t ghcr.io/picosh/pico/bouncer:$(DOCKER_TAG) ./bouncer
 .PHONY: bp-bouncer
@@ -52,18 +56,12 @@ bp-%: bp-setup
 bp-all: bp-prose bp-pastes bp-imgs bp-feeds bp-pgs bp-auth bp-bouncer
 .PHONY: bp-all
 
-bp-podman-%:
-	$(DOCKER_CMD) buildx build --platform $(DOCKER_PLATFORM) --build-arg "APP=$*" -t "ghcr.io/picosh/pico/$*-ssh:$(DOCKER_TAG)" --target release-ssh .
-	$(DOCKER_CMD) buildx build --platform $(DOCKER_PLATFORM) --build-arg "APP=$*" -t "ghcr.io/picosh/pico/$*-web:$(DOCKER_TAG)" --target release-web .
-	$(DOCKER_CMD) push "ghcr.io/picosh/pico/$*-ssh:$(DOCKER_TAG)"
-	$(DOCKER_CMD) push "ghcr.io/picosh/pico/$*-web:$(DOCKER_TAG)"
-.PHONY: bp-%
-
-bp-podman-all: bp-podman-prose bp-podman-pastes bp-podman-imgs bp-podman-feeds bp-podman-pgs
-.PHONY: all
-
 build-auth:
 	go build -o "build/auth" "./cmd/auth/web"
+.PHONY: build-auth
+
+build-pico:
+	go build -o "build/pico-ssh" "./cmd/pico/ssh"
 .PHONY: build-auth
 
 build-%:
@@ -71,7 +69,7 @@ build-%:
 	go build -o "build/$*-ssh" "./cmd/$*/ssh"
 .PHONY: build-%
 
-build: build-prose build-pastes build-imgs build-feeds build-pgs build-auth
+build: build-prose build-pastes build-imgs build-feeds build-pgs build-auth build-pico
 .PHONY: build
 
 store-clean:
@@ -125,10 +123,11 @@ migrate:
 	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20240221_add_project_acl.sql
 	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20240311_add_public_key_name.sql
 	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20240324_add_analytics_table.sql
+	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20240420_add_pico_space.sql
 .PHONY: migrate
 
 latest:
-	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20240324_add_analytics_table.sql
+	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20240420_add_pico_space.sql
 .PHONY: latest
 
 psql:
