@@ -1,5 +1,7 @@
 # pico.sh - hacker labs
 
+> Read our docs at [pico.sh](https://pico.sh).
+
 Open source and managed services leveraging SSH.
 
 The secret ingredient to all our services is how we let users
@@ -18,8 +20,6 @@ colleague?  Use rsync, scp, or sftp.  Hopefully you see the trend.
 - prose.sh: A blog platform using SSH for content management.
 - pastes.sh: Upload code snippets using SSH.
 - feeds.sh: An RSS email notification system using SSH.
-
-Read our docs at [pico.sh](https://pico.sh).
 
 ## development
 
