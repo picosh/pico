@@ -13,9 +13,10 @@ Want to publish a blog post? Use rsync, scp, or sftp. Want to publish a website?
 Use rsync, scp, or sftp. Want to share a code snippet with a colleague? Use
 rsync, scp, or sftp. Hopefully you see the trend.
 
-- [pgs.sh](https://pico.sh/pgs): A static site hosting platform using SSH.
-- [tuns.sh](https://pico.sh/tuns): https/wss/tcp tunnels to localhost using
-  only SSH.
+- [pgs.sh](https://pico.sh/pgs): A static site hosting platform using SSH for
+  site deployments.
+- [tuns.sh](https://pico.sh/tuns): https/wss/tcp tunnels to localhost using only
+  SSH.
 - [imgs.sh](https://pico.sh/imgs): Docker image registry using SSH for
   authentication.
 - [prose.sh](https://prose.sh): A blog platform using SSH for content
