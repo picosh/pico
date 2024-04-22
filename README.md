@@ -1,6 +1,7 @@
 # pico.sh - hacker labs
 
-> [!IMPORTANT] Read our docs at [pico.sh](https://pico.sh).
+> [!IMPORTANT]\
+> Read our docs at [pico.sh](https://pico.sh).
 
 Open source and managed services leveraging SSH.
 
