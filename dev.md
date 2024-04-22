@@ -34,14 +34,14 @@ make build
 
 All services are built inside the `./build` folder.
 
-If you want to start prose execute these binaries from the project root directory:
+If you want to start prose execute these binaries from the project root
+directory:
 
 ```bash
 ./build/prose-web
 # in a separate terminal
 ./build/prose-ssh
 ```
-
 
 ## deployment
 
@@ -58,8 +58,8 @@ Once images are built, docker compose is used to stand up the services:
 docker compose up -d
 ```
 
-This makes use of a production `.env.prod` environment file which defines
-the various listening addresses and services that will be started. For production,
+This makes use of a production `.env.prod` environment file which defines the
+various listening addresses and services that will be started. For production,
 we add a `.envrc` containing the following:
 
 ```bash
@@ -75,5 +75,5 @@ ln -s .env.prod .env
 
 This allows us to use docker-compose normally as we would in development.
 
-For any migrations, logging into the our database server, pulling the changes
-to migrations and running `make latest` is all that is needed.
+For any migrations, logging into the our database server, pulling the changes to
+migrations and running `make latest` is all that is needed.
