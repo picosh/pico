@@ -1,7 +1,6 @@
 package pico
 
 import (
-	"flag"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -33,23 +32,6 @@ func getUser(s ssh.Session, dbpool db.DB) (*db.User, error) {
 	return user, nil
 }
 
-func flagSet(cmdName string, sesh ssh.Session) (*flag.FlagSet, *bool) {
-	cmd := flag.NewFlagSet(cmdName, flag.ContinueOnError)
-	cmd.SetOutput(sesh)
-	write := cmd.Bool("write", false, "apply changes")
-	return cmd, write
-}
-
-func flagCheck(cmd *flag.FlagSet, posArg string, cmdArgs []string) bool {
-	_ = cmd.Parse(cmdArgs)
-
-	if posArg == "-h" || posArg == "--help" || posArg == "-help" {
-		cmd.Usage()
-		return false
-	}
-	return true
-}
-
 type Cmd struct {
 	User    *db.User
 	Session shared.CmdSession
@@ -61,20 +43,6 @@ type Cmd struct {
 
 func (c *Cmd) output(out string) {
 	_, _ = c.Session.Write([]byte(out + "\r\n"))
-}
-
-func (c *Cmd) error(err error) {
-	_, _ = fmt.Fprint(c.Session.Stderr(), err, "\r\n")
-	_ = c.Session.Exit(1)
-	_ = c.Session.Close()
-}
-
-func (c *Cmd) bail(err error) {
-	if err == nil {
-		return
-	}
-	c.Log.Error(err.Error())
-	c.error(err)
 }
 
 func (c *Cmd) help() {
