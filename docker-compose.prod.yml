@@ -382,3 +382,9 @@ networks:
     ipam:
       config:
         - subnet: 172.23.0.0/16
+  pico:
+    driver_opts:
+      com.docker.network.bridge.name: pico
+    ipam:
+      config:
+        - subnet: 172.24.0.0/16

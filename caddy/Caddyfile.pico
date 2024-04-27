@@ -1,4 +1,4 @@
-pico.sh {
+{$APP_DOMAIN}, tmp.pico.sh {
   reverse_proxy https://pico-docs-prod.pgs.sh {
     header_up Host pico-docs-prod.pgs.sh
   }
