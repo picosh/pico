@@ -315,7 +315,7 @@ services:
       APP_DOMAIN: ${PICO_DOMAIN:-pico.sh}
       APP_EMAIL: ${PICO_EMAIL:-hello@pico.sh}
     volumes:
-      - ${PICO_CADDYFILE}:/etc/caddy/Caddyfile.pico
+      - ${PICO_CADDYFILE}:/etc/caddy/Caddyfile
       - ./data/pico-caddy/data:/data
       - ./data/pico-caddy/config:/config
     ports:
