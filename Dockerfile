@@ -25,7 +25,18 @@ ENV GOOS=${TARGETOS} GOARCH=${TARGETARCH}
 
 RUN go build -ldflags "$LDFLAGS" -o /go/bin/${APP}-web ./cmd/${APP}/web
 
-FROM builder-web as builder-ssh
+FROM builder-deps as builder-ssh
+
+COPY . .
+
+ARG APP=prose
+ARG TARGETOS
+ARG TARGETARCH
+
+ENV CGO_ENABLED=0
+ENV LDFLAGS="-s -w"
+
+ENV GOOS=${TARGETOS} GOARCH=${TARGETARCH}
 
 RUN go build -ldflags "$LDFLAGS" -o /go/bin/${APP}-ssh ./cmd/${APP}/ssh
 

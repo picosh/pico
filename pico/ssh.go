@@ -1,4 +1,4 @@
-package pgs
+package pico
 
 import (
 	"context"
@@ -11,13 +11,11 @@ import (
 	"github.com/charmbracelet/promwish"
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
-	"github.com/picosh/pico/db"
+	bm "github.com/charmbracelet/wish/bubbletea"
 	"github.com/picosh/pico/db/postgres"
-	uploadassets "github.com/picosh/pico/filehandlers/assets"
 	"github.com/picosh/pico/shared"
-	"github.com/picosh/pico/shared/storage"
+	"github.com/picosh/pico/tui"
 	wsh "github.com/picosh/pico/wish"
-	"github.com/picosh/ptun"
 	"github.com/picosh/send/list"
 	"github.com/picosh/send/pipe"
 	"github.com/picosh/send/proxy"
@@ -32,7 +30,7 @@ func authHandler(ctx ssh.Context, key ssh.PublicKey) bool {
 	return true
 }
 
-func createRouter(cfg *shared.ConfigSite, handler *uploadassets.UploadAssetHandler) proxy.Router {
+func createRouter(cfg *shared.ConfigSite, handler *UploadHandler, cliHandler *CliHandler) proxy.Router {
 	return func(sh ssh.Handler, s ssh.Session) []wish.Middleware {
 		return []wish.Middleware{
 			pipe.Middleware(handler, ""),
@@ -40,74 +38,50 @@ func createRouter(cfg *shared.ConfigSite, handler *uploadassets.UploadAssetHandl
 			scp.Middleware(handler),
 			wishrsync.Middleware(handler),
 			auth.Middleware(handler),
-			wsh.PtyMdw(wsh.DeprecatedNotice()),
-			WishMiddleware(handler),
+			wsh.PtyMdw(bm.Middleware(tui.CmsMiddleware(cfg))),
+			WishMiddleware(cliHandler),
 			wsh.LogMiddleware(handler.GetLogger()),
 		}
 	}
 }
 
-func withProxy(cfg *shared.ConfigSite, handler *uploadassets.UploadAssetHandler, otherMiddleware ...wish.Middleware) ssh.Option {
+func withProxy(cfg *shared.ConfigSite, handler *UploadHandler, cliHandler *CliHandler, otherMiddleware ...wish.Middleware) ssh.Option {
 	return func(server *ssh.Server) error {
 		err := sftp.SSHOption(handler)(server)
 		if err != nil {
 			return err
 		}
 
-		return proxy.WithProxy(createRouter(cfg, handler), otherMiddleware...)(server)
+		return proxy.WithProxy(createRouter(cfg, handler, cliHandler), otherMiddleware...)(server)
 	}
 }
 
 func StartSshServer() {
-	host := shared.GetEnv("PGS_HOST", "0.0.0.0")
-	port := shared.GetEnv("PGS_SSH_PORT", "2222")
-	promPort := shared.GetEnv("PGS_PROM_PORT", "9222")
+	host := shared.GetEnv("PICO_HOST", "0.0.0.0")
+	port := shared.GetEnv("PICO_SSH_PORT", "2222")
+	promPort := shared.GetEnv("PICO_PROM_PORT", "9222")
 	cfg := NewConfigSite()
 	logger := cfg.Logger
 	dbpool := postgres.NewDB(cfg.DbURL, cfg.Logger)
 	defer dbpool.Close()
 
-	var st storage.StorageServe
-	var err error
-	if cfg.MinioURL == "" {
-		st, err = storage.NewStorageFS(cfg.StorageDir)
-	} else {
-		st, err = storage.NewStorageMinio(cfg.MinioURL, cfg.MinioUser, cfg.MinioPass)
-	}
-
-	if err != nil {
-		logger.Error(err.Error())
-		return
-	}
-
-	handler := uploadassets.NewUploadAssetHandler(
+	handler := NewUploadHandler(
 		dbpool,
 		cfg,
-		st,
 	)
-
-	ch := make(chan *db.AnalyticsVisits)
-	go shared.AnalyticsCollect(ch, dbpool, logger)
-	apiConfig := &shared.ApiConfig{
-		Cfg:            cfg,
-		Dbpool:         dbpool,
-		Storage:        st,
-		AnalyticsQueue: ch,
-	}
-
-	webTunnel := &ptun.WebTunnelHandler{
-		Logger:      logger,
-		HttpHandler: createHttpHandler(apiConfig),
+	cliHandler := &CliHandler{
+		Logger: logger,
+		DBPool: dbpool,
 	}
 
 	s, err := wish.NewServer(
 		wish.WithAddress(fmt.Sprintf("%s:%s", host, port)),
 		wish.WithHostKeyPath("ssh_data/term_info_ed25519"),
 		wish.WithPublicKeyAuth(authHandler),
-		ptun.WithWebTunnel(webTunnel),
 		withProxy(
 			cfg,
 			handler,
+			cliHandler,
 			promwish.Middleware(fmt.Sprintf("%s:%s", host, promPort), "pgs-ssh"),
 		),
 	)

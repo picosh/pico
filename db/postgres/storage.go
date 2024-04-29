@@ -136,7 +136,7 @@ var (
 
 const (
 	sqlSelectPublicKey         = `SELECT id, user_id, name, public_key, created_at FROM public_keys WHERE public_key = $1`
-	sqlSelectPublicKeys        = `SELECT id, user_id, name, public_key, created_at FROM public_keys WHERE user_id = $1`
+	sqlSelectPublicKeys        = `SELECT id, user_id, name, public_key, created_at FROM public_keys WHERE user_id = $1 ORDER BY created_at ASC`
 	sqlSelectUser              = `SELECT id, name, created_at FROM app_users WHERE id = $1`
 	sqlSelectUserForName       = `SELECT id, name, created_at FROM app_users WHERE name = $1`
 	sqlSelectUserForNameAndKey = `SELECT app_users.id, app_users.name, app_users.created_at, public_keys.id as pk_id, public_keys.public_key, public_keys.created_at as pk_created_at FROM app_users LEFT JOIN public_keys ON public_keys.user_id = app_users.id WHERE app_users.name = $1 AND public_keys.public_key = $2`

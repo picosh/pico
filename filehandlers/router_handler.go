@@ -66,7 +66,7 @@ func (r *FileHandlerRouter) Read(s ssh.Session, entry *utils.FileEntry) (os.File
 	return handler.Read(s, entry)
 }
 
-func (r *FileHandlerRouter) List(s ssh.Session, fpath string, isDir bool, recursive bool) ([]os.FileInfo, error) {
+func BaseList(s ssh.Session, fpath string, isDir bool, recursive bool, spaces []string, dbpool db.DB) ([]os.FileInfo, error) {
 	var fileList []os.FileInfo
 	user, err := util.GetUser(s)
 	if err != nil {
@@ -88,8 +88,8 @@ func (r *FileHandlerRouter) List(s ssh.Session, fpath string, isDir bool, recurs
 			FIsDir: true,
 		})
 
-		for _, space := range r.Spaces {
-			curPosts, e := r.DBPool.FindAllPostsForUser(user.ID, space)
+		for _, space := range spaces {
+			curPosts, e := dbpool.FindAllPostsForUser(user.ID, space)
 			if e != nil {
 				err = e
 				break
@@ -97,8 +97,8 @@ func (r *FileHandlerRouter) List(s ssh.Session, fpath string, isDir bool, recurs
 			posts = append(posts, curPosts...)
 		}
 	} else {
-		for _, space := range r.Spaces {
-			p, e := r.DBPool.FindPostWithFilename(cleanFilename, user.ID, space)
+		for _, space := range spaces {
+			p, e := dbpool.FindPostWithFilename(cleanFilename, user.ID, space)
 			if e != nil {
 				err = e
 				continue
@@ -123,6 +123,10 @@ func (r *FileHandlerRouter) List(s ssh.Session, fpath string, isDir bool, recurs
 	}
 
 	return fileList, nil
+}
+
+func (r *FileHandlerRouter) List(s ssh.Session, fpath string, isDir bool, recursive bool) ([]os.FileInfo, error) {
+	return BaseList(s, fpath, isDir, recursive, r.Spaces, r.DBPool)
 }
 
 func (r *FileHandlerRouter) GetLogger() *slog.Logger {

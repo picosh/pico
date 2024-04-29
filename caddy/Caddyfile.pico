@@ -1,0 +1,10 @@
+{$APP_DOMAIN}, tmp.pico.sh {
+  reverse_proxy https://pico-docs-prod.pgs.sh {
+    header_up Host pico-docs-prod.pgs.sh
+  }
+
+  tls {$APP_EMAIL} {
+		dns cloudflare {$CF_API_TOKEN}
+		resolvers 1.1.1.1
+	}
+}

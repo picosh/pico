@@ -115,6 +115,13 @@ services:
       - feeds
       - services
       - all
+  pico-ssh:
+    image: ghcr.io/picosh/pico/pico-ssh:latest
+    restart: always
+    profiles:
+      - pico
+      - services
+      - all
   auth-web:
     image: ghcr.io/picosh/pico/auth-web:latest
     restart: always

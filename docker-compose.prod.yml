@@ -304,6 +304,41 @@ services:
     ports:
       - "${FEEDS_SSH_V4:-22}:2222"
       - "${FEEDS_SSH_V6:-[::1]:22}:2222"
+  pico-caddy:
+    image: ghcr.io/picosh/pico/caddy:latest
+    restart: always
+    networks:
+      - pico
+    env_file:
+      - .env.prod
+    environment:
+      APP_DOMAIN: ${PICO_DOMAIN:-pico.sh}
+      APP_EMAIL: ${PICO_EMAIL:-hello@pico.sh}
+    volumes:
+      - ${PICO_CADDYFILE}:/etc/caddy/Caddyfile
+      - ./data/pico-caddy/data:/data
+      - ./data/pico-caddy/config:/config
+    ports:
+      - "${PICO_HTTPS_V4:-443}:443"
+      - "${PICO_HTTP_V4:-80}:80"
+      - "${PICO_HTTPS_V6:-[::1]:443}:443"
+      - "${PICO_HTTP_V6:-[::1]:80}:80"
+    profiles:
+      - pico
+      - caddy
+      - all
+  pico-ssh:
+    networks:
+      pico:
+        aliases:
+          - ssh
+    env_file:
+      - .env.prod
+    volumes:
+      - ./data/pico-ssh/data:/app/ssh_data
+    ports:
+      - "${PICO_SSH_V4:-22}:2222"
+      - "${PICO_SSH_V6:-[::1]:22}:2222"
 
 networks:
   default:
@@ -347,3 +382,9 @@ networks:
     ipam:
       config:
         - subnet: 172.23.0.0/16
+  pico:
+    driver_opts:
+      com.docker.network.bridge.name: pico
+    ipam:
+      config:
+        - subnet: 172.24.0.0/16

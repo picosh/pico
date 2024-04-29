@@ -151,6 +151,17 @@ services:
       - ./data/feeds-ssh/data:/app/ssh_data
     ports:
       - "2225:2222"
+  pico-ssh:
+    build:
+      args:
+        APP: pico
+      target: release-ssh
+    env_file:
+      - .env.example
+    volumes:
+      - ./data/pico-ssh/data:/app/ssh_data
+    ports:
+      - "2226:2222"
   auth-web:
     build:
       args:

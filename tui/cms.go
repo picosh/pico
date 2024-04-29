@@ -79,27 +79,16 @@ func CmsMiddleware(cfg *shared.ConfigSite) bm.Handler {
 			logger.Info("no active terminal, skipping")
 			return nil, nil
 		}
-		key, err := shared.KeyText(s)
-		if err != nil {
-			logger.Error(err.Error())
-			return nil, nil
-		}
 
 		sshUser := s.User()
-
 		dbpool := postgres.NewDB(cfg.DbURL, cfg.Logger)
-
-		if err != nil {
-			logger.Error(err.Error())
-		}
-
 		renderer := lipgloss.NewRenderer(s)
 		renderer.SetOutput(common.OutputFromSession(s))
 		styles := common.DefaultStyles(renderer)
 
 		m := model{
 			cfg:        cfg,
-			publicKey:  key,
+			publicKey:  s.PublicKey(),
 			dbpool:     dbpool,
 			sshUser:    sshUser,
 			status:     statusInit,
@@ -129,7 +118,7 @@ func CmsMiddleware(cfg *shared.ConfigSite) bm.Handler {
 // Just a generic tea.Model to demo terminal information of ssh.
 type model struct {
 	cfg             *shared.ConfigSite
-	publicKey       string
+	publicKey       ssh.PublicKey
 	dbpool          db.DB
 	user            *db.User
 	plusFeatureFlag *db.FeatureFlag
@@ -160,7 +149,12 @@ func (m model) findUser() (*db.User, error) {
 		return nil, nil
 	}
 
-	user, err := m.dbpool.FindUserForKey(m.sshUser, m.publicKey)
+	key, err := shared.KeyForKeyText(m.publicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	user, err = m.dbpool.FindUserForKey(m.sshUser, key)
 
 	if err != nil {
 		logger.Error("no user found for public key", "err", err.Error())
