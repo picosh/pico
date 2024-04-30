@@ -123,6 +123,12 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 
 	return func(next ssh.Handler) ssh.Handler {
 		return func(sesh ssh.Session) {
+			_, _, activePty := sesh.Pty()
+			if activePty {
+				next(sesh)
+				return
+			}
+
 			user, err := getUser(sesh, dbpool)
 			if err != nil {
 				utils.ErrorHandler(sesh, err)

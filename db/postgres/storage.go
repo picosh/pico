@@ -349,7 +349,7 @@ func NewDB(databaseUrl string, logger *slog.Logger) *PsqlDB {
 	return d
 }
 
-func (me *PsqlDB) RegisterUser(username string, pubkey string) (*db.User, error) {
+func (me *PsqlDB) RegisterUser(username, pubkey, comment string) (*db.User, error) {
 	lowerName := strings.ToLower(username)
 	valid, err := me.ValidateName(lowerName)
 	if !valid {
@@ -377,7 +377,7 @@ func (me *PsqlDB) RegisterUser(username string, pubkey string) (*db.User, error)
 		return nil, err
 	}
 
-	err = me.LinkUserKey(id, pubkey, tx)
+	err = me.InsertPublicKey(id, pubkey, comment, tx)
 	if err != nil {
 		return nil, err
 	}
@@ -396,24 +396,10 @@ func (me *PsqlDB) RemoveUsers(userIDs []string) error {
 	return err
 }
 
-func (me *PsqlDB) LinkUserKey(userID string, key string, tx *sql.Tx) error {
+func (me *PsqlDB) InsertPublicKey(userID, key, name string, tx *sql.Tx) error {
 	pk, _ := me.FindPublicKeyForKey(key)
 	if pk != nil {
 		return db.ErrPublicKeyTaken
-	}
-	var err error
-	if tx != nil {
-		_, err = tx.Exec(sqlInsertPublicKey, userID, key)
-	} else {
-		_, err = me.Db.Exec(sqlInsertPublicKey, userID, key)
-	}
-	return err
-}
-
-func (me *PsqlDB) InsertPublicKey(userID, key, name string, tx *sql.Tx) (*db.PublicKey, error) {
-	pk, _ := me.FindPublicKeyForKey(key)
-	if pk != nil {
-		return nil, db.ErrPublicKeyTaken
 	}
 	query := `INSERT INTO public_keys (user_id, public_key, name) VALUES ($1, $2, $3)`
 	var err error
@@ -423,14 +409,10 @@ func (me *PsqlDB) InsertPublicKey(userID, key, name string, tx *sql.Tx) (*db.Pub
 		_, err = me.Db.Exec(query, userID, key, name)
 	}
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	pk, err = me.FindPublicKeyForKey(key)
-	if err != nil {
-		return nil, err
-	}
-	return pk, nil
+	return nil
 }
 
 func (me *PsqlDB) UpdatePublicKey(pubkeyID, name string) (*db.PublicKey, error) {

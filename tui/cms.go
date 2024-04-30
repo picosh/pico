@@ -155,7 +155,6 @@ func (m model) findUser() (*db.User, error) {
 	}
 
 	user, err = m.dbpool.FindUserForKey(m.sshUser, key)
-
 	if err != nil {
 		logger.Error("no user found for public key", "err", err.Error())
 		// we only want to throw an error for specific cases

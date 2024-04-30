@@ -248,7 +248,7 @@ func spinnerView(m Model) string {
 
 func addPublicKey(m Model) tea.Cmd {
 	return func() tea.Msg {
-		pk, _, _, _, err := ssh.ParseAuthorizedKey([]byte(m.newKey))
+		pk, comment, _, _, err := ssh.ParseAuthorizedKey([]byte(m.newKey))
 		if err != nil {
 			return KeyInvalidMsg{}
 		}
@@ -257,7 +257,7 @@ func addPublicKey(m Model) tea.Cmd {
 		if err != nil {
 			return KeyInvalidMsg{}
 		}
-		err = m.dbpool.LinkUserKey(m.user.ID, key, nil)
+		err = m.dbpool.InsertPublicKey(m.user.ID, key, comment, nil)
 		if err != nil {
 			if errors.Is(err, db.ErrPublicKeyTaken) {
 				return KeyTakenMsg{}

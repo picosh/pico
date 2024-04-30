@@ -104,7 +104,7 @@ func (m Model) newStyledKey(styles common.Styles, key *db.PublicKey, active bool
 		gutter:       " ",
 		keyLabel:     "Key:",
 		dateLabel:    "Added:",
-		commentLabel: "Comment:",
+		commentLabel: "Name:",
 		commentVal:   key.Name,
 		dateVal:      styles.LabelDim.Render(date),
 		note:         note,
@@ -116,7 +116,7 @@ func (k *styledKey) selected() {
 	k.gutter = common.VerticalLine(k.styles.Renderer, common.StateSelected)
 	k.keyLabel = k.styles.Label.Render("Key:")
 	k.dateLabel = k.styles.Label.Render("Added:")
-	k.commentLabel = k.styles.Label.Render("Comment:")
+	k.commentLabel = k.styles.Label.Render("Name:")
 }
 
 // Deleting state.
@@ -124,7 +124,7 @@ func (k *styledKey) deleting() {
 	k.gutter = common.VerticalLine(k.styles.Renderer, common.StateDeleting)
 	k.keyLabel = k.styles.Delete.Render("Key:")
 	k.dateLabel = k.styles.Delete.Render("Added:")
-	k.commentLabel = k.styles.Delete.Render("Comment:")
+	k.commentLabel = k.styles.Delete.Render("Name:")
 	k.dateVal = k.styles.DeleteDim.Render(k.date)
 }
 

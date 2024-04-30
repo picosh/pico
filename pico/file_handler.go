@@ -222,7 +222,7 @@ func (h *UploadHandler) ProcessAuthorizedKeys(text []byte, logger *slog.Logger, 
 
 		logger.Info("adding pubkey for user", "pubkey", key)
 
-		_, err = dbpool.InsertPublicKey(user.ID, key, pk.Comment, nil)
+		err = dbpool.InsertPublicKey(user.ID, key, pk.Comment, nil)
 		if err != nil {
 			logger.Error("could not insert pubkey", "err", err.Error())
 		}

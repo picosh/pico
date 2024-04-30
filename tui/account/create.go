@@ -236,10 +236,10 @@ func Update(msg tea.Msg, m CreateModel) (CreateModel, tea.Cmd) {
 
 // View renders current view from the model.
 func View(m CreateModel) string {
-	intro := "To create an account, enter a username.\n"
+	intro := "To create an account, enter a username.\n\n"
 	intro += "After that, go to https://pico.sh/getting-started#next-steps"
-	s := fmt.Sprintf("%s\n\n%s\n", "hacker labs", intro)
-	s += fmt.Sprintf("Public Key: %s\n\n", m.publicKey)
+	s := fmt.Sprintf("%s\n\n%s\n\n", "hacker labs", intro)
+	s += fmt.Sprintf("Public Key: %s\n\n", shared.KeyForSha256(m.publicKey))
 	s += m.input.View() + "\n\n"
 
 	if m.state == submitting {
@@ -271,7 +271,7 @@ func createAccount(m CreateModel) tea.Cmd {
 			return errMsg{err}
 		}
 
-		user, err := m.dbpool.RegisterUser(m.newName, key)
+		user, err := m.dbpool.RegisterUser(m.newName, key, "")
 		if err != nil {
 			if errors.Is(err, db.ErrNameTaken) {
 				return NameTakenMsg{}

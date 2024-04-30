@@ -26,7 +26,7 @@ func ensureUser(w http.ResponseWriter, user *db.User) bool {
 	return true
 }
 
-func registerUser(apiConfig *shared.ApiConfig, ctx ssh.Context, pubkey ssh.PublicKey, pubkeyStr string) http.HandlerFunc {
+func registerUser(apiConfig *shared.ApiConfig, ctx ssh.Context, pubkey ssh.PublicKey) http.HandlerFunc {
 	logger := apiConfig.Cfg.Logger
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -35,10 +35,18 @@ func registerUser(apiConfig *shared.ApiConfig, ctx ssh.Context, pubkey ssh.Publi
 		body, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(body, &payload)
 
-		user, err := dbpool.RegisterUser(payload.Name, pubkeyStr)
+		pubkeyStr, err := shared.KeyForKeyText(pubkey)
+		if err != nil {
+			errMsg := fmt.Sprintf("could not get pubkey text: %s", err.Error())
+			logger.Error("could not get pubkey text", "err", err.Error())
+			shared.JSONError(w, errMsg, http.StatusUnprocessableEntity)
+			return
+		}
+
+		user, err := dbpool.RegisterUser(payload.Name, pubkeyStr, "")
 		if err != nil {
 			errMsg := fmt.Sprintf("error registering user: %s", err.Error())
-			logger.Info(errMsg)
+			logger.Error("error registering user", "err", err.Error())
 			shared.JSONError(w, errMsg, http.StatusUnprocessableEntity)
 			return
 		}
@@ -47,7 +55,7 @@ func registerUser(apiConfig *shared.ApiConfig, ctx ssh.Context, pubkey ssh.Publi
 		shared.SetUserCtx(ctx, user)
 		err = json.NewEncoder(w).Encode(picoApi)
 		if err != nil {
-			logger.Error(err.Error())
+			logger.Error("json encoding error", "err", err.Error())
 		}
 	}
 }
@@ -175,7 +183,13 @@ func createPubkey(httpCtx *shared.ApiConfig, ctx ssh.Context) http.HandlerFunc {
 		var payload createPubkeyPayload
 		body, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(body, &payload)
-		pubkey, err := dbpool.InsertPublicKey(user.ID, payload.Pubkey, payload.Name, nil)
+		err := dbpool.InsertPublicKey(user.ID, payload.Pubkey, payload.Name, nil)
+		if err != nil {
+			shared.JSONError(w, err.Error(), http.StatusUnprocessableEntity)
+			return
+		}
+
+		pubkey, err := dbpool.FindPublicKeyForKey(payload.Pubkey)
 		if err != nil {
 			shared.JSONError(w, err.Error(), http.StatusUnprocessableEntity)
 			return
@@ -652,14 +666,8 @@ func CreateRoutes(apiConfig *shared.ApiConfig, ctx ssh.Context) []shared.Route {
 		return []shared.Route{}
 	}
 
-	pubkeyStr, err := shared.KeyForKeyText(pubkey)
-	if err != nil {
-		logger.Error("could not convert key to text", "err", err.Error())
-		return []shared.Route{}
-	}
-
 	return []shared.Route{
-		shared.NewCorsRoute("POST", "/api/users", registerUser(apiConfig, ctx, pubkey, pubkeyStr)),
+		shared.NewCorsRoute("POST", "/api/users", registerUser(apiConfig, ctx, pubkey)),
 		shared.NewCorsRoute("GET", "/api/features", getFeatures(apiConfig, ctx)),
 		shared.NewCorsRoute("PUT", "/api/rss-token", findOrCreateRssToken(apiConfig, ctx)),
 		shared.NewCorsRoute("GET", "/api/pubkeys", getPublicKeys(apiConfig, ctx)),
