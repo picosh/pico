@@ -60,6 +60,11 @@ func AuthHandler(dbh db.DB, log *slog.Logger) func(ssh.Context, ssh.PublicKey) b
 			return true
 		}
 
+		if !dbh.HasFeatureForUser(user.ID, "plus") {
+			log.Error("not a pico+ user", "user", user.Name)
+			return false
+		}
+
 		return false
 	}
 }

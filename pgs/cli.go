@@ -188,9 +188,9 @@ func (c *Cmd) help() {
 }
 
 func (c *Cmd) stats(cfgMaxSize uint64) error {
-	ff, err := c.Dbpool.FindFeatureForUser(c.User.ID, "pgs")
+	ff, err := c.Dbpool.FindFeatureForUser(c.User.ID, "plus")
 	if err != nil {
-		ff = db.NewFeatureFlag(c.User.ID, "pgs", cfgMaxSize, 0)
+		ff = db.NewFeatureFlag(c.User.ID, "plus", cfgMaxSize, 0)
 	}
 	// this is jank
 	ff.Data.StorageMax = ff.FindStorageMax(cfgMaxSize)

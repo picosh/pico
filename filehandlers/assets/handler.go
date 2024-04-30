@@ -208,13 +208,13 @@ func (h *UploadAssetHandler) Validate(s ssh.Session) error {
 		return fmt.Errorf("must have username set")
 	}
 
-	ff, err := h.DBPool.FindFeatureForUser(user.ID, "pgs")
+	ff, err := h.DBPool.FindFeatureForUser(user.ID, "plus")
 	// pgs.sh has a free tier so users might not have a feature flag
 	// in which case we set sane defaults
 	if err != nil {
 		ff = db.NewFeatureFlag(
 			user.ID,
-			"pgs",
+			"plus",
 			h.Cfg.MaxSize,
 			h.Cfg.MaxAssetSize,
 		)
