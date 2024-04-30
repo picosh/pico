@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/ssh"
+	"github.com/charmbracelet/wish"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/filehandlers/util"
 	"github.com/picosh/pico/shared"
@@ -140,17 +141,25 @@ type KeyWithId struct {
 }
 
 type KeyDiffResult struct {
-	Add []KeyWithId
-	Rm  []string
+	Add    []KeyWithId
+	Rm     []string
+	Update []KeyWithId
 }
 
 func authorizedKeysDiff(keyInUse ssh.PublicKey, curKeys []KeyWithId, nextKeys []KeyWithId) KeyDiffResult {
+	update := []KeyWithId{}
 	add := []KeyWithId{}
 	for _, nk := range nextKeys {
 		found := false
 		for _, ck := range curKeys {
 			if ssh.KeysEqual(nk.Pk, ck.Pk) {
 				found = true
+
+				// update the comment field
+				if nk.Comment != ck.Comment {
+					ck.Comment = nk.Comment
+					update = append(update, ck)
+				}
 				break
 			}
 		}
@@ -180,12 +189,14 @@ func authorizedKeysDiff(keyInUse ssh.PublicKey, curKeys []KeyWithId, nextKeys []
 	}
 
 	return KeyDiffResult{
-		Add: add,
-		Rm:  rm,
+		Add:    add,
+		Rm:     rm,
+		Update: update,
 	}
 }
 
 func (h *UploadHandler) ProcessAuthorizedKeys(text []byte, logger *slog.Logger, user *db.User, s ssh.Session) error {
+	logger.Info("processing new authorized_keys")
 	dbpool := h.DBPool
 
 	curKeysStr, err := dbpool.FindKeysForUser(user)
@@ -209,7 +220,7 @@ func (h *UploadHandler) ProcessAuthorizedKeys(text []byte, logger *slog.Logger, 
 		if err != nil {
 			continue
 		}
-		curKeys = append(curKeys, KeyWithId{Pk: key, ID: pk.ID})
+		curKeys = append(curKeys, KeyWithId{Pk: key, ID: pk.ID, Comment: pk.Name})
 	}
 
 	diff := authorizedKeysDiff(s.PublicKey(), curKeys, nextKeys)
@@ -220,19 +231,43 @@ func (h *UploadHandler) ProcessAuthorizedKeys(text []byte, logger *slog.Logger, 
 			continue
 		}
 
-		logger.Info("adding pubkey for user", "pubkey", key)
+		wish.Errorf(s, "adding pubkey (%s)\n", key)
+		logger.Info("adding pubkey", "pubkey", key)
 
 		err = dbpool.InsertPublicKey(user.ID, key, pk.Comment, nil)
 		if err != nil {
+			wish.Errorf(s, "error: could not insert pubkey: %s (%s)\n", err.Error(), key)
 			logger.Error("could not insert pubkey", "err", err.Error())
 		}
 	}
 
+	for _, pk := range diff.Update {
+		key, err := shared.KeyForKeyText(pk.Pk)
+		if err != nil {
+			continue
+		}
+
+		wish.Errorf(s, "updating pubkey with comment: %s (%s)\n", pk.Comment, key)
+		logger.Info(
+			"updating pubkey with comment",
+			"pubkey", key,
+			"comment", pk.Comment,
+		)
+
+		_, err = dbpool.UpdatePublicKey(pk.ID, pk.Comment)
+		if err != nil {
+			wish.Errorf(s, "error: could not update pubkey: %s (%s)\n", err.Error(), key)
+			logger.Error("could not update pubkey", "err", err.Error(), "key", key)
+		}
+	}
+
 	if len(diff.Rm) > 0 {
-		logger.Info("removing pubkeys for user", "pubkeys", diff.Rm)
+		wish.Errorf(s, "removing pubkeys: %s\n", diff.Rm)
+		logger.Info("removing pubkeys", "pubkeys", diff.Rm)
 
 		err = dbpool.RemoveKeys(diff.Rm)
 		if err != nil {
+			wish.Errorf(s, "error: could not rm pubkeys: %s\n", err.Error())
 			logger.Error("could not remove pubkey", "err", err.Error())
 		}
 	}
@@ -252,7 +287,6 @@ func (h *UploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string, er
 	logger = logger.With(
 		"user", user.Name,
 		"filename", filename,
-		"space", h.Cfg.Space,
 	)
 
 	var text []byte
