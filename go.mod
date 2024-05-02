@@ -10,6 +10,7 @@ replace github.com/charmbracelet/wish => github.com/charmbracelet/wish v1.2.0
 replace github.com/charmbracelet/ssh => github.com/charmbracelet/ssh v0.0.0-20230822194956-1a051f898e09
 
 require (
+	git.sr.ht/~delthas/senpai v0.3.1-0.20240425235039-206be659439e
 	github.com/alecthomas/chroma v0.10.0
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
 	github.com/charmbracelet/bubbles v0.16.1
@@ -47,6 +48,7 @@ require (
 )
 
 require (
+	git.sr.ht/~emersion/go-scfg v0.0.0-20231004133111-9dce55c8d63b // indirect
 	github.com/DavidGamba/go-getoptions v0.29.0 // indirect
 	github.com/PuerkitoBio/goquery v1.8.1 // indirect
 	github.com/andybalholm/cascadia v1.3.2 // indirect
@@ -61,6 +63,8 @@ require (
 	github.com/charmbracelet/log v0.3.1 // indirect
 	github.com/containerd/console v1.0.4-0.20230313162750-1ae8d489ac81 // indirect
 	github.com/creack/pty v1.1.21 // indirect
+	github.com/delthas/go-libnp v0.0.0-20221222161248-0e45ece1f878 // indirect
+	github.com/delthas/go-localeinfo v0.0.0-20221116001557-686a1e185118 // indirect
 	github.com/dlclark/regexp2 v1.10.0 // indirect
 	github.com/dsoprea/go-exif v0.0.0-20230826092837-6579e82b732d // indirect
 	github.com/dsoprea/go-exif/v2 v2.0.0-20230826092837-6579e82b732d // indirect
@@ -71,10 +75,13 @@ require (
 	github.com/dsoprea/go-utility v0.0.0-20221003172846-a3e1774ef349 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/forPelevin/gomoji v1.1.3 // indirect
+	github.com/gdamore/encoding v1.0.0 // indirect
+	github.com/gdamore/tcell/v2 v2.6.1-0.20230327043120-47ec3a77754f // indirect
 	github.com/go-errors/errors v1.5.1 // indirect
 	github.com/go-logfmt/logfmt v0.6.0 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/go-xmlfmt/xmlfmt v1.1.2 // indirect
+	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
 	github.com/golang/geo v0.0.0-20230421003525-6adc56603217 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
@@ -129,6 +136,8 @@ require (
 	golang.org/x/sys v0.16.0 // indirect
 	golang.org/x/term v0.16.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
+	golang.org/x/time v0.4.0 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
+	mvdan.cc/xurls/v2 v2.5.0 // indirect
 )

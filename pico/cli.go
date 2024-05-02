@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"git.sr.ht/~delthas/senpai"
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
 	"github.com/picosh/pico/db"
@@ -123,11 +124,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 
 	return func(next ssh.Handler) ssh.Handler {
 		return func(sesh ssh.Session) {
-			_, _, activePty := sesh.Pty()
-			if activePty {
-				next(sesh)
-				return
-			}
+			args := sesh.Command()
 
 			user, err := getUser(sesh, dbpool)
 			if err != nil {
@@ -135,7 +132,37 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				return
 			}
 
-			args := sesh.Command()
+			if len(args) > 0 && args[0] == "chat" {
+				chatToken, _ := dbpool.FindRssToken(user.ID)
+				if chatToken == "" {
+					chatToken, err = dbpool.InsertToken(user.ID, "pico-chat")
+					if err != nil {
+						wish.Error(sesh, err)
+						return
+					}
+				}
+				senpaiCfg := senpai.Config{
+					TLS:      true,
+					Addr:     "ircs://irc.pico.sh:6697",
+					Nick:     user.Name,
+					Password: &chatToken,
+				}
+				app, err := senpai.NewApp(senpaiCfg)
+				if err != nil {
+					wish.Error(sesh, err)
+					return
+				}
+
+				app.Run()
+				app.Close()
+				return
+			}
+
+			/*_, _, activePty := sesh.Pty()
+			if activePty {
+				next(sesh)
+				return
+			}*/
 
 			opts := Cmd{
 				Session: sesh,
