@@ -123,11 +123,16 @@ type Vtty struct {
 }
 
 func (v Vtty) Drain() error {
-	v.Write([]byte("\033c"))
-	err := v.Exit(0)
+	_, err := v.Write([]byte("\033[?25h\033[0 q\033[34h\033[?25h\033[39;49m\033[m^O\033[H\033[J\033[?1049l\033[?1l\033>\033[?1000l\033[?1002l\033[?1003l\033[?1006l\033[?2004l"))
 	if err != nil {
 		return err
 	}
+
+	err = v.Exit(0)
+	if err != nil {
+		return err
+	}
+
 	err = v.Close()
 	return err
 }
