@@ -147,10 +147,10 @@ const (
 	FROM app_users
 	LEFT JOIN tokens ON tokens.user_id = app_users.id
 	WHERE tokens.token = $1 AND tokens.expires_at > NOW()`
-	sqlInsertToken           = `INSERT INTO tokens (user_id, name) VALUES($1, $2) RETURNING token;`
-	sqlRemoveToken           = `DELETE FROM tokens WHERE id = $1`
-	sqlSelectTokensForUser   = `SELECT id, user_id, name, created_at, expires_at FROM tokens WHERE user_id = $1`
-	sqlSelectRssTokenForUser = `SELECT token FROM tokens WHERE user_id = $1 AND name = 'pico-rss'`
+	sqlInsertToken              = `INSERT INTO tokens (user_id, name) VALUES($1, $2) RETURNING token;`
+	sqlRemoveToken              = `DELETE FROM tokens WHERE id = $1`
+	sqlSelectTokensForUser      = `SELECT id, user_id, name, created_at, expires_at FROM tokens WHERE user_id = $1`
+	sqlSelectTokenByNameForUser = `SELECT token FROM tokens WHERE user_id = $1 AND name = $2`
 
 	sqlSelectTotalUsers          = `SELECT count(id) FROM app_users`
 	sqlSelectUsersAfterDate      = `SELECT count(id) FROM app_users WHERE created_at >= $1`
@@ -1789,9 +1789,9 @@ func (me *PsqlDB) InsertToken(userID, name string) (string, error) {
 	return token, nil
 }
 
-func (me *PsqlDB) FindRssToken(userID string) (string, error) {
+func (me *PsqlDB) FindTokenByName(userID, name string) (string, error) {
 	var token string
-	err := me.Db.QueryRow(sqlSelectRssTokenForUser, userID).Scan(&token)
+	err := me.Db.QueryRow(sqlSelectTokenByNameForUser, userID, name).Scan(&token)
 	if err != nil {
 		return "", err
 	}

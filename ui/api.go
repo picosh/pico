@@ -105,7 +105,7 @@ func findOrCreateRssToken(apiConfig *shared.ApiConfig, ctx ssh.Context) http.Han
 
 		dbpool := shared.GetDB(r)
 		var err error
-		rssToken, _ := dbpool.FindRssToken(user.ID)
+		rssToken, _ := dbpool.FindTokenByName(user.ID, "pico-rss")
 		if rssToken == "" {
 			rssToken, err = dbpool.InsertToken(user.ID, "pico-rss")
 			if err != nil {

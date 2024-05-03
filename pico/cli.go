@@ -157,6 +157,10 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 	return func(next ssh.Handler) ssh.Handler {
 		return func(sesh ssh.Session) {
 			args := sesh.Command()
+			if len(args) == 0 {
+				next(sesh)
+				return
+			}
 
 			user, err := getUser(sesh, dbpool)
 			if err != nil {
@@ -170,15 +174,15 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					wish.Fatalln(sesh, "need pty `-t`")
 					return
 				}
-				/* chatToken, _ := dbpool.FindRssToken(user.ID)
+
+				chatToken, _ := dbpool.FindTokenByName(user.ID, "pico-chat")
 				if chatToken == "" {
-					chatToken, err = dbpool.InsertToken(user.ID, "pico-rss")
+					chatToken, err = dbpool.InsertToken(user.ID, "pico-chat")
 					if err != nil {
 						wish.Error(sesh, err)
 						return
 					}
-				} */
-				chatToken := ""
+				}
 				vty := Vtty{
 					sesh,
 				}
@@ -200,23 +204,12 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				return
 			}
 
-			/*_, _, activePty := sesh.Pty()
-			if activePty {
-				next(sesh)
-				return
-			}*/
-
 			opts := Cmd{
 				Session: sesh,
 				User:    user,
 				Log:     log,
 				Dbpool:  dbpool,
 				Write:   false,
-			}
-
-			if len(args) == 0 {
-				next(sesh)
-				return
 			}
 
 			cmd := strings.TrimSpace(args[0])
