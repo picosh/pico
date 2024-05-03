@@ -123,9 +123,12 @@ type Vtty struct {
 }
 
 func (v Vtty) Drain() error {
-	v.Exit(0)
-	v.Close()
-	return nil
+	err := v.Exit(0)
+	if err != nil {
+		return err
+	}
+	err = v.Close()
+	return err
 }
 
 func (v Vtty) Start() error {
