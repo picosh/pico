@@ -123,6 +123,7 @@ type Vtty struct {
 }
 
 func (v Vtty) Drain() error {
+	v.Write([]byte("\033c"))
 	err := v.Exit(0)
 	if err != nil {
 		return err
