@@ -56,10 +56,12 @@ ENTRYPOINT ["/app/web"]
 FROM scratch as release-ssh
 
 WORKDIR /app
+ENV TERM="xterm-256color"
 
 ARG APP=prose
 
 COPY --from=builder-ssh /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder-ssh /go/bin/${APP}-ssh ./ssh
+
 
 ENTRYPOINT ["/app/ssh"]
