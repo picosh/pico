@@ -206,6 +206,8 @@ github.com/picosh/ptun v0.0.0-20240417140706-811cc2b70d9a h1:sBqfT6KBIYllVaw4bT1
 github.com/picosh/ptun v0.0.0-20240417140706-811cc2b70d9a/go.mod h1:WXCrhe0l9VL3ji0pdhvSJD6LLx99rJoAA/+PUQXf0Mo=
 github.com/picosh/send v0.0.0-20240217194807-77b972121e63 h1:VSSbAejFzj2KBThfVnMcNXQwzHmwjPUridgi29LxihU=
 github.com/picosh/send v0.0.0-20240217194807-77b972121e63/go.mod h1:1JCq0NVOdTDenQ0/Kd8e4rP80lu06UHJJ+6dQxhcpew=
+github.com/picosh/senpai v0.0.0-20240503200611-af89e73973b0 h1:pBRIbiCj7K6rGELijb//dYhyCo8A3fvxW5dijrJVtjs=
+github.com/picosh/senpai v0.0.0-20240503200611-af89e73973b0/go.mod h1:QaBDtybFC5gz7EG/9c3bgzuyW7W5W2rYLFZxWNuWk3Q=
 github.com/pkg/sftp v1.13.6 h1:JFZT4XbOU7l77xGSpOdW+pwIMqP044IyjXX6FGyEKFo=
 github.com/pkg/sftp v1.13.6/go.mod h1:tz1ryNURKu77RL+GuCzmoJYxQczL3wLNNpPWagdg4Qk=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
