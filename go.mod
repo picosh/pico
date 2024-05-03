@@ -9,6 +9,10 @@ replace github.com/charmbracelet/wish => github.com/charmbracelet/wish v1.2.0
 
 replace github.com/charmbracelet/ssh => github.com/charmbracelet/ssh v0.0.0-20230822194956-1a051f898e09
 
+replace git.sr.ht/~delthas/senpai => /home/erock/src/senpai
+
+replace github.com/gdamore/tcell/v2 => github.com/delthas/tcell/v2 v2.4.1-0.20230710100648-1489e78d90fb
+
 require (
 	git.sr.ht/~delthas/senpai v0.3.1-0.20240425235039-206be659439e
 	github.com/alecthomas/chroma v0.10.0

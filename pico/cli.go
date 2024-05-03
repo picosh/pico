@@ -118,6 +118,38 @@ type CliHandler struct {
 	Logger *slog.Logger
 }
 
+type Vtty struct {
+	ssh.Session
+}
+
+func (v Vtty) Drain() error {
+	v.Exit(0)
+	v.Close()
+	return nil
+}
+
+func (v Vtty) Start() error {
+	return nil
+}
+
+func (v Vtty) Stop() error {
+	return nil
+}
+
+func (v Vtty) WindowSize() (width int, height int, err error) {
+	pty, _, _ := v.Pty()
+	return pty.Window.Width, pty.Window.Height, nil
+}
+
+func (v Vtty) NotifyResize(cb func()) {
+	_, notify, _ := v.Pty()
+	go func() {
+		for range notify {
+			cb()
+		}
+	}()
+}
+
 func WishMiddleware(handler *CliHandler) wish.Middleware {
 	dbpool := handler.DBPool
 	log := handler.Logger
@@ -133,20 +165,30 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 			}
 
 			if len(args) > 0 && args[0] == "chat" {
-				chatToken, _ := dbpool.FindRssToken(user.ID)
+				_, _, hasPty := sesh.Pty()
+				if !hasPty {
+					wish.Fatalln(sesh, "need pty `-t`")
+					return
+				}
+				/* chatToken, _ := dbpool.FindRssToken(user.ID)
 				if chatToken == "" {
-					chatToken, err = dbpool.InsertToken(user.ID, "pico-chat")
+					chatToken, err = dbpool.InsertToken(user.ID, "pico-rss")
 					if err != nil {
 						wish.Error(sesh, err)
 						return
 					}
+				} */
+				chatToken := ""
+				vty := Vtty{
+					sesh,
 				}
-				senpaiCfg := senpai.Config{
-					TLS:      true,
-					Addr:     "ircs://irc.pico.sh:6697",
-					Nick:     user.Name,
-					Password: &chatToken,
-				}
+				senpaiCfg := senpai.Defaults()
+				senpaiCfg.TLS = true
+				senpaiCfg.Addr = "irc.pico.sh:6697"
+				senpaiCfg.Nick = user.Name
+				senpaiCfg.Password = &chatToken
+				senpaiCfg.Tty = vty
+
 				app, err := senpai.NewApp(senpaiCfg)
 				if err != nil {
 					wish.Error(sesh, err)

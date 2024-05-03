@@ -488,6 +488,10 @@ figure {
   margin-left: 0.5rem;
 }
 
+.pt-0 {
+  padding-top: 0;
+}
+
 .my {
   margin-top: 0.5rem;
   margin-bottom: 0.5rem;
@@ -570,6 +574,12 @@ figure {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+}
+
+.group-2 {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
 .group-h {
@@ -709,5 +719,9 @@ figure {
 
   header {
     margin: 0;
+  }
+
+  .flex-collapse {
+    flex-direction: column;
   }
 }
