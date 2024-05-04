@@ -174,8 +174,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.state = stateNormal
 					return m, unlinkKey(m)
 				case stateDeletingActiveKey:
+					m.state = stateQuitting
 					// Active key will be deleted. Remove the key and exit.
-					fallthrough
+					return m, unlinkKey(m)
 				case stateDeletingAccount:
 					// Account will be deleted. Remove the key and exit.
 					m.state = stateQuitting
