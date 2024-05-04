@@ -3,6 +3,7 @@ package tui
 import (
 	"errors"
 	"fmt"
+	"io"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
@@ -329,20 +330,39 @@ func updateChildren(msg tea.Msg, m model) (model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m model) loadChat() tea.Cmd {
-	return func() tea.Msg {
-		pass, err := m.dbpool.UpsertToken(m.user.ID, "pico-chat")
-		if err != nil {
-			return tea.Quit()
-		}
-		app, err := shared.NewSenpaiApp(m.session, m.user.Name, pass)
-		if err != nil {
-			return tea.Quit()
-		}
-		app.Run()
-		app.Close()
-		return tea.Quit()
+type SenpaiCmd struct {
+	user    *db.User
+	session ssh.Session
+	dbpool  db.DB
+}
+
+func (m *SenpaiCmd) Run() error {
+	pass, err := m.dbpool.UpsertToken(m.user.ID, "pico-chat")
+	if err != nil {
+		return err
 	}
+	app, err := shared.NewSenpaiApp(m.session, m.user.Name, pass)
+	if err != nil {
+		return err
+	}
+	app.Run()
+	app.Close()
+	return nil
+}
+
+func (m *SenpaiCmd) SetStdin(io.Reader)  {}
+func (m *SenpaiCmd) SetStdout(io.Writer) {}
+func (m *SenpaiCmd) SetStderr(io.Writer) {}
+
+func (m model) loadChat() tea.Cmd {
+	sp := &SenpaiCmd{
+		session: m.session,
+		dbpool:  m.dbpool,
+		user:    m.user,
+	}
+	return tea.Exec(sp, func(err error) tea.Msg {
+		return tea.Quit()
+	})
 }
 
 func (m model) menuView() string {
