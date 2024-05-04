@@ -1789,6 +1789,16 @@ func (me *PsqlDB) InsertToken(userID, name string) (string, error) {
 	return token, nil
 }
 
+func (me *PsqlDB) UpsertToken(userID, name string) (string, error) {
+	token, _ := me.FindTokenByName(userID, name)
+	if token != "" {
+		return token, nil
+	}
+
+	token, err := me.InsertToken(userID, name)
+	return token, err
+}
+
 func (me *PsqlDB) FindTokenByName(userID, name string) (string, error) {
 	var token string
 	err := me.Db.QueryRow(sqlSelectTokenByNameForUser, userID, name).Scan(&token)

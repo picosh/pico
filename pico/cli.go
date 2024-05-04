@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"strings"
 
-	"git.sr.ht/~delthas/senpai"
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
 	"github.com/picosh/pico/db"
@@ -118,47 +117,6 @@ type CliHandler struct {
 	Logger *slog.Logger
 }
 
-type Vtty struct {
-	ssh.Session
-}
-
-func (v Vtty) Drain() error {
-	_, err := v.Write([]byte("\033[?25h\033[0 q\033[34h\033[?25h\033[39;49m\033[m^O\033[H\033[J\033[?1049l\033[?1l\033>\033[?1000l\033[?1002l\033[?1003l\033[?1006l\033[?2004l"))
-	if err != nil {
-		return err
-	}
-
-	err = v.Exit(0)
-	if err != nil {
-		return err
-	}
-
-	err = v.Close()
-	return err
-}
-
-func (v Vtty) Start() error {
-	return nil
-}
-
-func (v Vtty) Stop() error {
-	return nil
-}
-
-func (v Vtty) WindowSize() (width int, height int, err error) {
-	pty, _, _ := v.Pty()
-	return pty.Window.Width, pty.Window.Height, nil
-}
-
-func (v Vtty) NotifyResize(cb func()) {
-	_, notify, _ := v.Pty()
-	go func() {
-		for range notify {
-			cb()
-		}
-	}()
-}
-
 func WishMiddleware(handler *CliHandler) wish.Middleware {
 	dbpool := handler.DBPool
 	log := handler.Logger
@@ -180,34 +138,23 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 			if len(args) > 0 && args[0] == "chat" {
 				_, _, hasPty := sesh.Pty()
 				if !hasPty {
-					wish.Fatalln(sesh, "need pty `-t`")
+					wish.Fatalln(
+						sesh,
+						"In order to render chat you need to enable PTY with the `ssh -t` flag",
+					)
 					return
 				}
 
-				chatToken, _ := dbpool.FindTokenByName(user.ID, "pico-chat")
-				if chatToken == "" {
-					chatToken, err = dbpool.InsertToken(user.ID, "pico-chat")
-					if err != nil {
-						wish.Error(sesh, err)
-						return
-					}
-				}
-				vty := Vtty{
-					sesh,
-				}
-				senpaiCfg := senpai.Defaults()
-				senpaiCfg.TLS = true
-				senpaiCfg.Addr = "irc.pico.sh:6697"
-				senpaiCfg.Nick = user.Name
-				senpaiCfg.Password = &chatToken
-				senpaiCfg.Tty = vty
-
-				app, err := senpai.NewApp(senpaiCfg)
+				pass, err := dbpool.UpsertToken(user.ID, "pico-chat")
 				if err != nil {
-					wish.Error(sesh, err)
+					wish.Fatalln(sesh, err)
 					return
 				}
-
+				app, err := shared.NewSenpaiApp(sesh, user.Name, pass)
+				if err != nil {
+					wish.Fatalln(sesh, err)
+					return
+				}
 				app.Run()
 				app.Close()
 				return

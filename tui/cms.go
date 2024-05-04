@@ -30,6 +30,7 @@ const (
 	statusNoAccount
 	statusBrowsingKeys
 	statusBrowsingTokens
+	statusChat
 	statusQuitting
 )
 
@@ -50,6 +51,7 @@ type menuChoice int
 const (
 	keysChoice menuChoice = iota
 	tokensChoice
+	chatChoice
 	exitChoice
 	unsetChoice // set when no choice has been made
 )
@@ -58,6 +60,7 @@ const (
 var menuChoices = map[menuChoice]string{
 	keysChoice:   "Manage keys",
 	tokensChoice: "Manage tokens",
+	chatChoice:   "Chat",
 	exitChoice:   "Exit",
 }
 
@@ -87,6 +90,7 @@ func CmsMiddleware(cfg *shared.ConfigSite) bm.Handler {
 		styles := common.DefaultStyles(renderer)
 
 		m := model{
+			session:    s,
 			cfg:        cfg,
 			publicKey:  s.PublicKey(),
 			dbpool:     dbpool,
@@ -134,6 +138,7 @@ type model struct {
 	tokens          tokens.Model
 	createAccount   account.CreateModel
 	terminalSize    tea.WindowSizeMsg
+	session         ssh.Session
 }
 
 func (m model) Init() tea.Cmd {
@@ -311,6 +316,10 @@ func updateChildren(msg tea.Msg, m model) (model, tea.Cmd) {
 		m.status = statusBrowsingTokens
 		m.menuChoice = unsetChoice
 		cmd = tokens.LoadKeys(m.tokens)
+	case chatChoice:
+		m.status = statusChat
+		m.menuChoice = unsetChoice
+		cmd = m.loadChat()
 	case exitChoice:
 		m.status = statusQuitting
 		m.dbpool.Close()
@@ -318,6 +327,22 @@ func updateChildren(msg tea.Msg, m model) (model, tea.Cmd) {
 	}
 
 	return m, cmd
+}
+
+func (m model) loadChat() tea.Cmd {
+	return func() tea.Msg {
+		pass, err := m.dbpool.UpsertToken(m.user.ID, "pico-chat")
+		if err != nil {
+			return tea.Quit()
+		}
+		app, err := shared.NewSenpaiApp(m.session, m.user.Name, pass)
+		if err != nil {
+			return tea.Quit()
+		}
+		app.Run()
+		app.Close()
+		return tea.Quit()
+	}
 }
 
 func (m model) menuView() string {
