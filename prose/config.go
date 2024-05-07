@@ -41,6 +41,7 @@ func NewConfigSite() *shared.ConfigSite {
 			".gif",
 			".webp",
 			".svg",
+			".ico",
 		},
 		HiddenPosts:  []string{"_readme.md", "_styles.css", "_footer.md", "_404.md"},
 		Logger:       shared.CreateLogger(debug == "1"),
