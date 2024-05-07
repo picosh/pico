@@ -123,8 +123,8 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 
 	return func(next ssh.Handler) ssh.Handler {
 		return func(sesh ssh.Session) {
-			_, _, activePty := sesh.Pty()
-			if activePty {
+			args := sesh.Command()
+			if len(args) == 0 {
 				next(sesh)
 				return
 			}
@@ -135,7 +135,30 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				return
 			}
 
-			args := sesh.Command()
+			if len(args) > 0 && args[0] == "chat" {
+				_, _, hasPty := sesh.Pty()
+				if !hasPty {
+					wish.Fatalln(
+						sesh,
+						"In order to render chat you need to enable PTY with the `ssh -t` flag",
+					)
+					return
+				}
+
+				pass, err := dbpool.UpsertToken(user.ID, "pico-chat")
+				if err != nil {
+					wish.Fatalln(sesh, err)
+					return
+				}
+				app, err := shared.NewSenpaiApp(sesh, user.Name, pass)
+				if err != nil {
+					wish.Fatalln(sesh, err)
+					return
+				}
+				app.Run()
+				app.Close()
+				return
+			}
 
 			opts := Cmd{
 				Session: sesh,
@@ -143,11 +166,6 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				Log:     log,
 				Dbpool:  dbpool,
 				Write:   false,
-			}
-
-			if len(args) == 0 {
-				next(sesh)
-				return
 			}
 
 			cmd := strings.TrimSpace(args[0])

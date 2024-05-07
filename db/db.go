@@ -340,7 +340,8 @@ type DB interface {
 	FindUserForToken(token string) (*User, error)
 	FindTokensForUser(userID string) ([]*Token, error)
 	InsertToken(userID, name string) (string, error)
-	FindRssToken(userID string) (string, error)
+	UpsertToken(userID, name string) (string, error)
+	FindTokenByName(userID, name string) (string, error)
 	RemoveToken(tokenID string) error
 
 	FindPosts() ([]*Post, error)
