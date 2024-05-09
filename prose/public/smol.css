@@ -18,18 +18,18 @@
 @media (prefers-color-scheme: light) {
   :root {
     --main-hue: 250;
-    --white: #6a737d;
+    --white: #2e3f53;
     --white-light: #cfe0f4;
-    --white-dark: #9b9b9b;
+    --white-dark: #6c6a6a;
     --code: #52576f;
-    --pre: #f6f8fa;
-    --bg-color: #fdfdfd;
+    --pre: #e1e7ee;
+    --bg-color: #f4f4f4;
     --text-color: #24292f;
     --link-color: #005cc5;
     --visited: #6f42c1;
     --blockquote: #005cc5;
     --blockquote-bg: #cfe0f4;
-    --hover: #d73a49;
+    --hover: #c11e7a;
     --grey: #ccc;
     --grey-light: #6a708e;
     --shadow: #e8e8e8;
