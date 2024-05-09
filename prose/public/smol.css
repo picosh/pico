@@ -21,8 +21,7 @@
     --white: #6a737d;
     --white-light: #cfe0f4;
     --white-dark: #9b9b9b;
-    --code: #e3e5e8;
-    --code-border: #e3e5e8;
+    --code: #52576f;
     --pre: #f6f8fa;
     --bg-color: #fdfdfd;
     --text-color: #24292f;
@@ -44,14 +43,13 @@
     --white-light: #f2f2f2;
     --white-dark: #c6c6c6;
     --code: #414558;
-    --code-border: #252525;
     --pre: #252525;
     --bg-color: #282a36;
     --text-color: #f2f2f2;
     --link-color: #8be9fd;
     --visited: #bd93f9;
     --blockquote: #bd93f9;
-    --blockquote-bg: #414558;
+    --blockquote-bg: #353548;
     --hover: #ff80bf;
     --grey: #414558;
     --grey-light: #6a708e;
@@ -98,8 +96,7 @@ pre {
 code,
 kbd,
 samp {
-  background-color: var(--code);
-  border: 1px solid var(--code-border);
+  border: 2px solid var(--code);
 }
 
 pre > code {
@@ -109,8 +106,9 @@ pre > code {
 }
 
 code {
+  font-size: 90%;
   border-radius: 0.3rem;
-  padding: 0.15rem 0.2rem 0.05rem;
+  padding: 0.15rem 0.3rem 0.05rem;
 }
 
 pre {
@@ -169,12 +167,13 @@ hr {
 }
 
 a {
-  text-decoration: underline;
+  text-decoration: none;
   color: var(--link-color);
 }
 
 a:hover,
 a:visited:hover {
+  text-decoration: underline;
   color: var(--hover);
 }
 
