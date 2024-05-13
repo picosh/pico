@@ -10,6 +10,7 @@ import (
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/tui/common"
+	"github.com/picosh/pico/tui/plus"
 	"github.com/picosh/send/send/utils"
 )
 
@@ -51,65 +52,8 @@ func (c *Cmd) help() {
 }
 
 func (c *Cmd) plus() {
-	clientRefId := c.User.Name
-	paymentLink := "https://buy.stripe.com/6oEaIvaNq7DA4NO9AD"
-	url := fmt.Sprintf("%s?client_reference_id=%s", paymentLink, clientRefId)
-	md := fmt.Sprintf(`# pico+
-
-Signup to get premium access
-
-## $2/month (billed annually)
-
-Includes:
-- pgs.sh - 10GB asset storage
-- tuns.sh - full access
-- imgs.sh - 5GB image registry storage
-- prose.sh - 1GB image storage
-- prose.sh - 1GB image storage
-- beta access - Invited to join our private IRC channel
-
-There are a few ways to purchase a membership. We try our best to
-provide immediate access to pico+ regardless of payment method.
-
-## Stripe (US/CA Only)
-
-%s
-
-This is the quickest way to access pico+. The Stripe payment
-method requires an email address. We will never use your email
-for anything unless absolutely necessary.
-
-## Snail Mail
-
-Send cash (USD) or check to:
-- pico.sh LLC
-- 206 E Huron St STE 103
-- Ann Arbor MI 48104
-
-Message us when payment is in transit and we will grant you
-temporary access topico+ that will be converted to a full
-year after we received it.
-
-## Notes
-
-Have any questions not covered here? Email us or join IRC,
-we will promptly respond.
-
-Unfortunately we do not have the labor bandwidth to support
-international users for pico+ at this time. As a result,
-we only offer our premium services to the US and Canada.
-
-We do not maintain active subscriptions for pico+. Every
-year you must pay again. We do not take monthly payments,
-you must pay for a year up-front. Pricing is subject to
-change because we plan on continuing to include more services
-as we build them.
-
-Need higher limits? We are more than happy to extend limits.
-Just message us and we can chat.
-`, url)
-
-	c.output(md)
+	view := plus.PlusView(c.User.Name)
+	c.output(view)
 }
 
 type CliHandler struct {
