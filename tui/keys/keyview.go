@@ -136,9 +136,9 @@ func (k styledKey) render(state keyState) string {
 		k.deleting()
 	}
 	return fmt.Sprintf(
-		"%s %s %s\n%s %s %s\n%s %s %s %s\n\n",
+		"%s %s %s %s\n%s %s %s\n%s %s %s\n\n",
+		k.gutter, k.commentLabel, k.commentVal, k.note,
 		k.gutter, k.keyLabel, k.fingerprint.state(state, k.styles),
 		k.gutter, k.dateLabel, k.dateVal,
-		k.gutter, k.commentLabel, k.commentVal, k.note,
 	)
 }

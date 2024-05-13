@@ -32,8 +32,8 @@ const (
 	statusNoAccount
 	statusBrowsingKeys
 	statusBrowsingTokens
-	statusChat
 	statusBrowsingPlus
+	statusChat
 	statusQuitting
 )
 
@@ -54,8 +54,8 @@ type menuChoice int
 const (
 	keysChoice menuChoice = iota
 	tokensChoice
-	chatChoice
 	plusChoice
+	chatChoice
 	exitChoice
 	unsetChoice // set when no choice has been made
 )
@@ -64,8 +64,8 @@ const (
 var menuChoices = map[menuChoice]string{
 	keysChoice:   "manage keys",
 	tokensChoice: "manage tokens",
-	chatChoice:   "chat",
 	plusChoice:   "pico+",
+	chatChoice:   "chat",
 	exitChoice:   "exit",
 }
 

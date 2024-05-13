@@ -112,12 +112,14 @@ func Update(msg tea.Msg, m Model) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.Type {
-		case tea.KeyCtrlC, tea.KeyEscape:
+		case tea.KeyCtrlC:
 			m.Quit = true
+		case tea.KeyEscape:
+			m.Done = true
 
 		default:
 			switch msg.String() {
-			case "q", "esc":
+			case "q":
 				m.Done = true
 			}
 		}
