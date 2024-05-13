@@ -20,6 +20,7 @@ import (
 	"github.com/picosh/pico/tui/common"
 	"github.com/picosh/pico/tui/info"
 	"github.com/picosh/pico/tui/keys"
+	"github.com/picosh/pico/tui/notifications"
 	"github.com/picosh/pico/tui/plus"
 	"github.com/picosh/pico/tui/tokens"
 )
@@ -33,6 +34,7 @@ const (
 	statusBrowsingKeys
 	statusBrowsingTokens
 	statusBrowsingPlus
+	statusBrowsingNotifications
 	statusChat
 	statusQuitting
 )
@@ -55,6 +57,7 @@ const (
 	keysChoice menuChoice = iota
 	tokensChoice
 	plusChoice
+	notificationsChoice
 	chatChoice
 	exitChoice
 	unsetChoice // set when no choice has been made
@@ -62,11 +65,12 @@ const (
 
 // menu text corresponding to menu choices. these are presented to the user.
 var menuChoices = map[menuChoice]string{
-	keysChoice:   "manage keys",
-	tokensChoice: "manage tokens",
-	plusChoice:   "pico+",
-	chatChoice:   "chat",
-	exitChoice:   "exit",
+	keysChoice:          "Manage keys",
+	tokensChoice:        "Manage tokens",
+	plusChoice:          "Pico+",
+	notificationsChoice: "Notifications",
+	chatChoice:          "Chat",
+	exitChoice:          "Exit",
 }
 
 func NewSpinner(styles common.Styles) spinner.Model {
@@ -142,6 +146,7 @@ type model struct {
 	keys            keys.Model
 	tokens          tokens.Model
 	plus            plus.Model
+	notifications   notifications.Model
 	createAccount   account.CreateModel
 	terminalSize    tea.WindowSizeMsg
 	session         ssh.Session
@@ -243,6 +248,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.tokens = tokens.NewModel(m.styles, m.dbpool, m.user)
 		m.createAccount = account.NewCreateModel(m.styles, m.dbpool, m.publicKey)
 		m.plus = plus.NewModel(m.styles, m.user, m.session)
+		m.notifications = notifications.NewModel(m.styles, m.dbpool, m.user, m.session)
 	}
 
 	switch m.status {
@@ -252,6 +258,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.tokens = tokens.NewModel(m.styles, m.dbpool, m.user)
 		m.createAccount = account.NewCreateModel(m.styles, m.dbpool, m.publicKey)
 		m.plus = plus.NewModel(m.styles, m.user, m.session)
+		m.notifications = notifications.NewModel(m.styles, m.dbpool, m.user, m.session)
 		if m.user == nil {
 			m.status = statusNoAccount
 		} else {
@@ -308,7 +315,16 @@ func updateChildren(msg tea.Msg, m model) (model, tea.Cmd) {
 		if m.plus.Done {
 			m.plus = plus.NewModel(m.styles, m.user, m.session)
 			m.status = statusReady
-		} else if m.tokens.Quit {
+		} else if m.plus.Quit {
+			m.status = statusQuitting
+			return m, tea.Quit
+		}
+	case statusBrowsingNotifications:
+		m.notifications, cmd = notifications.Update(msg, m.notifications)
+		if m.notifications.Done {
+			m.notifications = notifications.NewModel(m.styles, m.dbpool, m.user, m.session)
+			m.status = statusReady
+		} else if m.notifications.Quit {
 			m.status = statusQuitting
 			return m, tea.Quit
 		}
@@ -335,6 +351,9 @@ func updateChildren(msg tea.Msg, m model) (model, tea.Cmd) {
 		cmd = tokens.LoadKeys(m.tokens)
 	case plusChoice:
 		m.status = statusBrowsingPlus
+		m.menuChoice = unsetChoice
+	case notificationsChoice:
+		m.status = statusBrowsingNotifications
 		m.menuChoice = unsetChoice
 	case chatChoice:
 		m.status = statusChat
@@ -434,6 +453,9 @@ func (m model) View() string {
 		s += m.tokens.View()
 	case statusBrowsingPlus:
 		s = plus.View(m.plus)
+		return s
+	case statusBrowsingNotifications:
+		s = notifications.View(m.notifications)
 		return s
 	}
 	return m.styles.App.Render(wrap.String(wordwrap.String(s, w), w))

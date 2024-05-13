@@ -10,6 +10,7 @@ import (
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/tui/common"
+	"github.com/picosh/pico/tui/notifications"
 	"github.com/picosh/pico/tui/plus"
 	"github.com/picosh/send/send/utils"
 )
@@ -54,6 +55,12 @@ func (c *Cmd) help() {
 func (c *Cmd) plus() {
 	view := plus.PlusView(c.User.Name)
 	c.output(view)
+}
+
+func (c *Cmd) notifications() error {
+	md := notifications.NotificationsView(c.Dbpool, c.User.ID)
+	c.output(md)
+	return nil
 }
 
 type CliHandler struct {
@@ -119,6 +126,12 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					return
 				} else if cmd == "pico+" {
 					opts.plus()
+					return
+				} else if cmd == "notifications" {
+					err := opts.notifications()
+					if err != nil {
+						wish.Fatalln(sesh, err)
+					}
 					return
 				} else {
 					next(sesh)
