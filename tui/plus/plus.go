@@ -47,6 +47,15 @@ Send cash (USD) or check to:
 - 206 E Huron St STE 103
 - Ann Arbor MI 48104
 
+## What are the storage limits?
+
+We don't want pico+ users to think about storage limits.  For all
+intents and purposes, there are no storage restrictions.  Having said
+that, if we detect abuse or feel like a user is storing too much, we
+will notify the user and potentially suspend their account.
+
+Again, most users do not need to worry.
+
 ## Notes
 
 Have any questions not covered here? [Email](mailto:hello@pico.sh)
