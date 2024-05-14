@@ -16,7 +16,7 @@ import (
 	"github.com/x-way/crawlerdetect"
 )
 
-func hmacString(secret, data string) string {
+func HmacString(secret, data string) string {
 	hmacer := hmac.New(sha256.New, []byte(secret))
 	hmacer.Write([]byte(data))
 	dataHmac := hmacer.Sum(nil)
@@ -117,7 +117,7 @@ func AnalyticsVisitFromRequest(r *http.Request, userID string, secret string) (*
 		UserID:    userID,
 		Host:      host,
 		Path:      path,
-		IpAddress: hmacString(secret, ipAddress),
+		IpAddress: HmacString(secret, ipAddress),
 		UserAgent: cleanUserAgent(r.UserAgent()),
 		Referer:   referer,
 		Status:    http.StatusOK,

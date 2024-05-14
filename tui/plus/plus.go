@@ -12,9 +12,8 @@ import (
 )
 
 func PlusView(username string) string {
-	clientRefId := username
-	paymentLink := "https://buy.stripe.com/6oEaIvaNq7DA4NO9AD"
-	url := fmt.Sprintf("%s?client_reference_id=%s", paymentLink, clientRefId)
+	paymentLink := "https://checkout.pico.sh/buy/73c26cf9-3fac-44c3-b744-298b3032a96b?discount=0"
+	url := fmt.Sprintf("%s&checkout[custom][username]=%s", paymentLink, username)
 	md := fmt.Sprintf(`# pico+
 
 Signup to get premium access
@@ -36,7 +35,7 @@ There are a few ways to purchase a membership. We try our best to
 provide immediate access to <code>pico+</code> regardless of payment
 method.
 
-## Stripe (US/CA Only)
+## Online Payment (credit card, paypal)
 
 %s
 
@@ -60,10 +59,6 @@ Again, most users do not need to worry.
 
 Have any questions not covered here? [Email](mailto:hello@pico.sh)
 us or join [IRC](https://pico.sh/irc), we will promptly respond.
-
-Unfortunately we do not have the human bandwidth to support
-international users for pico+ at this time. As a
-result, we only offer our premium services to the US and Canada.
 
 We do not maintain active subscriptions for pico+.
 Every year you must pay again. We do not take monthly payments, you

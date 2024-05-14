@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"crypto/hmac"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -9,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -16,7 +18,6 @@ import (
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
-	stripe "github.com/stripe/stripe-go/v75"
 )
 
 type Client struct {
@@ -395,80 +396,131 @@ func rssHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func stripeWebhookHandler(w http.ResponseWriter, r *http.Request) {
-	client := getClient(r)
-	dbpool := client.Dbpool
-	logger := client.Logger
-	const MaxBodyBytes = int64(65536)
-	r.Body = http.MaxBytesReader(w, r.Body, MaxBodyBytes)
-	payload, err := io.ReadAll(r.Body)
-	if err != nil {
-		logger.Error("error reading request body", "err", err.Error())
-		w.WriteHeader(http.StatusServiceUnavailable)
-		return
-	}
+type OrderEvent struct {
+	Meta *struct {
+		EventName  string `json:"event_name"`
+		CustomData *struct {
+			PicoUsername string `json:"username"`
+		} `json:"custom_data"`
+	} `json:"meta"`
+	Data *struct {
+		Type string `json:"type"`
+		ID   string `json:"id"`
+		Attr *struct {
+			OrderNumber int       `json:"order_number"`
+			Identifier  string    `json:"identifier"`
+			UserName    string    `json:"user_name"`
+			UserEmail   string    `json:"user_email"`
+			CreatedAt   time.Time `json:"created_at"`
+			Status      string    `json:"status"` // `paid`, `refund`
+		} `json:"attributes"`
+	} `json:"data"`
+}
 
-	event := stripe.Event{}
-
-	if err := json.Unmarshal(payload, &event); err != nil {
-		logger.Error("failed to parse webhook body JSON", "err", err.Error())
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	switch event.Type {
-	case "checkout.session.completed":
-		var checkout stripe.CheckoutSession
-		err := json.Unmarshal(event.Data.Raw, &checkout)
+// Status code must be 200 or else lemonsqueezy will keep retrying
+// https://docs.lemonsqueezy.com/help/webhooks
+func paymentWebhookHandler(secret string) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		client := getClient(r)
+		dbpool := client.Dbpool
+		logger := client.Logger
+		const MaxBodyBytes = int64(65536)
+		r.Body = http.MaxBytesReader(w, r.Body, MaxBodyBytes)
+		payload, err := io.ReadAll(r.Body)
 		if err != nil {
-			logger.Error("error parsing webhook JSON", "err", err.Error())
-			w.WriteHeader(http.StatusBadRequest)
+			logger.Error("error reading request body", "err", err.Error())
+			w.WriteHeader(http.StatusOK)
 			return
 		}
-		username := checkout.ClientReferenceID
-		txId := ""
-		if checkout.PaymentIntent != nil {
-			txId = checkout.PaymentIntent.ID
+
+		event := OrderEvent{}
+
+		if err := json.Unmarshal(payload, &event); err != nil {
+			logger.Error("failed to parse webhook body JSON", "err", err.Error())
+			w.WriteHeader(http.StatusOK)
+			return
 		}
-		email := ""
-		if checkout.CustomerDetails != nil {
-			email = checkout.CustomerDetails.Email
+
+		hash := shared.HmacString(secret, string(payload))
+		sig := r.Header.Get("X-Signature")
+		if !hmac.Equal([]byte(hash), []byte(sig)) {
+			logger.Error("invalid signature X-Signature")
+			w.WriteHeader(http.StatusOK)
+			return
 		}
-		created := checkout.Created
-		status := checkout.PaymentStatus
+
+		if event.Meta == nil {
+			logger.Error("no meta field found")
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		if event.Meta.EventName != "order_created" {
+			logger.Error("event not order_created", "event", event.Meta.EventName)
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		if event.Meta.CustomData == nil {
+			logger.Error("no custom data found")
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		username := event.Meta.CustomData.PicoUsername
+
+		if event.Data == nil || event.Data.Attr == nil {
+			logger.Error("no data or data.attributes fields found")
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		email := event.Data.Attr.UserEmail
+		created := event.Data.Attr.CreatedAt
+		status := event.Data.Attr.Status
+		txID := fmt.Sprint(event.Data.Attr.OrderNumber)
 
 		log := logger.With(
 			"username", username,
 			"email", email,
 			"created", created,
 			"paymentStatus", status,
-			"txId", txId,
+			"txId", txID,
 		)
 		log.Info(
-			"stripe:checkout.session.completed",
+			"order_created event",
 		)
 
+		// https://checkout.pico.sh/buy/35b1be57-1e25-487f-84dd-5f09bb8783ec?discount=0&checkout[custom][username]=erock
 		if username == "" {
-			log.Error("no `?client_reference_id={username}` found in URL, cannot add pico+ membership")
+			log.Error("no `?checkout[custom][username]=xxx` found in URL, cannot add pico+ membership")
 			w.WriteHeader(http.StatusOK)
 			return
 		}
 
-		err = dbpool.AddPicoPlusUser(username, "stripe", txId)
+		if status != "paid" {
+			log.Error("status not paid")
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		err = dbpool.AddPicoPlusUser(username, "lemonsqueezy", txID)
 		if err != nil {
 			log.Error("failed to add pico+ user", "err", err)
 		} else {
 			log.Info("successfully added pico+ user")
 		}
-	default:
-		// logger.Info("unhandled event type", "type", event.Type)
-	}
 
-	w.WriteHeader(http.StatusOK)
+		w.WriteHeader(http.StatusOK)
+	}
 }
 
 func createMainRoutes() []shared.Route {
 	fileServer := http.FileServer(http.Dir("auth/public"))
+	secret := os.Getenv("PICO_SECRET_WEBHOOK")
+	if secret == "" {
+		panic("must provide PICO_SECRET_WEBHOOK environment variable")
+	}
 
 	routes := []shared.Route{
 		shared.NewRoute("GET", "/.well-known/oauth-authorization-server", wellKnownHandler),
@@ -478,7 +530,7 @@ func createMainRoutes() []shared.Route {
 		shared.NewRoute("POST", "/key", keyHandler),
 		shared.NewRoute("GET", "/rss/(.+)", rssHandler),
 		shared.NewRoute("POST", "/redirect", redirectHandler),
-		shared.NewRoute("POST", "/webhook", stripeWebhookHandler),
+		shared.NewRoute("POST", "/webhook", paymentWebhookHandler(secret)),
 		shared.NewRoute("GET", "/main.css", fileServer.ServeHTTP),
 		shared.NewRoute("GET", "/card.png", fileServer.ServeHTTP),
 		shared.NewRoute("GET", "/favicon-16x16.png", fileServer.ServeHTTP),
