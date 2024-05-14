@@ -76,7 +76,9 @@ func NewModel(styles common.Styles, dbpool db.DB, user *db.User, session ssh.Ses
 	hh := headerHeight(styles)
 	viewport := viewport.New(headerWidth(pty.Window.Width), pty.Window.Height-hh)
 	viewport.YPosition = hh
-	viewport.SetContent(NotificationsView(dbpool, user.ID))
+	if user != nil {
+		viewport.SetContent(NotificationsView(dbpool, user.ID))
+	}
 
 	return Model{
 		Done:     false,

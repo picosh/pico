@@ -97,7 +97,9 @@ func NewModel(styles common.Styles, user *db.User, session ssh.Session) Model {
 	hh := headerHeight(styles)
 	viewport := viewport.New(headerWidth(pty.Window.Width), pty.Window.Height-hh)
 	viewport.YPosition = hh
-	viewport.SetContent(PlusView(user.Name))
+	if user != nil {
+		viewport.SetContent(PlusView(user.Name))
+	}
 
 	return Model{
 		Done:     false,
