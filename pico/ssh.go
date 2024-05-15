@@ -82,7 +82,7 @@ func StartSshServer() {
 			cfg,
 			handler,
 			cliHandler,
-			promwish.Middleware(fmt.Sprintf("%s:%s", host, promPort), "pgs-ssh"),
+			promwish.Middleware(fmt.Sprintf("%s:%s", host, promPort), "pico-ssh"),
 		),
 	)
 	if err != nil {

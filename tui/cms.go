@@ -2,13 +2,13 @@ package tui
 
 import (
 	"errors"
-	"fmt"
 	"io"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/ssh"
+	"github.com/charmbracelet/wish"
 	bm "github.com/charmbracelet/wish/bubbletea"
 	"github.com/muesli/reflow/indent"
 	"github.com/muesli/reflow/wordwrap"
@@ -33,8 +33,8 @@ const (
 	statusNoAccount
 	statusBrowsingKeys
 	statusBrowsingTokens
-	statusBrowsingPlus
 	statusBrowsingNotifications
+	statusBrowsingPlus
 	statusChat
 	statusQuitting
 )
@@ -56,8 +56,8 @@ type menuChoice int
 const (
 	keysChoice menuChoice = iota
 	tokensChoice
-	plusChoice
 	notificationsChoice
+	plusChoice
 	chatChoice
 	exitChoice
 	unsetChoice // set when no choice has been made
@@ -67,8 +67,8 @@ const (
 var menuChoices = map[menuChoice]string{
 	keysChoice:          "Manage keys",
 	tokensChoice:        "Manage tokens",
-	plusChoice:          "Pico+",
 	notificationsChoice: "Notifications",
+	plusChoice:          "Pico+",
 	chatChoice:          "Chat",
 	exitChoice:          "Exit",
 }
@@ -83,25 +83,25 @@ func NewSpinner(styles common.Styles) spinner.Model {
 type GotDBMsg db.DB
 
 func CmsMiddleware(cfg *shared.ConfigSite) bm.Handler {
-	return func(s ssh.Session) (tea.Model, []tea.ProgramOption) {
+	return func(sesh ssh.Session) (tea.Model, []tea.ProgramOption) {
 		logger := cfg.Logger
 
-		_, _, active := s.Pty()
+		_, _, active := sesh.Pty()
 		if !active {
 			logger.Info("no active terminal, skipping")
 			return nil, nil
 		}
 
-		sshUser := s.User()
+		sshUser := sesh.User()
 		dbpool := postgres.NewDB(cfg.DbURL, cfg.Logger)
-		renderer := lipgloss.NewRenderer(s)
-		renderer.SetOutput(common.OutputFromSession(s))
+		renderer := lipgloss.NewRenderer(sesh)
+		renderer.SetOutput(common.OutputFromSession(sesh))
 		styles := common.DefaultStyles(renderer)
 
 		m := model{
-			session:    s,
+			session:    sesh,
 			cfg:        cfg,
-			publicKey:  s.PublicKey(),
+			publicKey:  sesh.PublicKey(),
 			dbpool:     dbpool,
 			sshUser:    sshUser,
 			status:     statusInit,
@@ -116,7 +116,7 @@ func CmsMiddleware(cfg *shared.ConfigSite) bm.Handler {
 
 		user, err := m.findUser()
 		if err != nil {
-			_, _ = fmt.Fprintln(s.Stderr(), err)
+			wish.Errorln(sesh, err)
 			return nil, nil
 		}
 		m.user = user
@@ -177,6 +177,7 @@ func (m model) findUser() (*db.User, error) {
 		if errors.Is(err, &db.ErrMultiplePublicKeys{}) {
 			return nil, err
 		}
+		// no user and not error indicates we need to create an account
 		return nil, nil
 	}
 
@@ -259,6 +260,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.createAccount = account.NewCreateModel(m.styles, m.dbpool, m.publicKey)
 		m.plus = plus.NewModel(m.styles, m.user, m.session)
 		m.notifications = notifications.NewModel(m.styles, m.dbpool, m.user, m.session)
+		// no user found? go to create account screen
 		if m.user == nil {
 			m.status = statusNoAccount
 		} else {

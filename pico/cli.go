@@ -12,7 +12,6 @@ import (
 	"github.com/picosh/pico/tui/common"
 	"github.com/picosh/pico/tui/notifications"
 	"github.com/picosh/pico/tui/plus"
-	"github.com/picosh/send/send/utils"
 )
 
 func getUser(s ssh.Session, dbpool db.DB) (*db.User, error) {
@@ -82,7 +81,9 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 
 			user, err := getUser(sesh, dbpool)
 			if err != nil {
-				utils.ErrorHandler(sesh, err)
+				wish.Errorf(sesh, "detected ssh command: %s\n", args)
+				s := fmt.Errorf("error: you need to create an account before using the remote cli: %w", err)
+				wish.Fatalln(sesh, s)
 				return
 			}
 

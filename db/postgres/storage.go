@@ -456,7 +456,7 @@ func (me *PsqlDB) FindPublicKeyForKey(key string) (*db.PublicKey, error) {
 	}
 
 	if len(keys) == 0 {
-		return nil, errors.New("no public keys found for key provided")
+		return nil, fmt.Errorf("pubkey not found in our database: [%s]", key)
 	}
 
 	// When we run PublicKeyForKey and there are multiple public keys returned from the database
@@ -590,6 +590,7 @@ func (me *PsqlDB) FindUserForKey(username string, key string) (*db.User, error) 
 	me.Logger.Info("attempting to find user with only public key", "key", key)
 	pk, err := me.FindPublicKeyForKey(key)
 	if err == nil {
+		me.Logger.Info("found pubkey, looking for user", "key", key, "userID", pk.UserID)
 		user, err := me.FindUser(pk.UserID)
 		if err != nil {
 			return nil, err
