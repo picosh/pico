@@ -13,17 +13,17 @@ Want to publish a blog post? Use rsync, scp, or sftp. Want to publish a website?
 Use rsync, scp, or sftp. Want to share a code snippet with a colleague? Use
 rsync, scp, or sftp. Hopefully you see the trend.
 
-- [pgs.sh](https://pico.sh/pgs): A static site hosting platform using SSH for
+- [tuns](https://pico.sh/tuns): https/wss/tcp tunnels to localhost using only
+- [pages](https://pico.sh/pgs): A static site hosting platform using SSH for
   site deployments.
-- [tuns.sh](https://pico.sh/tuns): https/wss/tcp tunnels to localhost using only
   SSH.
-- [imgs.sh](https://pico.sh/imgs): Docker image registry using SSH for
-  authentication.
-- [prose.sh](https://prose.sh): A blog platform using SSH for content
+- [prose](https://pico.sh/prose): A blog platform using SSH for content
   management.
-- [pastes.sh](https://pastes.sh): Upload code snippets using rsync, scp, and
+- [pastes](https://pico.sh/pastes): Upload code snippets using rsync, scp, and
   sftp.
-- [feeds.sh](https://feeds.sh): An RSS email notification service using SSH.
+- [feeds](https://pico.sh/feeds): An RSS email notification service using SSH.
+- [docker registry](https://pico.sh/imgs): Docker image registry using SSH for
+  authentication.
 
 ## Deploy a site with a single command
 
