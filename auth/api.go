@@ -274,7 +274,12 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !client.Dbpool.HasFeatureForUser(user.ID, space) {
+	if space == "tuns" {
+		if !client.Dbpool.HasFeatureForUser(user.ID, "plus") {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+	} else if !client.Dbpool.HasFeatureForUser(user.ID, space) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
@@ -341,8 +346,7 @@ func rssHandler(w http.ResponseWriter, r *http.Request) {
 	var feedItems []*feeds.Item
 
 	now := time.Now()
-	// using pgs as the signal
-	ff, err := client.Dbpool.FindFeatureForUser(user.ID, "pgs")
+	ff, err := client.Dbpool.FindFeatureForUser(user.ID, "plus")
 	if err != nil {
 		// still want to send an empty feed
 	} else {

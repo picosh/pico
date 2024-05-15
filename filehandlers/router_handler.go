@@ -149,13 +149,13 @@ func (r *FileHandlerRouter) Validate(s ssh.Session) error {
 		return fmt.Errorf("must have username set")
 	}
 
-	ff, _ := r.DBPool.FindFeatureForUser(user.ID, r.Cfg.Space)
+	ff, _ := r.DBPool.FindFeatureForUser(user.ID, "plus")
 	// we have free tiers so users might not have a feature flag
 	// in which case we set sane defaults
 	if ff == nil {
 		ff = db.NewFeatureFlag(
 			user.ID,
-			r.Cfg.Space,
+			"plus",
 			r.Cfg.MaxSize,
 			r.Cfg.MaxAssetSize,
 		)
