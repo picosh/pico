@@ -2,6 +2,7 @@ package plus
 
 import (
 	"fmt"
+	"net/url"
 
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -12,8 +13,8 @@ import (
 )
 
 func PlusView(username string) string {
-	paymentLink := "https://checkout.pico.sh/buy/73c26cf9-3fac-44c3-b744-298b3032a96b?discount=0"
-	url := fmt.Sprintf("%s&checkout[custom][username]=%s", paymentLink, username)
+	paymentLink := "https://auth.pico.sh/checkout"
+	url := fmt.Sprintf("%s/%s", paymentLink, url.QueryEscape(username))
 	md := fmt.Sprintf(`# pico+
 
 Signup to get premium access

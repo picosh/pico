@@ -515,6 +515,22 @@ func paymentWebhookHandler(secret string) func(http.ResponseWriter, *http.Reques
 	}
 }
 
+// URL shortener for out pico+ URL
+func checkoutHandler(w http.ResponseWriter, r *http.Request) {
+	username, err := url.PathUnescape(getField(r, 0))
+	if err != nil {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		return
+	}
+	link := "https://checkout.pico.sh/buy/73c26cf9-3fac-44c3-b744-298b3032a96b"
+	url := fmt.Sprintf(
+		"%s?discount=0&checkout[custom][username]=%s",
+		link,
+		username,
+	)
+	http.Redirect(w, r, url, http.StatusMovedPermanently)
+}
+
 func createMainRoutes() []shared.Route {
 	fileServer := http.FileServer(http.Dir("auth/public"))
 	secret := os.Getenv("PICO_SECRET_WEBHOOK")
@@ -523,6 +539,7 @@ func createMainRoutes() []shared.Route {
 	}
 
 	routes := []shared.Route{
+		shared.NewRoute("GET", "/checkout/(.+)", checkoutHandler),
 		shared.NewRoute("GET", "/.well-known/oauth-authorization-server", wellKnownHandler),
 		shared.NewRoute("POST", "/introspect", introspectHandler),
 		shared.NewRoute("GET", "/authorize", authorizeHandler),
