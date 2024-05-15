@@ -24,9 +24,8 @@ import (
 var fnameRe = regexp.MustCompile(`[-_]+`)
 var subdomainRe = regexp.MustCompile(`^[a-z0-9-]+$`)
 
-var KB = 1024
-var MB = KB * 1024
-var GB = MB * 1024
+var KB = 1000
+var MB = KB * 1000
 
 func IsValidSubdomain(subd string) bool {
 	return subdomainRe.MatchString(subd)
@@ -150,7 +149,7 @@ func Shasum(data []byte) string {
 }
 
 func BytesToGB(size int) float32 {
-	return (((float32(size) / 1024) / 1024) / 1024)
+	return (((float32(size) / 1000) / 1000) / 1000)
 }
 
 // https://stackoverflow.com/a/46964105
