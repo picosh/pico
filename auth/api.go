@@ -515,7 +515,7 @@ func paymentWebhookHandler(secret string) func(http.ResponseWriter, *http.Reques
 	}
 }
 
-// URL shortener for out pico+ URL
+// URL shortener for out pico+ URL.
 func checkoutHandler(w http.ResponseWriter, r *http.Request) {
 	username, err := url.PathUnescape(getField(r, 0))
 	if err != nil {
