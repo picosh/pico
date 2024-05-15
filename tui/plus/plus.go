@@ -31,6 +31,7 @@ Signup to get premium access
   - blog analytics
 - docker registry
   - full access
+- 20GB total storage
 
 There are a few ways to purchase a membership. We try our best to
 provide immediate access to <code>pico+</code> regardless of payment
