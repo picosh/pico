@@ -6,9 +6,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
+	bm "github.com/charmbracelet/wish/bubbletea"
 	"github.com/picosh/pico/db"
 	uploadassets "github.com/picosh/pico/filehandlers/assets"
 	"github.com/picosh/pico/shared"
@@ -71,10 +71,19 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 
 	return func(next ssh.Handler) ssh.Handler {
 		return func(sesh ssh.Session) {
-			_, _, activePty := sesh.Pty()
-			if activePty {
+			args := sesh.Command()
+			if len(args) == 0 {
 				next(sesh)
 				return
+			}
+
+			// default width and height when no pty
+			width := 80
+			height := 60
+			pty, _, ok := sesh.Pty()
+			if ok {
+				width = pty.Window.Width
+				height = pty.Window.Height
 			}
 
 			user, err := getUser(sesh, dbpool)
@@ -83,11 +92,7 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 				return
 			}
 
-			args := sesh.Command()
-
-			renderer := lipgloss.NewRenderer(sesh)
-			// this might be dangerous but going with it for now
-			// renderer.SetColorProfile(termenv.ANSI256)
+			renderer := bm.MakeRenderer(sesh)
 			styles := common.DefaultStyles(renderer)
 
 			opts := Cmd{
@@ -98,6 +103,8 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 				Dbpool:  dbpool,
 				Write:   false,
 				Styles:  styles,
+				Width:   width,
+				Height:  height,
 			}
 
 			cmd := strings.TrimSpace(args[0])

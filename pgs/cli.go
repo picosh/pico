@@ -15,7 +15,7 @@ import (
 	"github.com/picosh/pico/tui/common"
 )
 
-func projectTable(styles common.Styles, projects []*db.Project) *table.Table {
+func projectTable(styles common.Styles, projects []*db.Project, width int) *table.Table {
 	headers := []string{
 		"Name",
 		"Last Updated",
@@ -42,12 +42,13 @@ func projectTable(styles common.Styles, projects []*db.Project) *table.Table {
 	}
 
 	t := table.New().
+		Width(width).
 		Headers(headers...).
 		Rows(data...)
 	return t
 }
 
-func getHelpText(styles common.Styles, userName string) string {
+func getHelpText(styles common.Styles, userName string, width int) string {
 	helpStr := "Commands: [help, stats, ls, rm, link, unlink, prune, retain, depends, acl]\n"
 	helpStr += styles.Note.Render("NOTICE:") + " *must* append with `--write` for the changes to persist.\n"
 
@@ -97,7 +98,8 @@ func getHelpText(styles common.Styles, userName string) string {
 	}
 
 	t := table.New().
-		Border(lipgloss.HiddenBorder()).
+		Width(width).
+		Border(lipgloss.RoundedBorder()).
 		Headers(headers...).
 		Rows(data...)
 
@@ -113,6 +115,8 @@ type Cmd struct {
 	Dbpool  db.DB
 	Write   bool
 	Styles  common.Styles
+	Width   int
+	Height  int
 }
 
 func (c *Cmd) output(out string) {
@@ -184,7 +188,7 @@ func (c *Cmd) RmProjectAssets(projectName string) error {
 }
 
 func (c *Cmd) help() {
-	c.output(getHelpText(c.Styles, c.User.Name))
+	c.output(getHelpText(c.Styles, c.User.Name, c.Width))
 }
 
 func (c *Cmd) stats(cfgMaxSize uint64) error {
@@ -221,7 +225,8 @@ func (c *Cmd) stats(cfgMaxSize uint64) error {
 	}
 
 	t := table.New().
-		Border(lipgloss.HiddenBorder()).
+		Width(c.Width).
+		Border(lipgloss.RoundedBorder()).
 		Headers(headers...).
 		Rows(data)
 	c.output(t.String())
@@ -239,7 +244,7 @@ func (c *Cmd) ls() error {
 		c.output("no projects found")
 	}
 
-	t := projectTable(c.Styles, projects)
+	t := projectTable(c.Styles, projects, c.Width)
 	c.output(t.String())
 
 	return nil
@@ -325,7 +330,7 @@ func (c *Cmd) depends(projectName string) error {
 		return nil
 	}
 
-	t := projectTable(c.Styles, projects)
+	t := projectTable(c.Styles, projects, c.Width)
 	c.output(t.String())
 
 	return nil

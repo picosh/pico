@@ -5,7 +5,6 @@ import (
 	"io"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
 	bm "github.com/charmbracelet/wish/bubbletea"
@@ -86,8 +85,7 @@ func CmsMiddleware(cfg *shared.ConfigSite) bm.Handler {
 
 		sshUser := sesh.User()
 		dbpool := postgres.NewDB(cfg.DbURL, cfg.Logger)
-		renderer := lipgloss.NewRenderer(sesh)
-		renderer.SetOutput(common.OutputFromSession(sesh))
+		renderer := bm.MakeRenderer(sesh)
 		styles := common.DefaultStyles(renderer)
 
 		m := model{
