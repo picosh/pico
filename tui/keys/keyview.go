@@ -34,7 +34,7 @@ type Fingerprint struct {
 func (f Fingerprint) String() string {
 	return fmt.Sprintf(
 		"%s %s",
-		f.Styles.ListDim.Render(strings.ToUpper(f.Algorithm)),
+		f.Styles.ListKey.Render(strings.ToUpper(f.Algorithm)),
 		f.Styles.ListKey.Render(f.Type+":"+f.Value),
 	)
 }
@@ -64,7 +64,7 @@ func (f fingerprint) state(s keyState, styles common.Styles) string {
 	if s == keyDeleting {
 		return fmt.Sprintf(
 			"%s %s",
-			styles.DeleteDim.Render(strings.ToUpper(f.Algorithm)),
+			styles.Delete.Render(strings.ToUpper(f.Algorithm)),
 			styles.Delete.Render(f.Type+":"+f.Value),
 		)
 	}
@@ -85,7 +85,7 @@ type styledKey struct {
 }
 
 func (m Model) newStyledKey(styles common.Styles, key *db.PublicKey, active bool) styledKey {
-	date := key.CreatedAt.Format("02 Jan 2006 15:04:05 MST")
+	date := key.CreatedAt.Format("02 Jan 2006")
 	fp, err := FingerprintSHA256(styles, key)
 	if err != nil {
 		fp = Fingerprint{Value: "[error generating fingerprint]"}
@@ -93,7 +93,7 @@ func (m Model) newStyledKey(styles common.Styles, key *db.PublicKey, active bool
 
 	var note string
 	if active {
-		note = m.styles.NoteDim.Render("• ") + m.styles.Note.Render("Current Key")
+		note = m.styles.Note.Render("• ") + m.styles.Note.Render("Current Key")
 	}
 
 	// Default state
@@ -106,7 +106,7 @@ func (m Model) newStyledKey(styles common.Styles, key *db.PublicKey, active bool
 		dateLabel:    "Added:",
 		commentLabel: "Name:",
 		commentVal:   key.Name,
-		dateVal:      styles.LabelDim.Render(date),
+		dateVal:      styles.Label.Render(date),
 		note:         note,
 	}
 }
@@ -125,7 +125,7 @@ func (k *styledKey) deleting() {
 	k.keyLabel = k.styles.Delete.Render("Key:")
 	k.dateLabel = k.styles.Delete.Render("Added:")
 	k.commentLabel = k.styles.Delete.Render("Name:")
-	k.dateVal = k.styles.DeleteDim.Render(k.date)
+	k.dateVal = k.styles.Delete.Render(k.date)
 }
 
 func (k styledKey) render(state keyState) string {

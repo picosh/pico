@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -52,23 +51,12 @@ func KeyValueView(styles Styles, stuff ...string) string {
 			continue
 		}
 		// odd: value
-		s += styles.LabelDim.Render(stuff[i])
+		s += styles.Label.Render(stuff[i])
 		s += "\n"
 		index++
 	}
 
 	return strings.TrimSpace(s)
-}
-
-// NewSpinner returns a spinner model.
-func NewSpinner(styles Styles) spinner.Model {
-	spinnerStyle := styles.Renderer.NewStyle().
-		Foreground(lipgloss.AdaptiveColor{Light: "#8E8E8E", Dark: "#747373"})
-
-	s := spinner.New()
-	s.Spinner = spinner.Dot
-	s.Style = spinnerStyle
-	return s
 }
 
 // OKButtonView returns a button reading "OK".

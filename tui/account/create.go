@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/spinner"
 	input "github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/ssh"
@@ -58,7 +57,6 @@ type CreateModel struct {
 	index     index
 	errMsg    string
 	input     input.Model
-	spinner   spinner.Model
 }
 
 // updateFocus updates the focused states in the model based on the current
@@ -112,7 +110,6 @@ func NewCreateModel(styles common.Styles, dbpool db.DB, publicKey ssh.PublicKey)
 		index:     textInput,
 		errMsg:    "",
 		input:     im,
-		spinner:   common.NewSpinner(styles),
 		publicKey: publicKey,
 	}
 }
@@ -174,10 +171,7 @@ func Update(msg tea.Msg, m CreateModel) (CreateModel, tea.Cmd) {
 					m.errMsg = ""
 					m.newName = strings.TrimSpace(m.input.Value())
 
-					return m, tea.Batch(
-						createAccount(m), // fire off the command, too
-						m.spinner.Tick,
-					)
+					return m, createAccount(m)
 				case cancelButton: // Exit
 					m.Quit = true
 					return m, nil
@@ -220,12 +214,6 @@ func Update(msg tea.Msg, m CreateModel) (CreateModel, tea.Cmd) {
 
 		return m, nil
 
-	case spinner.TickMsg:
-		var cmd tea.Cmd
-		m.spinner, cmd = m.spinner.Update(msg)
-
-		return m, cmd
-
 	default:
 		var cmd tea.Cmd
 		m.input, cmd = m.input.Update(msg) // Do we still need this?
@@ -257,7 +245,7 @@ func View(m CreateModel) string {
 }
 
 func spinnerView(m CreateModel) string {
-	return m.spinner.View() + " Creating account..."
+	return "Creating account..."
 }
 
 func createAccount(m CreateModel) tea.Cmd {

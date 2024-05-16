@@ -18,7 +18,7 @@ type styledKey struct {
 }
 
 func (m Model) newStyledKey(styles common.Styles, token *db.Token, active bool) styledKey {
-	date := token.CreatedAt.Format("02 Jan 2006 15:04:05 MST")
+	date := token.CreatedAt.Format("02 Jan 2006")
 
 	// Default state
 	return styledKey{
@@ -28,7 +28,7 @@ func (m Model) newStyledKey(styles common.Styles, token *db.Token, active bool) 
 		gutter:    " ",
 		nameLabel: "Name:",
 		dateLabel: "Added:",
-		dateVal:   styles.LabelDim.Render(date),
+		dateVal:   styles.Label.Render(date),
 	}
 }
 
@@ -44,7 +44,7 @@ func (k *styledKey) deleting() {
 	k.gutter = common.VerticalLine(k.styles.Renderer, common.StateDeleting)
 	k.nameLabel = k.styles.Delete.Render("Name:")
 	k.dateLabel = k.styles.Delete.Render("Added:")
-	k.dateVal = k.styles.DeleteDim.Render(k.date)
+	k.dateVal = k.styles.Delete.Render(k.date)
 }
 
 func (k styledKey) render(state keyState) string {

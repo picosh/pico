@@ -27,13 +27,9 @@ type Styles struct {
 	Prompt,
 	FocusedPrompt,
 	Note,
-	NoteDim,
 	Delete,
-	DeleteDim,
 	Label,
-	LabelDim,
 	ListKey,
-	ListDim,
 	InactivePagination,
 	SelectionMarker,
 	SelectedMenuItem,
@@ -65,14 +61,9 @@ func DefaultStyles(renderer *lipgloss.Renderer) Styles {
 	s.Prompt = renderer.NewStyle().MarginRight(1).SetString("•")
 	s.FocusedPrompt = s.Prompt.Copy().Foreground(Fuschia)
 	s.Note = renderer.NewStyle().Foreground(Green)
-	s.NoteDim = renderer.NewStyle().
-		Foreground(Green)
 	s.Delete = s.Error.Copy()
-	s.DeleteDim = renderer.NewStyle().Foreground(FaintRed)
 	s.Label = renderer.NewStyle().Foreground(Fuschia)
-	s.LabelDim = renderer.NewStyle().Foreground(Indigo)
 	s.ListKey = renderer.NewStyle().Foreground(Indigo)
-	s.ListDim = renderer.NewStyle().Foreground(SubtleIndigo)
 	s.InactivePagination = renderer.NewStyle().
 		Foreground(Grey)
 	s.SelectionMarker = renderer.NewStyle().

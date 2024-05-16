@@ -4,7 +4,6 @@ import (
 	"errors"
 	"io"
 
-	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/ssh"
@@ -100,7 +99,6 @@ func CmsMiddleware(cfg *shared.ConfigSite) bm.Handler {
 			status:     statusInit,
 			menuChoice: unsetChoice,
 			styles:     styles,
-			spinner:    common.NewSpinner(styles),
 			terminalSize: tea.WindowSizeMsg{
 				Width:  80,
 				Height: 24,
@@ -135,7 +133,6 @@ type model struct {
 	menuChoice      menuChoice
 	styles          common.Styles
 	info            info.Model
-	spinner         spinner.Model
 	keys            keys.Model
 	tokens          tokens.Model
 	plus            plus.Model
@@ -146,7 +143,7 @@ type model struct {
 }
 
 func (m model) Init() tea.Cmd {
-	return m.spinner.Tick
+	return nil
 }
 
 func (m model) findUser() (*db.User, error) {
@@ -193,12 +190,16 @@ func (m model) findPlusFeatureFlag() (*db.FeatureFlag, error) {
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var (
 		cmds []tea.Cmd
-		cmd  tea.Cmd
 	)
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.terminalSize = msg
+		var cmd tea.Cmd
+		m.plus, cmd = plus.Update(msg, m.plus, m.terminalSize)
+		cmds = append(cmds, cmd)
+		m.notifications, cmd = notifications.Update(msg, m.notifications, m.terminalSize)
+		cmds = append(cmds, cmd)
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyCtrlC:
@@ -241,8 +242,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.keys = keys.NewModel(m.styles, m.cfg.Logger, m.dbpool, m.user)
 		m.tokens = tokens.NewModel(m.styles, m.dbpool, m.user)
 		m.createAccount = account.NewCreateModel(m.styles, m.dbpool, m.publicKey)
-		m.plus = plus.NewModel(m.styles, m.user, m.session)
-		m.notifications = notifications.NewModel(m.styles, m.dbpool, m.user, m.session)
+		m.plus = plus.NewModel(m.styles, m.user, m.session, m.terminalSize)
+		m.notifications = notifications.NewModel(m.styles, m.dbpool, m.user, m.terminalSize)
 	}
 
 	switch m.status {
@@ -251,8 +252,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.keys = keys.NewModel(m.styles, m.cfg.Logger, m.dbpool, m.user)
 		m.tokens = tokens.NewModel(m.styles, m.dbpool, m.user)
 		m.createAccount = account.NewCreateModel(m.styles, m.dbpool, m.publicKey)
-		m.plus = plus.NewModel(m.styles, m.user, m.session)
-		m.notifications = notifications.NewModel(m.styles, m.dbpool, m.user, m.session)
+		m.plus = plus.NewModel(m.styles, m.user, m.session, m.terminalSize)
+		m.notifications = notifications.NewModel(m.styles, m.dbpool, m.user, m.terminalSize)
 		// no user found? go to create account screen
 		if m.user == nil {
 			m.status = statusNoAccount
@@ -261,6 +262,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	var cmd tea.Cmd
 	m, cmd = updateChildren(msg, m)
 	if cmd != nil {
 		cmds = append(cmds, cmd)
@@ -306,18 +308,18 @@ func updateChildren(msg tea.Msg, m model) (model, tea.Cmd) {
 			return m, tea.Quit
 		}
 	case statusBrowsingPlus:
-		m.plus, cmd = plus.Update(msg, m.plus)
+		m.plus, cmd = plus.Update(msg, m.plus, m.terminalSize)
 		if m.plus.Done {
-			m.plus = plus.NewModel(m.styles, m.user, m.session)
+			m.plus = plus.NewModel(m.styles, m.user, m.session, m.terminalSize)
 			m.status = statusReady
 		} else if m.plus.Quit {
 			m.status = statusQuitting
 			return m, tea.Quit
 		}
 	case statusBrowsingNotifications:
-		m.notifications, cmd = notifications.Update(msg, m.notifications)
+		m.notifications, cmd = notifications.Update(msg, m.notifications, m.terminalSize)
 		if m.notifications.Done {
-			m.notifications = notifications.NewModel(m.styles, m.dbpool, m.user, m.session)
+			m.notifications = notifications.NewModel(m.styles, m.dbpool, m.user, m.terminalSize)
 			m.status = statusReady
 		} else if m.notifications.Quit {
 			m.status = statusQuitting

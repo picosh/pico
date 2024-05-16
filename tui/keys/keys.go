@@ -4,7 +4,6 @@ import (
 	"log/slog"
 
 	pager "github.com/charmbracelet/bubbles/paginator"
-	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/tui/common"
@@ -58,7 +57,6 @@ type Model struct {
 	index          int             // index of selected key in relation to the current page
 	Exit           bool
 	Quit           bool
-	spinner        spinner.Model
 	createKey      createkey.Model
 }
 
@@ -98,7 +96,6 @@ func NewModel(styles common.Styles, logger *slog.Logger, dbpool db.DB, user *db.
 		activeKeyIndex: -1,
 		keys:           []*db.PublicKey{},
 		index:          0,
-		spinner:        common.NewSpinner(styles),
 		Exit:           false,
 		Quit:           false,
 	}
@@ -106,9 +103,7 @@ func NewModel(styles common.Styles, logger *slog.Logger, dbpool db.DB, user *db.
 
 // Init is the Tea initialization function.
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(
-		m.spinner.Tick,
-	)
+	return nil
 }
 
 // Update is the tea update function which handles incoming messages.
@@ -226,12 +221,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.state = stateNormal
 		return m, fetchKeys(m.dbpool, m.user)
 
-	case spinner.TickMsg:
-		var cmd tea.Cmd
-		if m.state < stateNormal {
-			m.spinner, cmd = m.spinner.Update(msg)
-		}
-		return m, cmd
 	}
 
 	switch m.state {
@@ -291,7 +280,7 @@ func (m Model) View() string {
 
 	switch m.state {
 	case stateLoading:
-		s = m.spinner.View() + " Loading...\n\n"
+		s = "Loading...\n\n"
 	case stateQuitting:
 		s = "Thanks for using pico.sh!\n"
 	case stateCreateKey:
@@ -372,15 +361,12 @@ func helpView(m Model) string {
 func (m Model) promptView(prompt string) string {
 	st := m.styles.Delete.Copy().MarginTop(2).MarginRight(1)
 	return st.Render(prompt) +
-		m.styles.DeleteDim.Render("(y/N)")
+		m.styles.Delete.Render("(y/N)")
 }
 
 // LoadKeys returns the command necessary for loading the keys.
 func LoadKeys(m Model) tea.Cmd {
-	return tea.Batch(
-		fetchKeys(m.dbpool, m.user),
-		m.spinner.Tick,
-	)
+	return fetchKeys(m.dbpool, m.user)
 }
 
 // fetchKeys loads the current set of keys via the charm client.

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/spinner"
 	input "github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/picosh/pico/db"
@@ -52,7 +51,6 @@ type Model struct {
 	index     index
 	errMsg    string
 	input     input.Model
-	spinner   spinner.Model
 }
 
 // updateFocus updates the focused states in the model based on the current
@@ -108,7 +106,6 @@ func NewModel(styles common.Styles, dbpool db.DB, user *db.User) Model {
 		index:     textInput,
 		errMsg:    "",
 		input:     im,
-		spinner:   common.NewSpinner(styles),
 	}
 }
 
@@ -170,10 +167,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.errMsg = ""
 					m.tokenName = strings.TrimSpace(m.input.Value())
 
-					return m, tea.Batch(
-						addToken(m), // fire off the command, too
-						m.spinner.Tick,
-					)
+					return m, addToken(m)
 				case cancelButton: // Exit this mini-app
 					m.Done = true
 					return m, dismiss
@@ -204,12 +198,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.errMsg = m.styles.Wrap.Render(head + body)
 
 		return m, nil
-
-	case spinner.TickMsg:
-		var cmd tea.Cmd
-		m.spinner, cmd = m.spinner.Update(msg)
-
-		return m, cmd
 
 	default:
 		var cmd tea.Cmd
@@ -242,7 +230,7 @@ func (m Model) View() string {
 }
 
 func spinnerView(m Model) string {
-	return m.spinner.View() + " Submitting..."
+	return "Submitting..."
 }
 
 func dismiss() tea.Msg { return TokenDismissed(1) }

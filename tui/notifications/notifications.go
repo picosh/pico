@@ -6,7 +6,6 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
-	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/tui/common"
 )
@@ -71,10 +70,9 @@ func headerWidth(w int) int {
 }
 
 // NewModel returns a new username model in its initial state.
-func NewModel(styles common.Styles, dbpool db.DB, user *db.User, session ssh.Session) Model {
-	pty, _, _ := session.Pty()
+func NewModel(styles common.Styles, dbpool db.DB, user *db.User, termSize tea.WindowSizeMsg) Model {
 	hh := headerHeight(styles)
-	viewport := viewport.New(headerWidth(pty.Window.Width), pty.Window.Height-hh)
+	viewport := viewport.New(headerWidth(termSize.Width), termSize.Height-hh)
 	viewport.YPosition = hh
 	if user != nil {
 		viewport.SetContent(NotificationsView(dbpool, user.ID))
@@ -90,7 +88,7 @@ func NewModel(styles common.Styles, dbpool db.DB, user *db.User, session ssh.Ses
 }
 
 // Update is the Bubble Tea update loop.
-func Update(msg tea.Msg, m Model) (Model, tea.Cmd) {
+func Update(msg tea.Msg, m Model, termSize tea.WindowSizeMsg) (Model, tea.Cmd) {
 	var cmd tea.Cmd
 	var cmds []tea.Cmd
 
@@ -108,13 +106,11 @@ func Update(msg tea.Msg, m Model) (Model, tea.Cmd) {
 				m.Done = true
 			}
 		}
-
-	case tea.WindowSizeMsg:
-		m.viewport.Width = headerWidth(msg.Width)
-		hh := headerHeight(m.styles)
-		m.viewport.Height = msg.Height - hh
 	}
 
+	m.viewport.Width = headerWidth(termSize.Width)
+	hh := headerHeight(m.styles)
+	m.viewport.Height = termSize.Height - hh
 	m.viewport, cmd = m.viewport.Update(msg)
 	cmds = append(cmds, cmd)
 
