@@ -79,7 +79,7 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 
 			// default width and height when no pty
 			width := 80
-			height := 60
+			height := 24
 			pty, _, ok := sesh.Pty()
 			if ok {
 				width = pty.Window.Width
