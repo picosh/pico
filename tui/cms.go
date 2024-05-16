@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"fmt"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/muesli/reflow/wordwrap"
 	"github.com/muesli/reflow/wrap"
@@ -67,15 +69,14 @@ func (m *UI) Init() tea.Cmd {
 }
 
 func (m *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var (
-		cmds []tea.Cmd
-	)
+	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.shared.Width = msg.Width
 		m.shared.Height = msg.Height
 		cmds = append(cmds, m.updateModels(msg))
+
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyCtrlC:
@@ -84,11 +85,12 @@ func (m *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		switch msg.String() {
-		// Quit
 		case "q", "esc":
+			fmt.Println("BOOM!")
 			m.shared.Dbpool.Close()
 			return m, tea.Quit
 		}
+
 	case account.CreateAccountMsg:
 		m.state = readyState
 		m.shared.User = msg
@@ -110,7 +112,7 @@ func (m *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, m.loadChat())
 		case menu.ExitChoice:
 			m.shared.Dbpool.Close()
-			cmds = append(cmds, tea.Quit)
+			return m, tea.Quit
 		}
 	}
 
