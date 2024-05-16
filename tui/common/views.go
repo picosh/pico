@@ -111,3 +111,19 @@ func HelpView(styles Styles, sections ...string) string {
 
 	return s
 }
+
+func LogoView() string {
+	return `
+    .                   ."
+   i-~l^             'I~??!
+  I??_??-<I^     .,!_??+<-?I
+  _-+ .,!+??->:;<??-<;'  +-_
+ '-?i     ':i_??_!".     i?-'
+  _-+         ''         +-_
+  I??I                  I??I
+   !??l.              .l??i
+    ;_?_I'          'I_?_;
+     .I+??_>l:,,:l>_??+I.
+        ';i+--??--+i;'
+             ....`
+}
