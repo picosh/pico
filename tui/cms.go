@@ -113,7 +113,9 @@ func CmsMiddleware(cfg *shared.ConfigSite) bm.Handler {
 		ff, _ := m.findPlusFeatureFlag()
 		m.plusFeatureFlag = ff
 
-		return m, []tea.ProgramOption{tea.WithAltScreen()}
+		opts := bm.MakeOptions(sesh)
+		opts = append(opts, tea.WithAltScreen())
+		return m, opts
 	}
 }
 
