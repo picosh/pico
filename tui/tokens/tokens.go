@@ -41,29 +41,30 @@ type (
 
 // Model is the Tea state model for this user interface.
 type Model struct {
-	dbpool         db.DB
-	user           *db.User
-	styles         common.Styles
-	pager          pager.Model
+	shared common.SharedModel
+
+	Exit bool
+	Quit bool
+
 	state          state
 	err            error
 	activeKeyIndex int         // index of the key in the below slice which is currently in use
 	tokens         []*db.Token // keys linked to user's account
 	index          int         // index of selected key in relation to the current page
-	Exit           bool
-	Quit           bool
-	createKey      createtoken.Model
+
+	pager     pager.Model
+	createKey createtoken.Model
 }
 
 // getSelectedIndex returns the index of the cursor in relation to the total
 // number of items.
-func (m *Model) getSelectedIndex() int {
+func (m Model) getSelectedIndex() int {
 	return m.index + m.pager.Page*m.pager.PerPage
 }
 
 // UpdatePaging runs an update against the underlying pagination model as well
 // as performing some related tasks on this model.
-func (m *Model) UpdatePaging(msg tea.Msg) {
+func (m Model) UpdatePaging(msg tea.Msg) {
 	// Handle paging
 	m.pager.SetTotalPages(len(m.tokens))
 	m.pager, _ = m.pager.Update(msg)
@@ -74,24 +75,25 @@ func (m *Model) UpdatePaging(msg tea.Msg) {
 }
 
 // NewModel creates a new model with defaults.
-func NewModel(styles common.Styles, dbpool db.DB, user *db.User) Model {
+func NewModel(shared common.SharedModel) Model {
 	p := pager.New()
 	p.PerPage = keysPerPage
 	p.Type = pager.Dots
-	p.InactiveDot = styles.InactivePagination.Render("•")
+	p.InactiveDot = shared.Styles.InactivePagination.Render("•")
 
 	return Model{
-		dbpool:         dbpool,
-		user:           user,
-		styles:         styles,
-		pager:          p,
+		shared: shared,
+
+		Exit: false,
+		Quit: false,
+
 		state:          stateLoading,
 		err:            nil,
 		activeKeyIndex: -1,
 		tokens:         []*db.Token{},
 		index:          0,
-		Exit:           false,
-		Quit:           false,
+
+		pager: p,
 	}
 }
 
@@ -151,7 +153,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				switch m.state {
 				case stateDeletingKey:
 					m.state = stateNormal
-					return m, unlinkKey(m)
+					return m, m.unlinkKey()
 				}
 			}
 		}
@@ -185,13 +187,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case createtoken.TokenDismissed:
 		m.state = stateNormal
-		return m, fetchKeys(m.dbpool, m.user)
+		return m, FetchTokens(m.shared)
 
 	}
 
 	switch m.state {
 	case stateNormal:
-		m.createKey = createtoken.NewModel(m.styles, m.dbpool, m.user)
+		m.createKey = createtoken.NewModel(m.shared)
 	case stateDeletingKey:
 		// If an item is being confirmed for delete, any key (other than the key
 		// used for confirmation above) cancels the deletion
@@ -224,7 +226,7 @@ func updateChildren(msg tea.Msg, m Model) (Model, tea.Cmd) {
 		m.createKey = createKeyModel
 		cmd = newCmd
 		if m.createKey.Done {
-			m.createKey = createtoken.NewModel(m.styles, m.dbpool, m.user) // reset the state
+			m.createKey = createtoken.NewModel(m.shared) // reset the state
 			m.state = stateNormal
 		} else if m.createKey.Quit {
 			m.state = stateQuitting
@@ -266,7 +268,7 @@ func (m Model) View() string {
 		case stateDeletingKey:
 			s += m.promptView("Delete this key?")
 		default:
-			s += "\n\n" + helpView(m)
+			s += "\n\n" + m.helpView()
 		}
 	}
 
@@ -292,7 +294,7 @@ func keysView(m Model) string {
 		} else {
 			state = keyNormal
 		}
-		s += m.newStyledKey(m.styles, key, i+start == m.activeKeyIndex).render(state)
+		s += newStyledKey(m.shared.Styles, key, i+start == m.activeKeyIndex).render(state)
 	}
 
 	// If there aren't enough keys to fill the view, fill the missing parts
@@ -306,7 +308,7 @@ func keysView(m Model) string {
 	return s
 }
 
-func helpView(m Model) string {
+func (m Model) helpView() string {
 	var items []string
 	if len(m.tokens) > 1 {
 		items = append(items, "j/k, ↑/↓: choose")
@@ -315,24 +317,18 @@ func helpView(m Model) string {
 		items = append(items, "h/l, ←/→: page")
 	}
 	items = append(items, []string{"x: delete", "n: create", "esc: exit"}...)
-	return common.HelpView(m.styles, items...)
+	return common.HelpView(m.shared.Styles, items...)
 }
 
 func (m Model) promptView(prompt string) string {
-	st := m.styles.Delete.Copy().MarginTop(2).MarginRight(1)
+	st := m.shared.Styles.Delete.Copy().MarginTop(2).MarginRight(1)
 	return st.Render(prompt) +
-		m.styles.Delete.Render("(y/N)")
+		m.shared.Styles.Delete.Render("(y/N)")
 }
 
-// LoadKeys returns the command necessary for loading the keys.
-func LoadKeys(m Model) tea.Cmd {
-	return fetchKeys(m.dbpool, m.user)
-}
-
-// fetchKeys loads the current set of keys via the charm client.
-func fetchKeys(dbpool db.DB, user *db.User) tea.Cmd {
+func FetchTokens(shrd common.SharedModel) tea.Cmd {
 	return func() tea.Msg {
-		ak, err := dbpool.FindTokensForUser(user.ID)
+		ak, err := shrd.Dbpool.FindTokensForUser(shrd.User.ID)
 		if err != nil {
 			return errMsg{err}
 		}
@@ -341,10 +337,10 @@ func fetchKeys(dbpool db.DB, user *db.User) tea.Cmd {
 }
 
 // unlinkKey deletes the selected key.
-func unlinkKey(m Model) tea.Cmd {
+func (m Model) unlinkKey() tea.Cmd {
 	return func() tea.Msg {
 		id := m.tokens[m.getSelectedIndex()].ID
-		err := m.dbpool.RemoveToken(id)
+		err := m.shared.Dbpool.RemoveToken(id)
 		if err != nil {
 			return errMsg{err}
 		}

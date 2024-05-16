@@ -7,8 +7,6 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
-	"github.com/charmbracelet/ssh"
-	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/tui/common"
 )
 
@@ -77,11 +75,11 @@ we plan on continuing to include more services as we build them.`, url)
 
 // Model holds the state of the username UI.
 type Model struct {
+	shared common.SharedModel
+
 	Done bool // true when it's time to exit this view
 	Quit bool // true when the user wants to quit the whole program
 
-	styles   common.Styles
-	user     *db.User
 	viewport viewport.Model
 }
 
@@ -94,25 +92,29 @@ func headerWidth(w int) int {
 }
 
 // NewModel returns a new username model in its initial state.
-func NewModel(styles common.Styles, user *db.User, session ssh.Session, termSize tea.WindowSizeMsg) Model {
-	hh := headerHeight(styles)
-	viewport := viewport.New(headerWidth(termSize.Width), termSize.Height-hh)
+func NewModel(shared common.SharedModel) Model {
+	hh := headerHeight(shared.Styles)
+	viewport := viewport.New(headerWidth(shared.Width), shared.Height-hh)
 	viewport.YPosition = hh
-	if user != nil {
-		viewport.SetContent(PlusView(user.Name))
+	if shared.User != nil {
+		viewport.SetContent(PlusView(shared.User.Name))
 	}
 
 	return Model{
+		shared: shared,
+
 		Done:     false,
 		Quit:     false,
-		styles:   styles,
-		user:     user,
 		viewport: viewport,
 	}
 }
 
+func (m Model) Init() tea.Cmd {
+	return nil
+}
+
 // Update is the Bubble Tea update loop.
-func Update(msg tea.Msg, m Model, termSize tea.WindowSizeMsg) (Model, tea.Cmd) {
+func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	var cmds []tea.Cmd
 
@@ -132,9 +134,9 @@ func Update(msg tea.Msg, m Model, termSize tea.WindowSizeMsg) (Model, tea.Cmd) {
 		}
 	}
 
-	m.viewport.Width = headerWidth(termSize.Width)
-	hh := headerHeight(m.styles)
-	m.viewport.Height = termSize.Height - hh
+	m.viewport.Width = headerWidth(m.shared.Width)
+	hh := headerHeight(m.shared.Styles)
+	m.viewport.Height = m.shared.Height - hh
 	m.viewport, cmd = m.viewport.Update(msg)
 	cmds = append(cmds, cmd)
 
@@ -142,7 +144,6 @@ func Update(msg tea.Msg, m Model, termSize tea.WindowSizeMsg) (Model, tea.Cmd) {
 }
 
 // View renders current view from the model.
-func View(m Model) string {
-	s := m.viewport.View()
-	return s
+func (m Model) View() string {
+	return m.viewport.View()
 }

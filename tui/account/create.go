@@ -7,7 +7,6 @@ import (
 
 	input "github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/tui/common"
@@ -45,34 +44,54 @@ var deny = strings.Join(db.DenyList, ", ")
 var helpMsg = fmt.Sprintf("Names can only contain plain letters and numbers and must be less than 50 characters. No emjois. No names from deny list: %s", deny)
 
 // Model holds the state of the username UI.
-type CreateModel struct {
+type Model struct {
+	shared common.SharedModel
+
 	Done bool // true when it's time to exit this view
 	Quit bool // true when the user wants to quit the whole program
 
-	dbpool    db.DB
-	publicKey ssh.PublicKey
-	styles    common.Styles
-	state     state
-	newName   string
-	index     index
-	errMsg    string
-	input     input.Model
+	state   state
+	newName string
+	index   index
+	errMsg  string
+	input   input.Model
+}
+
+// NewModel returns a new username model in its initial state.
+func NewModel(shared common.SharedModel) Model {
+	im := input.New()
+	im.Cursor.Style = shared.Styles.Cursor
+	im.Placeholder = "enter username"
+	im.Prompt = shared.Styles.FocusedPrompt.String()
+	im.CharLimit = 50
+	im.Focus()
+
+	return Model{
+		shared:  shared,
+		Done:    false,
+		Quit:    false,
+		state:   ready,
+		newName: "",
+		index:   textInput,
+		errMsg:  "",
+		input:   im,
+	}
 }
 
 // updateFocus updates the focused states in the model based on the current
 // focus index.
-func (m *CreateModel) updateFocus() {
+func (m Model) updateFocus() {
 	if m.index == textInput && !m.input.Focused() {
 		m.input.Focus()
-		m.input.Prompt = m.styles.FocusedPrompt.String()
+		m.input.Prompt = m.shared.Styles.FocusedPrompt.String()
 	} else if m.index != textInput && m.input.Focused() {
 		m.input.Blur()
-		m.input.Prompt = m.styles.Prompt.String()
+		m.input.Prompt = m.shared.Styles.Prompt.String()
 	}
 }
 
 // Move the focus index one unit forward.
-func (m *CreateModel) indexForward() {
+func (m Model) indexForward() {
 	m.index++
 	if m.index > cancelButton {
 		m.index = textInput
@@ -82,7 +101,7 @@ func (m *CreateModel) indexForward() {
 }
 
 // Move the focus index one unit backwards.
-func (m *CreateModel) indexBackward() {
+func (m Model) indexBackward() {
 	m.index--
 	if m.index < textInput {
 		m.index = cancelButton
@@ -91,44 +110,13 @@ func (m *CreateModel) indexBackward() {
 	m.updateFocus()
 }
 
-// NewModel returns a new username model in its initial state.
-func NewCreateModel(styles common.Styles, dbpool db.DB, publicKey ssh.PublicKey) CreateModel {
-	im := input.New()
-	im.Cursor.Style = styles.Cursor
-	im.Placeholder = "enter username"
-	im.Prompt = styles.FocusedPrompt.String()
-	im.CharLimit = 50
-	im.Focus()
-
-	return CreateModel{
-		Done:      false,
-		Quit:      false,
-		dbpool:    dbpool,
-		styles:    styles,
-		state:     ready,
-		newName:   "",
-		index:     textInput,
-		errMsg:    "",
-		input:     im,
-		publicKey: publicKey,
-	}
-}
-
 // Init is the Bubble Tea initialization function.
-func Init(styles common.Styles, dbpool db.DB, publicKey ssh.PublicKey) func() (CreateModel, tea.Cmd) {
-	return func() (CreateModel, tea.Cmd) {
-		m := NewCreateModel(styles, dbpool, publicKey)
-		return m, InitialCmd()
-	}
-}
-
-// InitialCmd returns the initial command.
-func InitialCmd() tea.Cmd {
+func (m Model) Init() tea.Cmd {
 	return input.Blink
 }
 
 // Update is the Bubble Tea update loop.
-func Update(msg tea.Msg, m CreateModel) (CreateModel, tea.Cmd) {
+func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.Type {
@@ -171,7 +159,7 @@ func Update(msg tea.Msg, m CreateModel) (CreateModel, tea.Cmd) {
 					m.errMsg = ""
 					m.newName = strings.TrimSpace(m.input.Value())
 
-					return m, createAccount(m)
+					return m, m.createAccount()
 				case cancelButton: // Exit
 					m.Quit = true
 					return m, nil
@@ -192,25 +180,25 @@ func Update(msg tea.Msg, m CreateModel) (CreateModel, tea.Cmd) {
 
 	case NameTakenMsg:
 		m.state = ready
-		m.errMsg = m.styles.Subtle.Render("Sorry, ") +
-			m.styles.Error.Render(m.newName) +
-			m.styles.Subtle.Render(" is taken.")
+		m.errMsg = m.shared.Styles.Subtle.Render("Sorry, ") +
+			m.shared.Styles.Error.Render(m.newName) +
+			m.shared.Styles.Subtle.Render(" is taken.")
 
 		return m, nil
 
 	case NameInvalidMsg:
 		m.state = ready
-		head := m.styles.Error.Render("Invalid name. ")
-		body := m.styles.Subtle.Render(helpMsg)
-		m.errMsg = m.styles.Wrap.Render(head + body)
+		head := m.shared.Styles.Error.Render("Invalid name. ")
+		body := m.shared.Styles.Subtle.Render(helpMsg)
+		m.errMsg = m.shared.Styles.Wrap.Render(head + body)
 
 		return m, nil
 
 	case errMsg:
 		m.state = ready
-		head := m.styles.Error.Render("Oh, what? There was a curious error we were not expecting. ")
-		body := m.styles.Subtle.Render(msg.Error())
-		m.errMsg = m.styles.Wrap.Render(head + body)
+		head := m.shared.Styles.Error.Render("Oh, what? There was a curious error we were not expecting. ")
+		body := m.shared.Styles.Subtle.Render(msg.Error())
+		m.errMsg = m.shared.Styles.Wrap.Render(head + body)
 
 		return m, nil
 
@@ -223,18 +211,18 @@ func Update(msg tea.Msg, m CreateModel) (CreateModel, tea.Cmd) {
 }
 
 // View renders current view from the model.
-func View(m CreateModel) string {
+func (m Model) View() string {
 	intro := "To create an account, enter a username.\n\n"
 	intro += "After that, go to https://pico.sh/getting-started#next-steps"
 	s := fmt.Sprintf("%s\n\n%s\n\n", "hacker labs", intro)
-	s += fmt.Sprintf("Public Key: %s\n\n", shared.KeyForSha256(m.publicKey))
+	s += fmt.Sprintf("Public Key: %s\n\n", shared.KeyForSha256(m.shared.Session.PublicKey()))
 	s += m.input.View() + "\n\n"
 
 	if m.state == submitting {
-		s += spinnerView(m)
+		s += m.spinnerView()
 	} else {
-		s += common.OKButtonView(m.styles, m.index == 1, true)
-		s += " " + common.CancelButtonView(m.styles, m.index == 2, false)
+		s += common.OKButtonView(m.shared.Styles, m.index == 1, true)
+		s += " " + common.CancelButtonView(m.shared.Styles, m.index == 2, false)
 		if m.errMsg != "" {
 			s += "\n\n" + m.errMsg
 		}
@@ -244,22 +232,22 @@ func View(m CreateModel) string {
 	return s
 }
 
-func spinnerView(m CreateModel) string {
+func (m Model) spinnerView() string {
 	return "Creating account..."
 }
 
-func createAccount(m CreateModel) tea.Cmd {
+func (m Model) createAccount() tea.Cmd {
 	return func() tea.Msg {
 		if m.newName == "" {
 			return NameInvalidMsg{}
 		}
 
-		key, err := shared.KeyForKeyText(m.publicKey)
+		key, err := shared.KeyForKeyText(m.shared.Session.PublicKey())
 		if err != nil {
 			return errMsg{err}
 		}
 
-		user, err := m.dbpool.RegisterUser(m.newName, key, "")
+		user, err := m.shared.Dbpool.RegisterUser(m.newName, key, "")
 		if err != nil {
 			if errors.Is(err, db.ErrNameTaken) {
 				return NameTakenMsg{}
