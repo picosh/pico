@@ -73,13 +73,6 @@ var menuChoices = map[menuChoice]string{
 	exitChoice:          "Exit",
 }
 
-func NewSpinner(styles common.Styles) spinner.Model {
-	s := spinner.New()
-	s.Spinner = spinner.Dot
-	s.Style = styles.Spinner
-	return s
-}
-
 type GotDBMsg db.DB
 
 func CmsMiddleware(cfg *shared.ConfigSite) bm.Handler {
@@ -460,5 +453,6 @@ func (m model) View() string {
 		s = notifications.View(m.notifications)
 		return s
 	}
-	return m.styles.App.Render(wrap.String(wordwrap.String(s, w), w))
+	str := wrap.String(wordwrap.String(s, w), w)
+	return m.styles.App.Render(str)
 }
