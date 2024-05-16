@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/glamour"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/tui/common"
+	"github.com/picosh/pico/tui/pages"
 )
 
 func NotificationsView(dbpool db.DB, userID string) string {
@@ -53,11 +54,11 @@ Create a feeds file (e.g. pico.txt):`, url)
 
 // Model holds the state of the username UI.
 type Model struct {
+	shared common.SharedModel
+
 	Done bool // true when it's time to exit this view
 	Quit bool // true when the user wants to quit the whole program
 
-	styles   common.Styles
-	user     *db.User
 	viewport viewport.Model
 }
 
@@ -69,56 +70,46 @@ func headerWidth(w int) int {
 	return w - 2
 }
 
-// NewModel returns a new username model in its initial state.
-func NewModel(styles common.Styles, dbpool db.DB, user *db.User, termSize tea.WindowSizeMsg) Model {
-	hh := headerHeight(styles)
-	viewport := viewport.New(headerWidth(termSize.Width), termSize.Height-hh)
+func NewModel(shared common.SharedModel) Model {
+	hh := headerHeight(shared.Styles)
+	viewport := viewport.New(headerWidth(shared.Width), shared.Height-hh)
 	viewport.YPosition = hh
-	if user != nil {
-		viewport.SetContent(NotificationsView(dbpool, user.ID))
+	if shared.User != nil {
+		viewport.SetContent(NotificationsView(shared.Dbpool, shared.User.ID))
 	}
 
 	return Model{
+		shared: shared,
+
 		Done:     false,
 		Quit:     false,
-		styles:   styles,
-		user:     user,
 		viewport: viewport,
 	}
 }
 
-// Update is the Bubble Tea update loop.
-func Update(msg tea.Msg, m Model, termSize tea.WindowSizeMsg) (Model, tea.Cmd) {
-	var cmd tea.Cmd
-	var cmds []tea.Cmd
+func (m Model) Init() tea.Cmd {
+	return nil
+}
 
+func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.Type {
-		case tea.KeyCtrlC:
-			m.Quit = true
-		case tea.KeyEscape:
-			m.Done = true
+	case tea.WindowSizeMsg:
+		m.viewport.Width = headerWidth(m.shared.Width)
+		hh := headerHeight(m.shared.Styles)
+		m.viewport.Height = m.shared.Height - hh
 
-		default:
-			switch msg.String() {
-			case "q":
-				m.Done = true
-			}
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "q", "esc":
+			return m, pages.Navigate(pages.MenuPage)
 		}
 	}
 
-	m.viewport.Width = headerWidth(termSize.Width)
-	hh := headerHeight(m.styles)
-	m.viewport.Height = termSize.Height - hh
+	var cmd tea.Cmd
 	m.viewport, cmd = m.viewport.Update(msg)
-	cmds = append(cmds, cmd)
-
-	return m, tea.Batch(cmds...)
+	return m, cmd
 }
 
-// View renders current view from the model.
-func View(m Model) string {
-	s := m.viewport.View()
-	return s
+func (m Model) View() string {
+	return m.viewport.View()
 }

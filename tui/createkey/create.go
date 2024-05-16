@@ -9,6 +9,7 @@ import (
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/tui/common"
+	"github.com/picosh/pico/tui/pages"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -39,12 +40,8 @@ type errMsg struct {
 func (e errMsg) Error() string { return e.err.Error() }
 
 type Model struct {
-	Done bool
-	Quit bool
+	shared common.SharedModel
 
-	dbpool db.DB
-	user   *db.User
-	styles common.Styles
 	state  state
 	newKey string
 	index  index
@@ -57,10 +54,10 @@ type Model struct {
 func (m *Model) updateFocus() {
 	if m.index == textInput && !m.input.Focused() {
 		m.input.Focus()
-		m.input.Prompt = m.styles.FocusedPrompt.String()
+		m.input.Prompt = m.shared.Styles.FocusedPrompt.String()
 	} else if m.index != textInput && m.input.Focused() {
 		m.input.Blur()
-		m.input.Prompt = m.styles.Prompt.String()
+		m.input.Prompt = m.shared.Styles.Prompt.String()
 	}
 }
 
@@ -85,20 +82,17 @@ func (m *Model) indexBackward() {
 }
 
 // NewModel returns a new username model in its initial state.
-func NewModel(styles common.Styles, dbpool db.DB, user *db.User) Model {
+func NewModel(shared common.SharedModel) Model {
 	im := input.New()
-	im.Cursor.Style = styles.Cursor
+	im.Cursor.Style = shared.Styles.Cursor
 	im.Placeholder = "ssh-ed25519 AAAA..."
-	im.Prompt = styles.FocusedPrompt.String()
+	im.Prompt = shared.Styles.FocusedPrompt.String()
 	im.CharLimit = 2049
 	im.Focus()
 
 	return Model{
-		Done:   false,
-		Quit:   false,
-		dbpool: dbpool,
-		user:   user,
-		styles: styles,
+		shared: shared,
+
 		state:  ready,
 		newKey: "",
 		index:  textInput,
@@ -117,12 +111,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.Type {
-		case tea.KeyCtrlC: // quit
-			m.Quit = true
-			return m, nil
 		case tea.KeyEscape: // exit this mini-app
-			m.Done = true
-			return m, nil
+			return m, pages.Navigate(pages.PubkeysPage)
 
 		default:
 			// Ignore keys if we're submitting
@@ -159,10 +149,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.errMsg = ""
 					m.newKey = strings.TrimSpace(m.input.Value())
 
-					return m, addPublicKey(m)
-				case cancelButton: // Exit this mini-app
-					m.Done = true
-					return m, nil
+					return m, m.addPublicKey()
+				case cancelButton:
+					return m, pages.Navigate(pages.PubkeysPage)
 				}
 			}
 
@@ -178,31 +167,39 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
+	case KeySetMsg:
+		return m, pages.Navigate(pages.PubkeysPage)
+
 	case KeyInvalidMsg:
 		m.state = ready
-		head := m.styles.Error.Render("Invalid public key. ")
+		head := m.shared.Styles.Error.Render("Invalid public key. ")
 		helpMsg := "Public keys must but in the correct format"
-		body := m.styles.Subtle.Render(helpMsg)
-		m.errMsg = m.styles.Wrap.Render(head + body)
+		body := m.shared.Styles.Subtle.Render(helpMsg)
+		m.errMsg = m.shared.Styles.Wrap.Render(head + body)
 
 		return m, nil
 
 	case KeyTakenMsg:
 		m.state = ready
-		head := m.styles.Error.Render("Invalid public key. ")
+		head := m.shared.Styles.Error.Render("Invalid public key. ")
 		helpMsg := "Public key is associated with another user"
-		body := m.styles.Subtle.Render(helpMsg)
-		m.errMsg = m.styles.Wrap.Render(head + body)
+		body := m.shared.Styles.Subtle.Render(helpMsg)
+		m.errMsg = m.shared.Styles.Wrap.Render(head + body)
 
 		return m, nil
 
 	case errMsg:
 		m.state = ready
-		head := m.styles.Error.Render("Oh, what? There was a curious error we were not expecting. ")
-		body := m.styles.Subtle.Render(msg.Error())
-		m.errMsg = m.styles.Wrap.Render(head + body)
+		head := m.shared.Styles.Error.Render("Oh, what? There was a curious error we were not expecting. ")
+		body := m.shared.Styles.Subtle.Render(msg.Error())
+		m.errMsg = m.shared.Styles.Wrap.Render(head + body)
 
 		return m, nil
+
+	// leaving page so reset model
+	case pages.NavigateMsg:
+		next := NewModel(m.shared)
+		return next, next.Init()
 
 	default:
 		var cmd tea.Cmd
@@ -218,10 +215,10 @@ func (m Model) View() string {
 	s += m.input.View() + "\n\n"
 
 	if m.state == submitting {
-		s += spinnerView(m)
+		s += m.spinnerView()
 	} else {
-		s += common.OKButtonView(m.styles, m.index == 1, true)
-		s += " " + common.CancelButtonView(m.styles, m.index == 2, false)
+		s += common.OKButtonView(m.shared.Styles, m.index == 1, true)
+		s += " " + common.CancelButtonView(m.shared.Styles, m.index == 2, false)
 		if m.errMsg != "" {
 			s += "\n\n" + m.errMsg
 		}
@@ -230,11 +227,11 @@ func (m Model) View() string {
 	return s
 }
 
-func spinnerView(m Model) string {
+func (m Model) spinnerView() string {
 	return "Submitting..."
 }
 
-func addPublicKey(m Model) tea.Cmd {
+func (m *Model) addPublicKey() tea.Cmd {
 	return func() tea.Msg {
 		pk, comment, _, _, err := ssh.ParseAuthorizedKey([]byte(m.newKey))
 		if err != nil {
@@ -245,7 +242,7 @@ func addPublicKey(m Model) tea.Cmd {
 		if err != nil {
 			return KeyInvalidMsg{}
 		}
-		err = m.dbpool.InsertPublicKey(m.user.ID, key, comment, nil)
+		err = m.shared.Dbpool.InsertPublicKey(m.shared.User.ID, key, comment, nil)
 		if err != nil {
 			if errors.Is(err, db.ErrPublicKeyTaken) {
 				return KeyTakenMsg{}

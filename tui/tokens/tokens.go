@@ -5,7 +5,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/tui/common"
-	"github.com/picosh/pico/tui/createtoken"
+	"github.com/picosh/pico/tui/pages"
 )
 
 const keysPerPage = 4
@@ -16,7 +16,6 @@ const (
 	stateLoading state = iota
 	stateNormal
 	stateDeletingKey
-	stateCreateKey
 	stateQuitting
 )
 
@@ -41,18 +40,15 @@ type (
 
 // Model is the Tea state model for this user interface.
 type Model struct {
-	dbpool         db.DB
-	user           *db.User
-	styles         common.Styles
-	pager          pager.Model
+	shared common.SharedModel
+
 	state          state
 	err            error
 	activeKeyIndex int         // index of the key in the below slice which is currently in use
 	tokens         []*db.Token // keys linked to user's account
 	index          int         // index of selected key in relation to the current page
-	Exit           bool
-	Quit           bool
-	createKey      createtoken.Model
+
+	pager pager.Model
 }
 
 // getSelectedIndex returns the index of the cursor in relation to the total
@@ -74,85 +70,72 @@ func (m *Model) UpdatePaging(msg tea.Msg) {
 }
 
 // NewModel creates a new model with defaults.
-func NewModel(styles common.Styles, dbpool db.DB, user *db.User) Model {
+func NewModel(shared common.SharedModel) Model {
 	p := pager.New()
 	p.PerPage = keysPerPage
 	p.Type = pager.Dots
-	p.InactiveDot = styles.InactivePagination.Render("•")
+	p.InactiveDot = shared.Styles.InactivePagination.Render("•")
 
 	return Model{
-		dbpool:         dbpool,
-		user:           user,
-		styles:         styles,
-		pager:          p,
+		shared: shared,
+
 		state:          stateLoading,
 		err:            nil,
 		activeKeyIndex: -1,
 		tokens:         []*db.Token{},
 		index:          0,
-		Exit:           false,
-		Quit:           false,
+
+		pager: p,
 	}
 }
 
 // Init is the Tea initialization function.
 func (m Model) Init() tea.Cmd {
-	return nil
+	return FetchTokens(m.shared)
 }
 
 // Update is the tea update function which handles incoming messages.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var (
 		cmds []tea.Cmd
-		cmd  tea.Cmd
 	)
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch msg.Type {
-		case tea.KeyCtrlC:
-			m.Exit = true
+		switch msg.String() {
+		case "q", "esc":
+			return m, pages.Navigate(pages.MenuPage)
+		case "up", "k":
+			m.index--
+			if m.index < 0 && m.pager.Page > 0 {
+				m.index = m.pager.PerPage - 1
+				m.pager.PrevPage()
+			}
+			m.index = max(0, m.index)
+		case "down", "j":
+			itemsOnPage := m.pager.ItemsOnPage(len(m.tokens))
+			m.index++
+			if m.index > itemsOnPage-1 && m.pager.Page < m.pager.TotalPages-1 {
+				m.index = 0
+				m.pager.NextPage()
+			}
+			m.index = min(itemsOnPage-1, m.index)
+
+		case "n":
+			return m, pages.Navigate(pages.CreateTokenPage)
+
+		// Delete
+		case "x":
+			m.state = stateDeletingKey
+			m.UpdatePaging(msg)
 			return m, nil
-		}
 
-		if m.state != stateCreateKey {
-			switch msg.String() {
-			case "q", "esc":
-				m.Exit = true
-				return m, nil
-			case "up", "k":
-				m.index--
-				if m.index < 0 && m.pager.Page > 0 {
-					m.index = m.pager.PerPage - 1
-					m.pager.PrevPage()
-				}
-				m.index = max(0, m.index)
-			case "down", "j":
-				itemsOnPage := m.pager.ItemsOnPage(len(m.tokens))
-				m.index++
-				if m.index > itemsOnPage-1 && m.pager.Page < m.pager.TotalPages-1 {
-					m.index = 0
-					m.pager.NextPage()
-				}
-				m.index = min(itemsOnPage-1, m.index)
-
-			case "n":
-				m.state = stateCreateKey
-				return m, nil
-
-			// Delete
-			case "x":
-				m.state = stateDeletingKey
-				m.UpdatePaging(msg)
-				return m, nil
-
-			// Confirm Delete
-			case "y":
-				switch m.state {
-				case stateDeletingKey:
-					m.state = stateNormal
-					return m, unlinkKey(m)
-				}
+		// Confirm Delete
+		case "y":
+			switch m.state {
+			case stateDeletingKey:
+				m.state = stateNormal
+				return m, m.unlinkKey()
 			}
 		}
 
@@ -183,15 +166,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		return m, nil
 
-	case createtoken.TokenDismissed:
-		m.state = stateNormal
-		return m, fetchKeys(m.dbpool, m.user)
-
+	// leaving page so reset model
+	case pages.NavigateMsg:
+		next := NewModel(m.shared)
+		return next, next.Init()
 	}
 
 	switch m.state {
-	case stateNormal:
-		m.createKey = createtoken.NewModel(m.styles, m.dbpool, m.user)
 	case stateDeletingKey:
 		// If an item is being confirmed for delete, any key (other than the key
 		// used for confirmation above) cancels the deletion
@@ -202,38 +183,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	m.UpdatePaging(msg)
-
-	m, cmd = updateChildren(msg, m)
-	if cmd != nil {
-		cmds = append(cmds, cmd)
-	}
-
 	return m, tea.Batch(cmds...)
-}
-
-func updateChildren(msg tea.Msg, m Model) (Model, tea.Cmd) {
-	var cmd tea.Cmd
-
-	switch m.state {
-	case stateCreateKey:
-		newModel, newCmd := m.createKey.Update(msg)
-		createKeyModel, ok := newModel.(createtoken.Model)
-		if !ok {
-			panic("could not perform assertion on posts model")
-		}
-		m.createKey = createKeyModel
-		cmd = newCmd
-		if m.createKey.Done {
-			m.createKey = createtoken.NewModel(m.styles, m.dbpool, m.user) // reset the state
-			m.state = stateNormal
-		} else if m.createKey.Quit {
-			m.state = stateQuitting
-			return m, tea.Quit
-		}
-
-	}
-
-	return m, cmd
 }
 
 // View renders the current UI into a string.
@@ -249,8 +199,6 @@ func (m Model) View() string {
 		s = "Loading...\n\n"
 	case stateQuitting:
 		s = "Thanks for using pico.sh!\n"
-	case stateCreateKey:
-		s = m.createKey.View()
 	default:
 		s = "Here are the tokens linked to your account.\n\n"
 		s += "A token can be used for connecting to our\nIRC bouncer from your client.\n\n"
@@ -266,7 +214,7 @@ func (m Model) View() string {
 		case stateDeletingKey:
 			s += m.promptView("Delete this key?")
 		default:
-			s += "\n\n" + helpView(m)
+			s += "\n\n" + m.helpView()
 		}
 	}
 
@@ -292,7 +240,7 @@ func keysView(m Model) string {
 		} else {
 			state = keyNormal
 		}
-		s += m.newStyledKey(m.styles, key, i+start == m.activeKeyIndex).render(state)
+		s += newStyledKey(m.shared.Styles, key, i+start == m.activeKeyIndex).render(state)
 	}
 
 	// If there aren't enough keys to fill the view, fill the missing parts
@@ -306,7 +254,7 @@ func keysView(m Model) string {
 	return s
 }
 
-func helpView(m Model) string {
+func (m *Model) helpView() string {
 	var items []string
 	if len(m.tokens) > 1 {
 		items = append(items, "j/k, ↑/↓: choose")
@@ -315,24 +263,18 @@ func helpView(m Model) string {
 		items = append(items, "h/l, ←/→: page")
 	}
 	items = append(items, []string{"x: delete", "n: create", "esc: exit"}...)
-	return common.HelpView(m.styles, items...)
+	return common.HelpView(m.shared.Styles, items...)
 }
 
-func (m Model) promptView(prompt string) string {
-	st := m.styles.Delete.Copy().MarginTop(2).MarginRight(1)
+func (m *Model) promptView(prompt string) string {
+	st := m.shared.Styles.Delete.Copy().MarginTop(2).MarginRight(1)
 	return st.Render(prompt) +
-		m.styles.Delete.Render("(y/N)")
+		m.shared.Styles.Delete.Render("(y/N)")
 }
 
-// LoadKeys returns the command necessary for loading the keys.
-func LoadKeys(m Model) tea.Cmd {
-	return fetchKeys(m.dbpool, m.user)
-}
-
-// fetchKeys loads the current set of keys via the charm client.
-func fetchKeys(dbpool db.DB, user *db.User) tea.Cmd {
+func FetchTokens(shrd common.SharedModel) tea.Cmd {
 	return func() tea.Msg {
-		ak, err := dbpool.FindTokensForUser(user.ID)
+		ak, err := shrd.Dbpool.FindTokensForUser(shrd.User.ID)
 		if err != nil {
 			return errMsg{err}
 		}
@@ -341,10 +283,10 @@ func fetchKeys(dbpool db.DB, user *db.User) tea.Cmd {
 }
 
 // unlinkKey deletes the selected key.
-func unlinkKey(m Model) tea.Cmd {
+func (m *Model) unlinkKey() tea.Cmd {
 	return func() tea.Msg {
 		id := m.tokens[m.getSelectedIndex()].ID
-		err := m.dbpool.RemoveToken(id)
+		err := m.shared.Dbpool.RemoveToken(id)
 		if err != nil {
 			return errMsg{err}
 		}

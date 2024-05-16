@@ -17,7 +17,7 @@ type styledKey struct {
 	dateVal   string
 }
 
-func (m Model) newStyledKey(styles common.Styles, token *db.Token, active bool) styledKey {
+func newStyledKey(styles common.Styles, token *db.Token, active bool) styledKey {
 	date := token.CreatedAt.Format("02 Jan 2006")
 
 	// Default state

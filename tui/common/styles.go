@@ -58,7 +58,7 @@ func DefaultStyles(renderer *lipgloss.Renderer) Styles {
 	s.Subtle = renderer.NewStyle().
 		Foreground(Grey)
 	s.Error = renderer.NewStyle().Foreground(Red)
-	s.Prompt = renderer.NewStyle().MarginRight(1).SetString("•")
+	s.Prompt = renderer.NewStyle().MarginRight(1).SetString(">")
 	s.FocusedPrompt = s.Prompt.Copy().Foreground(Fuschia)
 	s.Note = renderer.NewStyle().Foreground(Green)
 	s.Delete = s.Error.Copy()

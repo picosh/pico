@@ -1,13 +1,15 @@
-package createtoken
+package createaccount
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
 	input "github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/picosh/pico/db"
+	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/tui/common"
-	"github.com/picosh/pico/tui/pages"
 )
 
 type state int
@@ -15,9 +17,9 @@ type state int
 const (
 	ready state = iota
 	submitting
-	submitted
 )
 
+// index specifies the UI element that's in focus.
 type index int
 
 const (
@@ -26,45 +28,48 @@ const (
 	cancelButton
 )
 
-type TokenSetMsg struct {
-	token string
-}
+type CreateAccountMsg *db.User
 
-type errMsg struct {
-	err error
-}
+// NameTakenMsg is sent when the requested username has already been taken.
+type NameTakenMsg struct{}
+
+// NameInvalidMsg is sent when the requested username has failed validation.
+type NameInvalidMsg struct{}
+
+type errMsg struct{ err error }
 
 func (e errMsg) Error() string { return e.err.Error() }
 
+var deny = strings.Join(db.DenyList, ", ")
+var helpMsg = fmt.Sprintf("Names can only contain plain letters and numbers and must be less than 50 characters. No emjois. No names from deny list: %s", deny)
+
+// Model holds the state of the username UI.
 type Model struct {
 	shared common.SharedModel
 
-	state     state
-	tokenName string
-	token     string
-	index     index
-	errMsg    string
-	input     input.Model
+	state   state
+	newName string
+	index   index
+	errMsg  string
+	input   input.Model
 }
 
 // NewModel returns a new username model in its initial state.
 func NewModel(shared common.SharedModel) Model {
 	im := input.New()
 	im.Cursor.Style = shared.Styles.Cursor
-	im.Placeholder = "A name used for your reference"
+	im.Placeholder = "enter username"
 	im.Prompt = shared.Styles.FocusedPrompt.String()
-	im.CharLimit = 256
+	im.CharLimit = 50
 	im.Focus()
 
 	return Model{
-		shared: shared,
-
-		state:     ready,
-		tokenName: "",
-		token:     "",
-		index:     textInput,
-		errMsg:    "",
-		input:     im,
+		shared:  shared,
+		state:   ready,
+		newName: "",
+		index:   textInput,
+		errMsg:  "",
+		input:   im,
 	}
 }
 
@@ -82,7 +87,7 @@ func (m *Model) updateFocus() {
 
 // Move the focus index one unit forward.
 func (m *Model) indexForward() {
-	m.index += 1
+	m.index++
 	if m.index > cancelButton {
 		m.index = textInput
 	}
@@ -92,7 +97,7 @@ func (m *Model) indexForward() {
 
 // Move the focus index one unit backwards.
 func (m *Model) indexBackward() {
-	m.index -= 1
+	m.index--
 	if m.index < textInput {
 		m.index = cancelButton
 	}
@@ -115,8 +120,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		switch msg.String() {
-		case "q", "esc":
-			return m, pages.Navigate(pages.TokensPage)
 		case "tab":
 			m.indexForward()
 		case "shift+tab":
@@ -141,18 +144,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case textInput:
 				fallthrough
 			case okButton: // Submit the form
-				// form already submitted so ok button exits
-				if m.state == submitted {
-					return m, pages.Navigate(pages.TokensPage)
-				}
-
 				m.state = submitting
 				m.errMsg = ""
-				m.tokenName = strings.TrimSpace(m.input.Value())
+				m.newName = strings.TrimSpace(m.input.Value())
 
-				return m, m.addToken()
-			case cancelButton:
-				return m, pages.Navigate(pages.TokensPage)
+				return m, m.createAccount()
+			case cancelButton: // Exit
+				return m, tea.Quit
 			}
 		}
 
@@ -167,9 +165,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		return m, nil
 
-	case TokenSetMsg:
-		m.state = submitted
-		m.token = msg.token
+	case NameTakenMsg:
+		m.state = ready
+		m.errMsg = m.shared.Styles.Subtle.Render("Sorry, ") +
+			m.shared.Styles.Error.Render(m.newName) +
+			m.shared.Styles.Subtle.Render(" is taken.")
+
+		return m, nil
+
+	case NameInvalidMsg:
+		m.state = ready
+		head := m.shared.Styles.Error.Render("Invalid name.")
+		m.errMsg = m.shared.Styles.Wrap.Render(head)
+
 		return m, nil
 
 	case errMsg:
@@ -179,11 +187,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.errMsg = m.shared.Styles.Wrap.Render(head + body)
 
 		return m, nil
-
-	// leaving page so reset model
-	case pages.NavigateMsg:
-		next := NewModel(m.shared)
-		return next, next.Init()
 
 	default:
 		var cmd tea.Cmd
@@ -195,15 +198,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // View renders current view from the model.
 func (m Model) View() string {
-	s := "Enter a name for your token\n\n"
+	intro := "To create an account, enter a username.\n\n"
+	intro += "After that, go to https://pico.sh/getting-started#next-steps"
+	s := fmt.Sprintf("%s\n\n%s\n\n", "hacker labs", intro)
+	s += fmt.Sprintf("Public Key: %s\n\n", shared.KeyForSha256(m.shared.Session.PublicKey()))
 	s += m.input.View() + "\n\n"
 
 	if m.state == submitting {
-		s += spinnerView()
-	} else if m.state == submitted {
-		s = fmt.Sprintf("Save this token:\n%s\n\n", m.token)
-		s += "After you exit this screen you will *not* be able to see it again.\n\n"
-		s += common.OKButtonView(m.shared.Styles, m.index == 1, true)
+		s += m.spinnerView()
 	} else {
 		s += common.OKButtonView(m.shared.Styles, m.index == 1, true)
 		s += " " + common.CancelButtonView(m.shared.Styles, m.index == 2, false)
@@ -211,21 +213,39 @@ func (m Model) View() string {
 			s += "\n\n" + m.errMsg
 		}
 	}
+	s += fmt.Sprintf("\n\n%s\n", helpMsg)
 
 	return s
 }
 
-func (m *Model) addToken() tea.Cmd {
+func (m Model) spinnerView() string {
+	return "Creating account..."
+}
+
+func (m *Model) createAccount() tea.Cmd {
 	return func() tea.Msg {
-		token, err := m.shared.Dbpool.InsertToken(m.shared.User.ID, m.tokenName)
+		if m.newName == "" {
+			return NameInvalidMsg{}
+		}
+
+		key, err := shared.KeyForKeyText(m.shared.Session.PublicKey())
 		if err != nil {
 			return errMsg{err}
 		}
 
-		return TokenSetMsg{token}
-	}
-}
+		user, err := m.shared.Dbpool.RegisterUser(m.newName, key, "")
+		if err != nil {
+			if errors.Is(err, db.ErrNameTaken) {
+				return NameTakenMsg{}
+			} else if errors.Is(err, db.ErrNameInvalid) {
+				return NameInvalidMsg{}
+			} else if errors.Is(err, db.ErrNameDenied) {
+				return NameInvalidMsg{}
+			} else {
+				return errMsg{err}
+			}
+		}
 
-func spinnerView() string {
-	return "Submitting..."
+		return CreateAccountMsg(user)
+	}
 }

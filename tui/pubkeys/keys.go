@@ -1,13 +1,11 @@
-package keys
+package pubkeys
 
 import (
-	"log/slog"
-
 	pager "github.com/charmbracelet/bubbles/paginator"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/tui/common"
-	"github.com/picosh/pico/tui/createkey"
+	"github.com/picosh/pico/tui/pages"
 )
 
 const keysPerPage = 4
@@ -20,7 +18,6 @@ const (
 	stateDeletingKey
 	stateDeletingActiveKey
 	stateDeletingAccount
-	stateCreateKey
 	stateQuitting
 )
 
@@ -45,19 +42,34 @@ type (
 
 // Model is the Tea state model for this user interface.
 type Model struct {
-	logger         *slog.Logger
-	dbpool         db.DB
-	user           *db.User
-	styles         common.Styles
-	pager          pager.Model
+	shared common.SharedModel
+
 	state          state
 	err            error
 	activeKeyIndex int             // index of the key in the below slice which is currently in use
 	keys           []*db.PublicKey // keys linked to user's account
 	index          int             // index of selected key in relation to the current page
-	Exit           bool
-	Quit           bool
-	createKey      createkey.Model
+
+	pager pager.Model
+}
+
+// NewModel creates a new model with defaults.
+func NewModel(shared common.SharedModel) Model {
+	p := pager.New()
+	p.PerPage = keysPerPage
+	p.Type = pager.Dots
+	p.InactiveDot = shared.Styles.InactivePagination.Render("•")
+
+	return Model{
+		shared: shared,
+
+		pager:          p,
+		state:          stateLoading,
+		err:            nil,
+		activeKeyIndex: -1,
+		keys:           []*db.PublicKey{},
+		index:          0,
+	}
 }
 
 // getSelectedIndex returns the index of the cursor in relation to the total
@@ -78,105 +90,71 @@ func (m *Model) UpdatePaging(msg tea.Msg) {
 	m.index = min(m.index, numItems-1)
 }
 
-// NewModel creates a new model with defaults.
-func NewModel(styles common.Styles, logger *slog.Logger, dbpool db.DB, user *db.User) Model {
-	p := pager.New()
-	p.PerPage = keysPerPage
-	p.Type = pager.Dots
-	p.InactiveDot = styles.InactivePagination.Render("•")
-
-	return Model{
-		logger:         logger,
-		dbpool:         dbpool,
-		user:           user,
-		styles:         styles,
-		pager:          p,
-		state:          stateLoading,
-		err:            nil,
-		activeKeyIndex: -1,
-		keys:           []*db.PublicKey{},
-		index:          0,
-		Exit:           false,
-		Quit:           false,
-	}
-}
-
 // Init is the Tea initialization function.
 func (m Model) Init() tea.Cmd {
-	return nil
+	return FetchKeys(m.shared)
 }
 
 // Update is the tea update function which handles incoming messages.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var (
 		cmds []tea.Cmd
-		cmd  tea.Cmd
 	)
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch msg.Type {
-		case tea.KeyCtrlC:
-			m.Exit = true
+		switch msg.String() {
+		case "q", "esc":
+			return m, pages.Navigate(pages.MenuPage)
+		case "up", "k":
+			m.index -= 1
+			if m.index < 0 && m.pager.Page > 0 {
+				m.index = m.pager.PerPage - 1
+				m.pager.PrevPage()
+			}
+			m.index = max(0, m.index)
+		case "down", "j":
+			itemsOnPage := m.pager.ItemsOnPage(len(m.keys))
+			m.index += 1
+			if m.index > itemsOnPage-1 && m.pager.Page < m.pager.TotalPages-1 {
+				m.index = 0
+				m.pager.NextPage()
+			}
+			m.index = min(itemsOnPage-1, m.index)
+
+		case "n":
+			return m, pages.Navigate(pages.CreatePubkeyPage)
+
+		// Delete
+		case "x":
+			m.state = stateDeletingKey
+			m.UpdatePaging(msg)
 			return m, nil
-		}
 
-		if m.state != stateCreateKey {
-			switch msg.String() {
-			case "q", "esc":
-				m.Exit = true
-				return m, nil
-			case "up", "k":
-				m.index--
-				if m.index < 0 && m.pager.Page > 0 {
-					m.index = m.pager.PerPage - 1
-					m.pager.PrevPage()
+		// Confirm Delete
+		case "y":
+			switch m.state {
+			case stateDeletingKey:
+				if len(m.keys) == 1 {
+					// The user is about to delete her account. Double confirm.
+					m.state = stateDeletingAccount
+					return m, nil
 				}
-				m.index = max(0, m.index)
-			case "down", "j":
-				itemsOnPage := m.pager.ItemsOnPage(len(m.keys))
-				m.index++
-				if m.index > itemsOnPage-1 && m.pager.Page < m.pager.TotalPages-1 {
-					m.index = 0
-					m.pager.NextPage()
+				if m.getSelectedIndex() == m.activeKeyIndex {
+					// The user is going to delete her active key. Double confirm.
+					m.state = stateDeletingActiveKey
+					return m, nil
 				}
-				m.index = min(itemsOnPage-1, m.index)
-
-			case "n":
-				m.state = stateCreateKey
-				return m, nil
-
-			// Delete
-			case "x":
-				m.state = stateDeletingKey
-				m.UpdatePaging(msg)
-				return m, nil
-
-			// Confirm Delete
-			case "y":
-				switch m.state {
-				case stateDeletingKey:
-					if len(m.keys) == 1 {
-						// The user is about to delete her account. Double confirm.
-						m.state = stateDeletingAccount
-						return m, nil
-					}
-					if m.getSelectedIndex() == m.activeKeyIndex {
-						// The user is going to delete her active key. Double confirm.
-						m.state = stateDeletingActiveKey
-						return m, nil
-					}
-					m.state = stateNormal
-					return m, unlinkKey(m)
-				case stateDeletingActiveKey:
-					m.state = stateQuitting
-					// Active key will be deleted. Remove the key and exit.
-					return m, unlinkKey(m)
-				case stateDeletingAccount:
-					// Account will be deleted. Remove the key and exit.
-					m.state = stateQuitting
-					return m, deleteAccount(m)
-				}
+				m.state = stateNormal
+				return m, m.unlinkKey()
+			case stateDeletingActiveKey:
+				m.state = stateQuitting
+				// Active key will be deleted. Remove the key and exit.
+				return m, m.unlinkKey()
+			case stateDeletingAccount:
+				// Account will be deleted. Remove the key and exit.
+				m.state = stateQuitting
+				return m, m.deleteAccount()
 			}
 		}
 
@@ -189,7 +167,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.index = 0
 		m.keys = msg
 		for i, key := range m.keys {
-			if key.Key == m.user.PublicKey.Key {
+			if key.Key == m.shared.User.PublicKey.Key {
 				m.activeKeyIndex = i
 			}
 		}
@@ -210,22 +188,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Update cursor
 		m.index = min(m.index, m.pager.ItemsOnPage(len(m.keys)-1))
 		for i, key := range m.keys {
-			if key.Key == m.user.PublicKey.Key {
+			if key.Key == m.shared.User.PublicKey.Key {
 				m.activeKeyIndex = i
 			}
 		}
 
 		return m, nil
 
-	case createkey.KeySetMsg:
-		m.state = stateNormal
-		return m, fetchKeys(m.dbpool, m.user)
-
+	// leaving page so reset model
+	case pages.NavigateMsg:
+		next := NewModel(m.shared)
+		return next, next.Init()
 	}
 
 	switch m.state {
-	case stateNormal:
-		m.createKey = createkey.NewModel(m.styles, m.dbpool, m.user)
 	case stateDeletingKey:
 		// If an item is being confirmed for delete, any key (other than the key
 		// used for confirmation above) cancels the deletion
@@ -236,38 +212,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	m.UpdatePaging(msg)
-
-	m, cmd = updateChildren(msg, m)
-	if cmd != nil {
-		cmds = append(cmds, cmd)
-	}
-
 	return m, tea.Batch(cmds...)
-}
-
-func updateChildren(msg tea.Msg, m Model) (Model, tea.Cmd) {
-	var cmd tea.Cmd
-
-	switch m.state {
-	case stateCreateKey:
-		newModel, newCmd := m.createKey.Update(msg)
-		createKeyModel, ok := newModel.(createkey.Model)
-		if !ok {
-			panic("could not perform assertion on posts model")
-		}
-		m.createKey = createKeyModel
-		cmd = newCmd
-		if m.createKey.Done {
-			m.createKey = createkey.NewModel(m.styles, m.dbpool, m.user) // reset the state
-			m.state = stateNormal
-		} else if m.createKey.Quit {
-			m.state = stateQuitting
-			return m, tea.Quit
-		}
-
-	}
-
-	return m, cmd
 }
 
 // View renders the current UI into a string.
@@ -283,13 +228,11 @@ func (m Model) View() string {
 		s = "Loading...\n\n"
 	case stateQuitting:
 		s = "Thanks for using pico.sh!\n"
-	case stateCreateKey:
-		s = m.createKey.View()
 	default:
 		s = "Here are the keys linked to your pico.sh account.\n\n"
 
 		// Keys
-		s += keysView(m)
+		s += m.keysView()
 		if m.pager.TotalPages > 1 {
 			s += m.pager.View()
 		}
@@ -303,14 +246,14 @@ func (m Model) View() string {
 		case stateDeletingAccount:
 			s += m.promptView("Sure? This will delete your account. Are you absolutely positive?")
 		default:
-			s += "\n\n" + helpView(m)
+			s += "\n\n" + m.helpView()
 		}
 	}
 
 	return s
 }
 
-func keysView(m Model) string {
+func (m *Model) keysView() string {
 	var (
 		s          string
 		state      keyState
@@ -332,7 +275,7 @@ func keysView(m Model) string {
 		} else {
 			state = keyNormal
 		}
-		s += m.newStyledKey(m.styles, key, i+start == m.activeKeyIndex).render(state)
+		s += m.newStyledKey(m.shared.Styles, key, i+start == m.activeKeyIndex).render(state)
 	}
 
 	// If there aren't enough keys to fill the view, fill the missing parts
@@ -346,7 +289,7 @@ func keysView(m Model) string {
 	return s
 }
 
-func helpView(m Model) string {
+func (m *Model) helpView() string {
 	var items []string
 	if len(m.keys) > 1 {
 		items = append(items, "j/k, ↑/↓: choose")
@@ -355,24 +298,19 @@ func helpView(m Model) string {
 		items = append(items, "h/l, ←/→: page")
 	}
 	items = append(items, []string{"x: delete", "n: create", "esc: exit"}...)
-	return common.HelpView(m.styles, items...)
+	return common.HelpView(m.shared.Styles, items...)
 }
 
-func (m Model) promptView(prompt string) string {
-	st := m.styles.Delete.Copy().MarginTop(2).MarginRight(1)
+func (m *Model) promptView(prompt string) string {
+	st := m.shared.Styles.Delete.Copy().MarginTop(2).MarginRight(1)
 	return st.Render(prompt) +
-		m.styles.Delete.Render("(y/N)")
+		m.shared.Styles.Delete.Render("(y/N)")
 }
 
-// LoadKeys returns the command necessary for loading the keys.
-func LoadKeys(m Model) tea.Cmd {
-	return fetchKeys(m.dbpool, m.user)
-}
-
-// fetchKeys loads the current set of keys via the charm client.
-func fetchKeys(dbpool db.DB, user *db.User) tea.Cmd {
+// FetchKeys loads the current set of keys via the charm client.
+func FetchKeys(shrd common.SharedModel) tea.Cmd {
 	return func() tea.Msg {
-		ak, err := dbpool.FindKeysForUser(user)
+		ak, err := shrd.Dbpool.FindKeysForUser(shrd.User)
 		if err != nil {
 			return errMsg{err}
 		}
@@ -381,10 +319,10 @@ func fetchKeys(dbpool db.DB, user *db.User) tea.Cmd {
 }
 
 // unlinkKey deletes the selected key.
-func unlinkKey(m Model) tea.Cmd {
+func (m *Model) unlinkKey() tea.Cmd {
 	return func() tea.Msg {
 		id := m.keys[m.getSelectedIndex()].ID
-		err := m.dbpool.RemoveKeys([]string{id})
+		err := m.shared.Dbpool.RemoveKeys([]string{id})
 		if err != nil {
 			return errMsg{err}
 		}
@@ -392,11 +330,11 @@ func unlinkKey(m Model) tea.Cmd {
 	}
 }
 
-func deleteAccount(m Model) tea.Cmd {
+func (m *Model) deleteAccount() tea.Cmd {
 	return func() tea.Msg {
 		id := m.keys[m.getSelectedIndex()].UserID
-		m.logger.Info("user requested account deletion", "user", m.user.Name, "id", id)
-		err := m.dbpool.RemoveUsers([]string{id})
+		m.shared.Logger.Info("user requested account deletion", "user", m.shared.User.Name, "id", id)
+		err := m.shared.Dbpool.RemoveUsers([]string{id})
 		if err != nil {
 			return errMsg{err}
 		}
