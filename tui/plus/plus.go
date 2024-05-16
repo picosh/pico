@@ -75,11 +75,7 @@ we plan on continuing to include more services as we build them.`, url)
 
 // Model holds the state of the username UI.
 type Model struct {
-	shared common.SharedModel
-
-	Done bool // true when it's time to exit this view
-	Quit bool // true when the user wants to quit the whole program
-
+	shared   common.SharedModel
 	viewport viewport.Model
 }
 
@@ -101,10 +97,7 @@ func NewModel(shared common.SharedModel) Model {
 	}
 
 	return Model{
-		shared: shared,
-
-		Done:     false,
-		Quit:     false,
+		shared:   shared,
 		viewport: viewport,
 	}
 }
@@ -120,17 +113,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch msg.Type {
-		case tea.KeyCtrlC:
-			m.Quit = true
-		case tea.KeyEscape:
-			m.Done = true
-
-		default:
-			switch msg.String() {
-			case "q":
-				m.Done = true
-			}
+		switch msg.String() {
+		case "q", "esc":
+			return m, common.ExitPage()
 		}
 	}
 

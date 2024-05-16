@@ -1,8 +1,6 @@
 package tui
 
 import (
-	"fmt"
-
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/muesli/reflow/wordwrap"
 	"github.com/muesli/reflow/wrap"
@@ -84,12 +82,8 @@ func (m *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 
-		switch msg.String() {
-		case "q", "esc":
-			fmt.Println("BOOM!")
-			m.shared.Dbpool.Close()
-			return m, tea.Quit
-		}
+	case common.ExitMsg:
+		m.activePage = menuPage
 
 	case account.CreateAccountMsg:
 		m.state = readyState

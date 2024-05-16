@@ -43,9 +43,6 @@ type (
 type Model struct {
 	shared common.SharedModel
 
-	Exit bool
-	Quit bool
-
 	state          state
 	err            error
 	activeKeyIndex int         // index of the key in the below slice which is currently in use
@@ -84,9 +81,6 @@ func NewModel(shared common.SharedModel) Model {
 	return Model{
 		shared: shared,
 
-		Exit: false,
-		Quit: false,
-
 		state:          stateLoading,
 		err:            nil,
 		activeKeyIndex: -1,
@@ -111,50 +105,45 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch msg.Type {
-		case tea.KeyCtrlC:
-			m.Exit = true
-			return m, nil
+		if m.state == stateCreateKey {
+			break
 		}
 
-		if m.state != stateCreateKey {
-			switch msg.String() {
-			case "q", "esc":
-				m.Exit = true
-				return m, nil
-			case "up", "k":
-				m.index--
-				if m.index < 0 && m.pager.Page > 0 {
-					m.index = m.pager.PerPage - 1
-					m.pager.PrevPage()
-				}
-				m.index = max(0, m.index)
-			case "down", "j":
-				itemsOnPage := m.pager.ItemsOnPage(len(m.tokens))
-				m.index++
-				if m.index > itemsOnPage-1 && m.pager.Page < m.pager.TotalPages-1 {
-					m.index = 0
-					m.pager.NextPage()
-				}
-				m.index = min(itemsOnPage-1, m.index)
+		switch msg.String() {
+		case "q", "esc":
+			return m, common.ExitPage()
+		case "up", "k":
+			m.index--
+			if m.index < 0 && m.pager.Page > 0 {
+				m.index = m.pager.PerPage - 1
+				m.pager.PrevPage()
+			}
+			m.index = max(0, m.index)
+		case "down", "j":
+			itemsOnPage := m.pager.ItemsOnPage(len(m.tokens))
+			m.index++
+			if m.index > itemsOnPage-1 && m.pager.Page < m.pager.TotalPages-1 {
+				m.index = 0
+				m.pager.NextPage()
+			}
+			m.index = min(itemsOnPage-1, m.index)
 
-			case "n":
-				m.state = stateCreateKey
-				return m, nil
+		case "n":
+			m.state = stateCreateKey
+			return m, nil
 
-			// Delete
-			case "x":
-				m.state = stateDeletingKey
-				m.UpdatePaging(msg)
-				return m, nil
+		// Delete
+		case "x":
+			m.state = stateDeletingKey
+			m.UpdatePaging(msg)
+			return m, nil
 
-			// Confirm Delete
-			case "y":
-				switch m.state {
-				case stateDeletingKey:
-					m.state = stateNormal
-					return m, m.unlinkKey()
-				}
+		// Confirm Delete
+		case "y":
+			switch m.state {
+			case stateDeletingKey:
+				m.state = stateNormal
+				return m, m.unlinkKey()
 			}
 		}
 

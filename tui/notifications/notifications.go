@@ -96,17 +96,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch msg.Type {
-		case tea.KeyCtrlC:
-			m.Quit = true
-		case tea.KeyEscape:
-			m.Done = true
-
-		default:
-			switch msg.String() {
-			case "q":
-				m.Done = true
-			}
+		switch msg.String() {
+		case "q", "esc":
+			return m, common.ExitPage()
 		}
 	}
 

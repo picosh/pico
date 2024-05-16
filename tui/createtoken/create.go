@@ -40,9 +40,6 @@ func (e errMsg) Error() string { return e.err.Error() }
 type Model struct {
 	shared common.SharedModel
 
-	Done bool
-	Quit bool
-
 	state     state
 	tokenName string
 	token     string
@@ -62,9 +59,6 @@ func NewModel(shared common.SharedModel) Model {
 
 	return Model{
 		shared: shared,
-
-		Done: false,
-		Quit: false,
 
 		state:     ready,
 		tokenName: "",
@@ -117,12 +111,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.Type {
-		case tea.KeyCtrlC: // quit
-			m.Quit = true
-			return m, dismiss
 		case tea.KeyEscape: // exit this mini-app
-			m.Done = true
-			return m, dismiss
+			return m, common.ExitPage()
 
 		default:
 			// Ignore keys if we're submitting
@@ -157,8 +147,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				case okButton: // Submit the form
 					// form already submitted so ok button exits
 					if m.state == submitted {
-						m.Done = true
-						return m, dismiss
+						return m, common.ExitPage()
 					}
 
 					m.state = submitting
@@ -167,8 +156,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 					return m, addToken(m)
 				case cancelButton: // Exit this mini-app
-					m.Done = true
-					return m, dismiss
+					return m, common.ExitPage()
 				}
 			}
 

@@ -45,9 +45,6 @@ type (
 type Model struct {
 	shared common.SharedModel
 
-	Exit bool
-	Quit bool
-
 	state          state
 	err            error
 	activeKeyIndex int             // index of the key in the below slice which is currently in use
@@ -92,8 +89,6 @@ func NewModel(shared common.SharedModel) Model {
 		activeKeyIndex: -1,
 		keys:           []*db.PublicKey{},
 		index:          0,
-		Exit:           false,
-		Quit:           false,
 	}
 }
 
@@ -111,17 +106,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch msg.Type {
-		case tea.KeyCtrlC:
-			m.Exit = true
-			return m, nil
-		}
-
 		if m.state != stateCreateKey {
 			switch msg.String() {
 			case "q", "esc":
-				m.Exit = true
-				return m, nil
+				return m, common.ExitPage()
 			case "up", "k":
 				m.index--
 				if m.index < 0 && m.pager.Page > 0 {

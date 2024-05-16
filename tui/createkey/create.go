@@ -40,8 +40,6 @@ func (e errMsg) Error() string { return e.err.Error() }
 
 type Model struct {
 	shared common.SharedModel
-	Done   bool
-	Quit   bool
 
 	state  state
 	newKey string
@@ -94,9 +92,6 @@ func NewModel(shared common.SharedModel) Model {
 	return Model{
 		shared: shared,
 
-		Done: false,
-		Quit: false,
-
 		state:  ready,
 		newKey: "",
 		index:  textInput,
@@ -115,12 +110,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.Type {
-		case tea.KeyCtrlC: // quit
-			m.Quit = true
-			return m, nil
 		case tea.KeyEscape: // exit this mini-app
-			m.Done = true
-			return m, nil
+			return m, common.ExitPage()
 
 		default:
 			// Ignore keys if we're submitting
@@ -159,8 +150,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 					return m, m.addPublicKey()
 				case cancelButton: // Exit this mini-app
-					m.Done = true
-					return m, nil
+					return m, common.ExitPage()
 				}
 			}
 
