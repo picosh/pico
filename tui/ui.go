@@ -17,6 +17,7 @@ import (
 	"github.com/picosh/pico/tui/pages"
 	"github.com/picosh/pico/tui/plus"
 	"github.com/picosh/pico/tui/pubkeys"
+	"github.com/picosh/pico/tui/settings"
 	"github.com/picosh/pico/tui/tokens"
 )
 
@@ -40,7 +41,7 @@ func NewUI(shared common.SharedModel) *UI {
 	m := &UI{
 		shared: shared,
 		state:  initState,
-		pages:  make([]tea.Model, 8),
+		pages:  make([]tea.Model, 9),
 	}
 	return m
 }
@@ -74,6 +75,7 @@ func (m *UI) Init() tea.Cmd {
 	m.pages[pages.TokensPage] = tokens.NewModel(m.shared)
 	m.pages[pages.NotificationsPage] = notifications.NewModel(m.shared)
 	m.pages[pages.PlusPage] = plus.NewModel(m.shared)
+	m.pages[pages.SettingsPage] = settings.NewModel(m.shared)
 	if m.shared.User == nil {
 		m.activePage = pages.CreateAccountPage
 	} else {
@@ -129,10 +131,12 @@ func (m *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.activePage = pages.PubkeysPage
 		case menu.TokensChoice:
 			m.activePage = pages.TokensPage
-		case menu.PlusChoice:
-			m.activePage = pages.PlusPage
 		case menu.NotificationsChoice:
 			m.activePage = pages.NotificationsPage
+		case menu.PlusChoice:
+			m.activePage = pages.PlusPage
+		case menu.SettingsChoice:
+			m.activePage = pages.SettingsPage
 		case menu.ChatChoice:
 			return m, LoadChat(m.shared)
 		case menu.ExitChoice:

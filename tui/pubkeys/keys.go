@@ -29,12 +29,6 @@ const (
 	keyDeleting
 )
 
-type errMsg struct {
-	err error
-}
-
-func (e errMsg) Error() string { return e.err.Error() }
-
 type (
 	keysLoadedMsg  []*db.PublicKey
 	unlinkedKeyMsg int
@@ -158,8 +152,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
-	case errMsg:
-		m.err = msg.err
+	case common.ErrMsg:
+		m.err = msg.Err
 		return m, nil
 
 	case keysLoadedMsg:
@@ -312,7 +306,7 @@ func FetchKeys(shrd common.SharedModel) tea.Cmd {
 	return func() tea.Msg {
 		ak, err := shrd.Dbpool.FindKeysForUser(shrd.User)
 		if err != nil {
-			return errMsg{err}
+			return common.ErrMsg{Err: err}
 		}
 		return keysLoadedMsg(ak)
 	}
@@ -324,7 +318,7 @@ func (m *Model) unlinkKey() tea.Cmd {
 		id := m.keys[m.getSelectedIndex()].ID
 		err := m.shared.Dbpool.RemoveKeys([]string{id})
 		if err != nil {
-			return errMsg{err}
+			return common.ErrMsg{Err: err}
 		}
 		return unlinkedKeyMsg(m.index)
 	}
@@ -336,7 +330,7 @@ func (m *Model) deleteAccount() tea.Cmd {
 		m.shared.Logger.Info("user requested account deletion", "user", m.shared.User.Name, "id", id)
 		err := m.shared.Dbpool.RemoveUsers([]string{id})
 		if err != nil {
-			return errMsg{err}
+			return common.ErrMsg{Err: err}
 		}
 		return unlinkedKeyMsg(m.index)
 	}
