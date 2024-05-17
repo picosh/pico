@@ -51,23 +51,10 @@ func (m *UI) updateActivePage(msg tea.Msg) tea.Cmd {
 	return cmd
 }
 
-func (m *UI) updateModels(msg tea.Msg) tea.Cmd {
-	cmds := []tea.Cmd{}
-	for i, page := range m.pages {
-		if page == nil {
-			continue
-		}
-		nm, cmd := page.Update(msg)
-		m.pages[i] = nm
-		cmds = append(cmds, cmd)
-	}
-	return tea.Batch(cmds...)
-}
-
 func (m *UI) Init() tea.Cmd {
 	// header height is required to calculate viewport for
 	// some pages
-	m.shared.HeaderHeight = lipgloss.Height(m.header())
+	m.shared.HeaderHeight = lipgloss.Height(m.header()) + 1
 	user, err := findUser(m.shared)
 	if err != nil {
 		wish.Errorln(m.shared.Session, err)
@@ -103,7 +90,6 @@ func (m *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.shared.Width = msg.Width
 		m.shared.Height = msg.Height
-		return m, m.updateModels(msg)
 
 	case tea.KeyMsg:
 		switch msg.Type {
@@ -180,3 +166,19 @@ func (m *UI) View() string {
 	)
 	return m.shared.Styles.App.Render(str)
 }
+
+/*
+TODO: I dont think we need this but keeping for a bit
+func (m *UI) updateModels(msg tea.Msg) tea.Cmd {
+	cmds := []tea.Cmd{}
+	for i, page := range m.pages {
+		if page == nil {
+			continue
+		}
+		nm, cmd := page.Update(msg)
+		m.pages[i] = nm
+		cmds = append(cmds, cmd)
+	}
+	return tea.Batch(cmds...)
+}
+*/

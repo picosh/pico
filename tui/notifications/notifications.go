@@ -92,9 +92,9 @@ func (m Model) Init() tea.Cmd {
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.viewport.Width = headerWidth(m.shared.Width)
+		m.viewport.Width = headerWidth(msg.Width)
 		hh := headerHeight(m.shared)
-		m.viewport.Height = m.shared.Height - hh
+		m.viewport.Height = msg.Height - hh
 
 	case tea.KeyMsg:
 		switch msg.String() {
