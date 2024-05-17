@@ -65,24 +65,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		switch msg.String() {
-		// Quit
 		case "q", "esc":
 			m.shared.Dbpool.Close()
 			return m, tea.Quit
 
-		// Prev menu item
 		case "up", "k":
 			m.menuIndex--
 			if m.menuIndex < 0 {
 				m.menuIndex = len(menuChoices) - 1
 			}
 
-		// Select menu item
 		case "enter":
 			m.menuChoice = menuChoice(m.menuIndex)
 			cmds = append(cmds, MenuMsg(m.menuChoice))
 
-		// Next menu item
 		case "down", "j":
 			m.menuIndex++
 			if m.menuIndex >= len(menuChoices) {
@@ -103,6 +99,10 @@ func MenuMsg(choice menuChoice) tea.Cmd {
 }
 
 func (m Model) bioView() string {
+	if m.shared.User == nil {
+		return "Loading user info..."
+	}
+
 	var username string
 	if m.shared.User.Name != "" {
 		username = m.shared.User.Name

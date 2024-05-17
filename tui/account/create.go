@@ -47,9 +47,6 @@ var helpMsg = fmt.Sprintf("Names can only contain plain letters and numbers and 
 type Model struct {
 	shared common.SharedModel
 
-	Done bool // true when it's time to exit this view
-	Quit bool // true when the user wants to quit the whole program
-
 	state   state
 	newName string
 	index   index
@@ -68,8 +65,6 @@ func NewModel(shared common.SharedModel) Model {
 
 	return Model{
 		shared:  shared,
-		Done:    false,
-		Quit:    false,
 		state:   ready,
 		newName: "",
 		index:   textInput,
@@ -80,7 +75,7 @@ func NewModel(shared common.SharedModel) Model {
 
 // updateFocus updates the focused states in the model based on the current
 // focus index.
-func (m Model) updateFocus() {
+func (m *Model) updateFocus() {
 	if m.index == textInput && !m.input.Focused() {
 		m.input.Focus()
 		m.input.Prompt = m.shared.Styles.FocusedPrompt.String()
@@ -91,7 +86,7 @@ func (m Model) updateFocus() {
 }
 
 // Move the focus index one unit forward.
-func (m Model) indexForward() {
+func (m *Model) indexForward() {
 	m.index++
 	if m.index > cancelButton {
 		m.index = textInput
@@ -101,7 +96,7 @@ func (m Model) indexForward() {
 }
 
 // Move the focus index one unit backwards.
-func (m Model) indexBackward() {
+func (m *Model) indexBackward() {
 	m.index--
 	if m.index < textInput {
 		m.index = cancelButton
@@ -119,64 +114,56 @@ func (m Model) Init() tea.Cmd {
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch msg.Type {
-		case tea.KeyCtrlC, tea.KeyEscape:
-			m.Quit = true
-			return m, nil
-
-		default:
-			// Ignore keys if we're submitting
-			if m.state == submitting {
-				return m, nil
-			}
-
-			switch msg.String() {
-			case "tab":
-				m.indexForward()
-			case "shift+tab":
-				m.indexBackward()
-			case "l", "k", "right":
-				if m.index != textInput {
-					m.indexForward()
-				}
-			case "h", "j", "left":
-				if m.index != textInput {
-					m.indexBackward()
-				}
-			case "up", "down":
-				if m.index == textInput {
-					m.indexForward()
-				} else {
-					m.index = textInput
-					m.updateFocus()
-				}
-			case "enter":
-				switch m.index {
-				case textInput:
-					fallthrough
-				case okButton: // Submit the form
-					m.state = submitting
-					m.errMsg = ""
-					m.newName = strings.TrimSpace(m.input.Value())
-
-					return m, m.createAccount()
-				case cancelButton: // Exit
-					m.Quit = true
-					return m, nil
-				}
-			}
-
-			// Pass messages through to the input element if that's the element
-			// in focus
-			if m.index == textInput {
-				var cmd tea.Cmd
-				m.input, cmd = m.input.Update(msg)
-
-				return m, cmd
-			}
-
+		// Ignore keys if we're submitting
+		if m.state == submitting {
 			return m, nil
 		}
+
+		switch msg.String() {
+		case "tab":
+			m.indexForward()
+		case "shift+tab":
+			m.indexBackward()
+		case "l", "k", "right":
+			if m.index != textInput {
+				m.indexForward()
+			}
+		case "h", "j", "left":
+			if m.index != textInput {
+				m.indexBackward()
+			}
+		case "up", "down":
+			if m.index == textInput {
+				m.indexForward()
+			} else {
+				m.index = textInput
+				m.updateFocus()
+			}
+		case "enter":
+			switch m.index {
+			case textInput:
+				fallthrough
+			case okButton: // Submit the form
+				m.state = submitting
+				m.errMsg = ""
+				m.newName = strings.TrimSpace(m.input.Value())
+
+				return m, m.createAccount()
+			case cancelButton: // Exit
+				return m, tea.Quit
+			}
+		}
+
+		// Pass messages through to the input element if that's the element
+		// in focus
+		if m.index == textInput {
+			var cmd tea.Cmd
+			m.input, cmd = m.input.Update(msg)
+
+			return m, cmd
+		}
+
+		return m, nil
 
 	case NameTakenMsg:
 		m.state = ready

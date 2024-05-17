@@ -83,10 +83,14 @@ func (m *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, m.updateActivePage(msg))
 		m.activePage = msg.Page
 
+	// user created account
 	case account.CreateAccountMsg:
 		m.state = readyState
 		m.shared.User = msg
-		cmds = append(cmds, m.updateModels(msg))
+		cmds = append(
+			cmds,
+			m.Init(),
+		)
 
 	case menu.MenuChoiceMsg:
 		switch msg.MenuChoice {
