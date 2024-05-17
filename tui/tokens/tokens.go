@@ -1,13 +1,11 @@
 package tokens
 
 import (
-	"fmt"
-
 	pager "github.com/charmbracelet/bubbles/paginator"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/tui/common"
-	"github.com/picosh/pico/tui/createtoken"
+	"github.com/picosh/pico/tui/pages"
 )
 
 const keysPerPage = 4
@@ -18,7 +16,6 @@ const (
 	stateLoading state = iota
 	stateNormal
 	stateDeletingKey
-	stateCreateKey
 	stateQuitting
 )
 
@@ -51,19 +48,18 @@ type Model struct {
 	tokens         []*db.Token // keys linked to user's account
 	index          int         // index of selected key in relation to the current page
 
-	pager     pager.Model
-	createKey createtoken.Model
+	pager pager.Model
 }
 
 // getSelectedIndex returns the index of the cursor in relation to the total
 // number of items.
-func (m Model) getSelectedIndex() int {
+func (m *Model) getSelectedIndex() int {
 	return m.index + m.pager.Page*m.pager.PerPage
 }
 
 // UpdatePaging runs an update against the underlying pagination model as well
 // as performing some related tasks on this model.
-func (m Model) UpdatePaging(msg tea.Msg) {
+func (m *Model) UpdatePaging(msg tea.Msg) {
 	// Handle paging
 	m.pager.SetTotalPages(len(m.tokens))
 	m.pager, _ = m.pager.Update(msg)
@@ -95,25 +91,20 @@ func NewModel(shared common.SharedModel) Model {
 
 // Init is the Tea initialization function.
 func (m Model) Init() tea.Cmd {
-	return nil
+	return FetchTokens(m.shared)
 }
 
 // Update is the tea update function which handles incoming messages.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var (
 		cmds []tea.Cmd
-		cmd  tea.Cmd
 	)
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		if m.state == stateCreateKey {
-			break
-		}
-
 		switch msg.String() {
 		case "q", "esc":
-			return m, common.ExitPage()
+			return m, pages.Navigate(pages.MenuPage)
 		case "up", "k":
 			m.index--
 			if m.index < 0 && m.pager.Page > 0 {
@@ -131,8 +122,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.index = min(itemsOnPage-1, m.index)
 
 		case "n":
-			m.state = stateCreateKey
-			return m, nil
+			return m, pages.Navigate(pages.CreateTokenPage)
 
 		// Delete
 		case "x":
@@ -177,16 +167,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	// leaving page so reset model
-	case common.ExitMsg:
-		fmt.Println("GETTING HIT RESET MODEL")
+	case pages.NavigateMsg:
 		next := NewModel(m.shared)
-		next.createKey = createtoken.NewModel(m.shared)
-		return next, nil
+		return next, next.Init()
 	}
 
 	switch m.state {
-	case stateNormal:
-		m.createKey = createtoken.NewModel(m.shared)
 	case stateDeletingKey:
 		// If an item is being confirmed for delete, any key (other than the key
 		// used for confirmation above) cancels the deletion
@@ -197,30 +183,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	m.UpdatePaging(msg)
-
-	m, cmd = updateChildren(msg, m)
-	if cmd != nil {
-		cmds = append(cmds, cmd)
-	}
-
 	return m, tea.Batch(cmds...)
-}
-
-func updateChildren(msg tea.Msg, m Model) (Model, tea.Cmd) {
-	var cmd tea.Cmd
-
-	switch m.state {
-	case stateCreateKey:
-		newModel, newCmd := m.createKey.Update(msg)
-		createKeyModel, ok := newModel.(createtoken.Model)
-		if !ok {
-			panic("could not perform assertion on posts model")
-		}
-		m.createKey = createKeyModel
-		cmd = newCmd
-	}
-
-	return m, cmd
 }
 
 // View renders the current UI into a string.
@@ -236,8 +199,6 @@ func (m Model) View() string {
 		s = "Loading...\n\n"
 	case stateQuitting:
 		s = "Thanks for using pico.sh!\n"
-	case stateCreateKey:
-		s = m.createKey.View()
 	default:
 		s = "Here are the tokens linked to your account.\n\n"
 		s += "A token can be used for connecting to our\nIRC bouncer from your client.\n\n"
@@ -293,7 +254,7 @@ func keysView(m Model) string {
 	return s
 }
 
-func (m Model) helpView() string {
+func (m *Model) helpView() string {
 	var items []string
 	if len(m.tokens) > 1 {
 		items = append(items, "j/k, ↑/↓: choose")
@@ -305,7 +266,7 @@ func (m Model) helpView() string {
 	return common.HelpView(m.shared.Styles, items...)
 }
 
-func (m Model) promptView(prompt string) string {
+func (m *Model) promptView(prompt string) string {
 	st := m.shared.Styles.Delete.Copy().MarginTop(2).MarginRight(1)
 	return st.Render(prompt) +
 		m.shared.Styles.Delete.Render("(y/N)")

@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/glamour"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/tui/common"
+	"github.com/picosh/pico/tui/pages"
 )
 
 func NotificationsView(dbpool db.DB, userID string) string {
@@ -100,7 +101,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "q", "esc":
-			return m, common.ExitPage()
+			return m, pages.Navigate(pages.MenuPage)
 		}
 	}
 

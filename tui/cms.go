@@ -6,22 +6,14 @@ import (
 	"github.com/muesli/reflow/wrap"
 	"github.com/picosh/pico/tui/account"
 	"github.com/picosh/pico/tui/common"
+	"github.com/picosh/pico/tui/createkey"
+	"github.com/picosh/pico/tui/createtoken"
 	"github.com/picosh/pico/tui/keys"
 	"github.com/picosh/pico/tui/menu"
 	"github.com/picosh/pico/tui/notifications"
+	"github.com/picosh/pico/tui/pages"
 	"github.com/picosh/pico/tui/plus"
 	"github.com/picosh/pico/tui/tokens"
-)
-
-type page int
-
-const (
-	menuPage page = iota
-	createAccountPage
-	pubkeysPage
-	tokensPage
-	notificationsPage
-	plusPage
 )
 
 type state int
@@ -36,7 +28,7 @@ type UI struct {
 	shared common.SharedModel
 
 	state      state
-	activePage page
+	activePage pages.Page
 	pages      []tea.Model
 }
 
@@ -44,22 +36,25 @@ func NewUI(shared common.SharedModel) *UI {
 	m := &UI{
 		shared: shared,
 		state:  initState,
-		pages:  make([]tea.Model, 6),
+		pages:  make([]tea.Model, 8),
 	}
 	return m
 }
 
 func (m *UI) Init() tea.Cmd {
-	m.pages[menuPage] = menu.NewModel(m.shared)
-	m.pages[createAccountPage] = account.NewModel(m.shared)
-	m.pages[pubkeysPage] = keys.NewModel(m.shared)
-	m.pages[tokensPage] = tokens.NewModel(m.shared)
-	m.pages[notificationsPage] = notifications.NewModel(m.shared)
-	m.pages[plusPage] = plus.NewModel(m.shared)
+	m.pages[pages.MenuPage] = menu.NewModel(m.shared)
+	m.pages[pages.CreateAccountPage] = account.NewModel(m.shared)
+	m.pages[pages.CreatePubkeyPage] = createkey.NewModel(m.shared)
+	m.pages[pages.CreateTokenPage] = createtoken.NewModel(m.shared)
+	m.pages[pages.CreateAccountPage] = account.NewModel(m.shared)
+	m.pages[pages.PubkeysPage] = keys.NewModel(m.shared)
+	m.pages[pages.TokensPage] = tokens.NewModel(m.shared)
+	m.pages[pages.NotificationsPage] = notifications.NewModel(m.shared)
+	m.pages[pages.PlusPage] = plus.NewModel(m.shared)
 	if m.shared.User == nil {
-		m.activePage = createAccountPage
+		m.activePage = pages.CreateAccountPage
 	} else {
-		m.activePage = menuPage
+		m.activePage = pages.MenuPage
 	}
 	m.state = readyState
 	cmds := make([]tea.Cmd, 0)
@@ -82,11 +77,11 @@ func (m *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 
-	case common.ExitMsg:
+	case pages.NavigateMsg:
 		// send message to the active page so it can teardown
 		// and reset itself
 		cmds = append(cmds, m.updateActivePage(msg))
-		m.activePage = menuPage
+		m.activePage = msg.Page
 
 	case account.CreateAccountMsg:
 		m.state = readyState
@@ -96,21 +91,21 @@ func (m *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case menu.MenuChoiceMsg:
 		switch msg.MenuChoice {
 		case menu.KeysChoice:
-			m.activePage = pubkeysPage
-			cmds = append(cmds, keys.FetchKeys(m.shared))
+			m.activePage = pages.PubkeysPage
 		case menu.TokensChoice:
-			m.activePage = tokensPage
-			cmds = append(cmds, tokens.FetchTokens(m.shared))
+			m.activePage = pages.TokensPage
 		case menu.PlusChoice:
-			m.activePage = plusPage
+			m.activePage = pages.PlusPage
 		case menu.NotificationsChoice:
-			m.activePage = notificationsPage
+			m.activePage = pages.NotificationsPage
 		case menu.ChatChoice:
-			cmds = append(cmds, LoadChat(m.shared))
+			return m, LoadChat(m.shared)
 		case menu.ExitChoice:
 			m.shared.Dbpool.Close()
 			return m, tea.Quit
 		}
+
+		cmds = append(cmds, m.pages[m.activePage].Init())
 	}
 
 	cmd := m.updateActivePage(msg)

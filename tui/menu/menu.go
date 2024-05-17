@@ -34,8 +34,7 @@ var menuChoices = map[menuChoice]string{
 }
 
 type Model struct {
-	shared common.SharedModel
-
+	shared     common.SharedModel
 	err        error
 	menuIndex  int
 	menuChoice menuChoice

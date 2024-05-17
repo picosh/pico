@@ -9,6 +9,7 @@ import (
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/tui/common"
+	"github.com/picosh/pico/tui/pages"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -50,7 +51,7 @@ type Model struct {
 
 // updateFocus updates the focused states in the model based on the current
 // focus index.
-func (m Model) updateFocus() {
+func (m *Model) updateFocus() {
 	if m.index == textInput && !m.input.Focused() {
 		m.input.Focus()
 		m.input.Prompt = m.shared.Styles.FocusedPrompt.String()
@@ -61,7 +62,7 @@ func (m Model) updateFocus() {
 }
 
 // Move the focus index one unit forward.
-func (m Model) indexForward() {
+func (m *Model) indexForward() {
 	m.index++
 	if m.index > cancelButton {
 		m.index = textInput
@@ -71,7 +72,7 @@ func (m Model) indexForward() {
 }
 
 // Move the focus index one unit backwards.
-func (m Model) indexBackward() {
+func (m *Model) indexBackward() {
 	m.index--
 	if m.index < textInput {
 		m.index = cancelButton
@@ -111,7 +112,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyEscape: // exit this mini-app
-			return m, common.ExitPage()
+			return m, pages.Navigate(pages.PubkeysPage)
 
 		default:
 			// Ignore keys if we're submitting
@@ -149,8 +150,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.newKey = strings.TrimSpace(m.input.Value())
 
 					return m, m.addPublicKey()
-				case cancelButton: // Exit this mini-app
-					return m, common.ExitPage()
+				case cancelButton:
+					return m, pages.Navigate(pages.PubkeysPage)
 				}
 			}
 

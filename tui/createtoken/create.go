@@ -7,6 +7,7 @@ import (
 	input "github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/picosh/pico/tui/common"
+	"github.com/picosh/pico/tui/pages"
 )
 
 type state int
@@ -69,7 +70,7 @@ func NewModel(shared common.SharedModel) Model {
 
 // updateFocus updates the focused states in the model based on the current
 // focus index.
-func (m Model) updateFocus() {
+func (m *Model) updateFocus() {
 	if m.index == textInput && !m.input.Focused() {
 		m.input.Focus()
 		m.input.Prompt = m.shared.Styles.FocusedPrompt.String()
@@ -80,8 +81,8 @@ func (m Model) updateFocus() {
 }
 
 // Move the focus index one unit forward.
-func (m Model) indexForward() {
-	m.index++
+func (m *Model) indexForward() {
+	m.index += 1
 	if m.index > cancelButton {
 		m.index = textInput
 	}
@@ -90,8 +91,8 @@ func (m Model) indexForward() {
 }
 
 // Move the focus index one unit backwards.
-func (m Model) indexBackward() {
-	m.index--
+func (m *Model) indexBackward() {
+	m.index -= 1
 	if m.index < textInput {
 		m.index = cancelButton
 	}
@@ -108,67 +109,63 @@ func (m Model) Init() tea.Cmd {
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch msg.Type {
-		case tea.KeyEscape: // exit this mini-app
-			return m, common.ExitPage()
-
-		default:
-			// Ignore keys if we're submitting
-			if m.state == submitting {
-				return m, nil
-			}
-
-			switch msg.String() {
-			case "tab":
-				m.indexForward()
-			case "shift+tab":
-				m.indexBackward()
-			case "l", "k", "right":
-				if m.index != textInput {
-					m.indexForward()
-				}
-			case "h", "j", "left":
-				if m.index != textInput {
-					m.indexBackward()
-				}
-			case "up", "down":
-				if m.index == textInput {
-					m.indexForward()
-				} else {
-					m.index = textInput
-					m.updateFocus()
-				}
-			case "enter":
-				switch m.index {
-				case textInput:
-					fallthrough
-				case okButton: // Submit the form
-					// form already submitted so ok button exits
-					if m.state == submitted {
-						return m, common.ExitPage()
-					}
-
-					m.state = submitting
-					m.errMsg = ""
-					m.tokenName = strings.TrimSpace(m.input.Value())
-
-					return m, addToken(m)
-				case cancelButton: // Exit this mini-app
-					return m, common.ExitPage()
-				}
-			}
-
-			// Pass messages through to the input element if that's the element
-			// in focus
-			if m.index == textInput {
-				var cmd tea.Cmd
-				m.input, cmd = m.input.Update(msg)
-
-				return m, cmd
-			}
-
+		// Ignore keys if we're submitting
+		if m.state == submitting {
 			return m, nil
 		}
+
+		switch msg.String() {
+		case "q", "esc":
+			return m, pages.Navigate(pages.TokensPage)
+		case "tab":
+			m.indexForward()
+		case "shift+tab":
+			m.indexBackward()
+		case "l", "k", "right":
+			if m.index != textInput {
+				m.indexForward()
+			}
+		case "h", "j", "left":
+			if m.index != textInput {
+				m.indexBackward()
+			}
+		case "up", "down":
+			if m.index == textInput {
+				m.indexForward()
+			} else {
+				m.index = textInput
+				m.updateFocus()
+			}
+		case "enter":
+			switch m.index {
+			case textInput:
+				fallthrough
+			case okButton: // Submit the form
+				// form already submitted so ok button exits
+				if m.state == submitted {
+					return m, pages.Navigate(pages.TokensPage)
+				}
+
+				m.state = submitting
+				m.errMsg = ""
+				m.tokenName = strings.TrimSpace(m.input.Value())
+
+				return m, m.addToken()
+			case cancelButton:
+				return m, pages.Navigate(pages.TokensPage)
+			}
+		}
+
+		// Pass messages through to the input element if that's the element
+		// in focus
+		if m.index == textInput {
+			var cmd tea.Cmd
+			m.input, cmd = m.input.Update(msg)
+
+			return m, cmd
+		}
+
+		return m, nil
 
 	case TokenSetMsg:
 		m.state = submitted
@@ -197,7 +194,7 @@ func (m Model) View() string {
 	s += m.input.View() + "\n\n"
 
 	if m.state == submitting {
-		s += spinnerView(m)
+		s += spinnerView()
 	} else if m.state == submitted {
 		s = fmt.Sprintf("Save this token:\n%s\n\n", m.token)
 		s += "After you exit this screen you will *not* be able to see it again.\n\n"
@@ -213,11 +210,7 @@ func (m Model) View() string {
 	return s
 }
 
-func spinnerView(m Model) string {
-	return "Submitting..."
-}
-
-func addToken(m Model) tea.Cmd {
+func (m Model) addToken() tea.Cmd {
 	return func() tea.Msg {
 		token, err := m.shared.Dbpool.InsertToken(m.shared.User.ID, m.tokenName)
 		if err != nil {
@@ -226,4 +219,8 @@ func addToken(m Model) tea.Cmd {
 
 		return TokenSetMsg{token}
 	}
+}
+
+func spinnerView() string {
+	return "Submitting..."
 }

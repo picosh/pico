@@ -6,6 +6,7 @@ import (
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/tui/common"
 	"github.com/picosh/pico/tui/createkey"
+	"github.com/picosh/pico/tui/pages"
 )
 
 const keysPerPage = 4
@@ -18,7 +19,6 @@ const (
 	stateDeletingKey
 	stateDeletingActiveKey
 	stateDeletingAccount
-	stateCreateKey
 	stateQuitting
 )
 
@@ -51,19 +51,18 @@ type Model struct {
 	keys           []*db.PublicKey // keys linked to user's account
 	index          int             // index of selected key in relation to the current page
 
-	pager     pager.Model
-	createKey createkey.Model
+	pager pager.Model
 }
 
 // getSelectedIndex returns the index of the cursor in relation to the total
 // number of items.
-func (m Model) getSelectedIndex() int {
+func (m *Model) getSelectedIndex() int {
 	return m.index + m.pager.Page*m.pager.PerPage
 }
 
 // UpdatePaging runs an update against the underlying pagination model as well
 // as performing some related tasks on this model.
-func (m Model) UpdatePaging(msg tea.Msg) {
+func (m *Model) UpdatePaging(msg tea.Msg) {
 	// Handle paging
 	m.pager.SetTotalPages(len(m.keys))
 	m.pager, _ = m.pager.Update(msg)
@@ -94,73 +93,69 @@ func NewModel(shared common.SharedModel) Model {
 
 // Init is the Tea initialization function.
 func (m Model) Init() tea.Cmd {
-	return nil
+	return FetchKeys(m.shared)
 }
 
 // Update is the tea update function which handles incoming messages.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var (
 		cmds []tea.Cmd
-		cmd  tea.Cmd
 	)
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		if m.state != stateCreateKey {
-			switch msg.String() {
-			case "q", "esc":
-				return m, common.ExitPage()
-			case "up", "k":
-				m.index--
-				if m.index < 0 && m.pager.Page > 0 {
-					m.index = m.pager.PerPage - 1
-					m.pager.PrevPage()
-				}
-				m.index = max(0, m.index)
-			case "down", "j":
-				itemsOnPage := m.pager.ItemsOnPage(len(m.keys))
-				m.index++
-				if m.index > itemsOnPage-1 && m.pager.Page < m.pager.TotalPages-1 {
-					m.index = 0
-					m.pager.NextPage()
-				}
-				m.index = min(itemsOnPage-1, m.index)
+		switch msg.String() {
+		case "q", "esc":
+			return m, pages.Navigate(pages.MenuPage)
+		case "up", "k":
+			m.index -= 1
+			if m.index < 0 && m.pager.Page > 0 {
+				m.index = m.pager.PerPage - 1
+				m.pager.PrevPage()
+			}
+			m.index = max(0, m.index)
+		case "down", "j":
+			itemsOnPage := m.pager.ItemsOnPage(len(m.keys))
+			m.index += 1
+			if m.index > itemsOnPage-1 && m.pager.Page < m.pager.TotalPages-1 {
+				m.index = 0
+				m.pager.NextPage()
+			}
+			m.index = min(itemsOnPage-1, m.index)
 
-			case "n":
-				m.state = stateCreateKey
-				return m, nil
+		case "n":
+			return m, pages.Navigate(pages.CreatePubkeyPage)
 
-			// Delete
-			case "x":
-				m.state = stateDeletingKey
-				m.UpdatePaging(msg)
-				return m, nil
+		// Delete
+		case "x":
+			m.state = stateDeletingKey
+			m.UpdatePaging(msg)
+			return m, nil
 
-			// Confirm Delete
-			case "y":
-				switch m.state {
-				case stateDeletingKey:
-					if len(m.keys) == 1 {
-						// The user is about to delete her account. Double confirm.
-						m.state = stateDeletingAccount
-						return m, nil
-					}
-					if m.getSelectedIndex() == m.activeKeyIndex {
-						// The user is going to delete her active key. Double confirm.
-						m.state = stateDeletingActiveKey
-						return m, nil
-					}
-					m.state = stateNormal
-					return m, m.unlinkKey()
-				case stateDeletingActiveKey:
-					m.state = stateQuitting
-					// Active key will be deleted. Remove the key and exit.
-					return m, m.unlinkKey()
-				case stateDeletingAccount:
-					// Account will be deleted. Remove the key and exit.
-					m.state = stateQuitting
-					return m, m.deleteAccount()
+		// Confirm Delete
+		case "y":
+			switch m.state {
+			case stateDeletingKey:
+				if len(m.keys) == 1 {
+					// The user is about to delete her account. Double confirm.
+					m.state = stateDeletingAccount
+					return m, nil
 				}
+				if m.getSelectedIndex() == m.activeKeyIndex {
+					// The user is going to delete her active key. Double confirm.
+					m.state = stateDeletingActiveKey
+					return m, nil
+				}
+				m.state = stateNormal
+				return m, m.unlinkKey()
+			case stateDeletingActiveKey:
+				m.state = stateQuitting
+				// Active key will be deleted. Remove the key and exit.
+				return m, m.unlinkKey()
+			case stateDeletingAccount:
+				// Account will be deleted. Remove the key and exit.
+				m.state = stateQuitting
+				return m, m.deleteAccount()
 			}
 		}
 
@@ -204,18 +199,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case createkey.KeySetMsg:
 		m.state = stateNormal
 		return m, FetchKeys(m.shared)
-
-	// leaving page so reset model
-	case common.ExitMsg:
-		next := NewModel(m.shared)
-		next.createKey = createkey.NewModel(m.shared)
-		return next, nil
-
 	}
 
 	switch m.state {
-	case stateNormal:
-		m.createKey = createkey.NewModel(m.shared)
 	case stateDeletingKey:
 		// If an item is being confirmed for delete, any key (other than the key
 		// used for confirmation above) cancels the deletion
@@ -226,30 +212,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	m.UpdatePaging(msg)
-
-	m, cmd = updateChildren(msg, m)
-	if cmd != nil {
-		cmds = append(cmds, cmd)
-	}
-
 	return m, tea.Batch(cmds...)
-}
-
-func updateChildren(msg tea.Msg, m Model) (Model, tea.Cmd) {
-	var cmd tea.Cmd
-
-	switch m.state {
-	case stateCreateKey:
-		newModel, newCmd := m.createKey.Update(msg)
-		createKeyModel, ok := newModel.(createkey.Model)
-		if !ok {
-			panic("could not perform assertion on posts model")
-		}
-		m.createKey = createKeyModel
-		cmd = newCmd
-	}
-
-	return m, cmd
 }
 
 // View renders the current UI into a string.
@@ -265,8 +228,6 @@ func (m Model) View() string {
 		s = "Loading...\n\n"
 	case stateQuitting:
 		s = "Thanks for using pico.sh!\n"
-	case stateCreateKey:
-		s = m.createKey.View()
 	default:
 		s = "Here are the keys linked to your pico.sh account.\n\n"
 
