@@ -65,6 +65,8 @@ func (m *UI) updateModels(msg tea.Msg) tea.Cmd {
 }
 
 func (m *UI) Init() tea.Cmd {
+	// header height is required to calculate viewport for
+	// some pages
 	m.shared.HeaderHeight = lipgloss.Height(m.header())
 	user, err := findUser(m.shared)
 	if err != nil {
@@ -118,6 +120,7 @@ func (m *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// user created account
 	case createaccount.CreateAccountMsg:
+		// reset model and pages
 		return m, m.Init()
 
 	case menu.MenuChoiceMsg:
@@ -155,7 +158,10 @@ func (m *UI) header() string {
 		Styles.
 		Note.
 		SetString(pages.ToTitle(m.activePage))
-	div := m.shared.Styles.HelpDivider.Foreground(common.Green)
+	div := m.shared.
+		Styles.
+		HelpDivider.Copy().
+		Foreground(common.Green)
 	s := fmt.Sprintf("%s%s%s\n\n", logo, div, title)
 	return s
 }
