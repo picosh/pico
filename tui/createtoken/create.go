@@ -25,8 +25,6 @@ const (
 	cancelButton
 )
 
-type TokenDismissed int
-
 type TokenSetMsg struct {
 	token string
 }
@@ -218,8 +216,6 @@ func (m Model) View() string {
 func spinnerView(m Model) string {
 	return "Submitting..."
 }
-
-func dismiss() tea.Msg { return TokenDismissed(1) }
 
 func addToken(m Model) tea.Cmd {
 	return func() tea.Msg {

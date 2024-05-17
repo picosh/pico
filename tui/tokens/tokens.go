@@ -1,6 +1,8 @@
 package tokens
 
 import (
+	"fmt"
+
 	pager "github.com/charmbracelet/bubbles/paginator"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/picosh/pico/db"
@@ -174,10 +176,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		return m, nil
 
-	case createtoken.TokenDismissed:
-		m.state = stateNormal
-		return m, FetchTokens(m.shared)
-
+	// leaving page so reset model
+	case common.ExitMsg:
+		fmt.Println("GETTING HIT RESET MODEL")
+		next := NewModel(m.shared)
+		next.createKey = createtoken.NewModel(m.shared)
+		return next, nil
 	}
 
 	switch m.state {
@@ -214,14 +218,6 @@ func updateChildren(msg tea.Msg, m Model) (Model, tea.Cmd) {
 		}
 		m.createKey = createKeyModel
 		cmd = newCmd
-		if m.createKey.Done {
-			m.createKey = createtoken.NewModel(m.shared) // reset the state
-			m.state = stateNormal
-		} else if m.createKey.Quit {
-			m.state = stateQuitting
-			return m, tea.Quit
-		}
-
 	}
 
 	return m, cmd

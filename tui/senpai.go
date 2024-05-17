@@ -3,6 +3,7 @@ package tui
 import (
 	"io"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/tui/common"
 )
@@ -28,3 +29,12 @@ func (m *SenpaiCmd) Run() error {
 func (m *SenpaiCmd) SetStdin(io.Reader)  {}
 func (m *SenpaiCmd) SetStdout(io.Writer) {}
 func (m *SenpaiCmd) SetStderr(io.Writer) {}
+
+func LoadChat(shrd common.SharedModel) tea.Cmd {
+	sp := &SenpaiCmd{
+		shared: shrd,
+	}
+	return tea.Exec(sp, func(err error) tea.Msg {
+		return tea.Quit()
+	})
+}

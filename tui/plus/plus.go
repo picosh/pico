@@ -108,10 +108,11 @@ func (m Model) Init() tea.Cmd {
 
 // Update is the Bubble Tea update loop.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
-	var cmds []tea.Cmd
-
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.viewport.Width = headerWidth(m.shared.Width)
+		hh := headerHeight(m.shared.Styles)
+		m.viewport.Height = m.shared.Height - hh
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "q", "esc":
@@ -119,13 +120,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	m.viewport.Width = headerWidth(m.shared.Width)
-	hh := headerHeight(m.shared.Styles)
-	m.viewport.Height = m.shared.Height - hh
+	var cmd tea.Cmd
 	m.viewport, cmd = m.viewport.Update(msg)
-	cmds = append(cmds, cmd)
-
-	return m, tea.Batch(cmds...)
+	return m, cmd
 }
 
 // View renders current view from the model.

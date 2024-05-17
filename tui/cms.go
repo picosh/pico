@@ -73,7 +73,7 @@ func (m *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.shared.Width = msg.Width
 		m.shared.Height = msg.Height
-		cmds = append(cmds, m.updateModels(msg))
+		return m, m.updateModels(msg)
 
 	case tea.KeyMsg:
 		switch msg.Type {
@@ -83,6 +83,9 @@ func (m *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case common.ExitMsg:
+		// send message to the active page so it can teardown
+		// and reset itself
+		cmds = append(cmds, m.updateActivePage(msg))
 		m.activePage = menuPage
 
 	case account.CreateAccountMsg:
@@ -103,18 +106,23 @@ func (m *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case menu.NotificationsChoice:
 			m.activePage = notificationsPage
 		case menu.ChatChoice:
-			cmds = append(cmds, m.loadChat())
+			cmds = append(cmds, LoadChat(m.shared))
 		case menu.ExitChoice:
 			m.shared.Dbpool.Close()
 			return m, tea.Quit
 		}
 	}
 
-	nm, cmd := m.pages[m.activePage].Update(msg)
-	m.pages[m.activePage] = nm
+	cmd := m.updateActivePage(msg)
 	cmds = append(cmds, cmd)
 
 	return m, tea.Batch(cmds...)
+}
+
+func (m *UI) updateActivePage(msg tea.Msg) tea.Cmd {
+	nm, cmd := m.pages[m.activePage].Update(msg)
+	m.pages[m.activePage] = nm
+	return cmd
 }
 
 func (m *UI) updateModels(msg tea.Msg) tea.Cmd {
@@ -125,15 +133,6 @@ func (m *UI) updateModels(msg tea.Msg) tea.Cmd {
 		cmds = append(cmds, cmd)
 	}
 	return tea.Batch(cmds...)
-}
-
-func (m *UI) loadChat() tea.Cmd {
-	sp := &SenpaiCmd{
-		shared: m.shared,
-	}
-	return tea.Exec(sp, func(err error) tea.Msg {
-		return tea.Quit()
-	})
 }
 
 func (m *UI) View() string {

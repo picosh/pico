@@ -43,8 +43,7 @@ type Model struct {
 
 func NewModel(shared common.SharedModel) Model {
 	return Model{
-		shared: shared,
-
+		shared:     shared,
 		menuChoice: UnsetChoice,
 	}
 }
