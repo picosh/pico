@@ -20,13 +20,11 @@ require (
 	github.com/charmbracelet/wish v1.4.0
 	github.com/google/go-cmp v0.6.0
 	github.com/gorilla/feeds v1.1.2
-	github.com/kr/pty v1.1.8
 	github.com/lib/pq v1.10.9
 	github.com/microcosm-cc/bluemonday v1.0.26
 	github.com/minio/minio-go/v7 v7.0.70
 	github.com/mmcdole/gofeed v1.3.0
 	github.com/muesli/reflow v0.3.0
-	github.com/muesli/termenv v0.15.2
 	github.com/neurosnap/go-exif-remove v0.0.0-20221010134343-50d1e3c35577
 	github.com/picosh/pobj v0.0.0-20240417140600-2071618b61c5
 	github.com/picosh/ptun v0.0.0-20240417140706-811cc2b70d9a
@@ -108,6 +106,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
+	github.com/muesli/termenv v0.15.2 // indirect
 	github.com/neurosnap/go-jpeg-image-structure v0.0.0-20221010133817-70b1c1ff679e // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/philhofer/fwd v1.1.2 // indirect
