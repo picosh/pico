@@ -22,3 +22,26 @@ func Navigate(page Page) tea.Cmd {
 		return NavigateMsg{page}
 	}
 }
+
+func ToTitle(page Page) string {
+	switch page {
+	case CreateAccountPage:
+		return "create account"
+	case CreatePubkeyPage:
+		return "add pubkey"
+	case CreateTokenPage:
+		return "new api token"
+	case MenuPage:
+		return "menu"
+	case NotificationsPage:
+		return "notifications"
+	case PlusPage:
+		return "pico+"
+	case TokensPage:
+		return "api tokens"
+	case PubkeysPage:
+		return "pubkeys"
+	}
+
+	return ""
+}

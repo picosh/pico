@@ -51,6 +51,10 @@ func DefaultStyles(renderer *lipgloss.Renderer) Styles {
 	s.Cursor = renderer.NewStyle().Foreground(Fuschia)
 	s.Wrap = renderer.NewStyle().Width(58)
 	s.Paragraph = s.Wrap.Copy().Margin(1, 0, 0, 2)
+	s.Logo = renderer.NewStyle().
+		Foreground(Cream).
+		Background(Indigo).
+		Padding(0, 1)
 	s.Code = renderer.NewStyle().
 		Foreground(Red).
 		Background(DarkRed).
@@ -71,10 +75,6 @@ func DefaultStyles(renderer *lipgloss.Renderer) Styles {
 		PaddingRight(1).
 		SetString("•")
 	s.SelectedMenuItem = renderer.NewStyle().Foreground(Fuschia)
-	s.Logo = renderer.NewStyle().
-		Foreground(Cream).
-		Background(Indigo).
-		Padding(0, 1)
 	s.BlurredButtonStyle = renderer.NewStyle().
 		Foreground(Cream).
 		Background(GreyLight).

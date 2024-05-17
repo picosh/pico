@@ -1,14 +1,13 @@
 package tui
 
 import (
-	"errors"
+	"fmt"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/wish"
 	"github.com/muesli/reflow/wordwrap"
 	"github.com/muesli/reflow/wrap"
-	"github.com/picosh/pico/db"
-	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/tui/common"
 	"github.com/picosh/pico/tui/createaccount"
 	"github.com/picosh/pico/tui/createkey"
@@ -66,6 +65,7 @@ func (m *UI) updateModels(msg tea.Msg) tea.Cmd {
 }
 
 func (m *UI) Init() tea.Cmd {
+	m.shared.HeaderHeight = lipgloss.Height(m.header())
 	user, err := findUser(m.shared)
 	if err != nil {
 		wish.Errorln(m.shared.Session, err)
@@ -146,49 +146,31 @@ func (m *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
+func (m *UI) header() string {
+	logo := m.shared.
+		Styles.
+		Logo.
+		SetString("pico.sh")
+	title := m.shared.
+		Styles.
+		Note.
+		SetString(pages.ToTitle(m.activePage))
+	div := m.shared.Styles.HelpDivider.Foreground(common.Green)
+	s := fmt.Sprintf("%s%s%s\n\n", logo, div, title)
+	return s
+}
+
 func (m *UI) View() string {
-	w := m.shared.Width - m.shared.Styles.App.GetHorizontalFrameSize()
-	s := m.shared.Styles.Logo.SetString("pico.sh").String() + "\n\n"
+	s := m.header()
+
 	if m.pages[m.activePage] != nil {
 		s += m.pages[m.activePage].View()
 	}
-	str := wrap.String(wordwrap.String(s, w), w)
+
+	width := m.shared.Width - m.shared.Styles.App.GetHorizontalFrameSize()
+	str := wrap.String(
+		wordwrap.String(s, width),
+		width,
+	)
 	return m.shared.Styles.App.Render(str)
-}
-
-func findUser(shrd common.SharedModel) (*db.User, error) {
-	logger := shrd.Cfg.Logger
-	var user *db.User
-	usr := shrd.Session.User()
-
-	key, err := shared.KeyForKeyText(shrd.Session.PublicKey())
-	if err != nil {
-		return nil, err
-	}
-
-	user, err = shrd.Dbpool.FindUserForKey(usr, key)
-	if err != nil {
-		logger.Error("no user found for public key", "err", err.Error())
-		// we only want to throw an error for specific cases
-		if errors.Is(err, &db.ErrMultiplePublicKeys{}) {
-			return nil, err
-		}
-		// no user and not error indicates we need to create an account
-		return nil, nil
-	}
-
-	return user, nil
-}
-
-func findPlusFeatureFlag(shrd common.SharedModel) (*db.FeatureFlag, error) {
-	if shrd.User == nil {
-		return nil, nil
-	}
-
-	ff, err := shrd.Dbpool.FindFeatureForUser(shrd.User.ID, "plus")
-	if err != nil {
-		return nil, err
-	}
-
-	return ff, nil
 }

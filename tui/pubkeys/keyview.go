@@ -93,7 +93,7 @@ func (m Model) newStyledKey(styles common.Styles, key *db.PublicKey, active bool
 
 	var note string
 	if active {
-		note = m.shared.Styles.Note.Render("• ") + m.shared.Styles.Note.Render("Current Key")
+		note = m.shared.Styles.Note.Render("• Current Key")
 	}
 
 	// Default state

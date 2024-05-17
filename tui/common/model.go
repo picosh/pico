@@ -17,5 +17,6 @@ type SharedModel struct {
 	PlusFeatureFlag *db.FeatureFlag
 	Width           int
 	Height          int
+	HeaderHeight    int
 	Styles          Styles
 }

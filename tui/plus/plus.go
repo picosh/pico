@@ -14,9 +14,7 @@ import (
 func PlusView(username string) string {
 	paymentLink := "https://auth.pico.sh/checkout"
 	url := fmt.Sprintf("%s/%s", paymentLink, url.QueryEscape(username))
-	md := fmt.Sprintf(`# pico+
-
-Signup to get premium access
+	md := fmt.Sprintf(`Signup to get premium access
 
 ## $2/month (billed annually)
 
@@ -80,8 +78,8 @@ type Model struct {
 	viewport viewport.Model
 }
 
-func headerHeight(styles common.Styles) int {
-	return 0
+func headerHeight(shrd common.SharedModel) int {
+	return shrd.HeaderHeight
 }
 
 func headerWidth(w int) int {
@@ -90,7 +88,7 @@ func headerWidth(w int) int {
 
 // NewModel returns a new username model in its initial state.
 func NewModel(shared common.SharedModel) Model {
-	hh := headerHeight(shared.Styles)
+	hh := headerHeight(shared)
 	viewport := viewport.New(headerWidth(shared.Width), shared.Height-hh)
 	viewport.YPosition = hh
 	if shared.User != nil {
@@ -112,7 +110,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.viewport.Width = headerWidth(m.shared.Width)
-		hh := headerHeight(m.shared.Styles)
+		hh := headerHeight(m.shared)
 		m.viewport.Height = m.shared.Height - hh
 	case tea.KeyMsg:
 		switch msg.String() {

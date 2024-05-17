@@ -17,9 +17,7 @@ func NotificationsView(dbpool db.DB, userID string) string {
 		return err.Error()
 	}
 	url := fmt.Sprintf("https://auth.pico.sh/rss/%s", pass)
-	md := fmt.Sprintf(`# Notifications
-
-We provide a special RSS feed for all pico users where we can send
+	md := fmt.Sprintf(`We provide a special RSS feed for all pico users where we can send
 user-specific notifications. This is where we will send pico+
 expiration notices, among other alerts. To be clear, this is
 optional but **highly** recommended.
@@ -62,8 +60,8 @@ type Model struct {
 	viewport viewport.Model
 }
 
-func headerHeight(styles common.Styles) int {
-	return 0
+func headerHeight(shrd common.SharedModel) int {
+	return shrd.HeaderHeight
 }
 
 func headerWidth(w int) int {
@@ -71,7 +69,7 @@ func headerWidth(w int) int {
 }
 
 func NewModel(shared common.SharedModel) Model {
-	hh := headerHeight(shared.Styles)
+	hh := headerHeight(shared)
 	viewport := viewport.New(headerWidth(shared.Width), shared.Height-hh)
 	viewport.YPosition = hh
 	if shared.User != nil {
@@ -95,7 +93,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.viewport.Width = headerWidth(m.shared.Width)
-		hh := headerHeight(m.shared.Styles)
+		hh := headerHeight(m.shared)
 		m.viewport.Height = m.shared.Height - hh
 
 	case tea.KeyMsg:
