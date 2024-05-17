@@ -16,7 +16,6 @@ const (
 	stateLoading state = iota
 	stateNormal
 	stateDeletingKey
-	stateQuitting
 )
 
 type keyState int
@@ -149,9 +148,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.tokens = msg
 
 	case unlinkedKeyMsg:
-		if m.state == stateQuitting {
-			return m, tea.Quit
-		}
 		i := m.getSelectedIndex()
 
 		// Remove key from array
@@ -197,11 +193,8 @@ func (m Model) View() string {
 	switch m.state {
 	case stateLoading:
 		s = "Loading...\n\n"
-	case stateQuitting:
-		s = "Thanks for using pico.sh!\n"
 	default:
-		s = "Here are the tokens linked to your account.\n\n"
-		s += "A token can be used for connecting to our\nIRC bouncer from your client.\n\n"
+		s = "Here are the tokens linked to your account. An API token can be used for connecting to our IRC bouncer or your pico RSS feed.\n\n"
 
 		// Keys
 		s += keysView(m)

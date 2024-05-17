@@ -229,7 +229,7 @@ func (m Model) View() string {
 	case stateQuitting:
 		s = "Thanks for using pico.sh!\n"
 	default:
-		s = "Here are the keys linked to your pico.sh account.\n\n"
+		s = "Here are the pubkeys linked to your account. Add more pubkeys to be able to login with multiple SSH keypairs.\n\n"
 
 		// Keys
 		s += m.keysView()
