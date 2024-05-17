@@ -11,7 +11,7 @@ import (
 	"github.com/picosh/pico/tui/pages"
 )
 
-func PlusView(username string) string {
+func PlusView(username string, w int) string {
 	paymentLink := "https://auth.pico.sh/checkout"
 	url := fmt.Sprintf("%s/%s", paymentLink, url.QueryEscape(username))
 	md := fmt.Sprintf(`Signup to get premium access
@@ -58,6 +58,7 @@ we plan on continuing to include more services as we build them.`, url)
 	r, _ := glamour.NewTermRenderer(
 		// detect background color and pick either the default dark or light theme
 		glamour.WithAutoStyle(),
+		glamour.WithWordWrap(w-20),
 	)
 	out, _ := r.Render(md)
 	return out
@@ -80,9 +81,10 @@ func headerWidth(w int) int {
 // NewModel returns a new username model in its initial state.
 func NewModel(shared common.SharedModel) Model {
 	hh := headerHeight(shared)
-	viewport := viewport.New(headerWidth(shared.Width), shared.Height-hh)
+	ww := headerWidth(shared.Width)
+	viewport := viewport.New(ww, shared.Height-hh)
 	if shared.User != nil {
-		viewport.SetContent(PlusView(shared.User.Name))
+		viewport.SetContent(PlusView(shared.User.Name, ww))
 	}
 
 	return Model{

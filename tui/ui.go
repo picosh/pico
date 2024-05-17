@@ -173,11 +173,8 @@ func (m *UI) View() string {
 		s += m.pages[m.activePage].View()
 	}
 
-	maxWidth := 100
 	width := m.shared.Width - m.shared.Styles.App.GetHorizontalFrameSize()
-	if width < maxWidth {
-		maxWidth = width
-	}
+	maxWidth := width
 	str := wrap.String(
 		wordwrap.String(s, maxWidth),
 		maxWidth,

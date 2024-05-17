@@ -11,7 +11,7 @@ import (
 	"github.com/picosh/pico/tui/pages"
 )
 
-func NotificationsView(dbpool db.DB, userID string) string {
+func NotificationsView(dbpool db.DB, userID string, w int) string {
 	pass, err := dbpool.UpsertToken(userID, "pico-rss")
 	if err != nil {
 		return err.Error()
@@ -42,6 +42,7 @@ Create a feeds file (e.g. pico.txt):`, url)
 	r, _ := glamour.NewTermRenderer(
 		// detect background color and pick either the default dark or light theme
 		glamour.WithAutoStyle(),
+		glamour.WithWordWrap(w-20),
 	)
 	out, err := r.Render(md)
 	if err != nil {
@@ -70,10 +71,11 @@ func headerWidth(w int) int {
 
 func NewModel(shared common.SharedModel) Model {
 	hh := headerHeight(shared)
-	viewport := viewport.New(headerWidth(shared.Width), shared.Height-hh)
+	ww := headerWidth(shared.Width)
+	viewport := viewport.New(ww, shared.Height-hh)
 	viewport.YPosition = hh
 	if shared.User != nil {
-		viewport.SetContent(NotificationsView(shared.Dbpool, shared.User.ID))
+		viewport.SetContent(NotificationsView(shared.Dbpool, shared.User.ID, ww))
 	}
 
 	return Model{

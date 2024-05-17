@@ -52,12 +52,12 @@ func (c *Cmd) help() {
 }
 
 func (c *Cmd) plus() {
-	view := plus.PlusView(c.User.Name)
+	view := plus.PlusView(c.User.Name, 80)
 	c.output(view)
 }
 
 func (c *Cmd) notifications() error {
-	md := notifications.NotificationsView(c.Dbpool, c.User.ID)
+	md := notifications.NotificationsView(c.Dbpool, c.User.ID, 80)
 	c.output(md)
 	return nil
 }
