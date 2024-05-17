@@ -283,7 +283,7 @@ func FetchTokens(shrd common.SharedModel) tea.Cmd {
 }
 
 // unlinkKey deletes the selected key.
-func (m Model) unlinkKey() tea.Cmd {
+func (m *Model) unlinkKey() tea.Cmd {
 	return func() tea.Msg {
 		id := m.tokens[m.getSelectedIndex()].ID
 		err := m.shared.Dbpool.RemoveToken(id)

@@ -222,7 +222,7 @@ func (m Model) spinnerView() string {
 	return "Creating account..."
 }
 
-func (m Model) createAccount() tea.Cmd {
+func (m *Model) createAccount() tea.Cmd {
 	return func() tea.Msg {
 		if m.newName == "" {
 			return NameInvalidMsg{}

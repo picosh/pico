@@ -231,7 +231,7 @@ func (m Model) spinnerView() string {
 	return "Submitting..."
 }
 
-func (m Model) addPublicKey() tea.Cmd {
+func (m *Model) addPublicKey() tea.Cmd {
 	return func() tea.Msg {
 		pk, comment, _, _, err := ssh.ParseAuthorizedKey([]byte(m.newKey))
 		if err != nil {

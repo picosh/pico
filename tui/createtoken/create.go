@@ -215,7 +215,7 @@ func (m Model) View() string {
 	return s
 }
 
-func (m Model) addToken() tea.Cmd {
+func (m *Model) addToken() tea.Cmd {
 	return func() tea.Msg {
 		token, err := m.shared.Dbpool.InsertToken(m.shared.User.ID, m.tokenName)
 		if err != nil {
