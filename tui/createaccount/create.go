@@ -199,11 +199,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // View renders current view from the model.
 func (m Model) View() string {
-	intro := "To create an account, enter a username.\n\n"
-	intro += "After that, go to https://pico.sh/getting-started#next-steps"
-	s := fmt.Sprintf("%s\n\n%s\n\n", "hacker labs", intro)
-	s += fmt.Sprintf("Public Key: %s\n\n", shared.KeyForSha256(m.shared.Session.PublicKey()))
-	s += m.input.View() + "\n\n"
+	s := common.LogoView() + "\n\n"
+	pubkey := fmt.Sprintf("pubkey: %s", shared.KeyForSha256(m.shared.Session.PublicKey()))
+	s += m.shared.Styles.Label.SetString(pubkey).String()
+	s += "\n\n" + m.input.View() + "\n\n"
 
 	if m.state == submitting {
 		s += m.spinnerView()
@@ -214,7 +213,7 @@ func (m Model) View() string {
 			s += "\n\n" + m.errMsg
 		}
 	}
-	s += fmt.Sprintf("\n\n%s\n", helpMsg)
+	s += fmt.Sprintf("\n\n%s\n", m.shared.Styles.HelpSection.SetString(helpMsg))
 
 	return s
 }
