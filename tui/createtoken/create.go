@@ -52,6 +52,7 @@ func NewModel(shared common.SharedModel) Model {
 	im := input.New()
 	im.Cursor.Style = shared.Styles.Cursor
 	im.Placeholder = "A name used for your reference"
+	im.PlaceholderStyle = shared.Styles.InputPlaceholder
 	im.Prompt = shared.Styles.FocusedPrompt.String()
 	im.CharLimit = 256
 	im.Focus()

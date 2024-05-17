@@ -84,6 +84,7 @@ func (m *Model) indexBackward() {
 // NewModel returns a new username model in its initial state.
 func NewModel(shared common.SharedModel) Model {
 	im := input.New()
+	im.PlaceholderStyle = shared.Styles.InputPlaceholder
 	im.Cursor.Style = shared.Styles.Cursor
 	im.Placeholder = "ssh-ed25519 AAAA..."
 	im.Prompt = shared.Styles.FocusedPrompt.String()

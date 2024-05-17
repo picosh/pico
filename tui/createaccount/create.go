@@ -59,6 +59,7 @@ func NewModel(shared common.SharedModel) Model {
 	im := input.New()
 	im.Cursor.Style = shared.Styles.Cursor
 	im.Placeholder = "enter username"
+	im.PlaceholderStyle = shared.Styles.InputPlaceholder
 	im.Prompt = shared.Styles.FocusedPrompt.String()
 	im.CharLimit = 50
 	im.Focus()

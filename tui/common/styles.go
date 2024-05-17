@@ -39,6 +39,7 @@ type Styles struct {
 	HelpSection,
 	HelpDivider,
 	App,
+	InputPlaceholder,
 	RoundedBorder lipgloss.Style
 	Renderer *lipgloss.Renderer
 }
@@ -64,6 +65,7 @@ func DefaultStyles(renderer *lipgloss.Renderer) Styles {
 	s.Error = renderer.NewStyle().Foreground(Red)
 	s.Prompt = renderer.NewStyle().MarginRight(1).SetString(">")
 	s.FocusedPrompt = s.Prompt.Copy().Foreground(Fuschia)
+	s.InputPlaceholder = renderer.NewStyle().Foreground(Grey)
 	s.Note = renderer.NewStyle().Foreground(Green)
 	s.Delete = s.Error.Copy()
 	s.Label = renderer.NewStyle().Foreground(Fuschia)
