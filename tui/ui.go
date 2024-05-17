@@ -83,6 +83,19 @@ func (m *UI) Init() tea.Cmd {
 	return nil
 }
 
+func (m *UI) updateModels(msg tea.Msg) tea.Cmd {
+	cmds := []tea.Cmd{}
+	for i, page := range m.pages {
+		if page == nil {
+			continue
+		}
+		nm, cmd := page.Update(msg)
+		m.pages[i] = nm
+		cmds = append(cmds, cmd)
+	}
+	return tea.Batch(cmds...)
+}
+
 func (m *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
@@ -90,6 +103,7 @@ func (m *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.shared.Width = msg.Width
 		m.shared.Height = msg.Height
+		return m, m.updateModels(msg)
 
 	case tea.KeyMsg:
 		switch msg.Type {
@@ -166,19 +180,3 @@ func (m *UI) View() string {
 	)
 	return m.shared.Styles.App.Render(str)
 }
-
-/*
-TODO: I dont think we need this but keeping for a bit
-func (m *UI) updateModels(msg tea.Msg) tea.Cmd {
-	cmds := []tea.Cmd{}
-	for i, page := range m.pages {
-		if page == nil {
-			continue
-		}
-		nm, cmd := page.Update(msg)
-		m.pages[i] = nm
-		cmds = append(cmds, cmd)
-	}
-	return tea.Batch(cmds...)
-}
-*/
