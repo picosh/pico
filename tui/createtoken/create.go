@@ -180,6 +180,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		return m, nil
 
+	// leaving page so reset model
+	case pages.NavigateMsg:
+		next := NewModel(m.shared)
+		return next, next.Init()
+
 	default:
 		var cmd tea.Cmd
 		m.input, cmd = m.input.Update(msg) // Do we still need this?

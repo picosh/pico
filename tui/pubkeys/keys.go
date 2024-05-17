@@ -1,11 +1,10 @@
-package keys
+package pubkeys
 
 import (
 	pager "github.com/charmbracelet/bubbles/paginator"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/tui/common"
-	"github.com/picosh/pico/tui/createkey"
 	"github.com/picosh/pico/tui/pages"
 )
 
@@ -54,24 +53,6 @@ type Model struct {
 	pager pager.Model
 }
 
-// getSelectedIndex returns the index of the cursor in relation to the total
-// number of items.
-func (m *Model) getSelectedIndex() int {
-	return m.index + m.pager.Page*m.pager.PerPage
-}
-
-// UpdatePaging runs an update against the underlying pagination model as well
-// as performing some related tasks on this model.
-func (m *Model) UpdatePaging(msg tea.Msg) {
-	// Handle paging
-	m.pager.SetTotalPages(len(m.keys))
-	m.pager, _ = m.pager.Update(msg)
-
-	// If selected item is out of bounds, put it in bounds
-	numItems := m.pager.ItemsOnPage(len(m.keys))
-	m.index = min(m.index, numItems-1)
-}
-
 // NewModel creates a new model with defaults.
 func NewModel(shared common.SharedModel) Model {
 	p := pager.New()
@@ -89,6 +70,24 @@ func NewModel(shared common.SharedModel) Model {
 		keys:           []*db.PublicKey{},
 		index:          0,
 	}
+}
+
+// getSelectedIndex returns the index of the cursor in relation to the total
+// number of items.
+func (m *Model) getSelectedIndex() int {
+	return m.index + m.pager.Page*m.pager.PerPage
+}
+
+// UpdatePaging runs an update against the underlying pagination model as well
+// as performing some related tasks on this model.
+func (m *Model) UpdatePaging(msg tea.Msg) {
+	// Handle paging
+	m.pager.SetTotalPages(len(m.keys))
+	m.pager, _ = m.pager.Update(msg)
+
+	// If selected item is out of bounds, put it in bounds
+	numItems := m.pager.ItemsOnPage(len(m.keys))
+	m.index = min(m.index, numItems-1)
 }
 
 // Init is the Tea initialization function.
@@ -196,9 +195,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		return m, nil
 
-	case createkey.KeySetMsg:
-		m.state = stateNormal
-		return m, FetchKeys(m.shared)
+	// leaving page so reset model
+	case pages.NavigateMsg:
+		next := NewModel(m.shared)
+		return next, next.Init()
 	}
 
 	switch m.state {
@@ -253,7 +253,7 @@ func (m Model) View() string {
 	return s
 }
 
-func (m Model) keysView() string {
+func (m *Model) keysView() string {
 	var (
 		s          string
 		state      keyState
@@ -289,7 +289,7 @@ func (m Model) keysView() string {
 	return s
 }
 
-func (m Model) helpView() string {
+func (m *Model) helpView() string {
 	var items []string
 	if len(m.keys) > 1 {
 		items = append(items, "j/k, ↑/↓: choose")
@@ -301,7 +301,7 @@ func (m Model) helpView() string {
 	return common.HelpView(m.shared.Styles, items...)
 }
 
-func (m Model) promptView(prompt string) string {
+func (m *Model) promptView(prompt string) string {
 	st := m.shared.Styles.Delete.Copy().MarginTop(2).MarginRight(1)
 	return st.Render(prompt) +
 		m.shared.Styles.Delete.Render("(y/N)")
@@ -319,7 +319,7 @@ func FetchKeys(shrd common.SharedModel) tea.Cmd {
 }
 
 // unlinkKey deletes the selected key.
-func (m Model) unlinkKey() tea.Cmd {
+func (m *Model) unlinkKey() tea.Cmd {
 	return func() tea.Msg {
 		id := m.keys[m.getSelectedIndex()].ID
 		err := m.shared.Dbpool.RemoveKeys([]string{id})
@@ -330,7 +330,7 @@ func (m Model) unlinkKey() tea.Cmd {
 	}
 }
 
-func (m Model) deleteAccount() tea.Cmd {
+func (m *Model) deleteAccount() tea.Cmd {
 	return func() tea.Msg {
 		id := m.keys[m.getSelectedIndex()].UserID
 		m.shared.Logger.Info("user requested account deletion", "user", m.shared.User.Name, "id", id)

@@ -1,4 +1,4 @@
-package account
+package createaccount
 
 import (
 	"errors"
@@ -175,9 +175,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case NameInvalidMsg:
 		m.state = ready
-		head := m.shared.Styles.Error.Render("Invalid name. ")
-		body := m.shared.Styles.Subtle.Render(helpMsg)
-		m.errMsg = m.shared.Styles.Wrap.Render(head + body)
+		head := m.shared.Styles.Error.Render("Invalid name.")
+		m.errMsg = m.shared.Styles.Wrap.Render(head)
 
 		return m, nil
 

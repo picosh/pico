@@ -34,6 +34,7 @@ func CmsMiddleware(cfg *shared.ConfigSite) bm.Handler {
 			Styles:  styles,
 			Width:   80,
 			Height:  24,
+			Logger:  logger,
 		}
 
 		m := NewUI(shrd)

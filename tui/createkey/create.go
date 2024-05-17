@@ -167,6 +167,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
+	case KeySetMsg:
+		return m, pages.Navigate(pages.PubkeysPage)
+
 	case KeyInvalidMsg:
 		m.state = ready
 		head := m.shared.Styles.Error.Render("Invalid public key. ")
@@ -192,6 +195,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.errMsg = m.shared.Styles.Wrap.Render(head + body)
 
 		return m, nil
+
+	// leaving page so reset model
+	case pages.NavigateMsg:
+		next := NewModel(m.shared)
+		return next, next.Init()
 
 	default:
 		var cmd tea.Cmd

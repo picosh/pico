@@ -4,15 +4,15 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/muesli/reflow/wordwrap"
 	"github.com/muesli/reflow/wrap"
-	"github.com/picosh/pico/tui/account"
 	"github.com/picosh/pico/tui/common"
+	"github.com/picosh/pico/tui/createaccount"
 	"github.com/picosh/pico/tui/createkey"
 	"github.com/picosh/pico/tui/createtoken"
-	"github.com/picosh/pico/tui/keys"
 	"github.com/picosh/pico/tui/menu"
 	"github.com/picosh/pico/tui/notifications"
 	"github.com/picosh/pico/tui/pages"
 	"github.com/picosh/pico/tui/plus"
+	"github.com/picosh/pico/tui/pubkeys"
 	"github.com/picosh/pico/tui/tokens"
 )
 
@@ -41,13 +41,29 @@ func NewUI(shared common.SharedModel) *UI {
 	return m
 }
 
+func (m *UI) updateActivePage(msg tea.Msg) tea.Cmd {
+	nm, cmd := m.pages[m.activePage].Update(msg)
+	m.pages[m.activePage] = nm
+	return cmd
+}
+
+func (m *UI) updateModels(msg tea.Msg) tea.Cmd {
+	cmds := []tea.Cmd{}
+	for i, page := range m.pages {
+		nm, cmd := page.Update(msg)
+		m.pages[i] = nm
+		cmds = append(cmds, cmd)
+	}
+	return tea.Batch(cmds...)
+}
+
 func (m *UI) Init() tea.Cmd {
 	m.pages[pages.MenuPage] = menu.NewModel(m.shared)
-	m.pages[pages.CreateAccountPage] = account.NewModel(m.shared)
+	m.pages[pages.CreateAccountPage] = createaccount.NewModel(m.shared)
 	m.pages[pages.CreatePubkeyPage] = createkey.NewModel(m.shared)
 	m.pages[pages.CreateTokenPage] = createtoken.NewModel(m.shared)
-	m.pages[pages.CreateAccountPage] = account.NewModel(m.shared)
-	m.pages[pages.PubkeysPage] = keys.NewModel(m.shared)
+	m.pages[pages.CreateAccountPage] = createaccount.NewModel(m.shared)
+	m.pages[pages.PubkeysPage] = pubkeys.NewModel(m.shared)
 	m.pages[pages.TokensPage] = tokens.NewModel(m.shared)
 	m.pages[pages.NotificationsPage] = notifications.NewModel(m.shared)
 	m.pages[pages.PlusPage] = plus.NewModel(m.shared)
@@ -84,13 +100,11 @@ func (m *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.activePage = msg.Page
 
 	// user created account
-	case account.CreateAccountMsg:
+	case createaccount.CreateAccountMsg:
 		m.state = readyState
 		m.shared.User = msg
-		cmds = append(
-			cmds,
-			m.Init(),
-		)
+		// reset all models
+		cmds = append(cmds, m.Init())
 
 	case menu.MenuChoiceMsg:
 		switch msg.MenuChoice {
@@ -116,22 +130,6 @@ func (m *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	cmds = append(cmds, cmd)
 
 	return m, tea.Batch(cmds...)
-}
-
-func (m *UI) updateActivePage(msg tea.Msg) tea.Cmd {
-	nm, cmd := m.pages[m.activePage].Update(msg)
-	m.pages[m.activePage] = nm
-	return cmd
-}
-
-func (m *UI) updateModels(msg tea.Msg) tea.Cmd {
-	cmds := []tea.Cmd{}
-	for i, page := range m.pages {
-		nm, cmd := page.Update(msg)
-		m.pages[i] = nm
-		cmds = append(cmds, cmd)
-	}
-	return tea.Batch(cmds...)
 }
 
 func (m *UI) View() string {
