@@ -154,10 +154,16 @@ func (m *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *UI) header() string {
+	logoTxt := "pico.sh"
+	ff := m.shared.PlusFeatureFlag
+	if ff != nil && ff.IsValid() {
+		logoTxt = "pico+"
+	}
+
 	logo := m.shared.
 		Styles.
 		Logo.
-		SetString("pico.sh")
+		SetString(logoTxt)
 	title := m.shared.
 		Styles.
 		Note.

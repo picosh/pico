@@ -129,7 +129,7 @@ func (m Model) featuresView() string {
 		row := []string{
 			feature.Name,
 			fmt.Sprintf("%.2f", storeMax),
-			feature.ExpiresAt.Format("2006-01-02"),
+			feature.ExpiresAt.Format(common.DateFormat),
 		}
 		data = append(data, row)
 	}

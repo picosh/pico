@@ -18,7 +18,7 @@ type styledKey struct {
 }
 
 func newStyledKey(styles common.Styles, token *db.Token, active bool) styledKey {
-	date := token.CreatedAt.Format("02 Jan 2006")
+	date := token.CreatedAt.Format(common.DateFormat)
 
 	// Default state
 	return styledKey{

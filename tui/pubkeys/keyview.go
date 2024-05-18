@@ -85,7 +85,7 @@ type styledKey struct {
 }
 
 func (m Model) newStyledKey(styles common.Styles, key *db.PublicKey, active bool) styledKey {
-	date := key.CreatedAt.Format("02 Jan 2006")
+	date := key.CreatedAt.Format(common.DateFormat)
 	fp, err := FingerprintSHA256(styles, key)
 	if err != nil {
 		fp = Fingerprint{Value: "[error generating fingerprint]"}

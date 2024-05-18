@@ -112,21 +112,18 @@ func (m Model) bioView() string {
 		username = m.shared.Styles.Subtle.Render("(none set)")
 	}
 
-	plus := "No"
 	expires := ""
 	if m.shared.PlusFeatureFlag != nil {
-		plus = "Yes"
-		expires = m.shared.PlusFeatureFlag.ExpiresAt.Format("02 Jan 2006")
+		expires = m.shared.PlusFeatureFlag.ExpiresAt.Format(common.DateFormat)
 	}
 
 	vals := []string{
 		"Username", username,
-		"Joined", m.shared.User.CreatedAt.Format("02 Jan 2006"),
-		"Pico+", plus,
+		"Joined", m.shared.User.CreatedAt.Format(common.DateFormat),
 	}
 
 	if expires != "" {
-		vals = append(vals, "Pico+ Expires At", expires)
+		vals = append(vals, "Pico+ Expires", expires)
 	}
 
 	return common.KeyValueView(m.shared.Styles, vals...)
