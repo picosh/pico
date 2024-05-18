@@ -13,6 +13,8 @@ import (
 	"github.com/picosh/pico/tui/pages"
 )
 
+var maxWidth = 50
+
 type state int
 
 const (
@@ -91,15 +93,11 @@ func (m Model) findAnalyticsFeature() *db.FeatureFlag {
 }
 
 func (m Model) analyticsView() string {
-	banner := `Get usage statistics on your blog, blog posts, and
-pages sites. For example, see unique visitors, most popular URLs,
-and top referers.
+	banner := `Get usage statistics on your blog, blog posts, and pages sites. For example, see unique visitors, most popular URLs, and top referers.
 
-We do not collect usage statistic unless analytics is enabled.
-Further, when analytics are disabled we do not purge usage statistics.
+We do not collect usage statistic unless analytics is enabled. Further, when analytics are disabled we do not purge usage statistics.
 
-We will only store usage statistics for 1 year from when the event
-was created.`
+We will only store usage statistics for 1 year from when the event was created.`
 
 	str := ""
 	hasPlus := m.shared.PlusFeatureFlag != nil
@@ -115,7 +113,7 @@ was created.`
 		str += banner + "\n\n" + m.shared.Styles.Error.SetString("Analytics is only available to pico+ users.").String()
 	}
 
-	return m.shared.Styles.RoundedBorder.SetString(str).String()
+	return m.shared.Styles.RoundedBorder.Copy().Width(maxWidth).SetString(str).String()
 }
 
 func (m Model) featuresView() string {
@@ -138,7 +136,7 @@ func (m Model) featuresView() string {
 	t := table.New().
 		Border(lipgloss.RoundedBorder()).
 		BorderStyle(m.shared.Styles.Renderer.NewStyle().BorderForeground(common.Indigo)).
-		Width(m.shared.Width).
+		Width(maxWidth).
 		Headers(headers...).
 		Rows(data...)
 	return "Features\n" + t.String()
