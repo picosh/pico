@@ -186,6 +186,8 @@ const (
 	WHERE hidden = FALSE AND publish_at::date <= CURRENT_DATE AND cur_space = $3
 	ORDER BY updated_at DESC
 	LIMIT $1 OFFSET $2`
+	// add some users to deny list since they are robogenerating a bunch of posts
+	// per day and are creating a lot of noise
 	sqlSelectPostsByRank = `
 	SELECT
 		posts.id,
@@ -204,7 +206,8 @@ const (
 	WHERE
 		hidden = FALSE AND
 		publish_at::date <= CURRENT_DATE AND
-		cur_space = $3
+		cur_space = $3 AND
+		app_users.name NOT IN ('algiegray', 'mrrccc')
 	ORDER BY publish_at DESC
 	LIMIT $1 OFFSET $2`
 
