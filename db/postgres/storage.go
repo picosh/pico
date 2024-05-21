@@ -187,7 +187,7 @@ const (
 	ORDER BY updated_at DESC
 	LIMIT $1 OFFSET $2`
 	// add some users to deny list since they are robogenerating a bunch of posts
-	// per day and are creating a lot of noise
+	// per day and are creating a lot of noise.
 	sqlSelectPostsByRank = `
 	SELECT
 		posts.id,
