@@ -55,10 +55,12 @@ func AuthHandler(dbh db.DB, log *slog.Logger) func(ssh.Context, ssh.PublicKey) b
 			return false
 		}
 
-		if user != nil {
-			setUserCtx(ctx, user)
-			return true
+		if user == nil {
+			log.Error("user not found", "err", err)
+			return false
 		}
+
+		setUserCtx(ctx, user)
 
 		if !dbh.HasFeatureForUser(user.ID, "plus") {
 			log.Error("not a pico+ user", "user", user.Name)
