@@ -33,7 +33,7 @@
 		# keep referrer data off of HTTP connections
 		Referrer-Policy no-referrer-when-downgrade
 
-		?Content-Security-Policy "default-src 'self'; img-src * 'unsafe-inline'; style-src * 'unsafe-inline'"
+		Content-Security-Policy "default-src 'self'; img-src * 'unsafe-inline'; style-src * 'unsafe-inline'"
 
 		X-XSS-Protection "1; mode=block"
 	}
