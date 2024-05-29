@@ -214,7 +214,7 @@ func (h *UploadImgHandler) Delete(s ssh.Session, entry *utils.FileEntry) error {
 
 	err = h.DBPool.RemovePosts([]string{post.ID})
 	if err != nil {
-		logger.Error("error removing image", err)
+		logger.Error("error removing image", "error", err)
 		return fmt.Errorf("error for %s: %v", filename, err)
 	}
 
