@@ -3,7 +3,6 @@ package imgs
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -43,11 +42,11 @@ func setUserCtx(ctx ssh.Context, user *db.User) {
 
 func AuthHandler(dbh db.DB, log *slog.Logger) func(ssh.Context, ssh.PublicKey) bool {
 	return func(ctx ssh.Context, key ssh.PublicKey) bool {
-		kb := base64.StdEncoding.EncodeToString(key.Marshal())
-		if kb == "" {
+		kk, err := shared.KeyForKeyText(key)
+		if err != nil {
+			log.Error("cannot get pubkey", "err", err)
 			return false
 		}
-		kk := fmt.Sprintf("%s %s", key.Type(), kb)
 
 		user, err := dbh.FindUserForKey("", kk)
 		if err != nil {
@@ -67,7 +66,7 @@ func AuthHandler(dbh db.DB, log *slog.Logger) func(ssh.Context, ssh.PublicKey) b
 			return false
 		}
 
-		return false
+		return true
 	}
 }
 
@@ -80,7 +79,7 @@ func (e *ErrorHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, e.Err.Error(), http.StatusInternalServerError)
 }
 
-func createServeMux(handler *CliHandler) func(ctx ssh.Context) http.Handler {
+func createServeMux(handler *CliHandler, pubsub *ptun.PubSubHandler) func(ctx ssh.Context) http.Handler {
 	return func(ctx ssh.Context) http.Handler {
 		router := http.NewServeMux()
 
@@ -88,6 +87,12 @@ func createServeMux(handler *CliHandler) func(ctx ssh.Context) http.Handler {
 		user, err := getUserCtx(ctx)
 		if err == nil && user != nil {
 			slug = user.Name
+		}
+
+		pubkeys, err := handler.DBPool.FindKeysForUser(user)
+		if err != nil {
+			handler.Logger.Error("cant get pubkeys for user", "err", err)
+			return router
 		}
 
 		proxy := httputil.NewSingleHostReverseProxy(&url.URL{
@@ -216,6 +221,39 @@ func createServeMux(handler *CliHandler) func(ctx ssh.Context) http.Handler {
 				}
 			}
 
+			if r.Request.Method == http.MethodPut && strings.Contains(r.Request.URL.Path, "/manifests/") {
+				digest := r.Header.Get("Docker-Content-Digest")
+				forwards := pubsub.GetForwards()
+				for _, rf := range forwards {
+					ck, err := shared.KeyForKeyText(rf.Pubkey)
+					if err != nil {
+						continue
+					}
+					found := false
+					for _, pk := range pubkeys {
+						if pk.Key == ck {
+							found = true
+						}
+					}
+					// event corresponds to a different user, skip
+					if !found {
+						continue
+					}
+
+					addr := rf.Listener.Addr()
+					furl := fmt.Sprintf(
+						"http://%s?path=%s&digest=%s",
+						addr.String(),
+						url.QueryEscape(r.Request.URL.Path),
+						url.QueryEscape(digest),
+					)
+					_, err = http.Get(furl)
+					if err != nil {
+						log.Println(err)
+					}
+				}
+			}
+
 			locationHeader := r.Header.Get("location")
 			if strings.Contains(locationHeader, fmt.Sprintf("/v2/%s", slug)) {
 				r.Header.Set("location", strings.ReplaceAll(locationHeader, fmt.Sprintf("/v2/%s", slug), "/v2"))
@@ -240,12 +278,13 @@ func StartSshServer() {
 		port = "2222"
 	}
 	dbUrl := os.Getenv("DATABASE_URL")
-	registryUrl := shared.GetEnv("REGISTRY_URL", "registry:5000")
-	minioUrl := shared.GetEnv("MINIO_URL", "")
+	registryUrl := shared.GetEnv("REGISTRY_URL", "0.0.0.0:5000")
+	minioUrl := shared.GetEnv("MINIO_URL", "http://0.0.0.0:9000")
 	minioUser := shared.GetEnv("MINIO_ROOT_USER", "")
 	minioPass := shared.GetEnv("MINIO_ROOT_PASSWORD", "")
 
-	logger := slog.Default()
+	logger := shared.CreateLogger(false)
+	logger.Info("bootup", "registry", registryUrl, "minio", minioUrl)
 	dbh := postgres.NewDB(dbUrl, logger)
 	st, err := storage.NewStorageMinio(minioUrl, minioUser, minioPass)
 	if err != nil {
@@ -259,13 +298,14 @@ func StartSshServer() {
 		RegistryUrl: registryUrl,
 	}
 
+	pubsub := ptun.NewPubSubHandler(logger)
 	s, err := wish.NewServer(
 		wish.WithAddress(fmt.Sprintf("%s:%s", host, port)),
 		wish.WithHostKeyPath("ssh_data/term_info_ed25519"),
 		wish.WithPublicKeyAuth(AuthHandler(dbh, logger)),
 		wish.WithMiddleware(WishMiddleware(handler)),
 		ptun.WithWebTunnel(
-			ptun.NewWebTunnelHandler(createServeMux(handler), logger),
+			ptun.NewWebTunnelHandler(createServeMux(handler, pubsub), logger),
 		),
 	)
 

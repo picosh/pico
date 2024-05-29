@@ -27,7 +27,7 @@ require (
 	github.com/muesli/reflow v0.3.0
 	github.com/neurosnap/go-exif-remove v0.0.0-20221010134343-50d1e3c35577
 	github.com/picosh/pobj v0.0.0-20240417140600-2071618b61c5
-	github.com/picosh/ptun v0.0.0-20240417140706-811cc2b70d9a
+	github.com/picosh/ptun v0.0.0-20240529032512-d89a21c7dd3d
 	github.com/picosh/send v0.0.0-20240217194807-77b972121e63
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06
 	github.com/sendgrid/sendgrid-go v3.14.0+incompatible
