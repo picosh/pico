@@ -307,6 +307,7 @@ func StartSshServer() {
 		ptun.WithWebTunnel(
 			ptun.NewWebTunnelHandler(createServeMux(handler, pubsub), logger),
 		),
+		ptun.WithPubSub(pubsub),
 	)
 
 	if err != nil {
