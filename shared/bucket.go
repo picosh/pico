@@ -18,6 +18,10 @@ func GetAssetBucketName(userID string) string {
 }
 
 func GetProjectName(entry *utils.FileEntry) string {
+	if entry.Mode.IsDir() && strings.Count(entry.Filepath, string(os.PathSeparator)) == 0 {
+		return entry.Filepath
+	}
+
 	dir := filepath.Dir(entry.Filepath)
 	list := strings.Split(dir, string(os.PathSeparator))
 	return list[1]

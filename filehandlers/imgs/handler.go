@@ -47,23 +47,6 @@ func NewUploadImgHandler(dbpool db.DB, cfg *shared.ConfigSite, storage storage.S
 	}
 }
 
-func (h *UploadImgHandler) removePost(data *PostMetaData) error {
-	// skip empty files from being added to db
-	if data.Post == nil {
-		h.Cfg.Logger.Info("file is empty, skipping record", "filename", data.Filename)
-		return nil
-	}
-
-	h.Cfg.Logger.Info("file is empty, removing record", "filename", data.Filename, "recordId", data.Cur.ID)
-	err := h.DBPool.RemovePosts([]string{data.Cur.ID})
-	if err != nil {
-		h.Cfg.Logger.Error(err.Error(), "filename", data.Filename)
-		return fmt.Errorf("error for %s: %v", data.Filename, err)
-	}
-
-	return nil
-}
-
 func (h *UploadImgHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileInfo, utils.ReaderAtCloser, error) {
 	user, err := util.GetUser(s)
 	if err != nil {
@@ -204,4 +187,48 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		(float32(totalFileSize)/float32(maxSize))*100,
 	)
 	return str, nil
+}
+
+func (h *UploadImgHandler) Delete(s ssh.Session, entry *utils.FileEntry) error {
+	user, err := util.GetUser(s)
+	if err != nil {
+		return err
+	}
+
+	filename := filepath.Base(entry.Filepath)
+
+	logger := h.Cfg.Logger.With(
+		"user", user.Name,
+		"filename", filename,
+	)
+
+	post, err := h.DBPool.FindPostWithFilename(
+		filename,
+		user.ID,
+		Space,
+	)
+	if err != nil {
+		logger.Info("unable to find image, continuing", "err", err.Error())
+		return err
+	}
+
+	err = h.DBPool.RemovePosts([]string{post.ID})
+	if err != nil {
+		logger.Error("error removing image", err)
+		return fmt.Errorf("error for %s: %v", filename, err)
+	}
+
+	bucket, err := h.Storage.UpsertBucket(user.ID)
+	if err != nil {
+		return err
+	}
+
+	err = h.Storage.DeleteObject(bucket, filename)
+	if err != nil {
+		return err
+	}
+
+	logger.Info("deleting image")
+
+	return nil
 }

@@ -1,8 +1,13 @@
 module github.com/picosh/pico
 
-go 1.21.9
+go 1.22
 
-// replace github.com/picosh/ptun => /home/erock/dev/pico/ptun
+// replace github.com/picosh/ptun => ../ptun
+
+// replace github.com/picosh/send => ../send
+
+// replace github.com/picosh/pobj => ../pobj
+
 replace git.sr.ht/~delthas/senpai => github.com/picosh/senpai v0.0.0-20240503200611-af89e73973b0
 
 replace github.com/gdamore/tcell/v2 => github.com/delthas/tcell/v2 v2.4.1-0.20230710100648-1489e78d90fb
@@ -26,9 +31,9 @@ require (
 	github.com/mmcdole/gofeed v1.3.0
 	github.com/muesli/reflow v0.3.0
 	github.com/neurosnap/go-exif-remove v0.0.0-20221010134343-50d1e3c35577
-	github.com/picosh/pobj v0.0.0-20240417140600-2071618b61c5
-	github.com/picosh/ptun v0.0.0-20240417140706-811cc2b70d9a
-	github.com/picosh/send v0.0.0-20240217194807-77b972121e63
+	github.com/picosh/pobj v0.0.0-20240529200402-7b5398cf8a9f
+	github.com/picosh/ptun v0.0.0-20240529133708-fcf1376b935e
+	github.com/picosh/send v0.0.0-20240529200640-3667d1ad154e
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06
 	github.com/sendgrid/sendgrid-go v3.14.0+incompatible
 	github.com/simplesurance/go-ip-anonymizer v0.0.0-20200429124537-35a880f8e87d

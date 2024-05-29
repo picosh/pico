@@ -5,9 +5,12 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"io/fs"
 	"log/slog"
 	"os"
+	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -277,19 +280,15 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 		h.Cfg.Logger.Error("user not found in ctx", "err", err.Error())
 		return "", err
 	}
+
+	if entry.Mode.IsDir() && strings.Count(entry.Filepath, "/") == 1 {
+		entry.Filepath = strings.TrimPrefix(entry.Filepath, "/")
+	}
+
 	logger := h.GetLogger().With(
 		"user", user.Name,
 		"file", entry.Filepath,
 	)
-
-	var origText []byte
-	if b, err := io.ReadAll(entry.Reader); err == nil {
-		origText = b
-	}
-	fileSize := binary.Size(origText)
-	// TODO: hack for now until I figure out how to get correct
-	// filesize from sftp,scp,rsync
-	entry.Size = int64(fileSize)
 
 	bucket, err := getBucket(s)
 	if err != nil {
@@ -325,11 +324,31 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 		setProject(s, project)
 	}
 
+	if entry.Mode.IsDir() {
+		_, err := h.Storage.PutObject(
+			bucket,
+			path.Join(shared.GetAssetFileName(entry), "._pico_keep_dir"),
+			utils.NopReaderAtCloser(bytes.NewReader([]byte{})),
+			entry,
+		)
+		return "", err
+	}
+
+	var origText []byte
+	if b, err := io.ReadAll(entry.Reader); err == nil {
+		origText = b
+	}
+	fileSize := binary.Size(origText)
+	// TODO: hack for now until I figure out how to get correct
+	// filesize from sftp,scp,rsync
+	entry.Size = int64(fileSize)
+
 	storageSize := getStorageSize(s)
 	featureFlag, err := futil.GetFeatureFlag(s)
 	if err != nil {
 		return "", err
 	}
+
 	// calculate the filsize difference between the same file already
 	// stored and the updated file being uploaded
 	assetFilename := shared.GetAssetFileName(entry)
@@ -387,6 +406,66 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 	)
 
 	return str, nil
+}
+
+func (h *UploadAssetHandler) Delete(s ssh.Session, entry *utils.FileEntry) error {
+	user, err := futil.GetUser(s)
+	if err != nil {
+		h.Cfg.Logger.Error("user not found in ctx", "err", err.Error())
+		return err
+	}
+
+	if entry.Mode.IsDir() && strings.Count(entry.Filepath, "/") == 1 {
+		entry.Filepath = strings.TrimPrefix(entry.Filepath, "/")
+	}
+
+	assetFilepath := shared.GetAssetFileName(entry)
+
+	logger := h.GetLogger().With(
+		"user", user.Name,
+		"file", assetFilepath,
+	)
+
+	bucket, err := getBucket(s)
+	if err != nil {
+		logger.Error("could not find bucket in ctx", "err", err.Error())
+		return err
+	}
+
+	projectName := shared.GetProjectName(entry)
+	logger = logger.With("project", projectName)
+
+	if assetFilepath == filepath.Join("/", projectName, "._pico_keep_dir") {
+		return os.ErrPermission
+	}
+
+	logger.Info("deleting file")
+
+	pathDir := filepath.Dir(assetFilepath)
+	fileName := filepath.Base(assetFilepath)
+
+	sibs, err := h.Storage.ListObjects(bucket, pathDir+"/", false)
+	if err != nil {
+		return err
+	}
+
+	sibs = slices.DeleteFunc(sibs, func(sib fs.FileInfo) bool {
+		return sib.Name() == fileName
+	})
+
+	if len(sibs) == 0 {
+		_, err := h.Storage.PutObject(
+			bucket,
+			filepath.Join(pathDir, "._pico_keep_dir"),
+			utils.NopReaderAtCloser(bytes.NewReader([]byte{})),
+			entry,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	return h.Storage.DeleteObject(bucket, assetFilepath)
 }
 
 func (h *UploadAssetHandler) validateAsset(data *FileData) (bool, error) {
@@ -447,30 +526,23 @@ func (h *UploadAssetHandler) validateAsset(data *FileData) (bool, error) {
 func (h *UploadAssetHandler) writeAsset(data *FileData) error {
 	assetFilepath := shared.GetAssetFileName(data.FileEntry)
 
-	if data.Size == 0 {
-		err := h.Storage.DeleteObject(data.Bucket, assetFilepath)
-		if err != nil {
-			return err
-		}
-	} else {
-		reader := bytes.NewReader(data.Text)
+	reader := bytes.NewReader(data.Text)
 
-		h.Cfg.Logger.Info(
-			"uploading file to bucket",
-			"user", data.User.Name,
-			"bucket", data.Bucket.Name,
-			"filename", assetFilepath,
-		)
+	h.Cfg.Logger.Info(
+		"uploading file to bucket",
+		"user", data.User.Name,
+		"bucket", data.Bucket.Name,
+		"filename", assetFilepath,
+	)
 
-		_, err := h.Storage.PutObject(
-			data.Bucket,
-			assetFilepath,
-			utils.NopReaderAtCloser(reader),
-			data.FileEntry,
-		)
-		if err != nil {
-			return err
-		}
+	_, err := h.Storage.PutObject(
+		data.Bucket,
+		assetFilepath,
+		utils.NopReaderAtCloser(reader),
+		data.FileEntry,
+	)
+	if err != nil {
+		return err
 	}
 
 	return nil

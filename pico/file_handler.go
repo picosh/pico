@@ -2,6 +2,7 @@ package pico
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -48,6 +49,10 @@ func (h *UploadHandler) getAuthorizedKeyFile(user *db.User) (*utils.VirtualFile,
 		FModTime: modTime,
 	}
 	return fileInfo, text, nil
+}
+
+func (h *UploadHandler) Delete(s ssh.Session, entry *utils.FileEntry) error {
+	return errors.New("unsupported")
 }
 
 func (h *UploadHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileInfo, utils.ReaderAtCloser, error) {

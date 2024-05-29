@@ -1,6 +1,8 @@
 package filehandlers
 
 import (
+	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -16,6 +18,7 @@ import (
 type ReadWriteHandler interface {
 	Write(ssh.Session, *utils.FileEntry) (string, error)
 	Read(ssh.Session, *utils.FileEntry) (os.FileInfo, utils.ReaderAtCloser, error)
+	Delete(ssh.Session, *utils.FileEntry) error
 }
 
 type FileHandlerRouter struct {
@@ -51,11 +54,23 @@ func (r *FileHandlerRouter) findHandler(entry *utils.FileEntry) (ReadWriteHandle
 }
 
 func (r *FileHandlerRouter) Write(s ssh.Session, entry *utils.FileEntry) (string, error) {
+	if entry.Mode.IsDir() {
+		return "", os.ErrInvalid
+	}
+
 	handler, err := r.findHandler(entry)
 	if err != nil {
 		return "", err
 	}
 	return handler.Write(s, entry)
+}
+
+func (r *FileHandlerRouter) Delete(s ssh.Session, entry *utils.FileEntry) error {
+	handler, err := r.findHandler(entry)
+	if err != nil {
+		return err
+	}
+	return handler.Delete(s, entry)
 }
 
 func (r *FileHandlerRouter) Read(s ssh.Session, entry *utils.FileEntry) (os.FileInfo, utils.ReaderAtCloser, error) {
@@ -98,6 +113,7 @@ func BaseList(s ssh.Session, fpath string, isDir bool, recursive bool, spaces []
 		}
 	} else {
 		for _, space := range spaces {
+
 			p, e := dbpool.FindPostWithFilename(cleanFilename, user.ID, space)
 			if e != nil {
 				err = e
@@ -109,11 +125,15 @@ func BaseList(s ssh.Session, fpath string, isDir bool, recursive bool, spaces []
 		posts = append(posts, post)
 	}
 
-	if err != nil {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
 	}
 
 	for _, post := range posts {
+		if post == nil {
+			continue
+		}
+
 		fileList = append(fileList, &utils.VirtualFile{
 			FName:    post.Filename,
 			FIsDir:   false,
