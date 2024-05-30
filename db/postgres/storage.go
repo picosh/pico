@@ -1893,7 +1893,7 @@ func (me *PsqlDB) AddPicoPlusUser(username, paymentType, txId string) error {
 			TxID:  txId,
 		}
 		_, err := tx.Exec(
-			`INSERT INTO payment_history (user_id, payment_type, amount, data) VALUES ($1, $2, 20 * 1000000, $3);`,
+			`INSERT INTO payment_history (user_id, payment_type, amount, data) VALUES ($1, $2, 24 * 1000000, $3);`,
 			user.ID,
 			paymentType,
 			data,
