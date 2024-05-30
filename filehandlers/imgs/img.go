@@ -91,27 +91,18 @@ func (h *UploadImgHandler) writeImg(s ssh.Session, data *PostMetaData) error {
 		return err
 	}
 
-	modTime := time.Unix(data.Mtime, 0)
+	modTime := time.Now()
+
+	if data.Mtime > 0 {
+		modTime = time.Unix(data.Mtime, 0)
+	}
+
 	logger := h.Cfg.Logger.With(
 		"user", data.Username,
 		"filename", data.Filename,
 	)
 
-	if len(data.OrigText) == 0 {
-		err = h.removePost(data)
-		if err != nil {
-			return err
-		}
-
-		bucket, err := h.Storage.UpsertBucket(data.User.ID)
-		if err != nil {
-			return err
-		}
-		err = h.Storage.DeleteObject(bucket, data.Filename)
-		if err != nil {
-			return err
-		}
-	} else if data.Cur == nil {
+	if data.Cur == nil {
 		logger.Info("file not found, adding record")
 		insertPost := db.Post{
 			UserID: user.ID,

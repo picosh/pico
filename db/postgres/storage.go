@@ -1553,7 +1553,7 @@ func (me *PsqlDB) FindFeedItemsByPostID(postID string) ([]*db.FeedItem, error) {
 
 func (me *PsqlDB) InsertProject(userID, name, projectDir string) (string, error) {
 	if !shared.IsValidSubdomain(name) {
-		return "", fmt.Errorf("(%s) is not a valid project name, must match /^[a-z0-9-]+$/", name)
+		return "", fmt.Errorf("'%s' is not a valid project name, must match /^[a-z0-9-]+$/", name)
 	}
 
 	var id string

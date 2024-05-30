@@ -218,10 +218,6 @@ func (f *Fetcher) ParseURL(fp *gofeed.Parser, url string) (*gofeed.Feed, error) 
 		return nil, fmt.Errorf("fetching feed resulted in an error: %s %s", resp.Status, body)
 	}
 
-	if err != nil {
-		return nil, err
-	}
-
 	feed, err := fp.ParseString(string(body))
 
 	if err != nil {

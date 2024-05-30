@@ -89,6 +89,10 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		"filename", filename,
 	)
 
+	if entry.Mode.IsDir() {
+		return "", fmt.Errorf("file entry is directory, but only files are supported: %s", filename)
+	}
+
 	var origText []byte
 	if b, err := io.ReadAll(entry.Reader); err == nil {
 		origText = b
@@ -144,23 +148,14 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		return "", err
 	}
 
-	modTime := time.Unix(entry.Mtime, 0)
+	modTime := time.Now()
+
+	if entry.Mtime > 0 {
+		modTime = time.Unix(entry.Mtime, 0)
+	}
 
 	// if the file is empty we remove it from our database
-	if len(origText) == 0 {
-		// skip empty files from being added to db
-		if post == nil {
-			logger.Info("file is empty, skipping record")
-			return "", nil
-		}
-
-		err := h.DBPool.RemovePosts([]string{post.ID})
-		logger.Info("file is empty, removing record")
-		if err != nil {
-			logger.Error(err.Error())
-			return "", fmt.Errorf("error for %s: %v", filename, err)
-		}
-	} else if post == nil {
+	if post == nil {
 		logger.Info("file not found, adding record")
 		insertPost := db.Post{
 			UserID: userID,
@@ -263,4 +258,37 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 
 	curl := shared.NewCreateURL(h.Cfg)
 	return h.Cfg.FullPostURL(curl, user.Name, metadata.Slug), nil
+}
+
+func (h *ScpUploadHandler) Delete(s ssh.Session, entry *utils.FileEntry) error {
+	logger := h.Cfg.Logger
+	user, err := util.GetUser(s)
+	if err != nil {
+		logger.Error(err.Error())
+		return err
+	}
+
+	userID := user.ID
+	filename := filepath.Base(entry.Filepath)
+	logger = logger.With(
+		"user", user.Name,
+		"filename", filename,
+	)
+
+	post, err := h.DBPool.FindPostWithFilename(filename, userID, h.Cfg.Space)
+	if err != nil {
+		return err
+	}
+
+	if post == nil {
+		return os.ErrNotExist
+	}
+
+	err = h.DBPool.RemovePosts([]string{post.ID})
+	logger.Info("removing record")
+	if err != nil {
+		logger.Error(err.Error())
+		return fmt.Errorf("error for %s: %v", filename, err)
+	}
+	return nil
 }
