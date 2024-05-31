@@ -51,7 +51,7 @@ func DefaultStyles(renderer *lipgloss.Renderer) Styles {
 
 	s.Cursor = renderer.NewStyle().Foreground(Fuschia)
 	s.Wrap = renderer.NewStyle().Width(58)
-	s.Paragraph = s.Wrap.Copy().Margin(1, 0, 0, 2)
+	s.Paragraph = s.Wrap.Margin(1, 0, 0, 2)
 	s.Logo = renderer.NewStyle().
 		Foreground(Cream).
 		Background(Indigo).
@@ -64,10 +64,10 @@ func DefaultStyles(renderer *lipgloss.Renderer) Styles {
 		Foreground(Grey)
 	s.Error = renderer.NewStyle().Foreground(Red)
 	s.Prompt = renderer.NewStyle().MarginRight(1).SetString(">")
-	s.FocusedPrompt = s.Prompt.Copy().Foreground(Fuschia)
+	s.FocusedPrompt = s.Prompt.Foreground(Fuschia)
 	s.InputPlaceholder = renderer.NewStyle().Foreground(Grey)
 	s.Note = renderer.NewStyle().Foreground(Green)
-	s.Delete = s.Error.Copy()
+	s.Delete = s.Error
 	s.Label = renderer.NewStyle().Foreground(Fuschia)
 	s.ListKey = renderer.NewStyle().Foreground(Indigo)
 	s.InactivePagination = renderer.NewStyle().
@@ -81,7 +81,7 @@ func DefaultStyles(renderer *lipgloss.Renderer) Styles {
 		Foreground(Cream).
 		Background(GreyLight).
 		Padding(0, 3)
-	s.FocusedButtonStyle = s.BlurredButtonStyle.Copy().
+	s.FocusedButtonStyle = s.BlurredButtonStyle.
 		Background(Fuschia)
 	s.HelpDivider = renderer.NewStyle().
 		Foreground(Grey).

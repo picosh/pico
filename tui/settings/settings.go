@@ -113,7 +113,7 @@ We will only store usage statistics for 1 year from when the event was created.`
 		str += banner + "\n\n" + m.shared.Styles.Error.SetString("Analytics is only available to pico+ users.").String()
 	}
 
-	return m.shared.Styles.RoundedBorder.Copy().Width(maxWidth).SetString(str).String()
+	return m.shared.Styles.RoundedBorder.Width(maxWidth).SetString(str).String()
 }
 
 func (m Model) featuresView() string {

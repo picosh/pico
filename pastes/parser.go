@@ -3,15 +3,15 @@ package pastes
 import (
 	"bytes"
 
-	"github.com/alecthomas/chroma/formatters/html"
-	"github.com/alecthomas/chroma/lexers"
-	"github.com/alecthomas/chroma/styles"
+	"github.com/alecthomas/chroma/v2/formatters/html"
+	"github.com/alecthomas/chroma/v2/lexers"
+	"github.com/alecthomas/chroma/v2/styles"
 )
 
 func ParseText(filename string, text string) (string, error) {
 	formatter := html.New(
 		html.WithLineNumbers(true),
-		html.LinkableLineNumbers(true, ""),
+		html.WithLinkableLineNumbers(true, ""),
 		html.WithClasses(true),
 	)
 	lexer := lexers.Match(filename)
@@ -26,7 +26,7 @@ func ParseText(filename string, text string) (string, error) {
 		return text, err
 	}
 	var buf bytes.Buffer
-	err = formatter.Format(&buf, styles.Dracula, iterator)
+	err = formatter.Format(&buf, styles.Get("dracula"), iterator)
 	if err != nil {
 		return text, err
 	}
