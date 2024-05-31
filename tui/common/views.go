@@ -72,9 +72,9 @@ func CancelButtonView(styles Styles, focused bool, defaultButton bool) string {
 func styledButton(styles Styles, str string, underlined, focused bool) string {
 	var st lipgloss.Style
 	if focused {
-		st = styles.FocusedButtonStyle.Copy()
+		st = styles.FocusedButtonStyle
 	} else {
-		st = styles.BlurredButtonStyle.Copy()
+		st = styles.BlurredButtonStyle
 	}
 	if underlined {
 		st = st.Underline(true)

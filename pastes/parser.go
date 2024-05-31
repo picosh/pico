@@ -26,7 +26,7 @@ func ParseText(filename string, text string) (string, error) {
 		return text, err
 	}
 	var buf bytes.Buffer
-	err = formatter.Format(&buf, styles.Dracula, iterator)
+	err = formatter.Format(&buf, styles.Get("dracula"), iterator)
 	if err != nil {
 		return text, err
 	}

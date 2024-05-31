@@ -170,7 +170,7 @@ func (m *UI) header() string {
 		SetString(pages.ToTitle(m.activePage))
 	div := m.shared.
 		Styles.
-		HelpDivider.Copy().
+		HelpDivider.
 		Foreground(common.Green)
 	s := fmt.Sprintf("%s%s%s\n\n", logo, div, title)
 	return s

@@ -296,7 +296,7 @@ func (m *Model) helpView() string {
 }
 
 func (m *Model) promptView(prompt string) string {
-	st := m.shared.Styles.Delete.Copy().MarginTop(2).MarginRight(1)
+	st := m.shared.Styles.Delete.MarginTop(2).MarginRight(1)
 	return st.Render(prompt) +
 		m.shared.Styles.Delete.Render("(y/N)")
 }
