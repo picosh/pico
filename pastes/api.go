@@ -55,6 +55,7 @@ type PostPageData struct {
 	PublishAtISO string
 	PublishAt    string
 	ExpiresAt    string
+	Unlisted     bool
 }
 
 type TransparencyPageData struct {
@@ -190,6 +191,11 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			expiresAt = post.ExpiresAt.Format("02 Jan, 2006")
 		}
 
+		unlisted := false
+		if post.Hidden {
+			unlisted = true
+		}
+
 		data = PostPageData{
 			Site:         *cfg.GetSiteData(),
 			PageTitle:    post.Filename,
@@ -204,6 +210,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			BlogName:     blogName,
 			Contents:     template.HTML(parsedText),
 			ExpiresAt:    expiresAt,
+			Unlisted:     unlisted,
 		}
 	} else {
 		logger.Info("post not found", "user", username, "slug", slug)

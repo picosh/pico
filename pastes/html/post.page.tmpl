@@ -27,11 +27,12 @@
 <header>
     <h1 class="text-2xl font-bold">{{.Title}}</h1>
     <p class="font-bold m-0">
-        <time datetime="{{.PublishAtISO}}">{{.PublishAt}}</time>
-        <span> on </span>
-        <a href="{{.BlogURL}}">{{.BlogName}}</a>
-        <span> | </span>
-        <a href="{{.RawURL}}">raw</a>
+      {{if .Unlisted}} <code>unlisted</code>{{end}}
+      <time datetime="{{.PublishAtISO}}">{{.PublishAt}}</time>
+      <span> &middot; <span>
+      <a href="{{.BlogURL}}">{{.BlogName}}</a>
+      <span> &middot; <span>
+      <a href="{{.RawURL}}">raw</a>
     </p>
     <p class="font-bold m-0">expires: {{.ExpiresAt}}</p>
 </header>
