@@ -12,16 +12,19 @@ replace git.sr.ht/~delthas/senpai => github.com/picosh/senpai v0.0.0-20240503200
 
 replace github.com/gdamore/tcell/v2 => github.com/delthas/tcell/v2 v2.4.1-0.20230710100648-1489e78d90fb
 
+// Until https://github.com/charmbracelet/ssh/issues/28 is solved
+replace github.com/charmbracelet/x/exp/term v0.0.0-20240529170602-5872190e21dd => github.com/charmbracelet/x/exp/term v0.0.0-20240328150354-ab9afc214dfd
+
 require (
 	git.sr.ht/~delthas/senpai v0.3.1-0.20240425235039-206be659439e
-	github.com/alecthomas/chroma v0.10.0
+	github.com/alecthomas/chroma/v2 v2.14.0
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
 	github.com/charmbracelet/bubbles v0.18.0
-	github.com/charmbracelet/bubbletea v0.26.1
+	github.com/charmbracelet/bubbletea v0.26.4
 	github.com/charmbracelet/glamour v0.7.0
-	github.com/charmbracelet/lipgloss v0.10.0
+	github.com/charmbracelet/lipgloss v0.11.0
 	github.com/charmbracelet/promwish v0.7.0
-	github.com/charmbracelet/ssh v0.0.0-20240507011153-ec70bd03034c
+	github.com/charmbracelet/ssh v0.0.0-20240515141028-546b2ee33a4d
 	github.com/charmbracelet/wish v1.4.0
 	github.com/google/go-cmp v0.6.0
 	github.com/gorilla/feeds v1.1.2
@@ -39,7 +42,7 @@ require (
 	github.com/simplesurance/go-ip-anonymizer v0.0.0-20200429124537-35a880f8e87d
 	github.com/x-way/crawlerdetect v0.2.21
 	github.com/yuin/goldmark v1.7.1
-	github.com/yuin/goldmark-highlighting v0.0.0-20220208100518-594be1970594
+	github.com/yuin/goldmark-highlighting/v2 v2.0.0-20230729083705-37449abec8cc
 	github.com/yuin/goldmark-meta v1.1.0
 	go.abhg.dev/goldmark/anchor v0.1.1
 	go.abhg.dev/goldmark/hashtag v0.3.1
@@ -52,7 +55,6 @@ require (
 	git.sr.ht/~emersion/go-scfg v0.0.0-20240128091534-2ae16e782082 // indirect
 	github.com/DavidGamba/go-getoptions v0.30.0 // indirect
 	github.com/PuerkitoBio/goquery v1.9.2 // indirect
-	github.com/alecthomas/chroma/v2 v2.8.0 // indirect
 	github.com/andybalholm/cascadia v1.3.2 // indirect
 	github.com/anmitsu/go-shlex v0.0.0-20200514113438-38f4b401e2be // indirect
 	github.com/antoniomika/go-rsync-receiver v0.0.0-20231110145728-c94949e1ab7d // indirect
@@ -63,8 +65,12 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/charmbracelet/keygen v0.5.0 // indirect
 	github.com/charmbracelet/log v0.4.0 // indirect
-	github.com/charmbracelet/x/errors v0.0.0-20240507171223-71e9351b56e7 // indirect
-	github.com/charmbracelet/x/exp/term v0.0.0-20240507171223-71e9351b56e7 // indirect
+	github.com/charmbracelet/x/ansi v0.1.2 // indirect
+	github.com/charmbracelet/x/errors v0.0.0-20240529170602-5872190e21dd // indirect
+	github.com/charmbracelet/x/exp/term v0.0.0-20240529170602-5872190e21dd // indirect
+	github.com/charmbracelet/x/input v0.1.1 // indirect
+	github.com/charmbracelet/x/term v0.1.1 // indirect
+	github.com/charmbracelet/x/windows v0.1.2 // indirect
 	github.com/creack/pty v1.1.21 // indirect
 	github.com/delthas/go-libnp v0.0.0-20221222161248-0e45ece1f878 // indirect
 	github.com/delthas/go-localeinfo v0.0.0-20221116001557-686a1e185118 // indirect
@@ -85,7 +91,7 @@ require (
 	github.com/go-logfmt/logfmt v0.6.0 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/go-xmlfmt/xmlfmt v1.1.2 // indirect
-	github.com/goccy/go-json v0.10.2 // indirect
+	github.com/goccy/go-json v0.10.3 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
 	github.com/golang/geo v0.0.0-20230421003525-6adc56603217 // indirect
@@ -98,12 +104,12 @@ require (
 	github.com/klauspost/cpuid/v2 v2.2.7 // indirect
 	github.com/kr/fs v0.1.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
-	github.com/lufia/plan9stats v0.0.0-20240408141607-282e7b5d6b74 // indirect
+	github.com/lufia/plan9stats v0.0.0-20240513124658-fba389f38bae // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-localereader v0.0.1 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
-	github.com/minio/madmin-go/v3 v3.0.51 // indirect
+	github.com/minio/madmin-go/v3 v3.0.53 // indirect
 	github.com/minio/md5-simd v1.1.2 // indirect
 	github.com/mmcdole/goxpp v1.1.1 // indirect
 	github.com/mmcloughlin/md4 v0.1.2 // indirect
@@ -117,10 +123,10 @@ require (
 	github.com/philhofer/fwd v1.1.2 // indirect
 	github.com/pkg/sftp v1.13.6 // indirect
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect
-	github.com/prometheus/client_golang v1.19.0 // indirect
+	github.com/prometheus/client_golang v1.19.1 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.53.0 // indirect
-	github.com/prometheus/procfs v0.14.0 // indirect
+	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/prometheus/prom2json v1.3.3 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rogpeppe/go-internal v1.11.0 // indirect
@@ -133,9 +139,10 @@ require (
 	github.com/tinylib/msgp v1.1.9 // indirect
 	github.com/tklauser/go-sysconf v0.3.14 // indirect
 	github.com/tklauser/numcpus v0.8.0 // indirect
+	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	github.com/yuin/goldmark-emoji v1.0.2 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
-	golang.org/x/exp v0.0.0-20240506185415-9bf2ced13842 // indirect
+	golang.org/x/exp v0.0.0-20240530194437-404ba88c7ed0 // indirect
 	golang.org/x/net v0.25.0 // indirect
 	golang.org/x/sync v0.7.0 // indirect
 	golang.org/x/sys v0.20.0 // indirect
