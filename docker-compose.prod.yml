@@ -262,6 +262,10 @@ services:
     ports:
       - "${PGS_SSH_V4:-22}:2222"
       - "${PGS_SSH_V6:-[::1]:22}:2222"
+    deploy:
+      resources:
+        limits:
+          memory: 3g
   feeds-caddy:
     image: ghcr.io/picosh/pico/caddy:latest
     restart: always
