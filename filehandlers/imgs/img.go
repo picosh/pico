@@ -56,7 +56,7 @@ func (h *UploadImgHandler) metaImg(data *PostMetaData) error {
 
 	reader := bytes.NewReader([]byte(data.Text))
 
-	fname, err := h.Storage.PutObject(
+	fname, _, err := h.Storage.PutObject(
 		bucket,
 		data.Filename,
 		utils.NopReaderAtCloser(reader),

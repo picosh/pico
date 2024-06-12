@@ -2,7 +2,6 @@ package uploadassets
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
 	"io"
 	"io/fs"
@@ -15,6 +14,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/ssh"
+	"github.com/charmbracelet/wish"
 	"github.com/picosh/pico/db"
 	futil "github.com/picosh/pico/filehandlers/util"
 	"github.com/picosh/pico/shared"
@@ -91,14 +91,10 @@ func shouldIgnoreFile(fp, ignoreStr string) bool {
 
 type FileData struct {
 	*utils.FileEntry
-	Text          []byte
-	User          *db.User
-	Bucket        sst.Bucket
-	StorageSize   uint64
-	FeatureFlag   *db.FeatureFlag
-	DeltaFileSize int64
-	Project       *db.Project
-	DenyList      string
+	User     *db.User
+	Bucket   sst.Bucket
+	Project  *db.Project
+	DenyList string
 }
 
 type UploadAssetHandler struct {
@@ -325,25 +321,15 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 	}
 
 	if entry.Mode.IsDir() {
-		_, err := h.Storage.PutObject(
+		_, _, err := h.Storage.PutObject(
 			bucket,
 			path.Join(shared.GetAssetFileName(entry), "._pico_keep_dir"),
-			utils.NopReaderAtCloser(bytes.NewReader([]byte{})),
+			bytes.NewReader([]byte{}),
 			entry,
 		)
 		return "", err
 	}
 
-	var origText []byte
-	if b, err := io.ReadAll(entry.Reader); err == nil {
-		origText = b
-	}
-	fileSize := binary.Size(origText)
-	// TODO: hack for now until I figure out how to get correct
-	// filesize from sftp,scp,rsync
-	entry.Size = int64(fileSize)
-
-	storageSize := getStorageSize(s)
 	featureFlag, err := futil.GetFeatureFlag(s)
 	if err != nil {
 		return "", err
@@ -353,7 +339,6 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 	// stored and the updated file being uploaded
 	assetFilename := shared.GetAssetFileName(entry)
 	curFileSize, _ := h.Storage.GetObjectSize(bucket, assetFilename)
-	deltaFileSize := curFileSize - entry.Size
 
 	denylist := getDenylist(s)
 	if denylist == nil {
@@ -367,15 +352,11 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 	}
 
 	data := &FileData{
-		FileEntry:     entry,
-		User:          user,
-		Text:          origText,
-		Bucket:        bucket,
-		StorageSize:   storageSize,
-		FeatureFlag:   featureFlag,
-		DeltaFileSize: deltaFileSize,
-		DenyList:      denylist.Denylist,
-		Project:       project,
+		FileEntry: entry,
+		User:      user,
+		Bucket:    bucket,
+		DenyList:  denylist.Denylist,
+		Project:   project,
 	}
 
 	valid, err := h.validateAsset(data)
@@ -383,11 +364,31 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 		return "", err
 	}
 
-	err = h.writeAsset(data)
+	// SFTP does not report file size so the more performant way to
+	//   check filesize constraints is to try and upload the file to s3
+	//	 with a specialized reader that raises an error if the filesize limit
+	//	 has been reached
+	storageMax := featureFlag.Data.StorageMax
+	fileMax := featureFlag.Data.FileMax
+	curStorageSize := getStorageSize(s)
+	remaining := int64(storageMax) - int64(curStorageSize)
+	sizeRemaining := min(remaining+curFileSize, fileMax)
+	if sizeRemaining <= 0 {
+		msg := "storage quota reached"
+		wish.Fatalln(s, msg)
+		return "", fmt.Errorf(msg)
+	}
+
+	fsize, err := h.writeAsset(
+		shared.NewMaxBytesReader(data.Reader, int64(sizeRemaining)),
+		data,
+	)
 	if err != nil {
-		logger.Error(err.Error())
+		logger.Error("could not write asset", "err", err.Error())
 		return "", err
 	}
+
+	deltaFileSize := curFileSize - fsize
 	nextStorageSize := incrementStorageSize(s, deltaFileSize)
 
 	url := h.Cfg.AssetURL(
@@ -454,10 +455,10 @@ func (h *UploadAssetHandler) Delete(s ssh.Session, entry *utils.FileEntry) error
 	})
 
 	if len(sibs) == 0 {
-		_, err := h.Storage.PutObject(
+		_, _, err := h.Storage.PutObject(
 			bucket,
 			filepath.Join(pathDir, "._pico_keep_dir"),
-			utils.NopReaderAtCloser(bytes.NewReader([]byte{})),
+			bytes.NewReader([]byte{}),
 			entry,
 		)
 		if err != nil {
@@ -469,41 +470,11 @@ func (h *UploadAssetHandler) Delete(s ssh.Session, entry *utils.FileEntry) error
 }
 
 func (h *UploadAssetHandler) validateAsset(data *FileData) (bool, error) {
-	storageMax := data.FeatureFlag.Data.StorageMax
-	var nextStorageSize uint64
-	if data.DeltaFileSize < 0 {
-		nextStorageSize = data.StorageSize - uint64(data.DeltaFileSize)
-	} else {
-		nextStorageSize = data.StorageSize + uint64(data.DeltaFileSize)
-	}
-	if nextStorageSize >= storageMax {
-		return false, fmt.Errorf(
-			"ERROR: user (%s) has exceeded (%d bytes) max (%d bytes)",
-			data.User.Name,
-			data.StorageSize,
-			storageMax,
-		)
-	}
+	fname := filepath.Base(data.Filepath)
 
 	projectName := shared.GetProjectName(data.FileEntry)
 	if projectName == "" || projectName == "/" || projectName == "." {
 		return false, fmt.Errorf("ERROR: invalid project name, you must copy files to a non-root folder (e.g. pgs.sh:/project-name)")
-	}
-
-	fileSize := data.Size
-	fname := filepath.Base(data.Filepath)
-	fileMax := data.FeatureFlag.Data.FileMax
-	if fileSize > fileMax {
-		return false, fmt.Errorf("ERROR: file (%s) has exceeded maximum file size (%d bytes)", fname, fileMax)
-	}
-
-	// ".well-known" is a special case
-	if strings.Contains(data.Filepath, "/.well-known/") {
-		if shared.IsTextFile(string(data.Text)) {
-			return true, nil
-		} else {
-			return false, fmt.Errorf("(%s) not a utf-8 text file", data.Filepath)
-		}
 	}
 
 	// special files we use for custom routing
@@ -523,10 +494,8 @@ func (h *UploadAssetHandler) validateAsset(data *FileData) (bool, error) {
 	return true, nil
 }
 
-func (h *UploadAssetHandler) writeAsset(data *FileData) error {
+func (h *UploadAssetHandler) writeAsset(reader io.Reader, data *FileData) (int64, error) {
 	assetFilepath := shared.GetAssetFileName(data.FileEntry)
-
-	reader := bytes.NewReader(data.Text)
 
 	h.Cfg.Logger.Info(
 		"uploading file to bucket",
@@ -535,15 +504,11 @@ func (h *UploadAssetHandler) writeAsset(data *FileData) error {
 		"filename", assetFilepath,
 	)
 
-	_, err := h.Storage.PutObject(
+	_, fsize, err := h.Storage.PutObject(
 		data.Bucket,
 		assetFilepath,
-		utils.NopReaderAtCloser(reader),
+		reader,
 		data.FileEntry,
 	)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return fsize, err
 }

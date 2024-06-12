@@ -5,7 +5,7 @@ import (
 )
 
 var maxSize = uint64(25 * shared.MB)
-var maxAssetSize = int64(5 * shared.MB)
+var maxAssetSize = int64(1 * shared.MB)
 
 func NewConfigSite() *shared.ConfigSite {
 	debug := shared.GetEnv("PGS_DEBUG", "0")
