@@ -32,7 +32,7 @@ func (me *SSHServer) authHandler(ctx ssh.Context, key ssh.PublicKey) bool {
 	return true
 }
 
-func createRouter(handler *filehandlers.FileHandlerRouter) proxy.Router {
+func createRouter(handler *filehandlers.FileHandlerRouter, cliHandler *CliHandler) proxy.Router {
 	return func(sh ssh.Handler, s ssh.Session) []wish.Middleware {
 		return []wish.Middleware{
 			pipe.Middleware(handler, ".md"),
@@ -41,19 +41,20 @@ func createRouter(handler *filehandlers.FileHandlerRouter) proxy.Router {
 			wishrsync.Middleware(handler),
 			auth.Middleware(handler),
 			wsh.PtyMdw(wsh.DeprecatedNotice()),
+			WishMiddleware(cliHandler),
 			wsh.LogMiddleware(handler.GetLogger()),
 		}
 	}
 }
 
-func withProxy(handler *filehandlers.FileHandlerRouter, otherMiddleware ...wish.Middleware) ssh.Option {
+func withProxy(handler *filehandlers.FileHandlerRouter, cliHandler *CliHandler, otherMiddleware ...wish.Middleware) ssh.Option {
 	return func(server *ssh.Server) error {
 		err := sftp.SSHOption(handler)(server)
 		if err != nil {
 			return err
 		}
 
-		return proxy.WithProxy(createRouter(handler), otherMiddleware...)(server)
+		return proxy.WithProxy(createRouter(handler, cliHandler), otherMiddleware...)(server)
 	}
 }
 
@@ -91,6 +92,11 @@ func StartSshServer() {
 	handler := filehandlers.NewFileHandlerRouter(cfg, dbh, fileMap)
 	handler.Spaces = []string{cfg.Space, "imgs"}
 
+	cliHandler := &CliHandler{
+		Logger: logger,
+		DBPool: dbh,
+	}
+
 	sshServer := &SSHServer{}
 	s, err := wish.NewServer(
 		wish.WithAddress(fmt.Sprintf("%s:%s", host, port)),
@@ -98,6 +104,7 @@ func StartSshServer() {
 		wish.WithPublicKeyAuth(sshServer.authHandler),
 		withProxy(
 			handler,
+			cliHandler,
 			promwish.Middleware(fmt.Sprintf("%s:%s", host, promPort), "prose-ssh"),
 		),
 	)
