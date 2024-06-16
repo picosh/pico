@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
@@ -62,6 +63,10 @@ func getHelpText(styles common.Styles, userName string, width int) string {
 		{
 			"stats",
 			"usage statistics",
+		},
+		{
+			fmt.Sprintf("stats %s", projectName),
+			fmt.Sprintf("site analytics for `%s`", projectName),
 		},
 		{
 			"ls",
@@ -189,6 +194,73 @@ func (c *Cmd) RmProjectAssets(projectName string) error {
 
 func (c *Cmd) help() {
 	c.output(getHelpText(c.Styles, c.User.Name, c.Width))
+}
+
+func uniqueVisitorsTbl(intervals []*db.VisitInterval) *table.Table {
+	headers := []string{"Date", "Unique Visitors"}
+	data := [][]string{}
+	for _, d := range intervals {
+		data = append(data, []string{
+			d.Interval.Format(time.RFC3339Nano),
+			fmt.Sprintf("%d", d.Visitors),
+		})
+	}
+
+	t := table.New().
+		Border(lipgloss.RoundedBorder()).
+		Headers(headers...).
+		Rows(data...)
+	return t
+}
+
+func visitUrlsTbl(urls []*db.VisitUrl) *table.Table {
+	headers := []string{"Site", "Count"}
+	data := [][]string{}
+	for _, d := range urls {
+		data = append(data, []string{
+			d.Url,
+			fmt.Sprintf("%d", d.Count),
+		})
+	}
+
+	t := table.New().
+		Border(lipgloss.RoundedBorder()).
+		Headers(headers...).
+		Rows(data...)
+	return t
+}
+
+func (c *Cmd) statsByProject(projectName string) error {
+	project, err := c.Dbpool.FindProjectByName(c.User.ID, projectName)
+	if err != nil {
+		return errors.Join(err, fmt.Errorf("project (%s) does not exit", projectName))
+	}
+
+	opts := &db.SummaryOpts{
+		FkID:     project.ID,
+		By:       "project_id",
+		Interval: "day",
+		Origin:   shared.StartOfMonth(),
+	}
+
+	summary, err := c.Dbpool.VisitSummary(opts)
+	if err != nil {
+		return err
+	}
+
+	c.output("Top URLs")
+	topUrlsTbl := visitUrlsTbl(summary.TopUrls)
+	c.output(topUrlsTbl.Width(c.Width).String())
+
+	c.output("Top Referers")
+	topRefsTbl := visitUrlsTbl(summary.TopReferers)
+	c.output(topRefsTbl.Width(c.Width).String())
+
+	uniqueTbl := uniqueVisitorsTbl(summary.Intervals)
+	c.output("Unique Visitors this Month")
+	c.output(uniqueTbl.Width(c.Width).String())
+
+	return nil
 }
 
 func (c *Cmd) stats(cfgMaxSize uint64) error {
