@@ -165,7 +165,10 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					opts.help()
 					return
 				} else if cmd == "stats" {
-					opts.stats()
+					err := opts.stats()
+					if err != nil {
+						wish.Fatalln(sesh, err)
+					}
 					return
 				} else {
 					next(sesh)

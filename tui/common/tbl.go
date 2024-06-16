@@ -27,10 +27,37 @@ func UniqueVisitorsTbl(intervals []*db.VisitInterval) *table.Table {
 }
 
 func VisitUrlsTbl(urls []*db.VisitUrl) *table.Table {
-	headers := []string{"Site", "Count"}
+	headers := []string{"URL", "Count"}
 	data := [][]string{}
 	for _, d := range urls {
 		data = append(data, []string{
+			d.Url,
+			fmt.Sprintf("%d", d.Count),
+		})
+	}
+
+	t := table.New().
+		Border(lipgloss.RoundedBorder()).
+		Headers(headers...).
+		Rows(data...)
+	return t
+}
+
+func VisitUrlsWithProjectTbl(projects []*db.Project, urls []*db.VisitUrl) *table.Table {
+	headers := []string{"Project", "URL", "Count"}
+	data := [][]string{}
+	for _, d := range urls {
+		if d.ProjectID == "" {
+			continue
+		}
+		projectName := ""
+		for _, project := range projects {
+			if project.ID == d.ProjectID {
+				projectName = project.Name
+			}
+		}
+		data = append(data, []string{
+			projectName,
 			d.Url,
 			fmt.Sprintf("%d", d.Count),
 		})

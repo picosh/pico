@@ -1,10 +1,12 @@
 package pgs
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"log/slog"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -228,6 +230,72 @@ func (c *Cmd) statsByProject(projectName string) error {
 	return nil
 }
 
+func (c *Cmd) statsSites() error {
+	opts := &db.SummaryOpts{
+		FkID:     c.User.ID,
+		By:       "user_id",
+		Interval: "day",
+		Origin:   shared.StartOfMonth(),
+	}
+
+	summary, err := c.Dbpool.VisitSummary(opts)
+	if err != nil {
+		return err
+	}
+
+	projects, err := c.Dbpool.FindProjectsByUser(c.User.ID)
+	if err != nil {
+		return err
+	}
+
+	c.output("\nVisitor Analytics this Month\n")
+
+	c.output("Top URLs")
+	topUrlsTbl := common.VisitUrlsWithProjectTbl(projects, summary.TopUrls)
+
+	c.output(topUrlsTbl.Width(c.Width).String())
+
+	c.output("Top Referers")
+	topRefsTbl := common.VisitUrlsTbl(summary.TopReferers)
+	c.output(topRefsTbl.Width(c.Width).String())
+
+	mapper := map[string]*db.VisitInterval{}
+	result := []*db.VisitUrl{}
+	// combine visitors by project_id
+	for _, interval := range summary.Intervals {
+		if interval.ProjectID == "" {
+			continue
+		}
+		if _, ok := mapper[interval.ProjectID]; !ok {
+			mapper[interval.ProjectID] = interval
+		}
+		mapper[interval.ProjectID].Visitors += interval.Visitors
+	}
+
+	for _, val := range mapper {
+		projectName := ""
+		for _, project := range projects {
+			if project.ID == val.ProjectID {
+				projectName = project.Name
+			}
+		}
+		result = append(result, &db.VisitUrl{
+			Url:   projectName,
+			Count: val.Visitors,
+		})
+	}
+
+	slices.SortFunc(result, func(a, b *db.VisitUrl) int {
+		return cmp.Compare(b.Count, a.Count)
+	})
+
+	uniqueTbl := common.VisitUrlsTbl(result)
+	c.output("Unique Visitors by Site")
+	c.output(uniqueTbl.Width(c.Width).String())
+
+	return nil
+}
+
 func (c *Cmd) stats(cfgMaxSize uint64) error {
 	ff, err := c.Dbpool.FindFeatureForUser(c.User.ID, "plus")
 	if err != nil {
@@ -268,7 +336,7 @@ func (c *Cmd) stats(cfgMaxSize uint64) error {
 		Rows(data)
 	c.output(t.String())
 
-	return nil
+	return c.statsSites()
 }
 
 func (c *Cmd) ls() error {
