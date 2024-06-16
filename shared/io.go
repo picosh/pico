@@ -2,6 +2,7 @@ package shared
 
 import (
 	"errors"
+	"fmt"
 	"io"
 )
 
@@ -9,17 +10,19 @@ import (
 var ErrSizeExceeded = errors.New("stream size exceeded")
 
 type MaxBytesReader struct {
-	io.Reader       // reader object
+	io.Reader // reader object
+	Limit     int64
 	N         int64 // max bytes remaining.
 }
 
 func NewMaxBytesReader(r io.Reader, limit int64) *MaxBytesReader {
-	return &MaxBytesReader{r, limit}
+	return &MaxBytesReader{r, limit, limit}
 }
 
 func (b *MaxBytesReader) Read(p []byte) (n int, err error) {
 	if b.N <= 0 {
-		return 0, ErrSizeExceeded
+		err := fmt.Errorf("%w: %.2fmb", ErrSizeExceeded, BytesToMB(int(b.Limit)))
+		return 0, err
 	}
 
 	if int64(len(p)) > b.N {

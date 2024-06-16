@@ -148,8 +148,12 @@ func Shasum(data []byte) string {
 	return hex.EncodeToString(bs)
 }
 
+func BytesToMB(size int) float32 {
+	return ((float32(size) / 1000) / 1000)
+}
+
 func BytesToGB(size int) float32 {
-	return (((float32(size) / 1000) / 1000) / 1000)
+	return BytesToMB(size) / 1000
 }
 
 // https://stackoverflow.com/a/46964105
