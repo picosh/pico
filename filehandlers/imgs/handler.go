@@ -48,7 +48,7 @@ func NewUploadImgHandler(dbpool db.DB, cfg *shared.ConfigSite, storage storage.S
 }
 
 func (h *UploadImgHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileInfo, utils.ReaderAtCloser, error) {
-	user, err := util.GetUser(s)
+	user, err := util.GetUser(s.Context())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -87,7 +87,7 @@ func (h *UploadImgHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileI
 }
 
 func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string, error) {
-	user, err := util.GetUser(s)
+	user, err := util.GetUser(s.Context())
 	if err != nil {
 		h.Cfg.Logger.Error(err.Error())
 		return "", err
@@ -143,7 +143,7 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		h.Cfg.Logger.Info("unable to find image, continuing", "filename", nextPost.Filename, "err", err.Error())
 	}
 
-	featureFlag, err := util.GetFeatureFlag(s)
+	featureFlag, err := util.GetFeatureFlag(s.Context())
 	if err != nil {
 		return "", err
 	}
@@ -190,7 +190,7 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 }
 
 func (h *UploadImgHandler) Delete(s ssh.Session, entry *utils.FileEntry) error {
-	user, err := util.GetUser(s)
+	user, err := util.GetUser(s.Context())
 	if err != nil {
 		return err
 	}

@@ -14,6 +14,7 @@ import (
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/filehandlers"
 	uploadimgs "github.com/picosh/pico/filehandlers/imgs"
+	"github.com/picosh/pico/filehandlers/util"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
 	wsh "github.com/picosh/pico/wish"
@@ -25,12 +26,6 @@ import (
 	"github.com/picosh/send/send/scp"
 	"github.com/picosh/send/send/sftp"
 )
-
-type SSHServer struct{}
-
-func (me *SSHServer) authHandler(ctx ssh.Context, key ssh.PublicKey) bool {
-	return true
-}
 
 func createRouter(handler *filehandlers.FileHandlerRouter, cliHandler *CliHandler) proxy.Router {
 	return func(sh ssh.Handler, s ssh.Session) []wish.Middleware {
@@ -97,11 +92,11 @@ func StartSshServer() {
 		DBPool: dbh,
 	}
 
-	sshServer := &SSHServer{}
+	sshAuth := util.NewSshAuthHandler(dbh, logger, cfg)
 	s, err := wish.NewServer(
 		wish.WithAddress(fmt.Sprintf("%s:%s", host, port)),
 		wish.WithHostKeyPath("ssh_data/term_info_ed25519"),
-		wish.WithPublicKeyAuth(sshServer.authHandler),
+		wish.WithPublicKeyAuth(sshAuth.PubkeyAuthHandler),
 		withProxy(
 			handler,
 			cliHandler,

@@ -56,7 +56,7 @@ func (h *UploadHandler) Delete(s ssh.Session, entry *utils.FileEntry) error {
 }
 
 func (h *UploadHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileInfo, utils.ReaderAtCloser, error) {
-	user, err := util.GetUser(s)
+	user, err := util.GetUser(s.Context())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -80,7 +80,7 @@ func (h *UploadHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileInfo
 
 func (h *UploadHandler) List(s ssh.Session, fpath string, isDir bool, recursive bool) ([]os.FileInfo, error) {
 	var fileList []os.FileInfo
-	user, err := util.GetUser(s)
+	user, err := util.GetUser(s.Context())
 	if err != nil {
 		return fileList, err
 	}
@@ -135,7 +135,7 @@ func (h *UploadHandler) Validate(s ssh.Session) error {
 		return fmt.Errorf("must have username set")
 	}
 
-	util.SetUser(s, user)
+	util.SetUser(s.Context(), user)
 	return nil
 }
 
@@ -282,7 +282,7 @@ func (h *UploadHandler) ProcessAuthorizedKeys(text []byte, logger *slog.Logger, 
 
 func (h *UploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string, error) {
 	logger := h.Cfg.Logger
-	user, err := util.GetUser(s)
+	user, err := util.GetUser(s.Context())
 	if err != nil {
 		logger.Error(err.Error())
 		return "", err

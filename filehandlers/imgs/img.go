@@ -80,7 +80,7 @@ func (h *UploadImgHandler) writeImg(s ssh.Session, data *PostMetaData) error {
 	if !valid {
 		return err
 	}
-	user, err := util.GetUser(s)
+	user, err := util.GetUser(s.Context())
 	if err != nil {
 		return err
 	}

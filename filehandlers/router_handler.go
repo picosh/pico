@@ -83,7 +83,7 @@ func (r *FileHandlerRouter) Read(s ssh.Session, entry *utils.FileEntry) (os.File
 
 func BaseList(s ssh.Session, fpath string, isDir bool, recursive bool, spaces []string, dbpool db.DB) ([]os.FileInfo, error) {
 	var fileList []os.FileInfo
-	user, err := util.GetUser(s)
+	user, err := util.GetUser(s.Context())
 	if err != nil {
 		return fileList, err
 	}
@@ -154,39 +154,15 @@ func (r *FileHandlerRouter) GetLogger() *slog.Logger {
 }
 
 func (r *FileHandlerRouter) Validate(s ssh.Session) error {
-	var err error
-	key, err := utils.KeyText(s)
-	if err != nil {
-		return fmt.Errorf("key not found")
-	}
-
-	user, err := r.DBPool.FindUserForKey(s.User(), key)
+	user, err := util.GetUser(s.Context())
 	if err != nil {
 		return err
 	}
 
-	if user.Name == "" {
-		return fmt.Errorf("must have username set")
-	}
-
-	ff, _ := r.DBPool.FindFeatureForUser(user.ID, "plus")
-	// we have free tiers so users might not have a feature flag
-	// in which case we set sane defaults
-	if ff == nil {
-		ff = db.NewFeatureFlag(
-			user.ID,
-			"plus",
-			r.Cfg.MaxSize,
-			r.Cfg.MaxAssetSize,
-		)
-	}
-	// this is jank
-	ff.Data.StorageMax = ff.FindStorageMax(r.Cfg.MaxSize)
-	ff.Data.FileMax = ff.FindFileMax(r.Cfg.MaxAssetSize)
-
-	util.SetUser(s, user)
-	util.SetFeatureFlag(s, ff)
-
-	r.Cfg.Logger.Info("attempting to upload files", "user", user.Name, "space", r.Cfg.Space)
+	r.Cfg.Logger.Info(
+		"attempting to upload files",
+		"user", user.Name,
+		"space", r.Cfg.Space,
+	)
 	return nil
 }

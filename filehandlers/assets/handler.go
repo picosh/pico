@@ -116,7 +116,7 @@ func (h *UploadAssetHandler) GetLogger() *slog.Logger {
 }
 
 func (h *UploadAssetHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileInfo, utils.ReaderAtCloser, error) {
-	user, err := futil.GetUser(s)
+	user, err := futil.GetUser(s.Context())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -150,7 +150,7 @@ func (h *UploadAssetHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.Fil
 func (h *UploadAssetHandler) List(s ssh.Session, fpath string, isDir bool, recursive bool) ([]os.FileInfo, error) {
 	var fileList []os.FileInfo
 
-	user, err := futil.GetUser(s)
+	user, err := futil.GetUser(s.Context())
 	if err != nil {
 		return fileList, err
 	}
@@ -222,8 +222,8 @@ func (h *UploadAssetHandler) Validate(s ssh.Session) error {
 	ff.Data.StorageMax = ff.FindStorageMax(h.Cfg.MaxSize)
 	ff.Data.FileMax = ff.FindFileMax(h.Cfg.MaxAssetSize)
 
-	futil.SetFeatureFlag(s, ff)
-	futil.SetUser(s, user)
+	futil.SetFeatureFlag(s.Context(), ff)
+	futil.SetUser(s.Context(), user)
 
 	assetBucket := shared.GetAssetBucketName(user.ID)
 	bucket, err := h.Storage.UpsertBucket(assetBucket)
@@ -271,7 +271,7 @@ func (h *UploadAssetHandler) findDenylist(bucket sst.Bucket, project *db.Project
 }
 
 func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (string, error) {
-	user, err := futil.GetUser(s)
+	user, err := futil.GetUser(s.Context())
 	if err != nil {
 		h.Cfg.Logger.Error("user not found in ctx", "err", err.Error())
 		return "", err
@@ -330,7 +330,7 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 		return "", err
 	}
 
-	featureFlag, err := futil.GetFeatureFlag(s)
+	featureFlag, err := futil.GetFeatureFlag(s.Context())
 	if err != nil {
 		return "", err
 	}
@@ -423,7 +423,7 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 }
 
 func (h *UploadAssetHandler) Delete(s ssh.Session, entry *utils.FileEntry) error {
-	user, err := futil.GetUser(s)
+	user, err := futil.GetUser(s.Context())
 	if err != nil {
 		h.Cfg.Logger.Error("user not found in ctx", "err", err.Error())
 		return err

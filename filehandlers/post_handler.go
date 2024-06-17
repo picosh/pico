@@ -47,7 +47,7 @@ func NewScpPostHandler(dbpool db.DB, cfg *shared.ConfigSite, hooks ScpFileHooks,
 }
 
 func (h *ScpUploadHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileInfo, utils.ReaderAtCloser, error) {
-	user, err := util.GetUser(s)
+	user, err := util.GetUser(s.Context())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -76,7 +76,7 @@ func (h *ScpUploadHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileI
 
 func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string, error) {
 	logger := h.Cfg.Logger
-	user, err := util.GetUser(s)
+	user, err := util.GetUser(s.Context())
 	if err != nil {
 		logger.Error(err.Error())
 		return "", err
@@ -262,7 +262,7 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 
 func (h *ScpUploadHandler) Delete(s ssh.Session, entry *utils.FileEntry) error {
 	logger := h.Cfg.Logger
-	user, err := util.GetUser(s)
+	user, err := util.GetUser(s.Context())
 	if err != nil {
 		logger.Error(err.Error())
 		return err
