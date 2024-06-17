@@ -16,6 +16,7 @@ import (
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
 	"github.com/picosh/pico/db"
+	"github.com/picosh/pico/filehandlers/util"
 	futil "github.com/picosh/pico/filehandlers/util"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
@@ -192,38 +193,10 @@ func (h *UploadAssetHandler) List(s ssh.Session, fpath string, isDir bool, recur
 }
 
 func (h *UploadAssetHandler) Validate(s ssh.Session) error {
-	var err error
-	key, err := shared.KeyText(s)
-	if err != nil {
-		return fmt.Errorf("key not found")
-	}
-
-	user, err := h.DBPool.FindUserForKey(s.User(), key)
+	user, err := util.GetUser(s.Context())
 	if err != nil {
 		return err
 	}
-
-	if user.Name == "" {
-		return fmt.Errorf("must have username set")
-	}
-
-	ff, err := h.DBPool.FindFeatureForUser(user.ID, "plus")
-	// pgs.sh has a free tier so users might not have a feature flag
-	// in which case we set sane defaults
-	if err != nil {
-		ff = db.NewFeatureFlag(
-			user.ID,
-			"plus",
-			h.Cfg.MaxSize,
-			h.Cfg.MaxAssetSize,
-		)
-	}
-	// this is jank
-	ff.Data.StorageMax = ff.FindStorageMax(h.Cfg.MaxSize)
-	ff.Data.FileMax = ff.FindFileMax(h.Cfg.MaxAssetSize)
-
-	futil.SetFeatureFlag(s.Context(), ff)
-	futil.SetUser(s.Context(), user)
 
 	assetBucket := shared.GetAssetBucketName(user.ID)
 	bucket, err := h.Storage.UpsertBucket(assetBucket)

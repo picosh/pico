@@ -23,6 +23,8 @@ func NewSshAuthHandler(dbpool db.DB, logger *slog.Logger, cfg *shared.ConfigSite
 }
 
 func (r *SshAuthHandler) PubkeyAuthHandler(ctx ssh.Context, key ssh.PublicKey) bool {
+	shared.SetPublicKeyCtx(ctx, key)
+
 	pubkey, err := shared.KeyForKeyText(key)
 	if err != nil {
 		return false
