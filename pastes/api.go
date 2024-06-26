@@ -118,7 +118,7 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 			URL:            template.URL(cfg.FullPostURL(curl, post.Username, post.Slug)),
 			BlogURL:        template.URL(cfg.FullBlogURL(curl, post.Username)),
 			Title:          post.Filename,
-			PublishAt:      post.PublishAt.Format("02 Jan, 2006"),
+			PublishAt:      post.PublishAt.Format(time.DateOnly),
 			PublishAtISO:   post.PublishAt.Format(time.RFC3339),
 			UpdatedTimeAgo: shared.TimeAgo(post.UpdatedAt),
 			UpdatedAtISO:   post.UpdatedAt.Format(time.RFC3339),
@@ -188,7 +188,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		expiresAt := "never"
 		if post.ExpiresAt != nil {
-			expiresAt = post.ExpiresAt.Format("02 Jan, 2006")
+			expiresAt = post.ExpiresAt.Format(time.DateOnly)
 		}
 
 		unlisted := false
@@ -204,7 +204,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			BlogURL:      template.URL(cfg.BlogURL(username)),
 			Description:  post.Description,
 			Title:        post.Filename,
-			PublishAt:    post.PublishAt.Format("02 Jan, 2006"),
+			PublishAt:    post.PublishAt.Format(time.DateOnly),
 			PublishAtISO: post.PublishAt.Format(time.RFC3339),
 			Username:     username,
 			BlogName:     blogName,
@@ -220,7 +220,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			Description:  "Paste not found",
 			Title:        "Paste not found",
 			BlogURL:      template.URL(cfg.BlogURL(username)),
-			PublishAt:    time.Now().Format("02 Jan, 2006"),
+			PublishAt:    time.Now().Format(time.DateOnly),
 			PublishAtISO: time.Now().Format(time.RFC3339),
 			Username:     username,
 			BlogName:     blogName,
