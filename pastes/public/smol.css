@@ -111,21 +111,6 @@ code {
   padding: 0.1rem 0.3rem;
 }
 
-.pill {
-  border: 1px solid var(--link-color);
-  color: var(--link-color);
-}
-
-.pill-alert {
-  border: 1px solid var(--hover);
-  color: var(--hover);
-}
-
-.pill-info {
-  border: 1px solid var(--visited);
-  color: var(--visited);
-}
-
 pre {
   font-size: 14px;
   border-radius: 5px;
@@ -146,9 +131,10 @@ summary {
 
 h1,
 h2,
-h3 {
+h3,
+h4 {
   margin: 0;
-  padding: 0.6rem 0 0 0;
+  padding: 0.5rem 0 0 0;
   border: 0;
   font-style: normal;
   font-weight: inherit;
@@ -207,7 +193,7 @@ header {
 }
 
 p {
-  margin: 0.8rem 0;
+  margin: 0.5rem 0;
 }
 
 article {
@@ -217,8 +203,8 @@ article {
 blockquote {
   border-left: 5px solid var(--blockquote);
   background-color: var(--blockquote-bg);
-  padding: 0.8rem;
-  margin: 1rem 0;
+  padding: 0.5rem 0.75rem;
+  margin: 0.5rem 0;
 }
 
 blockquote > p {
@@ -231,7 +217,7 @@ blockquote code {
 
 ul,
 ol {
-  padding: 0 0 0 2rem;
+  padding: 0 0 0 1rem;
   list-style-position: outside;
 }
 
@@ -750,6 +736,21 @@ figure {
 
 .list-decimal {
   list-style-type: decimal;
+}
+
+.pill {
+  border: 1px solid var(--link-color);
+  color: var(--link-color);
+}
+
+.pill-alert {
+  border: 1px solid var(--hover);
+  color: var(--hover);
+}
+
+.pill-info {
+  border: 1px solid var(--visited);
+  color: var(--visited);
 }
 
 @media only screen and (max-width: 40em) {
