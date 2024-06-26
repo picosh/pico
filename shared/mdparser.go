@@ -230,7 +230,7 @@ func ParseText(text string) (*ParsedText, error) {
 		&hashtag.Extender{},
 		hili,
 		&anchor.Extender{
-			Position: anchor.Before,
+			Position: anchor.After,
 			Texter:   anchor.Text("#"),
 		},
 	}
