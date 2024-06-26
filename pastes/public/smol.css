@@ -41,7 +41,7 @@
     --main-hue: 250;
     --white: #f2f2f2;
     --white-light: #f2f2f2;
-    --white-dark: #c6c6c6;
+    --white-dark: #e8e8e8;
     --code: #414558;
     --pre: #252525;
     --bg-color: #282a36;
@@ -111,6 +111,21 @@ code {
   padding: 0.1rem 0.3rem;
 }
 
+.pill {
+  border: 1px solid var(--link-color);
+  color: var(--link-color);
+}
+
+.pill-alert {
+  border: 1px solid var(--hover);
+  color: var(--hover);
+}
+
+.pill-info {
+  border: 1px solid var(--visited);
+  color: var(--visited);
+}
+
 pre {
   font-size: 14px;
   border-radius: 5px;
@@ -126,6 +141,7 @@ small {
 
 summary {
   display: list-item;
+  cursor: pointer;
 }
 
 h1,
@@ -521,6 +537,16 @@ figure {
   padding: 0;
 }
 
+.px-2 {
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+.px-4 {
+  padding-left: 2rem;
+  padding-right: 2rem;
+}
+
 .py {
   padding-top: 0.5rem;
   padding-bottom: 0.5rem;
@@ -697,6 +723,33 @@ figure {
 .box {
   border: 2px solid var(--grey-light);
   padding: 0.5rem 0.75rem;
+}
+
+.box-sm {
+  border: 2px solid var(--grey-light);
+  padding: 0.15rem 0.35rem;
+}
+
+.box-alert {
+  border: 2px solid var(--hover);
+  padding: 0.5rem 0.75rem;
+}
+
+.box-sm-alert {
+  border: 2px solid var(--hover);
+  padding: 0.15rem 0.35rem;
+}
+
+.list-none {
+  list-style-type: none;
+}
+
+.list-disc {
+  list-style-type: disc;
+}
+
+.list-decimal {
+  list-style-type: decimal;
 }
 
 @media only screen and (max-width: 40em) {
