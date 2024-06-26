@@ -54,7 +54,7 @@
         <time datetime="{{.PublishAtISO}}">{{.PublishAt}}</time>
         <span>&middot;<span>
         <a href="{{.BlogURL}}">{{.BlogName}}</a></p>
-    {{if .Description}}<div class="my font-italic">{{.Description}}</div>{{end}}
+    {{if .Description}}<blockquote class="font-italic">{{.Description}}</blockquote>{{end}}
     <div class="tags">
     {{range .Tags}}
         <a class="tag" href="{{$.BlogURL}}?tag={{.}}">#{{.}}</a>
