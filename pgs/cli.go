@@ -479,8 +479,8 @@ func (c *Cmd) prune(prefix string, keepNumLatest int) error {
 
 	goodbye := rmProjects
 	if keepNumLatest > 0 {
-		max := len(rmProjects) - (keepNumLatest)
-		if max <= 0 {
+		pmax := len(rmProjects) - (keepNumLatest)
+		if pmax <= 0 {
 			out := fmt.Sprintf(
 				"no projects available to prune (retention policy: %d, total: %d)",
 				keepNumLatest,
@@ -489,7 +489,7 @@ func (c *Cmd) prune(prefix string, keepNumLatest int) error {
 			c.output(out)
 			return nil
 		}
-		goodbye = rmProjects[:max]
+		goodbye = rmProjects[:pmax]
 	}
 
 	for _, project := range goodbye {
@@ -547,11 +547,11 @@ func (c *Cmd) rm(projectName string) error {
 			}
 		}
 	} else {
-		e := fmt.Errorf("(%s) project not found for user (%s)", projectName, c.User.Name)
-		return e
+		msg := fmt.Sprintf("(%s) project record not found for user (%s)", projectName, c.User.Name)
+		c.output(msg)
 	}
 
-	err = c.RmProjectAssets(project.Name)
+	err = c.RmProjectAssets(projectName)
 	return err
 }
 
