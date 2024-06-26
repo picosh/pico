@@ -20,12 +20,12 @@
     </section>
     {{end}}
 
-    <section class="posts">
+    <section class="posts group mt">
         {{if .HasFilter}}
             <a href={{.URL}}>clear filters</a>
         {{end}}
         {{range .Posts}}
-        <article class="my">
+        <article>
             <div class="flex items-center">
                 <time datetime="{{.PublishAtISO}}" class="text-sm post-date">{{.PublishAt}}</time>
                 <span class="text-md flex-1"><a href="{{.URL}}">{{.Title}}</a></span>
