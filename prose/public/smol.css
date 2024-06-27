@@ -638,7 +638,7 @@ figure {
   font-size: 1.6rem;
   line-height: 1.15;
   border-bottom: 2px solid var(--grey);
-  padding-bottom: 1rem;
+  padding-bottom: 0.7rem;
 }
 
 .md h2 {
