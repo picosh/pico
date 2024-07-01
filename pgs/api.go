@@ -212,6 +212,21 @@ func (h *AssetHandler) handle(w http.ResponseWriter, r *http.Request) {
 			)
 			http.Redirect(w, r, fp.Filepath, fp.Status)
 			return
+		} else if hasProtocol(fp.Filepath) {
+			// fetch content from url and serve it
+			resp, err := http.Get(fp.Filepath)
+			if err != nil {
+				http.Error(w, "404 not found", http.StatusNotFound)
+				return
+			}
+
+			w.Header().Set("content-type", resp.Header.Get("content-type"))
+			w.WriteHeader(status)
+			_, err = io.Copy(w, resp.Body)
+			if err != nil {
+				h.Logger.Error("io copy", "err", err.Error())
+			}
+			return
 		}
 
 		attempts = append(attempts, fp.Filepath)
