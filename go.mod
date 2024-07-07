@@ -33,7 +33,7 @@ require (
 	github.com/neurosnap/go-exif-remove v0.0.0-20221010134343-50d1e3c35577
 	github.com/picosh/pobj v0.0.0-20240613155002-f703e1356060
 	github.com/picosh/ptun v0.0.0-20240529133708-fcf1376b935e
-	github.com/picosh/send v0.0.0-20240529200640-3667d1ad154e
+	github.com/picosh/send v0.0.0-20240706191319-a4ef3917a8bd
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06
 	github.com/sendgrid/sendgrid-go v3.14.0+incompatible
 	github.com/simplesurance/go-ip-anonymizer v0.0.0-20200429124537-35a880f8e87d
