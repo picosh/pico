@@ -219,8 +219,8 @@ github.com/olekukonko/tablewriter v0.0.5 h1:P2Ga83D34wi1o9J6Wh1mRuqd4mF/x/lgBS7N
 github.com/olekukonko/tablewriter v0.0.5/go.mod h1:hPp6KlRPjbx+hW8ykQs1w3UBbZlj6HuIJcUGPhkA7kY=
 github.com/philhofer/fwd v1.1.2 h1:bnDivRJ1EWPjUIRXV5KfORO897HTbpFAQddBdE8t7Gw=
 github.com/philhofer/fwd v1.1.2/go.mod h1:qkPdfjR2SIEbspLqpe1tO4n5yICnr2DY7mqEx2tUTP0=
-github.com/picosh/pobj v0.0.0-20240613155002-f703e1356060 h1:lMVTxeTjp6TnuJOd7xvxTbOhk7rTrZhEWBkVwlkXpQQ=
-github.com/picosh/pobj v0.0.0-20240613155002-f703e1356060/go.mod h1:CViLWaCp2KP/zJdd7miNPkJb6i0v9HOgZ2wdbQuxCrQ=
+github.com/picosh/pobj v0.0.0-20240708144544-9d0e2ca3d3dc h1:ylEMiypOHSUhZfMFljs++FhooNHAXFsMMsT1cxoPVHE=
+github.com/picosh/pobj v0.0.0-20240708144544-9d0e2ca3d3dc/go.mod h1:CViLWaCp2KP/zJdd7miNPkJb6i0v9HOgZ2wdbQuxCrQ=
 github.com/picosh/ptun v0.0.0-20240529133708-fcf1376b935e h1:Um9aCUg1ysiUaB0nh3400UHlFAnhd8BXBsawqePxxqQ=
 github.com/picosh/ptun v0.0.0-20240529133708-fcf1376b935e/go.mod h1:WXCrhe0l9VL3ji0pdhvSJD6LLx99rJoAA/+PUQXf0Mo=
 github.com/picosh/send v0.0.0-20240706191319-a4ef3917a8bd h1:8JkwHLddx7RU40lOdj9BRUPtKgpM9+GaSP66ikOSYbo=

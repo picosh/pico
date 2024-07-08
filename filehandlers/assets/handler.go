@@ -257,6 +257,7 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 	logger := h.GetLogger().With(
 		"user", user.Name,
 		"file", entry.Filepath,
+		"size", entry.Size,
 	)
 
 	bucket, err := getBucket(s)

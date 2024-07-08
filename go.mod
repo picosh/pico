@@ -31,7 +31,7 @@ require (
 	github.com/mmcdole/gofeed v1.3.0
 	github.com/muesli/reflow v0.3.0
 	github.com/neurosnap/go-exif-remove v0.0.0-20221010134343-50d1e3c35577
-	github.com/picosh/pobj v0.0.0-20240613155002-f703e1356060
+	github.com/picosh/pobj v0.0.0-20240708144544-9d0e2ca3d3dc
 	github.com/picosh/ptun v0.0.0-20240529133708-fcf1376b935e
 	github.com/picosh/send v0.0.0-20240706191319-a4ef3917a8bd
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06
