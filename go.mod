@@ -4,7 +4,7 @@ go 1.22
 
 // replace github.com/picosh/tunkit => ../tunkit
 
-replace github.com/picosh/send => ../send
+// replace github.com/picosh/send => ../send
 
 // replace github.com/picosh/pobj => ../pobj
 
