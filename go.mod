@@ -2,7 +2,7 @@ module github.com/picosh/pico
 
 go 1.22
 
-// replace github.com/picosh/ptun => ../ptun
+// replace github.com/picosh/tunkit => ../tunkit
 
 replace github.com/picosh/send => ../send
 
@@ -32,8 +32,8 @@ require (
 	github.com/muesli/reflow v0.3.0
 	github.com/neurosnap/go-exif-remove v0.0.0-20221010134343-50d1e3c35577
 	github.com/picosh/pobj v0.0.0-20240708144544-9d0e2ca3d3dc
-	github.com/picosh/ptun v0.0.0-20240529133708-fcf1376b935e
 	github.com/picosh/send v0.0.0-20240706191319-a4ef3917a8bd
+	github.com/picosh/tunkit v0.0.0-20240709033345-8315d4f3cd0e
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06
 	github.com/sendgrid/sendgrid-go v3.14.0+incompatible
 	github.com/simplesurance/go-ip-anonymizer v0.0.0-20200429124537-35a880f8e87d

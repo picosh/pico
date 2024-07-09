@@ -24,7 +24,7 @@ import (
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
-	"github.com/picosh/ptun"
+	"github.com/picosh/tunkit"
 )
 
 type ctxUserKey struct{}
@@ -79,7 +79,7 @@ func (e *ErrorHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, e.Err.Error(), http.StatusInternalServerError)
 }
 
-func createServeMux(handler *CliHandler, pubsub *ptun.PubSubHandler) func(ctx ssh.Context) http.Handler {
+func createServeMux(handler *CliHandler, pubsub *tunkit.PubSubHandler) func(ctx ssh.Context) http.Handler {
 	return func(ctx ssh.Context) http.Handler {
 		router := http.NewServeMux()
 
@@ -303,16 +303,16 @@ func StartSshServer() {
 		RegistryUrl: registryUrl,
 	}
 
-	pubsub := ptun.NewPubSubHandler(logger)
+	pubsub := tunkit.NewPubSubHandler(logger)
 	s, err := wish.NewServer(
 		wish.WithAddress(fmt.Sprintf("%s:%s", host, port)),
 		wish.WithHostKeyPath("ssh_data/term_info_ed25519"),
 		wish.WithPublicKeyAuth(AuthHandler(dbh, logger)),
 		wish.WithMiddleware(WishMiddleware(handler)),
-		ptun.WithWebTunnel(
-			ptun.NewWebTunnelHandler(createServeMux(handler, pubsub), logger),
+		tunkit.WithWebTunnel(
+			tunkit.NewWebTunnelHandler(createServeMux(handler, pubsub), logger),
 		),
-		ptun.WithPubSub(pubsub),
+		tunkit.WithPubSub(pubsub),
 	)
 
 	if err != nil {

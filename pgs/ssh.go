@@ -18,7 +18,6 @@ import (
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
 	wsh "github.com/picosh/pico/wish"
-	"github.com/picosh/ptun"
 	"github.com/picosh/send/list"
 	"github.com/picosh/send/pipe"
 	"github.com/picosh/send/proxy"
@@ -26,6 +25,7 @@ import (
 	wishrsync "github.com/picosh/send/send/rsync"
 	"github.com/picosh/send/send/scp"
 	"github.com/picosh/send/send/sftp"
+	"github.com/picosh/tunkit"
 )
 
 func createRouter(cfg *shared.ConfigSite, handler *uploadassets.UploadAssetHandler) proxy.Router {
@@ -91,7 +91,7 @@ func StartSshServer() {
 		AnalyticsQueue: ch,
 	}
 
-	webTunnel := &ptun.WebTunnelHandler{
+	webTunnel := &tunkit.WebTunnelHandler{
 		Logger:      logger,
 		HttpHandler: createHttpHandler(apiConfig),
 	}
@@ -101,7 +101,7 @@ func StartSshServer() {
 		wish.WithAddress(fmt.Sprintf("%s:%s", host, port)),
 		wish.WithHostKeyPath("ssh_data/term_info_ed25519"),
 		wish.WithPublicKeyAuth(sshAuth.PubkeyAuthHandler),
-		ptun.WithWebTunnel(webTunnel),
+		tunkit.WithWebTunnel(webTunnel),
 		withProxy(
 			cfg,
 			handler,
