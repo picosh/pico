@@ -17,8 +17,6 @@ github.com/andybalholm/cascadia v1.3.2 h1:3Xi6Dw5lHF15JtdcmAHD3i1+T8plmv7BQ/nsVi
 github.com/andybalholm/cascadia v1.3.2/go.mod h1:7gtRlve5FxPPgIgX36uWBX58OdBsSS6lUvCFb+h7KvU=
 github.com/anmitsu/go-shlex v0.0.0-20200514113438-38f4b401e2be h1:9AeTilPcZAjCFIImctFaOjnTIavg87rW78vTPkQqLI8=
 github.com/anmitsu/go-shlex v0.0.0-20200514113438-38f4b401e2be/go.mod h1:ySMOLuWl6zY27l47sB3qLNK6tF2fkHG55UZxx8oIVo4=
-github.com/antoniomika/go-rsync-receiver v0.0.0-20231110145728-c94949e1ab7d h1:NyzUTxebDLLdtNu1gY5hn/amdAEnKG9DOawz82LwNTY=
-github.com/antoniomika/go-rsync-receiver v0.0.0-20231110145728-c94949e1ab7d/go.mod h1:zmqePVIo1hp+WEKxERLLGHJBDOr8/z/T4eFqXgWIw1w=
 github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de h1:FxWPpzIjnTlhPwqqXc4/vE0f7GvRjuAsbW+HOIe8KnA=
 github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de/go.mod h1:DCaWoUhZrYW9p1lxo/cm8EmUOOzAPSEZNGF2DK1dJgw=
 github.com/atotto/clipboard v0.1.4 h1:EH0zSVneZPSuFR11BlR9YppQTVDbh5+16AmcJi4g1z4=
@@ -219,10 +217,12 @@ github.com/olekukonko/tablewriter v0.0.5 h1:P2Ga83D34wi1o9J6Wh1mRuqd4mF/x/lgBS7N
 github.com/olekukonko/tablewriter v0.0.5/go.mod h1:hPp6KlRPjbx+hW8ykQs1w3UBbZlj6HuIJcUGPhkA7kY=
 github.com/philhofer/fwd v1.1.2 h1:bnDivRJ1EWPjUIRXV5KfORO897HTbpFAQddBdE8t7Gw=
 github.com/philhofer/fwd v1.1.2/go.mod h1:qkPdfjR2SIEbspLqpe1tO4n5yICnr2DY7mqEx2tUTP0=
-github.com/picosh/pobj v0.0.0-20240708144544-9d0e2ca3d3dc h1:ylEMiypOHSUhZfMFljs++FhooNHAXFsMMsT1cxoPVHE=
-github.com/picosh/pobj v0.0.0-20240708144544-9d0e2ca3d3dc/go.mod h1:CViLWaCp2KP/zJdd7miNPkJb6i0v9HOgZ2wdbQuxCrQ=
-github.com/picosh/send v0.0.0-20240706191319-a4ef3917a8bd h1:8JkwHLddx7RU40lOdj9BRUPtKgpM9+GaSP66ikOSYbo=
-github.com/picosh/send v0.0.0-20240706191319-a4ef3917a8bd/go.mod h1:V418obz9YdzjS3/oFzyDFzmPDnLu1nvy3wkLaixiT84=
+github.com/picosh/go-rsync-receiver v0.0.0-20240709135253-1daf4b12a9fc h1:bvcsoOvaNHPquFnRkdraEo7+8t6bW7nWEhlALnwZPdI=
+github.com/picosh/go-rsync-receiver v0.0.0-20240709135253-1daf4b12a9fc/go.mod h1:i0iR3W4GSm1PuvVxB9OH32E5jP+CYkVb2NQSe0JCtlo=
+github.com/picosh/pobj v0.0.0-20240709135546-27097077b26a h1:Cr1xODiyd/SjjBRtYA9VX6Do3D+w+DansQzkb4NGeyA=
+github.com/picosh/pobj v0.0.0-20240709135546-27097077b26a/go.mod h1:VIkR1MZBvxSK2OO47jikxikAO/sKb/vTmXX5ZuYTIvo=
+github.com/picosh/send v0.0.0-20240709135413-81b1dd703a11 h1:ElTyYxJPPfAz+NLRL9qy+SQ9UYaSGlWXWl2yYrLPzCU=
+github.com/picosh/send v0.0.0-20240709135413-81b1dd703a11/go.mod h1:RAgLDK3LrDK6pNeXtU9tjo28obl5DxShcTUk2nm/KCM=
 github.com/picosh/senpai v0.0.0-20240503200611-af89e73973b0 h1:pBRIbiCj7K6rGELijb//dYhyCo8A3fvxW5dijrJVtjs=
 github.com/picosh/senpai v0.0.0-20240503200611-af89e73973b0/go.mod h1:QaBDtybFC5gz7EG/9c3bgzuyW7W5W2rYLFZxWNuWk3Q=
 github.com/picosh/tunkit v0.0.0-20240709033345-8315d4f3cd0e h1:3rNSjBJ6VlvngWF58V/z0fPLH7WyzKpSboC6YznECgw=
