@@ -4,7 +4,7 @@ WORKDIR /app
 
 RUN apk add --no-cache git sqlite-libs sqlite-dev build-base
 
-RUN git clone https://github.com/emersion/soju
+RUN git clone https://codeberg.org/emersion/soju.git
 
 COPY subscriber-change.diff .
 
