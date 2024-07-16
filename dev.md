@@ -13,7 +13,7 @@ Initialize local env variables using direnv
 echo dotenv > .envrc && direnv allow
 ```
 
-Boot up database
+Boot up database (or bring your own)
 
 ```bash
 docker compose up -f docker-compose.yml -f docker-compose.override.yml --profile db -d
@@ -26,21 +26,10 @@ make create
 make migrate
 ```
 
-Build services
-
 ```bash
-make build
-```
-
-All services are built inside the `./build` folder.
-
-If you want to start prose execute these binaries from the project root
-directory:
-
-```bash
-./build/prose-web
+go run ./cmd/pgs/ssh
 # in a separate terminal
-./build/prose-ssh
+go run ./cmd/pgs/web
 ```
 
 ## deployment
