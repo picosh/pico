@@ -12,6 +12,7 @@ import (
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
 	bm "github.com/charmbracelet/wish/bubbletea"
+	"github.com/muesli/termenv"
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/tui"
@@ -38,7 +39,7 @@ func createRouter(cfg *shared.ConfigSite, handler *UploadHandler, cliHandler *Cl
 			scp.Middleware(handler),
 			wishrsync.Middleware(handler),
 			auth.Middleware(handler),
-			wsh.PtyMdw(bm.Middleware(tui.CmsMiddleware(cfg))),
+			wsh.PtyMdw(bm.MiddlewareWithColorProfile(tui.CmsMiddleware(cfg), termenv.ANSI256)),
 			WishMiddleware(cliHandler),
 			wsh.LogMiddleware(handler.GetLogger()),
 		}
