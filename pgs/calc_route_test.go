@@ -348,7 +348,7 @@ func TestCalcRoutes(t *testing.T) {
 			},
 		},
 		{
-			Name: "redirect-to-site",
+			Name: "rewrite-to-site",
 			Actual: calcRoutes(
 				"public",
 				"/",
@@ -366,7 +366,7 @@ func TestCalcRoutes(t *testing.T) {
 			},
 		},
 		{
-			Name: "redirect-to-site-subdir",
+			Name: "rewrite-to-site-subdir",
 			Actual: calcRoutes(
 				"public",
 				"/plugin/nice/",
@@ -384,7 +384,7 @@ func TestCalcRoutes(t *testing.T) {
 			},
 		},
 		{
-			Name: "redirect-to-another-pgs-site",
+			Name: "rewrite-to-another-pgs-site",
 			Actual: calcRoutes(
 				"public",
 				"/my-site/index.html",
@@ -402,7 +402,7 @@ func TestCalcRoutes(t *testing.T) {
 			},
 		},
 		{
-			Name: "redirect-placeholders",
+			Name: "rewrite-placeholders",
 			Actual: calcRoutes(
 				"public",
 				"/news/02/12/2004/my-story",
