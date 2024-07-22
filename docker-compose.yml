@@ -29,20 +29,6 @@ services:
     profiles:
       - db
       - all
-  lists-web:
-    image: ghcr.io/picosh/pico/lists-web:latest
-    restart: always
-    profiles:
-      - lists
-      - services
-      - all
-  lists-ssh:
-    image: ghcr.io/picosh/pico/lists-ssh:latest
-    restart: always
-    profiles:
-      - lists
-      - services
-      - all
   pastes-web:
     image: ghcr.io/picosh/pico/pastes-web:latest
     restart: always

@@ -44,48 +44,6 @@ services:
     volumes:
       - ./data/imgs-storage/data:/storage/imgs
       - ./data/pgs-storage/data:/storage/pgs
-  lists-caddy:
-    image: ghcr.io/picosh/pico/caddy:latest
-    restart: always
-    networks:
-      - lists
-    env_file:
-      - .env.prod
-    environment:
-      APP_DOMAIN: ${LISTS_DOMAIN:-lists.sh}
-      APP_EMAIL: ${LISTS_EMAIL:-hello@pico.sh}
-    volumes:
-      - ${LISTS_CADDYFILE}:/etc/caddy/Caddyfile
-      - ./data/lists-caddy/data:/data
-      - ./data/lists-caddy/config:/config
-    ports:
-      - "${LISTS_HTTPS_V4:-443}:443"
-      - "${LISTS_HTTP_V4:-80}:80"
-      - "${LISTS_HTTPS_V6:-[::1]:443}:443"
-      - "${LISTS_HTTP_V6:-[::1]:80}:80"
-    profiles:
-      - lists
-      - caddy
-      - all
-  lists-web:
-    networks:
-      lists:
-        aliases:
-          - web
-    env_file:
-      - .env.prod
-  lists-ssh:
-    networks:
-      lists:
-        aliases:
-          - ssh
-    env_file:
-      - .env.prod
-    volumes:
-      - ./data/lists-ssh/data:/app/ssh_data
-    ports:
-      - "${LISTS_SSH_V4:-22}:2222"
-      - "${LISTS_SSH_V6:-[::1]:22}:2222"
   pastes-caddy:
     image: ghcr.io/picosh/pico/caddy:latest
     restart: always
@@ -362,12 +320,6 @@ networks:
     ipam:
       config:
         - subnet: 172.19.0.0/16
-  lists:
-    driver_opts:
-      com.docker.network.bridge.name: lists
-    ipam:
-      config:
-        - subnet: 172.20.0.0/16
   imgs:
     driver_opts:
       com.docker.network.bridge.name: imgs

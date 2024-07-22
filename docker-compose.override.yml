@@ -25,26 +25,6 @@ services:
       - ./data/storage/data:/storage
     ports:
       - "8080:8080"
-  lists-web:
-    build:
-      args:
-        APP: lists
-      target: release-web
-    env_file:
-      - .env.example
-    ports:
-      - "3000:3000"
-  lists-ssh:
-    build:
-      args:
-        APP: lists
-      target: release-ssh
-    env_file:
-      - .env.example
-    volumes:
-      - ./data/lists-ssh/data:/app/ssh_data
-    ports:
-      - "2220:2222"
   pastes-web:
     build:
       args:
