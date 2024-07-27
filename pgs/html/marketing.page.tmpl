@@ -42,21 +42,19 @@
     <div class="box">
       <h2 class="text-xl">Features</h2>
       <ul>
-        <li>25MB asset storage with our free tier</li>
-        <li>10GB asset storage with <a href="https://pico.sh/plus">pico+</a></li>
-        <li>Terminal workflows</li>
-        <li>No client-side installation required to fully manage static sites</li>
+        <li>Use familiar cli tools to fully manage static sites</li>
         <li>Distinct static sites as projects</li>
         <li>Unlimited projects, created instantly upon upload</li>
         <li>Deploy using <a href="https://pico.sh/file-uploads">rsync, sftp, or scp</a></li>
         <li>Promotion/rollback support</li>
         <li>Managed HTTPS for all projects</li>
-        <li><a href="https://pico.sh/pgs#access-control-list">Private projects</a></li>
+        <li>Site <a href="https://pico.sh/analytics">analytics</a></li>
         <li><a href="https://pico.sh/custom-domains#pgssh">Custom domains</a> for projects</li>
         <li><a href="https://pico.sh/pgs#custom-redirects">Custom redirects</a></li>
         <li><a href="https://pico.sh/pgs#custom-headers">Custom headers</a></li>
         <li><a href="https://pico.sh/pgs#single-page-applications">SPA support</a></li>
         <li><a href="https://pico.sh/images#image-manipulation">Image manipulation API</a></li>
+        <li><a href="https://pico.sh/pgs#access-control-list">Private projects</a></li>
         <li><a href="https://pico.sh/faq#are-there-any-bandwidth-limitations">No bandwidth limitations</a></li>
       </ul>
     </div>
@@ -75,39 +73,6 @@
         That's it! There's no need to formally create a project, we create them
         on-the-fly. Further, we provide TLS for every project automatically.
       </p>
-    </div>
-
-    <div class="box">
-      <h2 class="text-xl">Manage your projects with a remote CLI</h2>
-
-      <p>
-        Use our CLI to manage your projects:
-      </p>
-
-      <pre>ssh pgs.sh help</pre>
-    </div>
-
-    <div class="box">
-      <h2 class="text-xl">Instant promotion and rollback</h2>
-
-      <p>
-        Additionally you can setup a pipeline for promotion and rollbacks, which will
-        instantly update your project.
-      </p>
-
-      <pre>ssh pgs.sh link project-prod --to project-d0131d4</pre>
-    </div>
-
-    <div class="box">
-      <h2 class="text-xl">Private projects</h2>
-
-      <p>
-        With SSH tunnels we support private sites with an access control list API.  Try it out:
-      </p>
-
-      <pre>ssh -L 1337:localhost:80 -N pico-ui@pgs.sh</pre>
-
-      <p>Then go to <a href="http://localhost:1337">localhost:1337</a></p>
     </div>
 
     <div>
