@@ -10,6 +10,7 @@ import (
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/filehandlers"
 	"github.com/picosh/pico/shared"
+	"github.com/sergi/go-diff/diffmatchpatch"
 )
 
 type MarkdownHooks struct {
@@ -61,6 +62,10 @@ func (p *MarkdownHooks) FileMeta(s ssh.Session, data *filehandlers.PostMetaData)
 	data.Aliases = parsedText.Aliases
 	data.Tags = parsedText.Tags
 	data.Description = parsedText.Description
+
+	dmp := diffmatchpatch.New()
+	diffs := dmp.DiffMain(data.Cur.Text, data.Text, false)
+	data.Data.Diff = dmp.DiffPrettyText(diffs)
 
 	if parsedText.PublishAt != nil && !parsedText.PublishAt.IsZero() {
 		data.PublishAt = parsedText.MetaData.PublishAt

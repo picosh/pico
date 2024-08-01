@@ -160,7 +160,7 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tag := r.URL.Query().Get("tag")
-	pager := &db.Pager{Num: 1000, Page: 0}
+	pager := &db.Pager{Num: 250, Page: 0}
 	var posts []*db.Post
 	var p *db.Paginate[*db.Post]
 	if tag == "" {
@@ -169,6 +169,13 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 		p, err = dbpool.FindUserPostsByTag(pager, tag, user.ID, cfg.Space)
 	}
 	posts = p.Data
+
+	byUpdated := strings.Contains(r.URL.Path, "live")
+	if byUpdated {
+		slices.SortFunc(posts, func(a *db.Post, b *db.Post) int {
+			return b.UpdatedAt.Compare(*a.UpdatedAt)
+		})
+	}
 
 	if err != nil {
 		logger.Error(err.Error())
@@ -653,6 +660,13 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 	curl := shared.CreateURLFromRequest(cfg, r)
 	blogUrl := cfg.FullBlogURL(curl, username)
 
+	byUpdated := strings.Contains(r.URL.Path, "live")
+	if byUpdated {
+		slices.SortFunc(posts, func(a *db.Post, b *db.Post) int {
+			return b.UpdatedAt.Compare(*a.UpdatedAt)
+		})
+	}
+
 	feed := &feeds.Feed{
 		Id:          blogUrl,
 		Title:       headerTxt.Title,
@@ -691,12 +705,18 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		realUrl := cfg.FullPostURL(curl, post.Username, post.Slug)
+		feedId := realUrl
+
+		if byUpdated {
+			feedId = fmt.Sprintf("%s:%s", realUrl, post.UpdatedAt.Format(time.RFC3339))
+		}
 
 		item := &feeds.Item{
-			Id:          realUrl,
+			Id:          feedId,
 			Title:       shared.FilenameToTitle(post.Filename, post.Title),
 			Link:        &feeds.Link{Href: realUrl},
 			Content:     tpl.String(),
+			Updated:     *post.UpdatedAt,
 			Created:     *post.CreatedAt,
 			Description: post.Description,
 		}
@@ -849,36 +869,16 @@ func createMainRoutes(staticRoutes []shared.Route) []shared.Route {
 		staticRoutes...,
 	)
 
-	routes = append(
-		routes,
-		shared.NewRoute("GET", "/rss", rssHandler),
-		shared.NewRoute("GET", "/rss.xml", rssHandler),
-		shared.NewRoute("GET", "/atom.xml", rssHandler),
-		shared.NewRoute("GET", "/feed.xml", rssHandler),
-
-		shared.NewRoute("GET", "/([^/]+)", blogHandler),
-		shared.NewRoute("GET", "/([^/]+)/rss", rssBlogHandler),
-		shared.NewRoute("GET", "/([^/]+)/rss.xml", rssBlogHandler),
-		shared.NewRoute("GET", "/([^/]+)/atom.xml", rssBlogHandler),
-		shared.NewRoute("GET", "/([^/]+)/atom", rssBlogHandler),
-		shared.NewRoute("GET", "/([^/]+)/blog/index.xml", rssBlogHandler),
-		shared.NewRoute("GET", "/([^/]+)/feed.xml", rssBlogHandler),
-		shared.NewRoute("GET", "/([^/]+)/_styles.css", blogStyleHandler),
-		shared.NewRoute("GET", "/raw/([^/]+)/(.+)", postRawHandler),
-		shared.NewRoute("GET", "/([^/]+)/(.+)/(.+)", imgs.ImgRequest),
-		shared.NewRoute("GET", "/([^/]+)/(.+.(?:jpg|jpeg|png|gif|webp|svg))$", imgs.ImgRequest),
-		shared.NewRoute("GET", "/([^/]+)/i", imgs.ImgsListHandler),
-		shared.NewRoute("GET", "/([^/]+)/(.+)", postHandler),
-	)
-
 	return routes
 }
 
 func createSubdomainRoutes(staticRoutes []shared.Route) []shared.Route {
 	routes := []shared.Route{
 		shared.NewRoute("GET", "/", blogHandler),
+		shared.NewRoute("GET", "/live", blogHandler),
 		shared.NewRoute("GET", "/_styles.css", blogStyleHandler),
 		shared.NewRoute("GET", "/rss", rssBlogHandler),
+		shared.NewRoute("GET", "/live/rss", rssBlogHandler),
 		shared.NewRoute("GET", "/rss.xml", rssBlogHandler),
 		shared.NewRoute("GET", "/atom.xml", rssBlogHandler),
 		shared.NewRoute("GET", "/feed.xml", rssBlogHandler),
