@@ -83,6 +83,7 @@ type PostPageData struct {
 	Footer       template.HTML
 	Favicon      template.URL
 	Unlisted     bool
+	Diff         template.HTML
 }
 
 type TransparencyPageData struct {
@@ -399,6 +400,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 		favicon = readmeParsed.Favicon
 	}
 
+	diff := ""
 	post, err := dbpool.FindPostWithSlug(slug, user.ID, cfg.Space)
 	if err == nil {
 		parsedText, err := shared.ParseText(post.Text)
@@ -413,6 +415,14 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 		if parsedText.ImageCard != "" {
 			ogImageCard = parsedText.ImageCard
 		}
+
+		// if parsedText.Live {
+		if post.Data.Diff != "" {
+			str := "```diff\n" + post.Data.Diff + "\n```"
+			diffParsed, _ := shared.ParseText(str)
+			diff = diffParsed.Html
+		}
+		// }
 
 		// track visit
 		view, err := shared.AnalyticsVisitFromRequest(r, user.ID, cfg.Secret)
@@ -451,6 +461,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			Favicon:      template.URL(favicon),
 			Footer:       footerHTML,
 			Unlisted:     unlisted,
+			Diff:         template.HTML(diff),
 		}
 	} else {
 		// TODO: HACK to support imgs slugs inside prose

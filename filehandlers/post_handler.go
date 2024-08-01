@@ -139,6 +139,7 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 
 	if post != nil {
 		metadata.Cur = post
+		metadata.Data = post.Data
 		metadata.Post.PublishAt = post.PublishAt
 	}
 
