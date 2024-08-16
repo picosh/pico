@@ -1,8 +1,8 @@
 diff --git a/downstream.go b/downstream.go
-index f28b40f..caef2e2 100644
+index 8527e94..82e2158 100644
 --- a/downstream.go
 +++ b/downstream.go
-@@ -2952,6 +2952,9 @@ func (dc *downstreamConn) handleMessageRegistered(ctx context.Context, msg *irc.
+@@ -2926,6 +2926,9 @@ func (dc *downstreamConn) handleMessageRegistered(ctx context.Context, msg *irc.
  				network.pushTargets.Del(target)
  			}
  			go network.broadcastWebPush(&irc.Message{
@@ -12,7 +12,7 @@ index f28b40f..caef2e2 100644
  				Command: "MARKREAD",
  				Params:  []string{target, timestampStr},
  			})
-@@ -3203,6 +3206,10 @@ func (dc *downstreamConn) handleMessageRegistered(ctx context.Context, msg *irc.
+@@ -3173,6 +3176,10 @@ func (dc *downstreamConn) handleMessageRegistered(ctx context.Context, msg *irc.
  				}}
  			}
  
@@ -24,7 +24,7 @@ index f28b40f..caef2e2 100644
  				Endpoint: endpoint,
  			}
 diff --git a/server.go b/server.go
-index d26e873..407355f 100644
+index 1f56205..4375fad 100644
 --- a/server.go
 +++ b/server.go
 @@ -10,6 +10,7 @@ import (
@@ -35,7 +35,7 @@ index d26e873..407355f 100644
  	"sync"
  	"sync/atomic"
  	"time"
-@@ -325,6 +326,15 @@ func (s *Server) sendWebPush(ctx context.Context, sub *webpush.Subscription, vap
+@@ -328,6 +329,15 @@ func (s *Server) sendWebPush(ctx context.Context, sub *webpush.Subscription, vap
  	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
  	defer cancel()
  
@@ -51,7 +51,7 @@ index d26e873..407355f 100644
  	var urgency webpush.Urgency
  	switch msg.Command {
  	case "PRIVMSG", "NOTICE", "INVITE":
-@@ -339,12 +349,10 @@ func (s *Server) sendWebPush(ctx context.Context, sub *webpush.Subscription, vap
+@@ -342,12 +352,10 @@ func (s *Server) sendWebPush(ctx context.Context, sub *webpush.Subscription, vap
  		},
  		VAPIDPublicKey:  s.webPush.VAPIDKeys.Public,
  		VAPIDPrivateKey: s.webPush.VAPIDKeys.Private,
@@ -69,18 +69,18 @@ index d26e873..407355f 100644
  
  	if vapidPubKey != options.VAPIDPublicKey {
 diff --git a/upstream.go b/upstream.go
-index e3bdf4e..38ed883 100644
+index 6de6445..d734fa0 100644
 --- a/upstream.go
 +++ b/upstream.go
-@@ -683,6 +683,7 @@ func (uc *upstreamConn) handleMessage(ctx context.Context, msg *irc.Message) err
+@@ -695,6 +695,7 @@ func (uc *upstreamConn) handleMessage(ctx context.Context, msg *irc.Message) err
  		}
  
- 		if !self && (highlight || directMessage) {
+ 		if sendPushNotification && (highlight || directMessage) {
 +			msg.Tags["bouncerNetwork"] = strconv.FormatInt(uc.network.ID, 10)
  			go uc.network.broadcastWebPush(msg)
  			if timestamp, err := time.Parse(xirc.ServerTimeLayout, string(msg.Tags["time"])); err == nil {
  				uc.network.pushTargets.Set(bufferName, timestamp)
-@@ -1612,6 +1613,7 @@ func (uc *upstreamConn) handleMessage(ctx context.Context, msg *irc.Message) err
+@@ -1639,6 +1640,7 @@ func (uc *upstreamConn) handleMessage(ctx context.Context, msg *irc.Message) err
  		})
  
  		if weAreInvited {
