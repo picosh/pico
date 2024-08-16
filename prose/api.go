@@ -873,6 +873,7 @@ func createMainRoutes(staticRoutes []shared.Route) []shared.Route {
 		shared.NewRoute("GET", "/", readHandler),
 		shared.NewRoute("GET", "/read", readHandler),
 		shared.NewRoute("GET", "/check", shared.CheckHandler),
+		shared.NewRoute("GET", "/rss", rssHandler),
 	}
 
 	routes = append(
