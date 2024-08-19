@@ -59,6 +59,7 @@ type Project struct {
 	ProjectDir string     `json:"project_dir"`
 	Username   string     `json:"username"`
 	Acl        ProjectAcl `json:"acl"`
+	Blocked    string     `json:"blocked"`
 	CreatedAt  *time.Time `json:"created_at"`
 	UpdatedAt  *time.Time `json:"updated_at"`
 }

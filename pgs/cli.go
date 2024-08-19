@@ -24,6 +24,7 @@ func projectTable(styles common.Styles, projects []*db.Project, width int) *tabl
 		"Links To",
 		"ACL Type",
 		"ACL",
+		"Blocked",
 	}
 	data := [][]string{}
 	for _, project := range projects {
@@ -40,6 +41,7 @@ func projectTable(styles common.Styles, projects []*db.Project, width int) *tabl
 			project.Acl.Type,
 			strings.Join(project.Acl.Data, " "),
 		)
+		row = append(row, project.Blocked)
 		data = append(data, row)
 	}
 
