@@ -353,9 +353,8 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 	remaining := int64(storageMax) - int64(curStorageSize)
 	sizeRemaining := min(remaining+curFileSize, fileMax)
 	if sizeRemaining <= 0 {
-		msg := "storage quota reached"
-		wish.Fatalln(s, msg)
-		return "", fmt.Errorf(msg)
+		wish.Fatalln(s, "storage quota reached")
+		return "", fmt.Errorf("storage quota reached")
 	}
 	logger = logger.With(
 		"storage max", storageMax,

@@ -428,6 +428,7 @@ func TestCalcRoutes(t *testing.T) {
 	for _, fixture := range fixtures {
 		t.Run(fixture.Name, func(t *testing.T) {
 			if cmp.Equal(fixture.Actual, fixture.Expected) == false {
+				//nolint
 				t.Fatalf(cmp.Diff(fixture.Expected, fixture.Actual))
 			}
 		})

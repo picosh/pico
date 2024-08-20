@@ -69,6 +69,7 @@ func TestParseRedirectText(t *testing.T) {
 				t.Error(err)
 			}
 			if cmp.Equal(results, fixture.expect) == false {
+				//nolint
 				t.Fatalf(cmp.Diff(fixture.expect, results))
 			}
 		})
