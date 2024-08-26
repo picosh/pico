@@ -19,23 +19,21 @@
 
 	header {
 		# disable FLoC tracking
-		Permissions-Policy interest-cohort=()
+		?Permissions-Policy interest-cohort=()
 
 		# enable HSTS
-		Strict-Transport-Security max-age=31536000;
+		?Strict-Transport-Security max-age=31536000;
 
 		# disable clients from sniffing the media type
-		X-Content-Type-Options nosniff
+		?X-Content-Type-Options nosniff
 
 		# clickjacking protection
-		X-Frame-Options DENY
+		?X-Frame-Options DENY
 
 		# keep referrer data off of HTTP connections
-		Referrer-Policy no-referrer-when-downgrade
+		?Referrer-Policy no-referrer-when-downgrade
 
-		Content-Security-Policy "default-src 'self'; img-src * 'unsafe-inline'; style-src * 'unsafe-inline'"
-
-		X-XSS-Protection "1; mode=block"
+		?X-XSS-Protection "1; mode=block"
 	}
 
 	@caddymetrics {
