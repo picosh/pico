@@ -329,9 +329,16 @@ func userHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	keys, err := client.Dbpool.FindKeysForUser(user)
+	if err != nil {
+		client.Logger.Error(err.Error())
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	err = json.NewEncoder(w).Encode(user)
+	err = json.NewEncoder(w).Encode(keys)
 	if err != nil {
 		client.Logger.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
