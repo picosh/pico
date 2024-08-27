@@ -298,6 +298,46 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func userHandler(w http.ResponseWriter, r *http.Request) {
+	client := getClient(r)
+
+	if !client.hasPrivilegedAccess(getApiToken(r)) {
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+
+	var data sishData
+
+	err := json.NewDecoder(r.Body).Decode(&data)
+	if err != nil {
+		client.Logger.Error(err.Error())
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	client.Logger.Info(
+		"handle key",
+		"remoteAddress", data.RemoteAddress,
+		"user", data.Username,
+		"publicKey", data.PublicKey,
+	)
+
+	user, err := client.Dbpool.FindUserForName(data.Username)
+	if err != nil {
+		client.Logger.Error(err.Error())
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	err = json.NewEncoder(w).Encode(user)
+	if err != nil {
+		client.Logger.Error(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
 func genFeedItem(now time.Time, expiresAt time.Time, warning time.Time, txt string) *feeds.Item {
 	if now.After(warning) {
 		content := fmt.Sprintf(
@@ -549,6 +589,7 @@ func createMainRoutes() []shared.Route {
 		shared.NewRoute("GET", "/authorize", authorizeHandler),
 		shared.NewRoute("POST", "/token", tokenHandler),
 		shared.NewRoute("POST", "/key", keyHandler),
+		shared.NewRoute("POST", "/user", userHandler),
 		shared.NewRoute("GET", "/rss/(.+)", rssHandler),
 		shared.NewRoute("POST", "/redirect", redirectHandler),
 		shared.NewRoute("POST", "/webhook", paymentWebhookHandler(secret)),
