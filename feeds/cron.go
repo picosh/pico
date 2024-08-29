@@ -7,6 +7,7 @@ import (
 	html "html/template"
 	"io"
 	"log/slog"
+	"math"
 	"net/http"
 	"strings"
 	"text/template"
@@ -58,8 +59,10 @@ type Feed struct {
 }
 
 type DigestFeed struct {
-	Feeds   []*Feed
-	Options DigestOptions
+	Feeds        []*Feed
+	Options      DigestOptions
+	KeepAliveURL string
+	DaysLeft     string
 }
 
 type DigestOptions struct {
@@ -120,26 +123,36 @@ func NewFetcher(dbpool db.DB, cfg *shared.ConfigSite) *Fetcher {
 	}
 }
 
-func (f *Fetcher) Validate(lastDigest *time.Time, parsed *shared.ListParsedText) error {
+func (f *Fetcher) Validate(post *db.Post, parsed *shared.ListParsedText) error {
+	lastDigest := post.Data.LastDigest
 	if lastDigest == nil {
 		return nil
 	}
 
-	digestAt := digestOptionToTime(*lastDigest, parsed.DigestInterval)
 	now := time.Now().UTC()
+
+	expiresAt := post.ExpiresAt
+	if expiresAt != nil {
+		if post.ExpiresAt.After(now) {
+			return fmt.Errorf("(%s) post has expired, skipping", post.ExpiresAt.Format(time.RFC3339))
+		}
+	}
+
+	digestAt := digestOptionToTime(*lastDigest, parsed.DigestInterval)
 	if digestAt.After(now) {
-		return fmt.Errorf("(%s) not time to digest, skipping", digestAt)
+		return fmt.Errorf("(%s) not time to digest, skipping", digestAt.Format(time.RFC3339))
 	}
 	return nil
 }
 
 func (f *Fetcher) RunPost(logger *slog.Logger, user *db.User, post *db.Post) error {
-	logger.Info("running feed post", "filename", post.Filename)
+	logger = logger.With("filename", post.Filename)
+	logger.Info("running feed post")
 
 	parsed := shared.ListParseText(post.Text)
 
 	logger.Info("last digest at", "lastDigest", post.Data.LastDigest)
-	err := f.Validate(post.Data.LastDigest, parsed)
+	err := f.Validate(post, parsed)
 	if err != nil {
 		logger.Info("validation failed", "err", err.Error())
 		return nil
@@ -161,7 +174,7 @@ func (f *Fetcher) RunPost(logger *slog.Logger, user *db.User, post *db.Post) err
 		urls = append(urls, url)
 	}
 
-	msgBody, err := f.FetchAll(logger, urls, parsed.InlineContent, post.ID, user.Name)
+	msgBody, err := f.FetchAll(logger, urls, parsed.InlineContent, user.Name, post)
 	if err != nil {
 		return err
 	}
@@ -173,6 +186,10 @@ func (f *Fetcher) RunPost(logger *slog.Logger, user *db.User, post *db.Post) err
 	}
 
 	now := time.Now().UTC()
+	if post.ExpiresAt == nil {
+		expiresAt := time.Now().AddDate(0, 3, 0)
+		post.ExpiresAt = &expiresAt
+	}
 	post.Data.LastDigest = &now
 	_, err = f.db.UpdatePost(post)
 	return err
@@ -313,10 +330,19 @@ type MsgBody struct {
 	Text string
 }
 
-func (f *Fetcher) FetchAll(logger *slog.Logger, urls []string, inlineContent bool, postID string, username string) (*MsgBody, error) {
+func (f *Fetcher) FetchAll(logger *slog.Logger, urls []string, inlineContent bool, username string, post *db.Post) (*MsgBody, error) {
 	fp := gofeed.NewParser()
-	feeds := &DigestFeed{Options: DigestOptions{InlineContent: inlineContent}}
-	feedItems, err := f.db.FindFeedItemsByPostID(postID)
+	daysLeft := "90"
+	if post.ExpiresAt != nil {
+		diff := time.Since(*post.ExpiresAt)
+		daysLeft = fmt.Sprintf("%f", math.Ceil(diff.Hours()/24))
+	}
+	feeds := &DigestFeed{
+		KeepAliveURL: fmt.Sprintf("https://feeds.pico.sh/keep-alive/%s", post.ID),
+		DaysLeft:     daysLeft,
+		Options:      DigestOptions{InlineContent: inlineContent},
+	}
+	feedItems, err := f.db.FindFeedItemsByPostID(post.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -342,7 +368,7 @@ func (f *Fetcher) FetchAll(logger *slog.Logger, urls []string, inlineContent boo
 	for _, feed := range feeds.Feeds {
 		for _, item := range feed.FeedItems {
 			fdi = append(fdi, &db.FeedItem{
-				PostID: postID,
+				PostID: post.ID,
 				GUID:   item.GUID,
 				Data: db.FeedItemData{
 					Title:       item.Title,
@@ -354,7 +380,7 @@ func (f *Fetcher) FetchAll(logger *slog.Logger, urls []string, inlineContent boo
 			})
 		}
 	}
-	err = f.db.InsertFeedItems(postID, fdi)
+	err = f.db.InsertFeedItems(post.ID, fdi)
 	if err != nil {
 		return nil, err
 	}

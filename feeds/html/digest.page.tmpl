@@ -9,6 +9,11 @@ img {
 }
 </style>
 
+<blockquote>
+  In order to keep this digest email active you must <a href="{{.KeepAliveURL}}">click this link</a>.
+  You have {{.DaysLeft}} days left.
+</blockquote>
+
 <div class="feeds">
 {{range .Feeds}}
 <div style="margin-bottom: 10px;">

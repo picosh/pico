@@ -3,6 +3,8 @@ package feeds
 import (
 	"fmt"
 	"net/http"
+	"net/url"
+	"time"
 
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
@@ -21,9 +23,45 @@ func createStaticRoutes() []shared.Route {
 	}
 }
 
+func keepAliveHandler(w http.ResponseWriter, r *http.Request) {
+	dbpool := shared.GetDB(r)
+	logger := shared.GetLogger(r)
+	postID, _ := url.PathUnescape(shared.GetField(r, 0))
+
+	post, err := dbpool.FindPost(postID)
+	if err != nil {
+		logger.Info("post not found")
+		http.Error(w, "post not found", http.StatusNotFound)
+		return
+	}
+
+	now := time.Now()
+	expiresAt := now.AddDate(0, 3, 0)
+	post.ExpiresAt = &expiresAt
+	_, err = dbpool.UpdatePost(post)
+	if err != nil {
+		logger.Error("could not update post", "err", err.Error())
+		http.Error(w, "server error", 500)
+		return
+	}
+
+	w.Header().Add("Content-Type", "text/plain")
+
+	txt := fmt.Sprintf(
+		"Success! This feed will stay active until %s or by clicking the link in your digest email again",
+		time.Now(),
+	)
+	_, err = w.Write([]byte(txt))
+	if err != nil {
+		logger.Error("could not write to writer", "err", err.Error())
+		http.Error(w, "server error", 500)
+	}
+}
+
 func createMainRoutes(staticRoutes []shared.Route) []shared.Route {
 	routes := []shared.Route{
 		shared.NewRoute("GET", "/", shared.CreatePageHandler("html/marketing.page.tmpl")),
+		shared.NewRoute("GET", "/keep-alive/(.+)", keepAliveHandler),
 	}
 
 	routes = append(
