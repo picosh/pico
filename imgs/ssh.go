@@ -24,6 +24,7 @@ import (
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
+	psub "github.com/picosh/pubsub"
 	"github.com/picosh/tunkit"
 )
 
@@ -79,7 +80,7 @@ func (e *ErrorHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, e.Err.Error(), http.StatusInternalServerError)
 }
 
-func createServeMux(handler *CliHandler, pubsub *tunkit.PubSubHandler) func(ctx ssh.Context) http.Handler {
+func createServeMux(handler *CliHandler, pubsub *psub.Cfg) func(ctx ssh.Context) http.Handler {
 	return func(ctx ssh.Context) http.Handler {
 		router := http.NewServeMux()
 
@@ -87,12 +88,6 @@ func createServeMux(handler *CliHandler, pubsub *tunkit.PubSubHandler) func(ctx 
 		user, err := getUserCtx(ctx)
 		if err == nil && user != nil {
 			slug = user.Name
-		}
-
-		pubkeys, err := handler.DBPool.FindKeysForUser(user)
-		if err != nil {
-			handler.Logger.Error("cant get pubkeys for user", "err", err)
-			return router
 		}
 
 		proxy := httputil.NewSingleHostReverseProxy(&url.URL{
@@ -221,41 +216,26 @@ func createServeMux(handler *CliHandler, pubsub *tunkit.PubSubHandler) func(ctx 
 
 			if r.Request.Method == http.MethodPut && strings.Contains(r.Request.URL.Path, "/manifests/") {
 				digest := r.Header.Get("Docker-Content-Digest")
-				forwards := pubsub.GetForwards()
-				for _, rf := range forwards {
-					ck, err := shared.KeyForKeyText(rf.Pubkey)
-					if err != nil {
-						continue
-					}
-					found := false
-					for _, pk := range pubkeys {
-						if pk.Key == ck {
-							found = true
-						}
-					}
-					// event corresponds to a different user, skip
-					if !found {
-						continue
-					}
+				// [ ]/v2/erock/alpine/manifests/latest
+				splitPath := strings.Split(r.Request.URL.Path, "/")
+				img := splitPath[3]
+				tag := splitPath[5]
 
-					// [ ]/v2/erock/alpine/manifests/latest
-					splitPath := strings.Split(r.Request.URL.Path, "/")
-					img := splitPath[3]
-					tag := splitPath[5]
+				furl := fmt.Sprintf(
+					"digest=%s&image=%s&tag=%s",
+					url.QueryEscape(digest),
+					img,
+					tag,
+				)
+				handler.Logger.Info("sending event", "url", furl)
 
-					addr := rf.Listener.Addr()
-					furl := fmt.Sprintf(
-						"http://%s?digest=%s&image=%s&tag=%s",
-						addr.String(),
-						url.QueryEscape(digest),
-						img,
-						tag,
-					)
-					handler.Logger.Info("sending event", "url", furl)
-					_, err = http.Get(furl)
-					if err != nil {
-						handler.Logger.Error("could not make request to pubsub", "err", err)
-					}
+				err := pubsub.PubSub.Pub(&psub.Msg{
+					Name:   fmt.Sprintf("%s@%s:%s", user.Name, img, tag),
+					Reader: strings.NewReader(furl),
+				})
+
+				if err != nil {
+					handler.Logger.Error("pub error", "err", err)
 				}
 			}
 
@@ -296,14 +276,21 @@ func StartSshServer() {
 		panic(err)
 	}
 
+	pubsub := &psub.Cfg{
+		Logger: logger,
+		PubSub: &psub.PubSubMulticast{
+			Logger: logger,
+		},
+	}
+
 	handler := &CliHandler{
 		Logger:      logger,
 		DBPool:      dbh,
 		Storage:     st,
 		RegistryUrl: registryUrl,
+		PubSub:      pubsub,
 	}
 
-	pubsub := tunkit.NewPubSubHandler(logger)
 	s, err := wish.NewServer(
 		wish.WithAddress(fmt.Sprintf("%s:%s", host, port)),
 		wish.WithHostKeyPath("ssh_data/term_info_ed25519"),
@@ -312,7 +299,6 @@ func StartSshServer() {
 		tunkit.WithWebTunnel(
 			tunkit.NewWebTunnelHandler(createServeMux(handler, pubsub), logger),
 		),
-		tunkit.WithPubSub(pubsub),
 	)
 
 	if err != nil {

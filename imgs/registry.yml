@@ -5,6 +5,7 @@ storage:
   s3:
     region: us-east-1
     bucket: imgs
+    # regionendpoint: http://minio:9000
     regionendpoint: https://minio.pico.sh
   redirect:
     disable: true

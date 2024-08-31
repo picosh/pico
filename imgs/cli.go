@@ -12,11 +12,13 @@ import (
 
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
+	"github.com/google/uuid"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pico/tui/common"
 	sst "github.com/picosh/pobj/storage"
+	psub "github.com/picosh/pubsub"
 	"github.com/picosh/send/send/utils"
 )
 
@@ -186,12 +188,14 @@ type CliHandler struct {
 	Logger      *slog.Logger
 	Storage     storage.StorageServe
 	RegistryUrl string
+	PubSub      *psub.Cfg
 }
 
 func WishMiddleware(handler *CliHandler) wish.Middleware {
 	dbpool := handler.DBPool
 	log := handler.Logger
 	st := handler.Storage
+	pubsub := handler.PubSub
 
 	return func(next ssh.Handler) ssh.Handler {
 		return func(sesh ssh.Session) {
@@ -254,6 +258,16 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				opts.notice()
 				opts.bail(err)
 				return
+			} else if cmd == "sub" {
+				err = pubsub.PubSub.Sub(&psub.Subscriber{
+					ID:      uuid.NewString(),
+					Name:    fmt.Sprintf("%s@%s", user.Name, repoName),
+					Session: sesh,
+					Chan:    make(chan error),
+				})
+				if err != nil {
+					wish.Errorln(sesh, err)
+				}
 			} else {
 				next(sesh)
 				return
