@@ -12,6 +12,10 @@ table {
   border-collapse: separate;
 }
 
+header blockquote {
+  margin: var(--grid-height) 0;
+}
+
 .post-date {
   width: 110px;
 }
