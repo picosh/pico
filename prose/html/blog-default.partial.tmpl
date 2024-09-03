@@ -1,12 +1,12 @@
 {{define "blog-default"}}
 <header class="text-center">
-    <h1 class="text-2xl font-bold">{{.Header.Title}}</h1>
-    {{if .Header.Bio}}<p class="text-lg">{{.Header.Bio}}</p>{{end}}
+    <h1 class="text-2xl font-bold mt-2">{{.Header.Title}}</h1>
+    {{if .Header.Bio}}<span>{{.Header.Bio}}</span>{{end}}
     <nav>
         {{range .Header.Nav}}
-        <a href="{{.URL}}" class="text-lg">{{.Text}}</a> |
+        <a href="{{.URL}}" class="text-lg transform-none">{{.Text}}</a> |
         {{end}}
-        <a href="{{.RSSURL}}" class="text-lg">rss</a>
+        <a href="{{.RSSURL}}" class="text-lg transform-none">rss</a>
     </nav>
     <hr />
 </header>
@@ -20,7 +20,7 @@
     </section>
     {{end}}
 
-    <section class="posts group mt">
+    <section class="posts group mt-2">
         {{if .HasFilter}}
             <a href={{.URL}}>clear filters</a>
         {{end}}
@@ -28,7 +28,7 @@
         <article>
             <div class="flex items-center">
                 <time datetime="{{.PublishAtISO}}" class="text-sm post-date">{{.PublishAt}}</time>
-                <span class="text-md flex-1"><a href="{{.URL}}">{{.Title}}</a></span>
+                <span class="text-md flex-1 m-0 transform-none"><a href="{{.URL}}">{{.Title}}</a></span>
             </div>
         </article>
         {{end}}

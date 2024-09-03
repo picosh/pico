@@ -12,6 +12,14 @@ table {
   border-collapse: separate;
 }
 
+header blockquote {
+  margin: var(--grid-height) 0;
+}
+
+.transform-none {
+  text-transform: none;
+}
+
 .post-date {
   width: 110px;
 }
@@ -26,6 +34,10 @@ table {
 
 .layout-aside img {
   border-radius: 5px;
+}
+
+.footnotes li p {
+  display: inline;
 }
 
 #readme {

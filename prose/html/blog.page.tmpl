@@ -41,6 +41,10 @@
 {{if .Header.Bio}}<meta property="twitter:description" content="{{.Header.Bio}}">{{end}}
 
 <link rel="alternate" href="{{.RSSURL}}" type="application/rss+xml" title="RSS feed for {{.Header.Title}}" />
+{{if .WithStyles}}
+  <link rel="stylesheet" href="/smol.css" />
+{{else}}
+{{end}}
 <link rel="stylesheet" href="/syntax.css" />
 {{if .HasCSS}}<link rel="stylesheet" href="{{.CssURL}}" />{{end}}
 {{end}}

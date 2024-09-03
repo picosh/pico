@@ -41,6 +41,10 @@
 {{if .Description}}<meta property="twitter:description" content="{{.Description}}">{{end}}
 
 <link rel="stylesheet" href="/syntax.css" />
+{{if .WithStyles}}
+  <link rel="stylesheet" href="/smol.css" />
+{{else}}
+{{end}}
 {{if .HasCSS}}<link rel="stylesheet" href="{{.CssURL}}" />{{end}}
 {{end}}
 
@@ -53,13 +57,15 @@
         {{if .Unlisted}} <code>unlisted</code>{{end}}
         <time datetime="{{.PublishAtISO}}">{{.PublishAt}}</time>
         <span>&middot;<span>
-        <a href="{{.BlogURL}}">{{.BlogName}}</a></p>
-    {{if .Description}}<blockquote class="font-italic">{{.Description}}</blockquote>{{end}}
+        <a href="{{.BlogURL}}">{{.BlogName}}</a>
+    </p>
+    {{if .Description}}<blockquote>{{.Description}}</blockquote>{{end}}
     <div class="tags">
     {{range .Tags}}
-        <a class="tag" href="{{$.BlogURL}}?tag={{.}}">#{{.}}</a>
+        <a class="link-alt tag" href="{{$.BlogURL}}?tag={{.}}">#{{.}}</a>
     {{end}}
     </div>
+    <hr />
 </header>
 <main>
     <article class="md">

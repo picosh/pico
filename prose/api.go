@@ -40,17 +40,18 @@ type PostItemData struct {
 }
 
 type BlogPageData struct {
-	Site      shared.SitePageData
-	PageTitle string
-	URL       template.URL
-	RSSURL    template.URL
-	Username  string
-	Readme    *ReadmeTxt
-	Header    *HeaderTxt
-	Posts     []PostItemData
-	HasCSS    bool
-	CssURL    template.URL
-	HasFilter bool
+	Site       shared.SitePageData
+	PageTitle  string
+	URL        template.URL
+	RSSURL     template.URL
+	Username   string
+	Readme     *ReadmeTxt
+	Header     *HeaderTxt
+	Posts      []PostItemData
+	HasCSS     bool
+	WithStyles bool
+	CssURL     template.URL
+	HasFilter  bool
 }
 
 type ReadPageData struct {
@@ -76,6 +77,7 @@ type PostPageData struct {
 	PublishAtISO string
 	PublishAt    string
 	HasCSS       bool
+	WithStyles   bool
 	CssURL       template.URL
 	Tags         []string
 	Image        template.URL
@@ -92,14 +94,15 @@ type TransparencyPageData struct {
 }
 
 type HeaderTxt struct {
-	Title     string
-	Bio       string
-	Nav       []shared.Link
-	HasLinks  bool
-	Layout    string
-	Image     template.URL
-	ImageCard string
-	Favicon   template.URL
+	Title      string
+	Bio        string
+	Nav        []shared.Link
+	HasLinks   bool
+	Layout     string
+	Image      template.URL
+	ImageCard  string
+	Favicon    template.URL
+	WithStyles bool
 }
 
 type ReadmeTxt struct {
@@ -199,10 +202,11 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	headerTxt := &HeaderTxt{
-		Title:     GetBlogName(username),
-		Bio:       "",
-		Layout:    "default",
-		ImageCard: "summary",
+		Title:      GetBlogName(username),
+		Bio:        "",
+		Layout:     "default",
+		ImageCard:  "summary",
+		WithStyles: true,
 	}
 	readmeTxt := &ReadmeTxt{}
 
@@ -216,6 +220,7 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 		headerTxt.Layout = parsedText.Layout
 		headerTxt.Image = template.URL(parsedText.Image)
 		headerTxt.ImageCard = parsedText.ImageCard
+		headerTxt.WithStyles = parsedText.WithStyles
 		headerTxt.Favicon = template.URL(parsedText.Favicon)
 		if parsedText.Title != "" {
 			headerTxt.Title = parsedText.Title
@@ -276,17 +281,18 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := BlogPageData{
-		Site:      *cfg.GetSiteData(),
-		PageTitle: headerTxt.Title,
-		URL:       template.URL(cfg.FullBlogURL(curl, username)),
-		RSSURL:    template.URL(cfg.RssBlogURL(curl, username, tag)),
-		Readme:    readmeTxt,
-		Header:    headerTxt,
-		Username:  username,
-		Posts:     postCollection,
-		HasCSS:    hasCSS,
-		CssURL:    template.URL(cfg.CssURL(username)),
-		HasFilter: tag != "",
+		Site:       *cfg.GetSiteData(),
+		PageTitle:  headerTxt.Title,
+		URL:        template.URL(cfg.FullBlogURL(curl, username)),
+		RSSURL:     template.URL(cfg.RssBlogURL(curl, username, tag)),
+		Readme:     readmeTxt,
+		Header:     headerTxt,
+		Username:   username,
+		Posts:      postCollection,
+		HasCSS:     hasCSS,
+		CssURL:     template.URL(cfg.CssURL(username)),
+		HasFilter:  tag != "",
+		WithStyles: headerTxt.WithStyles,
 	}
 
 	err = ts.Execute(w, data)
@@ -366,6 +372,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	ogImage := ""
 	ogImageCard := ""
 	hasCSS := false
+	withStyles := true
 	var data PostPageData
 
 	css, err := dbpool.FindPostWithFilename("_styles.css", user.ID, cfg.Space)
@@ -395,6 +402,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 		if readmeParsed.MetaData.Title != "" {
 			blogName = readmeParsed.MetaData.Title
 		}
+		withStyles = readmeParsed.WithStyles
 		ogImage = readmeParsed.Image
 		ogImageCard = readmeParsed.ImageCard
 		favicon = readmeParsed.Favicon
@@ -454,6 +462,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			Footer:       footerHTML,
 			Unlisted:     unlisted,
 			Diff:         template.HTML(diff),
+			WithStyles:   withStyles,
 		}
 	} else {
 		// TODO: HACK to support imgs slugs inside prose

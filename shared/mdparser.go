@@ -40,6 +40,7 @@ type MetaData struct {
 	ImageCard   string
 	Favicon     string
 	Hidden      bool
+	WithStyles  bool
 }
 
 type ParsedText struct {
@@ -68,9 +69,9 @@ func toString(obj interface{}) (string, error) {
 	}
 }
 
-func toBool(obj interface{}) (bool, error) {
+func toBool(obj interface{}, fallback bool) (bool, error) {
 	if obj == nil {
-		return false, nil
+		return fallback, nil
 	}
 	switch val := obj.(type) {
 	case bool:
@@ -213,8 +214,9 @@ func CreateGoldmark(extenders ...goldmark.Extender) goldmark.Markdown {
 func ParseText(text string) (*ParsedText, error) {
 	parsed := ParsedText{
 		MetaData: &MetaData{
-			Tags:    []string{},
-			Aliases: []string{},
+			Tags:       []string{},
+			Aliases:    []string{},
+			WithStyles: true,
 		},
 	}
 	hili := highlighting.NewHighlighting(
@@ -291,11 +293,17 @@ func ParseText(text string) (*ParsedText, error) {
 	}
 	parsed.MetaData.ImageCard = card
 
-	hidden, err := toBool(metaData["draft"])
+	hidden, err := toBool(metaData["draft"], false)
 	if err != nil {
 		return &parsed, fmt.Errorf("front-matter field (%s): %w", "draft", err)
 	}
 	parsed.MetaData.Hidden = hidden
+
+	withStyles, err := toBool(metaData["with_styles"], true)
+	if err != nil {
+		return &parsed, fmt.Errorf("front-matter field (%s): %w", "with_style", err)
+	}
+	parsed.MetaData.WithStyles = withStyles
 
 	favicon, err := toString(metaData["favicon"])
 	if err != nil {
