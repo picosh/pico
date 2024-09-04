@@ -45,6 +45,26 @@ services:
       - ./data/pastes-ssh/data:/app/ssh_data
     ports:
       - "2221:2222"
+  pubsub-web:
+    build:
+      args:
+        APP: pubsub
+      target: release-web
+    env_file:
+      - .env.example
+    ports:
+      - "3001:3000"
+  pubsub-ssh:
+    build:
+      args:
+        APP:pubsub
+      target: release-ssh
+    env_file:
+      - .env.example
+    volumes:
+      - ./data/pubsub-ssh/data:/app/ssh_data
+    ports:
+      - "2221:2222"
   prose-web:
     build:
       args:

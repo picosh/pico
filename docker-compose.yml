@@ -43,6 +43,20 @@ services:
       - pastes
       - services
       - all
+  pubsub-web:
+    image: ghcr.io/picosh/pico/pubsub-web:latest
+    restart: always
+    profiles:
+      - pubsub
+      - services
+      - all
+  pubsub-ssh:
+    image: ghcr.io/picosh/pico/pubsub-ssh:latest
+    restart: always
+    profiles:
+      - pubsub
+      - services
+      - all
   prose-web:
     image: ghcr.io/picosh/pico/prose-web:latest
     restart: always

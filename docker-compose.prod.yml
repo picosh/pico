@@ -86,6 +86,48 @@ services:
     ports:
       - "${PASTES_SSH_V4:-22}:2222"
       - "${PASTES_SSH_V6:-[::1]:22}:2222"
+  pubsub-caddy:
+    image: ghcr.io/picosh/pico/caddy:latest
+    restart: always
+    networks:
+      - pubsub
+    env_file:
+      - .env.prod
+    environment:
+      APP_DOMAIN: ${PUBSUB_DOMAIN:-pubsub.sh}
+      APP_EMAIL: ${PUBSUB_EMAIL:-hello@pico.sh}
+    volumes:
+      - ${PUBSUB_CADDYFILE}:/etc/caddy/Caddyfile
+      - ./data/pubsub-caddy/data:/data
+      - ./data/pubsub-caddy/config:/config
+    ports:
+      - "${PUBSUB_HTTPS_V4:-443}:443"
+      - "${PUBSUB_HTTP_V4:-80}:80"
+      - "${PUBSUB_HTTPS_V6:-[::1]:443}:443"
+      - "${PUBSUB_HTTP_V6:-[::1]:80}:80"
+    profiles:
+      - pubsub
+      - caddy
+      - all
+  pubsub-web:
+    networks:
+      pubsub:
+        aliases:
+          - web
+    env_file:
+      - .env.prod
+  pubsub-ssh:
+    networks:
+      pubsub:
+        aliases:
+          - ssh
+    env_file:
+      - .env.prod
+    volumes:
+      - ./data/pubsub-ssh/data:/app/ssh_data
+    ports:
+      - "${PUBSUB_SSH_V4:-22}:2222"
+      - "${PUBSUB_SSH_V6:-[::1]:22}:2222"
   prose-caddy:
     image: ghcr.io/picosh/pico/caddy:latest
     restart: always
@@ -344,3 +386,9 @@ networks:
     ipam:
       config:
         - subnet: 172.25.0.0/16
+  pubsub:
+    driver_opts:
+      com.docker.network.bridge.name: pubsub
+    ipam:
+      config:
+        - subnet: 172.27.0.0/16
