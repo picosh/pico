@@ -94,7 +94,7 @@ services:
     env_file:
       - .env.prod
     environment:
-      APP_DOMAIN: ${PUBSUB_DOMAIN:-pubsub.sh}
+      APP_DOMAIN: ${PUBSUB_DOMAIN:-send.pico.sh}
       APP_EMAIL: ${PUBSUB_EMAIL:-hello@pico.sh}
     volumes:
       - ${PUBSUB_CADDYFILE}:/etc/caddy/Caddyfile
