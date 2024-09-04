@@ -268,7 +268,7 @@ func StartSshServer() {
 	minioUser := shared.GetEnv("MINIO_ROOT_USER", "")
 	minioPass := shared.GetEnv("MINIO_ROOT_PASSWORD", "")
 
-	logger := shared.CreateLogger(false)
+	logger := shared.CreateLogger()
 	logger.Info("bootup", "registry", registryUrl, "minio", minioUrl)
 	dbh := postgres.NewDB(dbUrl, logger)
 	st, err := storage.NewStorageMinio(minioUrl, minioUser, minioPass)

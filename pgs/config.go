@@ -8,7 +8,6 @@ var maxSize = uint64(25 * shared.MB)
 var maxAssetSize = int64(10 * shared.MB)
 
 func NewConfigSite() *shared.ConfigSite {
-	debug := shared.GetEnv("PGS_DEBUG", "0")
 	domain := shared.GetEnv("PGS_DOMAIN", "pgs.sh")
 	port := shared.GetEnv("PGS_WEB_PORT", "3000")
 	protocol := shared.GetEnv("PGS_PROTOCOL", "https")
@@ -23,7 +22,6 @@ func NewConfigSite() *shared.ConfigSite {
 	}
 
 	cfg := shared.ConfigSite{
-		Debug:        debug == "1",
 		Secret:       secret,
 		Domain:       domain,
 		Port:         port,
@@ -36,7 +34,7 @@ func NewConfigSite() *shared.ConfigSite {
 		Space:        "pgs",
 		MaxSize:      maxSize,
 		MaxAssetSize: maxAssetSize,
-		Logger:       shared.CreateLogger(debug == "1"),
+		Logger:       shared.CreateLogger(),
 	}
 
 	return &cfg

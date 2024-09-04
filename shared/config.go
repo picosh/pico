@@ -261,7 +261,7 @@ func (c *ConfigSite) AssetURL(username, projectName, fpath string) string {
 	)
 }
 
-func CreateLogger(debug bool) *slog.Logger {
+func CreateLogger() *slog.Logger {
 	opts := &slog.HandlerOptions{
 		AddSource: true,
 	}

@@ -53,7 +53,7 @@ bp-%: bp-setup
 	$(DOCKER_BUILDX_BUILD) --build-arg "APP=$*" -t "ghcr.io/picosh/pico/$*-web:$(DOCKER_TAG)" --target release-web .
 .PHONY: bp-%
 
-bp-all: bp-prose bp-pastes bp-imgs bp-feeds bp-pgs bp-auth bp-bouncer
+bp-all: bp-prose bp-pastes bp-imgs bp-feeds bp-pgs bp-auth bp-bouncer bp-pubsub
 .PHONY: bp-all
 
 build-auth:
@@ -69,7 +69,7 @@ build-%:
 	go build -o "build/$*-ssh" "./cmd/$*/ssh"
 .PHONY: build-%
 
-build: build-prose build-pastes build-imgs build-feeds build-pgs build-auth build-pico
+build: build-prose build-pastes build-imgs build-feeds build-pgs build-auth build-pico build-pubsub
 .PHONY: build
 
 store-clean:

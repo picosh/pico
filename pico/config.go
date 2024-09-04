@@ -10,6 +10,6 @@ func NewConfigSite() *shared.ConfigSite {
 	return &shared.ConfigSite{
 		DbURL:  dbURL,
 		Space:  "pico",
-		Logger: shared.CreateLogger(false),
+		Logger: shared.CreateLogger(),
 	}
 }

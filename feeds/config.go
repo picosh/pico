@@ -30,6 +30,6 @@ func NewConfigSite() *shared.ConfigSite {
 		Space:       "feeds",
 		AllowedExt:  []string{".txt"},
 		HiddenPosts: []string{"_header.txt", "_readme.txt"},
-		Logger:      shared.CreateLogger(debug == "1"),
+		Logger:      shared.CreateLogger(),
 	}
 }
