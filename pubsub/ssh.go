@@ -44,8 +44,8 @@ func StartSshServer() {
 		wish.WithAddress(fmt.Sprintf("%s:%s", host, port)),
 		wish.WithHostKeyPath("ssh_data/term_info_ed25519"),
 		wish.WithPublicKeyAuth(sshAuth.PubkeyAuthHandler),
-		wish.WithMiddleware(WishMiddleware(handler)),
 		wish.WithMiddleware(
+			WishMiddleware(handler),
 			promwish.Middleware(fmt.Sprintf("%s:%s", host, promPort), "pubsub-ssh"),
 			wsh.LogMiddleware(logger),
 		),

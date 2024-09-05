@@ -103,6 +103,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 			}
 
 			if len(args) == 0 {
+				opts.help()
 				next(sesh)
 				return
 			}
@@ -111,15 +112,12 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 			if len(args) == 1 {
 				if cmd == "help" {
 					opts.help()
-					return
 				} else if cmd == "ls" {
 					err := opts.ls()
 					opts.bail(err)
-					return
-				} else {
-					next(sesh)
-					return
 				}
+				next(sesh)
+				return
 			}
 
 			repoName := strings.TrimSpace(args[1])
@@ -150,10 +148,9 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				if err != nil {
 					wish.Errorln(sesh, err)
 				}
-			} else {
-				next(sesh)
-				return
 			}
+
+			next(sesh)
 		}
 	}
 }
