@@ -30,6 +30,7 @@ func StartSshServer() {
 		Logger: logger,
 		PubSub: &psub.PubSubMulticast{
 			Logger: logger,
+			Chan:   make(chan *psub.Subscriber),
 		},
 	}
 
