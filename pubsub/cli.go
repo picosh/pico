@@ -2,8 +2,10 @@ package pubsub
 
 import (
 	"fmt"
+	"io"
 	"log/slog"
 	"strings"
+	"text/tabwriter"
 
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
@@ -11,10 +13,13 @@ import (
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
-	"github.com/picosh/pico/tui/common"
 	psub "github.com/picosh/pubsub"
 	"github.com/picosh/send/send/utils"
 )
+
+func NewTabWriter(out io.Writer) *tabwriter.Writer {
+	return tabwriter.NewWriter(out, 0, 0, 1, ' ', tabwriter.TabIndent)
+}
 
 func getUser(s ssh.Session, dbpool db.DB) (*db.User, error) {
 	var err error
@@ -35,42 +40,7 @@ func getUser(s ssh.Session, dbpool db.DB) (*db.User, error) {
 	return user, nil
 }
 
-type Cmd struct {
-	User    *db.User
-	Session shared.CmdSession
-	Log     *slog.Logger
-	Dbpool  db.DB
-	Styles  common.Styles
-}
-
-func (c *Cmd) output(out string) {
-	_, _ = c.Session.Write([]byte(out + "\r\n"))
-}
-
-func (c *Cmd) error(err error) {
-	_, _ = fmt.Fprint(c.Session.Stderr(), err, "\r\n")
-	_ = c.Session.Exit(1)
-	_ = c.Session.Close()
-}
-
-func (c *Cmd) bail(err error) {
-	if err == nil {
-		return
-	}
-	c.Log.Error(err.Error())
-	c.error(err)
-}
-
-func (c *Cmd) help() {
-	helpStr := "Commands: [pub, sub, ls]\n"
-	c.output(helpStr)
-}
-
-func (c *Cmd) ls() error {
-	helpStr := "TODO\n"
-	c.output(helpStr)
-	return nil
-}
+var helpStr = "Commands: [pub, sub, ls]\n"
 
 type CliHandler struct {
 	DBPool      db.DB
@@ -95,15 +65,8 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 
 			args := sesh.Command()
 
-			opts := Cmd{
-				Session: sesh,
-				User:    user,
-				Log:     log,
-				Dbpool:  dbpool,
-			}
-
 			if len(args) == 0 {
-				opts.help()
+				wish.Println(sesh, helpStr)
 				next(sesh)
 				return
 			}
@@ -111,10 +74,24 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 			cmd := strings.TrimSpace(args[0])
 			if len(args) == 1 {
 				if cmd == "help" {
-					opts.help()
+					wish.Println(sesh, helpStr)
 				} else if cmd == "ls" {
-					err := opts.ls()
-					opts.bail(err)
+					subs := pubsub.PubSub.GetSubs()
+
+					if len(subs) == 0 {
+						wish.Println(sesh, "no subs found")
+					} else {
+						writer := NewTabWriter(sesh)
+						fmt.Fprintln(writer, "Channel\tID")
+						for _, sub := range subs {
+							fmt.Fprintf(
+								writer,
+								"%s\t%s\n",
+								sub.Name, sub.ID,
+							)
+						}
+						writer.Flush()
+					}
 				}
 				next(sesh)
 				return
@@ -131,19 +108,37 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 			)
 
 			if cmd == "pub" {
-				err = pubsub.PubSub.Pub(&psub.Msg{
+				wish.Println(sesh, "sending msg ...")
+				msg := &psub.Msg{
 					Name:   fmt.Sprintf("%s@%s", user.Name, repoName),
 					Reader: sesh,
-				})
+				}
+
+				// hacky: we want to notify when no subs are found so
+				// we duplicate some logic for now
+				subs := pubsub.PubSub.GetSubs()
+				found := false
+				for _, sub := range subs {
+					if pubsub.PubSub.PubMatcher(msg, sub) {
+						found = true
+						break
+					}
+				}
+				if !found {
+					wish.Println(sesh, "no subs found ... waiting")
+				}
+
+				err = pubsub.PubSub.Pub(msg)
+				wish.Println(sesh, "msg sent!")
 				if err != nil {
 					wish.Errorln(sesh, err)
 				}
 			} else if cmd == "sub" {
 				err = pubsub.PubSub.Sub(&psub.Subscriber{
-					ID:      uuid.NewString(),
-					Name:    fmt.Sprintf("%s@%s", user.Name, repoName),
-					Session: sesh,
-					Chan:    make(chan error),
+					ID:     uuid.NewString(),
+					Name:   fmt.Sprintf("%s@%s", user.Name, repoName),
+					Writer: sesh,
+					Chan:   make(chan error),
 				})
 				if err != nil {
 					wish.Errorln(sesh, err)

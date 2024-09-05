@@ -16,5 +16,6 @@ func NewConfigSite() *shared.ConfigSite {
 		Protocol: protocol,
 		DbURL:    dbURL,
 		Logger:   shared.CreateLogger(),
+		Space:    "pubsub",
 	}
 }

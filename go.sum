@@ -226,6 +226,10 @@ github.com/picosh/pobj v0.0.0-20240709135546-27097077b26a h1:Cr1xODiyd/SjjBRtYA9
 github.com/picosh/pobj v0.0.0-20240709135546-27097077b26a/go.mod h1:VIkR1MZBvxSK2OO47jikxikAO/sKb/vTmXX5ZuYTIvo=
 github.com/picosh/pubsub v0.0.0-20240905021216-076708fdc9c2 h1:evyOvl/lZeW06naB1KOuZr6DRxCvbK98IqI5AfYF5pI=
 github.com/picosh/pubsub v0.0.0-20240905021216-076708fdc9c2/go.mod h1:FKC8uot+40iXmuDzTfbxYDG5PIc3ghwkmP2iItBKH0I=
+github.com/picosh/pubsub v0.0.0-20240905023503-81b6f9d0c296 h1:kNcOi4dfl+EUy56bOWZZ/9FtKnjmTGdxM/s01TUnPJg=
+github.com/picosh/pubsub v0.0.0-20240905023503-81b6f9d0c296/go.mod h1:FKC8uot+40iXmuDzTfbxYDG5PIc3ghwkmP2iItBKH0I=
+github.com/picosh/pubsub v0.0.0-20240905034711-96ac1473168b h1:GdwZbhoda9K8RpQH8mFovszBvIBH3l8bvTKzelL7FUc=
+github.com/picosh/pubsub v0.0.0-20240905034711-96ac1473168b/go.mod h1:FKC8uot+40iXmuDzTfbxYDG5PIc3ghwkmP2iItBKH0I=
 github.com/picosh/send v0.0.0-20240820031602-5d3b1a4494cc h1:IIsJuAFG2ju3cygKVKTIsYYZf21q5S3Dr1H4fGbfgJg=
 github.com/picosh/send v0.0.0-20240820031602-5d3b1a4494cc/go.mod h1:RAgLDK3LrDK6pNeXtU9tjo28obl5DxShcTUk2nm/KCM=
 github.com/picosh/senpai v0.0.0-20240503200611-af89e73973b0 h1:pBRIbiCj7K6rGELijb//dYhyCo8A3fvxW5dijrJVtjs=

@@ -24,15 +24,39 @@
 <meta property="og:image" content="https://{{.Site.Domain}}/card.png" />
 {{end}}
 
-{{define "attrs"}}{{end}}
+{{define "attrs"}}class="container-sm"{{end}}
 
 {{define "body"}}
-<header class="text-center">
-    <h1 class="text-2xl font-bold">{{.Site.Domain}}</h1>
-    <p class="text-lg">pubsub using ssh</p>
-    <pre>ssh {{.Site.Domain}} sub mykey</pre>
-    <pre>echo "hello world!" | ssh {{.Site.Domain}} pub mykey</pre>
+<header>
+  <h1 class="text-2xl font-bold text-center">pubsub using ssh</h1>
 </header>
+
+<hr />
+
+<article>
+  <p>
+    The simplest authenticated pubsub system.  Send messages through
+    user-defined channels.  Channels are private to the authenticated
+    ssh user.  The default pubsub model is multicast, meaning a publisher
+    (<code>pub</code>) will send its message to all subscribers
+    (<code>sub</code>).  Further, the <code>pub</code> will wait for a
+    valid <code>sub</code> before exiting.
+  </p>
+  <div>
+    <pre>ssh {{.Site.Domain}} sub mykey</pre>
+    <pre>echo "hello world!" | ssh {{.Site.Domain}} pub mykey
+# or
+cat important.md | ssh {{.Site.Domain}} pub mykey</pre>
+  </div>
+  <div>
+    <p>Compose automated scripts using unix pipes:</p>
+    <pre>ssh {{.Site.Domain}} sub "alpine:latest" | docker pull alpine:latest && docker up -d dev</pre>
+    <pre>docker build -t alpine:latest . | ssh {{.Site.Domain}} pub "alpine:latest"</pre>
+  </div>
+  <div class="text-center">
+    <a href="https://pico.sh/getting-started" class="btn-link my-2 inline-block">GET STARTED</a>
+  </div>
+</article>
 
 {{template "marketing-footer" .}}
 {{end}}
