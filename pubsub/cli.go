@@ -62,6 +62,10 @@ func toChannel(userName, name string) string {
 	return fmt.Sprintf("%s@%s", userName, name)
 }
 
+func toPublicChannel(name string) string {
+	return fmt.Sprintf("public@%s", name)
+}
+
 // extract user and scoped channel from channel.
 func fromChannel(channel string) (string, string) {
 	sp := strings.SplitN(channel, "@", 2)
@@ -157,6 +161,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 			if cmd == "pub" {
 				pubCmd := flagSet("pub", sesh)
 				empty := pubCmd.Bool("e", false, "Send an empty message to subs")
+				public := pubCmd.Bool("p", false, "Anyone can sub to this channel")
 				if !flagCheck(pubCmd, repoName, cmdArgs) {
 					return
 				}
@@ -169,9 +174,14 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					reader = sesh
 				}
 
+				name := toChannel(user.Name, channelName)
+				if *public {
+					name = toPublicChannel(channelName)
+				}
+
 				wish.Println(sesh, "sending msg ...")
 				msg := &psub.Msg{
-					Name:   toChannel(user.Name, channelName),
+					Name:   name,
 					Reader: reader,
 				}
 
@@ -195,9 +205,21 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					wish.Errorln(sesh, err)
 				}
 			} else if cmd == "sub" {
+				pubCmd := flagSet("pub", sesh)
+				public := pubCmd.Bool("p", false, "Subscribe to a public channel")
+				if !flagCheck(pubCmd, repoName, cmdArgs) {
+					return
+				}
+				channelName := repoName
+
+				name := toChannel(user.Name, channelName)
+				if *public {
+					name = toPublicChannel(channelName)
+				}
+
 				err = pubsub.PubSub.Sub(&psub.Subscriber{
 					ID:     uuid.NewString(),
-					Name:   toChannel(user.Name, repoName),
+					Name:   name,
 					Writer: sesh,
 					Chan:   make(chan error),
 				})
