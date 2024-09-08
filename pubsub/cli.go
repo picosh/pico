@@ -130,15 +130,15 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 						writer := NewTabWriter(sesh)
 						fmt.Fprintln(writer, "Channel\tID")
 						for _, sub := range subs {
-							userName, channel := fromChannel(sub.Name)
-							if userName != user.Name {
+							userName, _ := fromChannel(sub.Name)
+							if userName != "public" && userName != user.Name {
 								continue
 							}
 
 							fmt.Fprintf(
 								writer,
 								"%s\t%s\n",
-								channel, sub.ID,
+								sub.Name, sub.ID,
 							)
 						}
 						writer.Flush()
