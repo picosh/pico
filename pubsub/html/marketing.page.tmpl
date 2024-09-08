@@ -37,10 +37,10 @@
   <p>
     The simplest authenticated pubsub system.  Send messages through
     user-defined channels.  Channels are private to the authenticated
-    ssh user.  The default pubsub model is multicast, meaning a publisher
-    (<code>pub</code>) will send its message to all subscribers
-    (<code>sub</code>).  Further, the <code>pub</code> will wait for a
-    valid <code>sub</code> before exiting.
+    ssh user.  The default pubsub model is multicast with bidirectional
+    blocking, meaning a publisher (<code>pub</code>) will send its message to all
+    subscribers (<code>sub</code>).  Further, both <code>pub</code> and
+    <code>sub</code> will wait for at least one event to be sent or received.
   </p>
   <div>
     <pre>ssh {{.Site.Domain}} sub mykey</pre>
@@ -48,14 +48,27 @@
 # or
 cat important.md | ssh {{.Site.Domain}} pub mykey</pre>
   </div>
+
   <div>
-    <p>Compose automated scripts using unix pipes:</p>
-    <pre>ssh {{.Site.Domain}} sub "alpine:latest" | docker pull alpine:latest && docker up -d dev</pre>
-    <pre>docker build -t alpine:latest . | ssh {{.Site.Domain}} pub "alpine:latest"</pre>
+    <h2 class="text-xl">Simple desktop notifications</h2>
+    <pre>ssh {{.Site.Domain}} sub notify | notify-send "Job done!"</pre>
+    <pre>./longjob.sh; ssh {{.Site.Domain}} pub notify</pre>
   </div>
+
+  <div>
+    <h2 class="text-xl">Simple CI/CD</h2>
+    <pre>ssh {{.Site.Domain}} sub myimg | docker pull myimg && docker up -d dev</pre>
+    <pre>docker build -t myimg .; docker push myimg; ssh {{.Site.Domain}} pub myimg</pre>
+  </div>
+
   <div class="text-center">
     <a href="https://pico.sh/getting-started" class="btn-link my-2 inline-block">GET STARTED</a>
   </div>
+
+  <p>
+    This project was heavily inspired by
+    <a href="https://patchbay.pub">patchbay.pub</a>
+  </p>
 </article>
 
 {{template "marketing-footer" .}}

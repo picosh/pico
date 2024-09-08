@@ -58,7 +58,14 @@ func fromChannel(channel string) (string, string) {
 	return sp[0], sp[1]
 }
 
-var helpStr = "Commands: [pub, sub, ls]\n"
+var helpStr = `Commands: [pub, sub, ls]
+
+The simplest authenticated pubsub system.  Send messages through
+user-defined channels.  Channels are private to the authenticated
+ssh user.  The default pubsub model is multicast with bidirectional
+blocking, meaning a publisher ("pub") will send its message to all
+subscribers ("sub").  Further, both "pub" and "sub" will wait for
+at least one event to be sent or received.`
 
 type CliHandler struct {
 	DBPool      db.DB
