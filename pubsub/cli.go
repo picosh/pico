@@ -40,6 +40,24 @@ func getUser(s ssh.Session, dbpool db.DB) (*db.User, error) {
 	return user, nil
 }
 
+// scope channel to user by prefixing name.
+func toChannel(userName, name string) string {
+	return fmt.Sprintf("%s@%s", userName, name)
+}
+
+// extract user and scoped channel from channel.
+func fromChannel(channel string) (string, string) {
+	sp := strings.SplitN(channel, "@", 2)
+	ln := len(sp)
+	if ln == 0 {
+		return "", ""
+	}
+	if ln == 1 {
+		return "", ""
+	}
+	return sp[0], sp[1]
+}
+
 var helpStr = "Commands: [pub, sub, ls]\n"
 
 type CliHandler struct {
@@ -84,10 +102,15 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 						writer := NewTabWriter(sesh)
 						fmt.Fprintln(writer, "Channel\tID")
 						for _, sub := range subs {
+							userName, channel := fromChannel(sub.Name)
+							if userName != user.Name {
+								continue
+							}
+
 							fmt.Fprintf(
 								writer,
 								"%s\t%s\n",
-								sub.Name, sub.ID,
+								channel, sub.ID,
 							)
 						}
 						writer.Flush()
@@ -110,7 +133,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 			if cmd == "pub" {
 				wish.Println(sesh, "sending msg ...")
 				msg := &psub.Msg{
-					Name:   fmt.Sprintf("%s@%s", user.Name, repoName),
+					Name:   toChannel(user.Name, repoName),
 					Reader: sesh,
 				}
 
@@ -136,7 +159,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 			} else if cmd == "sub" {
 				err = pubsub.PubSub.Sub(&psub.Subscriber{
 					ID:     uuid.NewString(),
-					Name:   fmt.Sprintf("%s@%s", user.Name, repoName),
+					Name:   toChannel(user.Name, repoName),
 					Writer: sesh,
 					Chan:   make(chan error),
 				})
