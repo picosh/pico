@@ -1742,7 +1742,7 @@ func (me *PsqlDB) FindProjectsByUser(userID string) ([]*db.Project, error) {
 func (me *PsqlDB) FindAllProjects(page *db.Pager, by string) (*db.Paginate[*db.Project], error) {
 	var projects []*db.Project
 	sqlFindAllProjects := fmt.Sprintf(`
-	SELECT projects.id, user_id, app_users.name as username, projects.name, project_dir, projects.acl, projects.created_at, projects.updated_at
+	SELECT projects.id, user_id, app_users.name as username, projects.name, project_dir, projects.acl, projects.blocked, projects.created_at, projects.updated_at
 	FROM projects
 	LEFT JOIN app_users ON app_users.id = projects.user_id
 	ORDER BY %s DESC
