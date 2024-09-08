@@ -1,6 +1,7 @@
 package pubsub
 
 import (
+	"flag"
 	"fmt"
 	"io"
 	"log/slog"
@@ -16,6 +17,22 @@ import (
 	psub "github.com/picosh/pubsub"
 	"github.com/picosh/send/send/utils"
 )
+
+func flagSet(cmdName string, sesh ssh.Session) *flag.FlagSet {
+	cmd := flag.NewFlagSet(cmdName, flag.ContinueOnError)
+	cmd.SetOutput(sesh)
+	return cmd
+}
+
+func flagCheck(cmd *flag.FlagSet, posArg string, cmdArgs []string) bool {
+	_ = cmd.Parse(cmdArgs)
+
+	if posArg == "-h" || posArg == "--help" || posArg == "-help" {
+		cmd.Usage()
+		return false
+	}
+	return true
+}
 
 func NewTabWriter(out io.Writer) *tabwriter.Writer {
 	return tabwriter.NewWriter(out, 0, 0, 1, ' ', tabwriter.TabIndent)
@@ -138,10 +155,24 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 			)
 
 			if cmd == "pub" {
+				pubCmd := flagSet("pub", sesh)
+				empty := pubCmd.Bool("e", false, "Send an empty message to subs")
+				if !flagCheck(pubCmd, repoName, cmdArgs) {
+					return
+				}
+				channelName := repoName
+
+				var reader io.Reader
+				if *empty {
+					reader = strings.NewReader("")
+				} else {
+					reader = sesh
+				}
+
 				wish.Println(sesh, "sending msg ...")
 				msg := &psub.Msg{
-					Name:   toChannel(user.Name, repoName),
-					Reader: sesh,
+					Name:   toChannel(user.Name, channelName),
+					Reader: reader,
 				}
 
 				// hacky: we want to notify when no subs are found so

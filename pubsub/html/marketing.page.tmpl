@@ -42,33 +42,41 @@
     subscribers (<code>sub</code>).  Further, both <code>pub</code> and
     <code>sub</code> will wait for at least one event to be sent or received.
   </p>
+
   <div>
+    <h2 class="text-xl">A basic API</h2>
     <pre>ssh {{.Site.Domain}} sub mykey</pre>
-    <pre>echo "hello world!" | ssh {{.Site.Domain}} pub mykey
-# or
-cat important.md | ssh {{.Site.Domain}} pub mykey</pre>
+    <pre>echo "hello world!" | ssh {{.Site.Domain}} pub mykey</pre>
   </div>
 
   <div>
     <h2 class="text-xl">Simple desktop notifications</h2>
-    <pre>ssh {{.Site.Domain}} sub notify | notify-send "Job done!"</pre>
-    <pre>./longjob.sh; ssh {{.Site.Domain}} pub notify</pre>
+    <pre>ssh {{.Site.Domain}} sub notify | notify-send</pre>
+    <pre>./longjob.sh; echo "Job done!" | ssh {{.Site.Domain}} pub notify</pre>
   </div>
 
   <div>
     <h2 class="text-xl">Simple CI/CD</h2>
     <pre>ssh {{.Site.Domain}} sub myimg | docker pull myimg && docker up -d dev</pre>
-    <pre>docker build -t myimg .; docker push myimg; ssh {{.Site.Domain}} pub myimg</pre>
+    <pre>docker buildx build --push -t myimg .; ssh {{.Site.Domain}} pub myimg</pre>
   </div>
 
-  <div class="text-center">
-    <a href="https://pico.sh/getting-started" class="btn-link my-2 inline-block">GET STARTED</a>
+  <div>
+    <h2 class="text-xl">Caveats</h2>
+    <p>
+      You must always pipe something into <code>pub</code> or else it will block
+      indefinitely until the process is killed.
+    </p>
   </div>
 
   <p>
     This project was heavily inspired by
     <a href="https://patchbay.pub">patchbay.pub</a>
   </p>
+
+  <div class="text-center">
+    <a href="https://pico.sh/getting-started" class="btn-link my-2 inline-block">GET STARTED</a>
+  </div>
 </article>
 
 {{template "marketing-footer" .}}
