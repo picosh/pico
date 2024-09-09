@@ -10,18 +10,6 @@
 <meta property="og:url" content="https://{{.Site.Domain}}">
 <meta property="og:title" content="{{.Site.Domain}}">
 <meta property="og:description" content="pubsub using ssh">
-
-<meta name="twitter:card" content="summary" />
-<meta property="twitter:url" content="https://{{.Site.Domain}}">
-<meta property="twitter:title" content="{{.Site.Domain}}">
-<meta property="twitter:description" content="pubsub using ssh">
-<meta name="twitter:image" content="https://{{.Site.Domain}}/card.png" />
-<meta name="twitter:image:src" content="https://{{.Site.Domain}}/card.png" />
-
-<meta property="og:image:width" content="300" />
-<meta property="og:image:height" content="300" />
-<meta itemprop="image" content="https://{{.Site.Domain}}/card.png" />
-<meta property="og:image" content="https://{{.Site.Domain}}/card.png" />
 {{end}}
 
 {{define "attrs"}}class="container-sm"{{end}}
@@ -36,12 +24,14 @@
 <article>
   <p>
     The simplest authenticated pubsub system.  Send messages through
-    user-defined channels.  Channels are private to the authenticated
+    user-defined channels.  By default, channels are private to the authenticated
     ssh user.  The default pubsub model is multicast with bidirectional
     blocking, meaning a publisher (<code>pub</code>) will send its message to all
     subscribers (<code>sub</code>) on a channel.  Further, both <code>pub</code> and
     <code>sub</code> will wait for at least one event to be sent or received on the channel.
   </p>
+
+  <blockquote>This service is undergoing active development, expect bugs and restarts</blockquote>
 
   <div>
     <h2 class="text-xl">A basic API</h2>
@@ -51,20 +41,20 @@
 
   <div>
     <h2 class="text-xl">Simple desktop notifications</h2>
-    <pre>ssh {{.Site.Domain}} sub notify | notify-send "job done!"</pre>
+    <pre>ssh {{.Site.Domain}} sub notify; notify-send "job done!"</pre>
     <pre>./longjob.sh; ssh {{.Site.Domain}} pub notify -e</pre>
   </div>
 
   <div>
     <h2 class="text-xl">Simple CI/CD</h2>
-    <pre>ssh {{.Site.Domain}} sub myimg | docker pull myimg && docker up -d dev</pre>
+    <pre>ssh {{.Site.Domain}} sub myimg; docker pull myimg && docker up -d dev</pre>
     <pre>docker buildx build --push -t myimg .; ssh {{.Site.Domain}} pub myimg -e</pre>
   </div>
 
   <div>
     <h2 class="text-xl">Send a public message</h2>
     <pre>echo "hello world!" | ssh send.pico.sh pub mychan -p</pre>
-    <p>Now anyone with a <code>pico</code> can subscribe to this channel:</p>
+    <p>Now anyone with a <code>pico</code> account can subscribe to this channel:</p>
     <pre>ssh send.pico.sh sub mychan -p</pre>
   </div>
 
@@ -80,6 +70,10 @@
   <p>
     This project was heavily inspired by
     <a href="https://patchbay.pub">patchbay.pub</a>
+  </p>
+
+  <p>
+    built on our <a href="https://github.com/picosh/pubsub">go pkg</a>.
   </p>
 
   <div class="text-center">
