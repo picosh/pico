@@ -103,6 +103,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 
 	return func(next ssh.Handler) ssh.Handler {
 		return func(sesh ssh.Session) {
+			ctx := sesh.Context()
 			user, err := getUser(sesh, dbpool)
 			if err != nil {
 				utils.ErrorHandler(sesh, err)
@@ -199,6 +200,14 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					wish.Println(sesh, "no subs found ... waiting")
 				}
 
+				go func() {
+					<-ctx.Done()
+					err := pubsub.PubSub.UnPub(msg)
+					if err != nil {
+						wish.Errorln(sesh, err)
+					}
+				}()
+
 				err = pubsub.PubSub.Pub(msg)
 				wish.Println(sesh, "msg sent!")
 				if err != nil {
@@ -217,12 +226,21 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					name = toPublicChannel(channelName)
 				}
 
-				err = pubsub.PubSub.Sub(&psub.Subscriber{
+				sub := &psub.Subscriber{
 					ID:     uuid.NewString(),
 					Name:   name,
 					Writer: sesh,
 					Chan:   make(chan error),
-				})
+				}
+
+				go func() {
+					<-ctx.Done()
+					err := pubsub.PubSub.UnSub(sub)
+					if err != nil {
+						wish.Errorln(sesh, err)
+					}
+				}()
+				err = pubsub.PubSub.Sub(sub)
 				if err != nil {
 					wish.Errorln(sesh, err)
 				}
