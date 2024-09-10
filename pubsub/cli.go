@@ -60,11 +60,11 @@ func getUser(s ssh.Session, dbpool db.DB) (*db.User, error) {
 
 // scope channel to user by prefixing name.
 func toChannel(userName, name string) string {
-	return fmt.Sprintf("%s@%s", userName, name)
+	return fmt.Sprintf("%s/%s", userName, name)
 }
 
 func toPublicChannel(name string) string {
-	return fmt.Sprintf("public@%s", name)
+	return fmt.Sprintf("public/%s", name)
 }
 
 var helpStr = `Commands: [pub, sub, ls]
@@ -111,29 +111,29 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				if cmd == "help" {
 					wish.Println(sesh, helpStr)
 				} else if cmd == "ls" {
-					channels := pubsub.PubSub.GetChannels(fmt.Sprintf("%s@", user.Name))
+					channels := pubsub.PubSub.GetChannels(fmt.Sprintf("%s/", user.Name))
 
 					if len(channels) == 0 {
 						wish.Println(sesh, "no pubsub channels found")
 					} else {
-						outputData := "Channel Information\n"
+						outputData := "Channel Information\r\n"
 						for _, channel := range channels {
-							outputData += fmt.Sprintf("- %s:\n", channel.Name)
-							outputData += "\tPubs:\n"
+							outputData += fmt.Sprintf("- %s:\r\n", channel.Name)
+							outputData += "\tPubs:\r\n"
 
 							channel.Pubs.Range(func(I string, J *psub.Pub) bool {
-								outputData += fmt.Sprintf("\t- %s:\n", I)
+								outputData += fmt.Sprintf("\t- %s:\r\n", I)
 								return true
 							})
 
-							outputData += "\tSubs:\n"
+							outputData += "\tSubs:\r\n"
 
 							channel.Subs.Range(func(I string, J *psub.Sub) bool {
-								outputData += fmt.Sprintf("\t- %s:\n", I)
+								outputData += fmt.Sprintf("\t- %s:\r\n", I)
 								return true
 							})
 						}
-						sesh.Write([]byte(outputData))
+						_, _ = sesh.Write([]byte(outputData))
 					}
 				}
 				next(sesh)
@@ -173,7 +173,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 
 				wish.Println(sesh, "sending msg ...")
 				pub := &psub.Pub{
-					ID:     uuid.NewString(),
+					ID:     fmt.Sprintf("%s (%s@%s)", uuid.NewString(), user.Name, sesh.RemoteAddr().String()),
 					Done:   make(chan struct{}),
 					Reader: reader,
 				}
@@ -216,7 +216,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				}
 
 				sub := &psub.Sub{
-					ID:     uuid.NewString(),
+					ID:     fmt.Sprintf("%s (%s@%s)", uuid.NewString(), user.Name, sesh.RemoteAddr().String()),
 					Writer: sesh,
 					Done:   make(chan struct{}),
 					Data:   make(chan []byte),

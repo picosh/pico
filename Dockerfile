@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM golang:1.22 as builder-deps
+FROM --platform=$BUILDPLATFORM golang:1.22 AS builder-deps
 LABEL maintainer="Pico Maintainers <hello@pico.sh>"
 
 WORKDIR /app
@@ -10,7 +10,7 @@ COPY go.* ./
 
 RUN go mod download
 
-FROM builder-deps as builder-web
+FROM builder-deps AS builder-web
 
 COPY . .
 
@@ -25,7 +25,7 @@ ENV GOOS=${TARGETOS} GOARCH=${TARGETARCH}
 
 RUN go build -ldflags "$LDFLAGS" -o /go/bin/${APP}-web ./cmd/${APP}/web
 
-FROM builder-deps as builder-ssh
+FROM builder-deps AS builder-ssh
 
 COPY . .
 
@@ -40,7 +40,7 @@ ENV GOOS=${TARGETOS} GOARCH=${TARGETARCH}
 
 RUN go build -ldflags "$LDFLAGS" -o /go/bin/${APP}-ssh ./cmd/${APP}/ssh
 
-FROM scratch as release-web
+FROM scratch AS release-web
 
 WORKDIR /app
 
@@ -53,7 +53,7 @@ COPY --from=builder-web /app/${APP}/public ./${APP}/public
 
 ENTRYPOINT ["/app/web"]
 
-FROM scratch as release-ssh
+FROM scratch AS release-ssh
 
 WORKDIR /app
 ENV TERM="xterm-256color"
