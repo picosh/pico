@@ -20,6 +20,7 @@ import (
 
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
+	"github.com/google/uuid"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
@@ -229,8 +230,9 @@ func createServeMux(handler *CliHandler, pubsub *psub.Cfg) func(ctx ssh.Context)
 				)
 				handler.Logger.Info("sending event", "url", furl)
 
-				err := pubsub.PubSub.Pub(&psub.Msg{
-					Name:   fmt.Sprintf("%s@%s:%s", user.Name, img, tag),
+				err := pubsub.PubSub.Pub(fmt.Sprintf("%s@%s:%s", user.Name, img, tag), &psub.Pub{
+					ID:     uuid.NewString(),
+					Done:   make(chan struct{}),
 					Reader: strings.NewReader(furl),
 				})
 

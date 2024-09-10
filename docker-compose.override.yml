@@ -57,7 +57,7 @@ services:
   pubsub-ssh:
     build:
       args:
-        APP:pubsub
+        APP: pubsub
       target: release-ssh
     env_file:
       - .env.example

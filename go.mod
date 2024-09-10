@@ -17,6 +17,7 @@ replace github.com/gdamore/tcell/v2 => github.com/delthas/tcell/v2 v2.4.1-0.2023
 require (
 	git.sr.ht/~delthas/senpai v0.3.1-0.20240425235039-206be659439e
 	github.com/alecthomas/chroma/v2 v2.14.0
+	github.com/antoniomika/syncmap v1.0.0
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
 	github.com/charmbracelet/bubbles v0.18.0
 	github.com/charmbracelet/bubbletea v0.27.0
@@ -36,7 +37,7 @@ require (
 	github.com/muesli/termenv v0.15.3-0.20240509142007-81b8f94111d5
 	github.com/neurosnap/go-exif-remove v0.0.0-20221010134343-50d1e3c35577
 	github.com/picosh/pobj v0.0.0-20240709135546-27097077b26a
-	github.com/picosh/pubsub v0.0.0-20240909042445-92777a8b167b
+	github.com/picosh/pubsub v0.0.0-20240910225407-529d97896161
 	github.com/picosh/send v0.0.0-20240820031602-5d3b1a4494cc
 	github.com/picosh/tunkit v0.0.0-20240709033345-8315d4f3cd0e
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06
