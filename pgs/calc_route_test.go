@@ -103,7 +103,7 @@ func TestCalcRoutes(t *testing.T) {
 			},
 		},
 		{
-			Name: "redirectRule",
+			Name: "redirect-rule",
 			Actual: calcRoutes(
 				"test",
 				"/wow",
@@ -124,7 +124,7 @@ func TestCalcRoutes(t *testing.T) {
 			},
 		},
 		{
-			Name: "redirectToPico",
+			Name: "redirect-to-pico",
 			Actual: calcRoutes(
 				"test",
 				"/tester1",
@@ -155,7 +155,7 @@ func TestCalcRoutes(t *testing.T) {
 			},
 		},
 		{
-			Name: "redirectToRoot",
+			Name: "redirect-to-root",
 			Actual: calcRoutes(
 				"test",
 				"/wow/",
@@ -194,7 +194,7 @@ func TestCalcRoutes(t *testing.T) {
 			},
 		},
 		{
-			Name: "redirectFullUrl",
+			Name: "redirect-full-url",
 			Actual: calcRoutes(
 				"test",
 				"/wow.html",
@@ -208,11 +208,12 @@ func TestCalcRoutes(t *testing.T) {
 			),
 			Expected: []*HttpReply{
 				{Filepath: "test/wow.html", Status: 200},
-				{Filepath: "https://pico.sh", Status: 301},
+				{Filepath: "/wow.html/", Status: 301},
+				{Filepath: "test/404.html", Status: 404},
 			},
 		},
 		{
-			Name: "redirectFullUrlDirectory",
+			Name: "redirect-full-url-directory",
 			Actual: calcRoutes(
 				"test",
 				"/wow",
@@ -231,7 +232,7 @@ func TestCalcRoutes(t *testing.T) {
 			},
 		},
 		{
-			Name: "redirectDirectory",
+			Name: "redirect-directory",
 			Actual: calcRoutes(
 				"public",
 				"/xyz",
@@ -252,7 +253,7 @@ func TestCalcRoutes(t *testing.T) {
 			},
 		},
 		{
-			Name: "redirectSubDirectory",
+			Name: "redirect-sub-directory",
 			Actual: calcRoutes(
 				"public",
 				"/folder2",
@@ -274,7 +275,7 @@ func TestCalcRoutes(t *testing.T) {
 			},
 		},
 		{
-			Name: "redirectFromAndToSame",
+			Name: "redirect-from-and-to-same",
 			Actual: calcRoutes(
 				"public",
 				"/folder2",
@@ -294,7 +295,7 @@ func TestCalcRoutes(t *testing.T) {
 			},
 		},
 		{
-			Name: "redirectNoTrailingSlash",
+			Name: "redirect-no-trailing-slash",
 			Actual: calcRoutes(
 				"public",
 				"/space/",
@@ -313,7 +314,7 @@ func TestCalcRoutes(t *testing.T) {
 			},
 		},
 		{
-			Name: "redirectWithTrailingSlash",
+			Name: "redirect-with-trailing-slash",
 			Actual: calcRoutes(
 				"public",
 				"/space",
@@ -334,7 +335,7 @@ func TestCalcRoutes(t *testing.T) {
 			},
 		},
 		{
-			Name: "directoryWithExtension",
+			Name: "directory-with-extension",
 			Actual: calcRoutes(
 				"public",
 				"/space.nvim",
@@ -420,6 +421,47 @@ func TestCalcRoutes(t *testing.T) {
 				{Filepath: "public/blog/2004/02/12/my-story", Status: 200},
 				{Filepath: "public/blog/2004/02/12/my-story.html", Status: 200},
 				{Filepath: "/blog/2004/02/12/my-story/", Status: 301},
+				{Filepath: "public/404.html", Status: 404},
+			},
+		},
+		{
+			Name: "302-redirect",
+			Actual: calcRoutes(
+				"public",
+				"/pages/chem351.html",
+				[]*RedirectRule{
+					{
+						From:   "/pages/chem351.html",
+						To:     "/pages/chem351",
+						Status: 302,
+						Force:  true,
+					},
+				},
+			),
+			Expected: []*HttpReply{
+				{Filepath: "/pages/chem351", Status: 302},
+				{Filepath: "/pages/chem351.html/", Status: 301},
+				{Filepath: "public/404.html", Status: 404},
+			},
+		},
+		{
+			Name: "302-redirect-non-match",
+			Actual: calcRoutes(
+				"public",
+				"/pages/chem351",
+				[]*RedirectRule{
+					{
+						From:   "/pages/chem351.html",
+						To:     "/pages/chem351",
+						Status: 302,
+						Force:  true,
+					},
+				},
+			),
+			Expected: []*HttpReply{
+				{Filepath: "public/pages/chem351", Status: 200},
+				{Filepath: "public/pages/chem351.html", Status: 200},
+				{Filepath: "/pages/chem351/", Status: 301},
 				{Filepath: "public/404.html", Status: 404},
 			},
 		},

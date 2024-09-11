@@ -74,7 +74,7 @@ func checkIsRedirect(status int) bool {
 	return status >= 300 && status <= 399
 }
 
-func correlatePlaceholder(orig, pattern string) string {
+func correlatePlaceholder(orig, pattern string) (string, string) {
 	origList := splitFp(orig)
 	patternList := splitFp(pattern)
 	nextList := []string{}
@@ -89,7 +89,17 @@ func correlatePlaceholder(orig, pattern string) string {
 			nextList = append(nextList, origList[idx])
 		}
 	}
-	return filepath.Join(nextList...)
+
+	_type := "none"
+	if len(nextList) > 0 && len(nextList) == len(patternList) {
+		_type = "match"
+	} else if strings.Contains(pattern, "*") {
+		_type = "wildcard"
+	} else if strings.Contains(pattern, ":") {
+		_type = "variable"
+	}
+
+	return filepath.Join(nextList...), _type
 }
 
 func splitFp(str string) []string {
@@ -179,9 +189,22 @@ func calcRoutes(projectName, fp string, userRedirects []*RedirectRule) []*HttpRe
 
 		// hack: make suffix `/` optional when matching
 		from := filepath.Clean(redirect.From)
-		fromMatcher := correlatePlaceholder(fp, from)
-		rr := regexp.MustCompile(fromMatcher)
-		match := rr.FindStringSubmatch(fp)
+		match := []string{}
+		fromMatcher, matcherType := correlatePlaceholder(fp, from)
+		switch matcherType {
+		case "match":
+			fallthrough
+		case "wildcard":
+			fallthrough
+		case "variable":
+			rr := regexp.MustCompile(fromMatcher)
+			match = rr.FindStringSubmatch(fp)
+		case "none":
+			fallthrough
+		default:
+			break
+		}
+
 		if len(match) > 0 {
 			isRedirect := checkIsRedirect(redirect.Status)
 			if !isRedirect && !hasProtocol(redirect.To) {
@@ -221,8 +244,9 @@ func calcRoutes(projectName, fp string, userRedirects []*RedirectRule) []*HttpRe
 		}
 	}
 
-	// filename without extension mean we might have a directory
-	// so add a trailing slash with a 301
+	// we might have a directory so add a trailing slash with a 301
+	// we can't check for file extention because route could have a dot
+	// and ext parsing gets confused
 	if fp != "" && !strings.HasSuffix(fp, "/") {
 		redirectRoute := shared.GetAssetFileName(&utils.FileEntry{
 			Filepath: fp + "/",
