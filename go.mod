@@ -37,7 +37,7 @@ require (
 	github.com/muesli/termenv v0.15.3-0.20240509142007-81b8f94111d5
 	github.com/neurosnap/go-exif-remove v0.0.0-20221010134343-50d1e3c35577
 	github.com/picosh/pobj v0.0.0-20240709135546-27097077b26a
-	github.com/picosh/pubsub v0.0.0-20240910225407-529d97896161
+	github.com/picosh/pubsub v0.0.0-20240911013727-cd18ecbb6373
 	github.com/picosh/send v0.0.0-20240820031602-5d3b1a4494cc
 	github.com/picosh/tunkit v0.0.0-20240709033345-8315d4f3cd0e
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06
