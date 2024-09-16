@@ -416,14 +416,6 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			ogImageCard = parsedText.ImageCard
 		}
 
-		// if parsedText.Live {
-		if post.Data.Diff != "" {
-			str := "```diff\n" + post.Data.Diff + "\n```"
-			diffParsed, _ := shared.ParseText(str)
-			diff = diffParsed.Html
-		}
-		// }
-
 		// track visit
 		view, err := shared.AnalyticsVisitFromRequest(r, user.ID, cfg.Secret)
 		if err == nil {

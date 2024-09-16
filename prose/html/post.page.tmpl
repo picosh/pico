@@ -62,13 +62,6 @@
     </div>
 </header>
 <main>
-    {{if .Diff}}
-    <details>
-      <summary>diff</summary>
-      <div class="md">{{.Diff}}</div>
-    </details>
-    {{end}}
-
     <article class="md">
         {{.Contents}}
         <div id="post-footer" class="box">{{.Footer}}</div>

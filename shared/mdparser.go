@@ -40,7 +40,6 @@ type MetaData struct {
 	ImageCard   string
 	Favicon     string
 	Hidden      bool
-	Live        bool
 }
 
 type ParsedText struct {
@@ -303,12 +302,6 @@ func ParseText(text string) (*ParsedText, error) {
 		return &parsed, fmt.Errorf("front-matter field (%s): %w", "favicon", err)
 	}
 	parsed.MetaData.Favicon = favicon
-
-	live, err := toBool(metaData["live"])
-	if err != nil {
-		return &parsed, fmt.Errorf("front-matter field (%s): %w", "live", err)
-	}
-	parsed.MetaData.Live = live
 
 	var publishAt *time.Time = nil
 	date, err := toString(metaData["date"])

@@ -1,7 +1,6 @@
 package prose
 
 import (
-	"bytes"
 	"fmt"
 	"strings"
 
@@ -11,7 +10,6 @@ import (
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/filehandlers"
 	"github.com/picosh/pico/shared"
-	"github.com/sergi/go-diff/diffmatchpatch"
 )
 
 type MarkdownHooks struct {
@@ -48,26 +46,6 @@ func (p *MarkdownHooks) FileValidate(s ssh.Session, data *filehandlers.PostMetaD
 	return true, nil
 }
 
-func diffText(diffs []diffmatchpatch.Diff) string {
-	var buff bytes.Buffer
-	for _, diff := range diffs {
-		text := diff.Text
-
-		switch diff.Type {
-		case diffmatchpatch.DiffInsert:
-			_, _ = buff.WriteString("+")
-			_, _ = buff.WriteString(text)
-		case diffmatchpatch.DiffDelete:
-			_, _ = buff.WriteString("-")
-			_, _ = buff.WriteString(text)
-		case diffmatchpatch.DiffEqual:
-			_, _ = buff.WriteString(text)
-		}
-	}
-
-	return buff.String()
-}
-
 func (p *MarkdownHooks) FileMeta(s ssh.Session, data *filehandlers.PostMetaData) error {
 	parsedText, err := shared.ParseText(data.Text)
 	if err != nil {
@@ -83,14 +61,6 @@ func (p *MarkdownHooks) FileMeta(s ssh.Session, data *filehandlers.PostMetaData)
 	data.Aliases = parsedText.Aliases
 	data.Tags = parsedText.Tags
 	data.Description = parsedText.Description
-
-	if data.Cur.Text == data.Text {
-	} else {
-		dmp := diffmatchpatch.New()
-		diffs := dmp.DiffMain(data.Cur.Text, data.Text, false)
-		fmt.Println(diffs)
-		data.Data.Diff = diffText(diffs)
-	}
 
 	if parsedText.PublishAt != nil && !parsedText.PublishAt.IsZero() {
 		data.PublishAt = parsedText.MetaData.PublishAt
