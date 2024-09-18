@@ -111,7 +111,12 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				if cmd == "help" {
 					wish.Println(sesh, helpStr)
 				} else if cmd == "ls" {
-					channels := pubsub.PubSub.GetChannels(fmt.Sprintf("%s/", user.Name))
+					channelFilter := fmt.Sprintf("%s/", user.Name)
+					if handler.DBPool.HasFeatureForUser(user.ID, "admin") {
+						channelFilter = ""
+					}
+
+					channels := pubsub.PubSub.GetChannels(channelFilter)
 
 					if len(channels) == 0 {
 						wish.Println(sesh, "no pubsub channels found")
