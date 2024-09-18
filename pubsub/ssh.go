@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/antoniomika/syncmap"
 	"github.com/charmbracelet/promwish"
 	"github.com/charmbracelet/wish"
 	"github.com/picosh/pico/db/postgres"
@@ -29,8 +30,8 @@ func StartSshServer() {
 	pubsub := &psub.Cfg{
 		Logger: logger,
 		PubSub: &psub.PubSubMulticast{
-			Logger: logger,
-			Chan:   make(chan *psub.Subscriber),
+			Logger:   logger,
+			Channels: syncmap.New[string, *psub.Channel](),
 		},
 	}
 

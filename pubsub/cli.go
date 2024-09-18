@@ -1,6 +1,7 @@
 package pubsub
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"io"
@@ -59,24 +60,11 @@ func getUser(s ssh.Session, dbpool db.DB) (*db.User, error) {
 
 // scope channel to user by prefixing name.
 func toChannel(userName, name string) string {
-	return fmt.Sprintf("%s@%s", userName, name)
+	return fmt.Sprintf("%s/%s", userName, name)
 }
 
 func toPublicChannel(name string) string {
-	return fmt.Sprintf("public@%s", name)
-}
-
-// extract user and scoped channel from channel.
-func fromChannel(channel string) (string, string) {
-	sp := strings.SplitN(channel, "@", 2)
-	ln := len(sp)
-	if ln == 0 {
-		return "", ""
-	}
-	if ln == 1 {
-		return "", ""
-	}
-	return sp[0], sp[1]
+	return fmt.Sprintf("public/%s", name)
 }
 
 var helpStr = `Commands: [pub, sub, ls]
@@ -123,26 +111,34 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				if cmd == "help" {
 					wish.Println(sesh, helpStr)
 				} else if cmd == "ls" {
-					subs := pubsub.PubSub.GetSubs()
+					channelFilter := fmt.Sprintf("%s/", user.Name)
+					if handler.DBPool.HasFeatureForUser(user.ID, "admin") {
+						channelFilter = ""
+					}
 
-					if len(subs) == 0 {
-						wish.Println(sesh, "no subs found")
+					channels := pubsub.PubSub.GetChannels(channelFilter)
+
+					if len(channels) == 0 {
+						wish.Println(sesh, "no pubsub channels found")
 					} else {
-						writer := NewTabWriter(sesh)
-						fmt.Fprintln(writer, "Channel\tID")
-						for _, sub := range subs {
-							userName, _ := fromChannel(sub.Name)
-							if userName != "public" && userName != user.Name {
-								continue
-							}
+						outputData := "Channel Information\r\n"
+						for _, channel := range channels {
+							outputData += fmt.Sprintf("- %s:\r\n", channel.Name)
+							outputData += "\tPubs:\r\n"
 
-							fmt.Fprintf(
-								writer,
-								"%s\t%s\n",
-								sub.Name, sub.ID,
-							)
+							channel.Pubs.Range(func(I string, J *psub.Pub) bool {
+								outputData += fmt.Sprintf("\t- %s:\r\n", I)
+								return true
+							})
+
+							outputData += "\tSubs:\r\n"
+
+							channel.Subs.Range(func(I string, J *psub.Sub) bool {
+								outputData += fmt.Sprintf("\t- %s:\r\n", I)
+								return true
+							})
 						}
-						writer.Flush()
+						_, _ = sesh.Write([]byte(outputData))
 					}
 				}
 				next(sesh)
@@ -170,7 +166,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 
 				var reader io.Reader
 				if *empty {
-					reader = strings.NewReader("")
+					reader = bytes.NewReader(make([]byte, 1))
 				} else {
 					reader = sesh
 				}
@@ -181,34 +177,32 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				}
 
 				wish.Println(sesh, "sending msg ...")
-				msg := &psub.Msg{
-					Name:   name,
+				pub := &psub.Pub{
+					ID:     fmt.Sprintf("%s (%s@%s)", uuid.NewString(), user.Name, sesh.RemoteAddr().String()),
+					Done:   make(chan struct{}),
 					Reader: reader,
 				}
 
-				// hacky: we want to notify when no subs are found so
-				// we duplicate some logic for now
-				subs := pubsub.PubSub.GetSubs()
-				found := false
-				for _, sub := range subs {
-					if pubsub.PubSub.PubMatcher(msg, sub) {
-						found = true
-						break
-					}
+				count := 0
+				channelInfo := pubsub.PubSub.GetChannel(name)
+
+				if channelInfo != nil {
+					channelInfo.Subs.Range(func(I string, J *psub.Sub) bool {
+						count++
+						return true
+					})
 				}
-				if !found {
+
+				if count == 0 {
 					wish.Println(sesh, "no subs found ... waiting")
 				}
 
 				go func() {
 					<-ctx.Done()
-					err := pubsub.PubSub.UnPub(msg)
-					if err != nil {
-						wish.Errorln(sesh, err)
-					}
+					pub.Cleanup()
 				}()
 
-				err = pubsub.PubSub.Pub(msg)
+				err = pubsub.PubSub.Pub(name, pub)
 				wish.Println(sesh, "msg sent!")
 				if err != nil {
 					wish.Errorln(sesh, err)
@@ -226,21 +220,18 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					name = toPublicChannel(channelName)
 				}
 
-				sub := &psub.Subscriber{
-					ID:     uuid.NewString(),
-					Name:   name,
+				sub := &psub.Sub{
+					ID:     fmt.Sprintf("%s (%s@%s)", uuid.NewString(), user.Name, sesh.RemoteAddr().String()),
 					Writer: sesh,
-					Chan:   make(chan error),
+					Done:   make(chan struct{}),
+					Data:   make(chan []byte),
 				}
 
 				go func() {
 					<-ctx.Done()
-					err := pubsub.PubSub.UnSub(sub)
-					if err != nil {
-						wish.Errorln(sesh, err)
-					}
+					sub.Cleanup()
 				}()
-				err = pubsub.PubSub.Sub(sub)
+				err = pubsub.PubSub.Sub(name, sub)
 				if err != nil {
 					wish.Errorln(sesh, err)
 				}

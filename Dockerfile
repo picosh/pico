@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM golang:1.22 as builder-deps
+FROM --platform=$BUILDPLATFORM golang:1.22 AS builder-deps
 LABEL maintainer="Pico Maintainers <hello@pico.sh>"
 
 WORKDIR /app
@@ -8,24 +8,11 @@ RUN apt-get install -y git ca-certificates
 
 COPY go.* ./
 
-RUN go mod download
+RUN --mount=type=cache,target=/go/pkg/,rw \
+  --mount=type=cache,target=/root/.cache/,rw \
+  go mod download
 
-FROM builder-deps as builder-web
-
-COPY . .
-
-ARG APP=prose
-ARG TARGETOS
-ARG TARGETARCH
-
-ENV CGO_ENABLED=0
-ENV LDFLAGS="-s -w"
-
-ENV GOOS=${TARGETOS} GOARCH=${TARGETARCH}
-
-RUN go build -ldflags "$LDFLAGS" -o /go/bin/${APP}-web ./cmd/${APP}/web
-
-FROM builder-deps as builder-ssh
+FROM builder-deps AS builder-web
 
 COPY . .
 
@@ -38,9 +25,28 @@ ENV LDFLAGS="-s -w"
 
 ENV GOOS=${TARGETOS} GOARCH=${TARGETARCH}
 
-RUN go build -ldflags "$LDFLAGS" -o /go/bin/${APP}-ssh ./cmd/${APP}/ssh
+RUN --mount=type=cache,target=/go/pkg/,rw \
+  --mount=type=cache,target=/root/.cache/,rw \
+  go build -ldflags "$LDFLAGS" -o /go/bin/${APP}-web ./cmd/${APP}/web
 
-FROM scratch as release-web
+FROM builder-deps AS builder-ssh
+
+COPY . .
+
+ARG APP=prose
+ARG TARGETOS
+ARG TARGETARCH
+
+ENV CGO_ENABLED=0
+ENV LDFLAGS="-s -w"
+
+ENV GOOS=${TARGETOS} GOARCH=${TARGETARCH}
+
+RUN --mount=type=cache,target=/go/pkg/,rw \
+  --mount=type=cache,target=/root/.cache/,rw \
+  go build -ldflags "$LDFLAGS" -o /go/bin/${APP}-ssh ./cmd/${APP}/ssh
+
+FROM scratch AS release-web
 
 WORKDIR /app
 
@@ -53,7 +59,7 @@ COPY --from=builder-web /app/${APP}/public ./${APP}/public
 
 ENTRYPOINT ["/app/web"]
 
-FROM scratch as release-ssh
+FROM scratch AS release-ssh
 
 WORKDIR /app
 ENV TERM="xterm-256color"
