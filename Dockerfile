@@ -8,7 +8,9 @@ RUN apt-get install -y git ca-certificates
 
 COPY go.* ./
 
-RUN go mod download
+RUN --mount=type=cache,target=/go/pkg/,rw \
+  --mount=type=cache,target=/root/.cache/,rw \
+  go mod download
 
 FROM builder-deps AS builder-web
 
@@ -23,7 +25,9 @@ ENV LDFLAGS="-s -w"
 
 ENV GOOS=${TARGETOS} GOARCH=${TARGETARCH}
 
-RUN go build -ldflags "$LDFLAGS" -o /go/bin/${APP}-web ./cmd/${APP}/web
+RUN --mount=type=cache,target=/go/pkg/,rw \
+  --mount=type=cache,target=/root/.cache/,rw \
+  go build -ldflags "$LDFLAGS" -o /go/bin/${APP}-web ./cmd/${APP}/web
 
 FROM builder-deps AS builder-ssh
 
@@ -38,7 +42,9 @@ ENV LDFLAGS="-s -w"
 
 ENV GOOS=${TARGETOS} GOARCH=${TARGETARCH}
 
-RUN go build -ldflags "$LDFLAGS" -o /go/bin/${APP}-ssh ./cmd/${APP}/ssh
+RUN --mount=type=cache,target=/go/pkg/,rw \
+  --mount=type=cache,target=/root/.cache/,rw \
+  go build -ldflags "$LDFLAGS" -o /go/bin/${APP}-ssh ./cmd/${APP}/ssh
 
 FROM scratch AS release-web
 
