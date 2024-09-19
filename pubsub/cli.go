@@ -67,14 +67,16 @@ func toPublicChannel(name string) string {
 	return fmt.Sprintf("public/%s", name)
 }
 
-var helpStr = `Commands: [pub, sub, ls]
+var helpStr = `Commands: [pub, sub, ls, pipe]
 
 The simplest authenticated pubsub system.  Send messages through
 user-defined channels.  Channels are private to the authenticated
 ssh user.  The default pubsub model is multicast with bidirectional
 blocking, meaning a publisher ("pub") will send its message to all
 subscribers ("sub").  Further, both "pub" and "sub" will wait for
-at least one event to be sent or received.`
+at least one event to be sent or received. Pipe ("pipe") allows
+for bidirectional messages to be sent between any clients connected
+to a pipe.`
 
 type CliHandler struct {
 	DBPool      db.DB
@@ -117,27 +119,45 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					}
 
 					channels := pubsub.PubSub.GetChannels(channelFilter)
+					pipes := pubsub.PubSub.GetPipes(channelFilter)
 
-					if len(channels) == 0 {
-						wish.Println(sesh, "no pubsub channels found")
+					if len(channels) == 0 && len(pipes) == 0 {
+						wish.Println(sesh, "no pubsub channels or pipes found")
 					} else {
-						outputData := "Channel Information\r\n"
-						for _, channel := range channels {
-							outputData += fmt.Sprintf("- %s:\r\n", channel.Name)
-							outputData += "\tPubs:\r\n"
+						var outputData string
+						if len(channels) > 0 {
+							outputData += "Channel Information\r\n"
+							for _, channel := range channels {
+								outputData += fmt.Sprintf("- %s:\r\n", channel.Name)
+								outputData += "\tPubs:\r\n"
 
-							channel.Pubs.Range(func(I string, J *psub.Pub) bool {
-								outputData += fmt.Sprintf("\t- %s:\r\n", I)
-								return true
-							})
+								channel.Pubs.Range(func(I string, J *psub.Pub) bool {
+									outputData += fmt.Sprintf("\t- %s:\r\n", I)
+									return true
+								})
 
-							outputData += "\tSubs:\r\n"
+								outputData += "\tSubs:\r\n"
 
-							channel.Subs.Range(func(I string, J *psub.Sub) bool {
-								outputData += fmt.Sprintf("\t- %s:\r\n", I)
-								return true
-							})
+								channel.Subs.Range(func(I string, J *psub.Sub) bool {
+									outputData += fmt.Sprintf("\t- %s:\r\n", I)
+									return true
+								})
+							}
 						}
+
+						if len(pipes) > 0 {
+							outputData += "Pipe Information\r\n"
+							for _, pipe := range pipes {
+								outputData += fmt.Sprintf("- %s:\r\n", pipe.Name)
+								outputData += "\tClients:\r\n"
+
+								pipe.Clients.Range(func(I string, J *psub.PipeClient) bool {
+									outputData += fmt.Sprintf("\t- %s:\r\n", I)
+									return true
+								})
+							}
+						}
+
 						_, _ = sesh.Write([]byte(outputData))
 					}
 				}
@@ -234,6 +254,39 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				err = pubsub.PubSub.Sub(name, sub)
 				if err != nil {
 					wish.Errorln(sesh, err)
+				}
+			} else if cmd == "pipe" {
+				pipeCmd := flagSet("pipe", sesh)
+				public := pipeCmd.Bool("p", false, "Pipe to a public channel")
+				replay := pipeCmd.Bool("r", false, "Replay messages to the client that sent it")
+				if !flagCheck(pipeCmd, repoName, cmdArgs) {
+					return
+				}
+				channelName := repoName
+
+				name := toChannel(user.Name, channelName)
+				if *public {
+					name = toPublicChannel(channelName)
+				}
+
+				pipe := &psub.PipeClient{
+					ID:         fmt.Sprintf("%s (%s@%s)", uuid.NewString(), user.Name, sesh.RemoteAddr().String()),
+					Done:       make(chan struct{}),
+					Data:       make(chan psub.PipeMessage),
+					ReadWriter: sesh,
+					Replay:     *replay,
+				}
+
+				go func() {
+					<-ctx.Done()
+					pipe.Cleanup()
+				}()
+				readErr, writeErr := pubsub.PubSub.Pipe(name, pipe)
+				if readErr != nil {
+					wish.Errorln(sesh, readErr)
+				}
+				if writeErr != nil {
+					wish.Errorln(sesh, writeErr)
 				}
 			}
 
