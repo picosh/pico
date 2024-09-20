@@ -254,8 +254,9 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 		entry.Filepath = strings.TrimPrefix(entry.Filepath, "/")
 	}
 
-	logger := h.GetLogger().With(
-		"user", user.Name,
+	logger := h.GetLogger()
+	logger = shared.LoggerWithUser(logger, user)
+	logger = logger.With(
 		"file", entry.Filepath,
 		"size", entry.Size,
 	)
@@ -413,8 +414,9 @@ func (h *UploadAssetHandler) Delete(s ssh.Session, entry *utils.FileEntry) error
 
 	assetFilepath := shared.GetAssetFileName(entry)
 
-	logger := h.GetLogger().With(
-		"user", user.Name,
+	logger := h.GetLogger()
+	logger = shared.LoggerWithUser(logger, user)
+	logger = logger.With(
 		"file", assetFilepath,
 	)
 
@@ -488,9 +490,9 @@ func (h *UploadAssetHandler) validateAsset(data *FileData) (bool, error) {
 func (h *UploadAssetHandler) writeAsset(reader io.Reader, data *FileData) (int64, error) {
 	assetFilepath := shared.GetAssetFileName(data.FileEntry)
 
-	h.Cfg.Logger.Info(
+	logger := shared.LoggerWithUser(h.Cfg.Logger, data.User)
+	logger.Info(
 		"uploading file to bucket",
-		"user", data.User.Name,
 		"bucket", data.Bucket.Name,
 		"filename", assetFilepath,
 	)

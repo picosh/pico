@@ -54,7 +54,7 @@ func StartSshServer() {
 		),
 	)
 	if err != nil {
-		logger.Error(err.Error())
+		logger.Error("wish server", "err", err.Error())
 		return
 	}
 
@@ -63,7 +63,7 @@ func StartSshServer() {
 	logger.Info("Starting SSH server", "host", host, "port", port)
 	go func() {
 		if err = s.ListenAndServe(); err != nil {
-			logger.Error(err.Error())
+			logger.Error("listen", "err", err.Error())
 		}
 	}()
 
@@ -72,6 +72,6 @@ func StartSshServer() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer func() { cancel() }()
 	if err := s.Shutdown(ctx); err != nil {
-		logger.Error(err.Error())
+		logger.Error("shutdown", "err", err.Error())
 	}
 }

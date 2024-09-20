@@ -85,9 +85,12 @@ func (h *UploadImgHandler) writeImg(s ssh.Session, data *PostMetaData) error {
 		return err
 	}
 
+	logger := h.Cfg.Logger
+	logger = shared.LoggerWithUser(logger, user)
+
 	err = h.metaImg(data)
 	if err != nil {
-		h.Cfg.Logger.Info(err.Error())
+		logger.Error("could not get meta for img", "err", err.Error())
 		return err
 	}
 
@@ -97,8 +100,7 @@ func (h *UploadImgHandler) writeImg(s ssh.Session, data *PostMetaData) error {
 		modTime = time.Unix(data.Mtime, 0)
 	}
 
-	logger := h.Cfg.Logger.With(
-		"user", data.Username,
+	logger = logger.With(
 		"filename", data.Filename,
 	)
 
@@ -123,7 +125,7 @@ func (h *UploadImgHandler) writeImg(s ssh.Session, data *PostMetaData) error {
 		}
 		_, err := h.DBPool.InsertPost(&insertPost)
 		if err != nil {
-			logger.Error(err.Error())
+			logger.Error("post could not create", "err", err.Error())
 			return fmt.Errorf("error for %s: %v", data.Filename, err)
 		}
 
@@ -134,7 +136,7 @@ func (h *UploadImgHandler) writeImg(s ssh.Session, data *PostMetaData) error {
 			)
 			err = h.DBPool.ReplaceTagsForPost(data.Tags, data.Post.ID)
 			if err != nil {
-				logger.Error(err.Error())
+				logger.Error("post could not replace tags", "err", err.Error())
 				return fmt.Errorf("error for %s: %v", data.Filename, err)
 			}
 		}
@@ -162,7 +164,7 @@ func (h *UploadImgHandler) writeImg(s ssh.Session, data *PostMetaData) error {
 		}
 		_, err = h.DBPool.UpdatePost(&updatePost)
 		if err != nil {
-			logger.Error(err.Error())
+			logger.Error("post could not update", "err", err.Error())
 			return fmt.Errorf("error for %s: %v", data.Filename, err)
 		}
 
@@ -172,7 +174,7 @@ func (h *UploadImgHandler) writeImg(s ssh.Session, data *PostMetaData) error {
 		)
 		err = h.DBPool.ReplaceTagsForPost(data.Tags, data.Cur.ID)
 		if err != nil {
-			logger.Error(err.Error())
+			logger.Error("post could not replace tags", "err", err.Error())
 			return fmt.Errorf("error for %s: %v", data.Filename, err)
 		}
 	}

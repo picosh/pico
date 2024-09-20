@@ -34,7 +34,7 @@ func NewConfigSite() *shared.ConfigSite {
 		Space:        "pgs",
 		MaxSize:      maxSize,
 		MaxAssetSize: maxAssetSize,
-		Logger:       shared.CreateLogger(),
+		Logger:       shared.CreateLogger("pgs"),
 	}
 
 	return &cfg

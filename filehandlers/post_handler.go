@@ -78,14 +78,14 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 	logger := h.Cfg.Logger
 	user, err := util.GetUser(s.Context())
 	if err != nil {
-		logger.Error(err.Error())
+		logger.Error("error getting user from ctx", "err", err.Error())
 		return "", err
 	}
 
 	userID := user.ID
 	filename := filepath.Base(entry.Filepath)
+	logger = shared.LoggerWithUser(logger, user)
 	logger = logger.With(
-		"user", user.Name,
 		"filename", filename,
 	)
 
@@ -128,13 +128,13 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 
 	valid, err := h.Hooks.FileValidate(s, &metadata)
 	if !valid {
-		logger.Error(err.Error())
+		logger.Error("file failed validation", "err", err.Error())
 		return "", err
 	}
 
 	post, err := h.DBPool.FindPostWithFilename(metadata.Filename, metadata.User.ID, h.Cfg.Space)
 	if err != nil {
-		logger.Info("unable to load post, continuing", "err", err.Error())
+		logger.Error("unable to load post, continuing", "err", err.Error())
 	}
 
 	if post != nil {
@@ -145,7 +145,7 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 
 	err = h.Hooks.FileMeta(s, &metadata)
 	if err != nil {
-		logger.Error(err.Error())
+		logger.Error("file could not load meta", "err", err.Error())
 		return "", err
 	}
 
@@ -178,7 +178,7 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		}
 		post, err = h.DBPool.InsertPost(&insertPost)
 		if err != nil {
-			logger.Error(err.Error())
+			logger.Error("post could not be created", "err", err.Error())
 			return "", fmt.Errorf("error for %s: %v", filename, err)
 		}
 
@@ -190,7 +190,7 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 			)
 			err = h.DBPool.ReplaceAliasesForPost(metadata.Aliases, post.ID)
 			if err != nil {
-				logger.Error(err.Error())
+				logger.Error("post could not replace aliases", "err", err.Error())
 				return "", fmt.Errorf("error for %s: %v", filename, err)
 			}
 		}
@@ -202,7 +202,7 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 			)
 			err = h.DBPool.ReplaceTagsForPost(metadata.Tags, post.ID)
 			if err != nil {
-				logger.Error(err.Error())
+				logger.Error("post could not replace tags", "err", err.Error())
 				return "", fmt.Errorf("error for %s: %v", filename, err)
 			}
 		}
@@ -232,7 +232,7 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		}
 		_, err = h.DBPool.UpdatePost(&updatePost)
 		if err != nil {
-			logger.Error(err.Error())
+			logger.Error("post could not be updated", "err", err.Error())
 			return "", fmt.Errorf("error for %s: %v", filename, err)
 		}
 
@@ -242,7 +242,7 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		)
 		err = h.DBPool.ReplaceTagsForPost(metadata.Tags, post.ID)
 		if err != nil {
-			logger.Error(err.Error())
+			logger.Error("post could not replace tags", "err", err.Error())
 			return "", fmt.Errorf("error for %s: %v", filename, err)
 		}
 
@@ -252,7 +252,7 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		)
 		err = h.DBPool.ReplaceAliasesForPost(metadata.Aliases, post.ID)
 		if err != nil {
-			logger.Error(err.Error())
+			logger.Error("post could not replace aliases", "err", err.Error())
 			return "", fmt.Errorf("error for %s: %v", filename, err)
 		}
 	}
@@ -265,14 +265,14 @@ func (h *ScpUploadHandler) Delete(s ssh.Session, entry *utils.FileEntry) error {
 	logger := h.Cfg.Logger
 	user, err := util.GetUser(s.Context())
 	if err != nil {
-		logger.Error(err.Error())
+		logger.Error("could not get user from ctx", "err", err.Error())
 		return err
 	}
 
 	userID := user.ID
 	filename := filepath.Base(entry.Filepath)
+	logger = shared.LoggerWithUser(logger, user)
 	logger = logger.With(
-		"user", user.Name,
 		"filename", filename,
 	)
 
@@ -288,7 +288,7 @@ func (h *ScpUploadHandler) Delete(s ssh.Session, entry *utils.FileEntry) error {
 	err = h.DBPool.RemovePosts([]string{post.ID})
 	logger.Info("removing record")
 	if err != nil {
-		logger.Error(err.Error())
+		logger.Error("post could not remove", "err", err.Error())
 		return fmt.Errorf("error for %s: %v", filename, err)
 	}
 	return nil

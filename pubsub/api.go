@@ -16,14 +16,14 @@ func serveFile(file string, contentType string) http.HandlerFunc {
 
 		contents, err := os.ReadFile(cfg.StaticPath(fmt.Sprintf("public/%s", file)))
 		if err != nil {
-			logger.Error(err.Error())
+			logger.Error("could not read statis file", "err", err.Error())
 			http.Error(w, "file not found", 404)
 		}
 		w.Header().Add("Content-Type", contentType)
 
 		_, err = w.Write(contents)
 		if err != nil {
-			logger.Error(err.Error())
+			logger.Error("could not write static file", "err", err.Error())
 			http.Error(w, "server error", 500)
 		}
 	}
@@ -94,5 +94,5 @@ func StartApiServer() {
 		"domain", cfg.Domain,
 	)
 
-	logger.Error(http.ListenAndServe(portStr, router).Error())
+	logger.Error("listen", "err", http.ListenAndServe(portStr, router).Error())
 }

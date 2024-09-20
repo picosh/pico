@@ -88,17 +88,19 @@ type CliHandler struct {
 
 func WishMiddleware(handler *CliHandler) wish.Middleware {
 	dbpool := handler.DBPool
-	log := handler.Logger
 	pubsub := handler.PubSub
 
 	return func(next ssh.Handler) ssh.Handler {
 		return func(sesh ssh.Session) {
+			logger := handler.Logger
 			ctx := sesh.Context()
 			user, err := getUser(sesh, dbpool)
 			if err != nil {
 				utils.ErrorHandler(sesh, err)
 				return
 			}
+
+			logger = shared.LoggerWithUser(logger, user)
 
 			args := sesh.Command()
 
@@ -167,7 +169,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 
 			repoName := strings.TrimSpace(args[1])
 			cmdArgs := args[2:]
-			log.Info(
+			logger.Info(
 				"imgs middleware detected command",
 				"args", args,
 				"cmd", cmd,

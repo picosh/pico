@@ -9,6 +9,8 @@ import (
 	"os"
 	"path"
 	"strings"
+
+	"github.com/picosh/pico/db"
 )
 
 var DefaultEmail = "hello@pico.sh"
@@ -261,11 +263,16 @@ func (c *ConfigSite) AssetURL(username, projectName, fpath string) string {
 	)
 }
 
-func CreateLogger() *slog.Logger {
+func CreateLogger(space string) *slog.Logger {
 	opts := &slog.HandlerOptions{
 		AddSource: true,
 	}
-	return slog.New(
+	log := slog.New(
 		slog.NewTextHandler(os.Stdout, opts),
 	)
+	return log.With("service", space)
+}
+
+func LoggerWithUser(logger *slog.Logger, user *db.User) *slog.Logger {
+	return logger.With("user", user.Name, "userId", user.ID)
 }

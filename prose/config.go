@@ -44,7 +44,7 @@ func NewConfigSite() *shared.ConfigSite {
 			".ico",
 		},
 		HiddenPosts:  []string{"_readme.md", "_styles.css", "_footer.md", "_404.md"},
-		Logger:       shared.CreateLogger(),
+		Logger:       shared.CreateLogger("prose"),
 		MaxSize:      maxSize,
 		MaxAssetSize: maxImgSize,
 	}

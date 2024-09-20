@@ -87,11 +87,13 @@ func (h *UploadImgHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileI
 }
 
 func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string, error) {
+	logger := h.Cfg.Logger
 	user, err := util.GetUser(s.Context())
 	if err != nil {
-		h.Cfg.Logger.Error(err.Error())
+		logger.Error("could not get user from ctx", "err", err.Error())
 		return "", err
 	}
+	logger = shared.LoggerWithUser(logger, user)
 
 	filename := filepath.Base(entry.Filepath)
 
@@ -109,13 +111,13 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		noExifBytes, err := exifremove.Remove(text)
 		if err == nil {
 			if len(noExifBytes) == 0 {
-				h.Cfg.Logger.Info("file silently failed to strip exif data", "filename", filename)
+				logger.Info("file silently failed to strip exif data", "filename", filename)
 			} else {
 				text = noExifBytes
-				h.Cfg.Logger.Info("stripped exif data", "filename", filename)
+				logger.Info("stripped exif data", "filename", filename)
 			}
 		} else {
-			h.Cfg.Logger.Error(err.Error())
+			logger.Error("could not strip exif data", "err", err.Error())
 		}
 	}
 
@@ -140,7 +142,7 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 		Space,
 	)
 	if err != nil {
-		h.Cfg.Logger.Info("unable to find image, continuing", "filename", nextPost.Filename, "err", err.Error())
+		logger.Info("unable to find image, continuing", "filename", nextPost.Filename, "err", err.Error())
 	}
 
 	featureFlag, err := util.GetFeatureFlag(s.Context())
@@ -162,13 +164,13 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 
 	err = h.writeImg(s, &metadata)
 	if err != nil {
-		h.Cfg.Logger.Error(err.Error())
+		logger.Error("could not write img", "err", err.Error())
 		return "", err
 	}
 
 	totalFileSize, err := h.DBPool.FindTotalSizeForUser(user.ID)
 	if err != nil {
-		h.Cfg.Logger.Error(err.Error())
+		logger.Error("could not find total storage size for user", "err", err.Error())
 		return "", err
 	}
 
@@ -197,8 +199,9 @@ func (h *UploadImgHandler) Delete(s ssh.Session, entry *utils.FileEntry) error {
 
 	filename := filepath.Base(entry.Filepath)
 
-	logger := h.Cfg.Logger.With(
-		"user", user.Name,
+	logger := h.Cfg.Logger
+	logger = shared.LoggerWithUser(logger, user)
+	logger = logger.With(
 		"filename", filename,
 	)
 

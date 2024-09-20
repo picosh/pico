@@ -15,7 +15,7 @@ func NewConfigSite() *shared.ConfigSite {
 		Port:     port,
 		Protocol: protocol,
 		DbURL:    dbURL,
-		Logger:   shared.CreateLogger(),
+		Logger:   shared.CreateLogger("pubsub"),
 		Space:    "pubsub",
 	}
 }

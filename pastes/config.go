@@ -26,6 +26,6 @@ func NewConfigSite() *shared.ConfigSite {
 		MinioUser:  minioUser,
 		MinioPass:  minioPass,
 		Space:      "pastes",
-		Logger:     shared.CreateLogger(),
+		Logger:     shared.CreateLogger("pastes"),
 	}
 }

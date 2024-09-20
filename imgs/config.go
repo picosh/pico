@@ -27,7 +27,7 @@ func NewConfigSite() *shared.ConfigSite {
 		MinioPass:  minioPass,
 		Space:      "imgs",
 		AllowedExt: []string{".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".ico"},
-		Logger:     shared.CreateLogger(),
+		Logger:     shared.CreateLogger("imgs"),
 	}
 
 	return &cfg

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	html "html/template"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"text/template"
@@ -132,15 +133,15 @@ func (f *Fetcher) Validate(lastDigest *time.Time, parsed *shared.ListParsedText)
 	return nil
 }
 
-func (f *Fetcher) RunPost(user *db.User, post *db.Post) error {
-	f.cfg.Logger.Info("running feed post", "user", user.Name, "filename", post.Filename)
+func (f *Fetcher) RunPost(logger *slog.Logger, user *db.User, post *db.Post) error {
+	logger.Info("running feed post", "user", user.Name, "filename", post.Filename)
 
 	parsed := shared.ListParseText(post.Text)
 
-	f.cfg.Logger.Info("last digest at", "user", user.Name, "lastDigest", post.Data.LastDigest)
+	logger.Info("last digest at", "user", user.Name, "lastDigest", post.Data.LastDigest)
 	err := f.Validate(post.Data.LastDigest, parsed)
 	if err != nil {
-		f.cfg.Logger.Info(err.Error(), "user", user.Name)
+		logger.Info(err.Error(), "user", user.Name)
 		return nil
 	}
 
@@ -160,13 +161,13 @@ func (f *Fetcher) RunPost(user *db.User, post *db.Post) error {
 		urls = append(urls, url)
 	}
 
-	msgBody, err := f.FetchAll(urls, parsed.InlineContent, post.ID, user.Name)
+	msgBody, err := f.FetchAll(logger, urls, parsed.InlineContent, post.ID, user.Name)
 	if err != nil {
 		return err
 	}
 
 	subject := fmt.Sprintf("%s feed digest", post.Title)
-	err = f.SendEmail(user.Name, parsed.Email, subject, msgBody)
+	err = f.SendEmail(logger, user.Name, parsed.Email, subject, msgBody)
 	if err != nil {
 		return err
 	}
@@ -178,19 +179,20 @@ func (f *Fetcher) RunPost(user *db.User, post *db.Post) error {
 }
 
 func (f *Fetcher) RunUser(user *db.User) error {
+	logger := shared.LoggerWithUser(f.cfg.Logger, user)
 	posts, err := f.db.FindPostsForUser(&db.Pager{Num: 1000}, user.ID, "feeds")
 	if err != nil {
 		return err
 	}
 
 	if len(posts.Data) > 0 {
-		f.cfg.Logger.Info("found feed posts", "user", user.Name, "len", len(posts.Data))
+		logger.Info("found feed posts", "user", user.Name, "len", len(posts.Data))
 	}
 
 	for _, post := range posts.Data {
-		err = f.RunPost(user, post)
+		err = f.RunPost(logger, user, post)
 		if err != nil {
-			f.cfg.Logger.Info(err.Error(), "user", user)
+			logger.Info(err.Error(), "user", user)
 		}
 	}
 
@@ -227,8 +229,8 @@ func (f *Fetcher) ParseURL(fp *gofeed.Parser, url string) (*gofeed.Feed, error) 
 	return feed, nil
 }
 
-func (f *Fetcher) Fetch(fp *gofeed.Parser, url string, username string, feedItems []*db.FeedItem) (*Feed, error) {
-	f.cfg.Logger.Info("fetching feed", "user", username, "url", url)
+func (f *Fetcher) Fetch(logger *slog.Logger, fp *gofeed.Parser, url string, username string, feedItems []*db.FeedItem) (*Feed, error) {
+	logger.Info("fetching feed", "user", username, "url", url)
 
 	feed, err := f.ParseURL(fp, url)
 	if err != nil {
@@ -312,7 +314,7 @@ type MsgBody struct {
 	Text string
 }
 
-func (f *Fetcher) FetchAll(urls []string, inlineContent bool, postID string, username string) (*MsgBody, error) {
+func (f *Fetcher) FetchAll(logger *slog.Logger, urls []string, inlineContent bool, postID string, username string) (*MsgBody, error) {
 	fp := gofeed.NewParser()
 	feeds := &DigestFeed{Options: DigestOptions{InlineContent: inlineContent}}
 	feedItems, err := f.db.FindFeedItemsByPostID(postID)
@@ -321,12 +323,12 @@ func (f *Fetcher) FetchAll(urls []string, inlineContent bool, postID string, use
 	}
 
 	for _, url := range urls {
-		feedTmpl, err := f.Fetch(fp, url, username, feedItems)
+		feedTmpl, err := f.Fetch(logger, fp, url, username, feedItems)
 		if err != nil {
 			if errors.Is(err, ErrNoRecentArticles) {
-				f.cfg.Logger.Info(err.Error())
+				logger.Info(err.Error())
 			} else {
-				f.cfg.Logger.Error(err.Error())
+				logger.Error(err.Error())
 			}
 			continue
 		}
@@ -374,7 +376,7 @@ func (f *Fetcher) FetchAll(urls []string, inlineContent bool, postID string, use
 	}, nil
 }
 
-func (f *Fetcher) SendEmail(username, email string, subject string, msg *MsgBody) error {
+func (f *Fetcher) SendEmail(logger *slog.Logger, username, email string, subject string, msg *MsgBody) error {
 	if email == "" {
 		return fmt.Errorf("(%s) does not have an email associated with their feed post", username)
 	}
@@ -382,27 +384,27 @@ func (f *Fetcher) SendEmail(username, email string, subject string, msg *MsgBody
 	from := mail.NewEmail("team pico", shared.DefaultEmail)
 	to := mail.NewEmail(username, email)
 
-	// f.cfg.Logger.Infof("message body (%s)", plainTextContent)
+	// f.logger.Infof("message body (%s)", plainTextContent)
 
 	message := mail.NewSingleEmail(from, subject, to, msg.Text, msg.Html)
 	client := sendgrid.NewSendClient(f.cfg.SendgridKey)
 
-	f.cfg.Logger.Info("sending email digest", "user", username)
+	logger.Info("sending email digest", "user", username)
 	response, err := client.Send(message)
 	if err != nil {
 		return err
 	}
 
-	// f.cfg.Logger.Infof("(%s) email digest response: %v", username, response)
+	// f.logger.Infof("(%s) email digest response: %v", username, response)
 
 	if len(response.Headers["X-Message-Id"]) > 0 {
-		f.cfg.Logger.Info(
+		logger.Info(
 			"successfully sent email digest",
 			"email", email,
 			"x-message-id", response.Headers["X-Message-Id"][0],
 		)
 	} else {
-		f.cfg.Logger.Error(
+		logger.Error(
 			"could not find x-message-id, which means sending an email failed",
 			"email", email,
 		)
@@ -411,7 +413,7 @@ func (f *Fetcher) SendEmail(username, email string, subject string, msg *MsgBody
 	return nil
 }
 
-func (f *Fetcher) Run() error {
+func (f *Fetcher) Run(logger *slog.Logger) error {
 	users, err := f.db.FindUsers()
 	if err != nil {
 		return err
@@ -420,7 +422,7 @@ func (f *Fetcher) Run() error {
 	for _, user := range users {
 		err := f.RunUser(user)
 		if err != nil {
-			f.cfg.Logger.Error(err.Error())
+			logger.Error("RunUser failed", "err", err.Error())
 			continue
 		}
 	}
@@ -429,15 +431,16 @@ func (f *Fetcher) Run() error {
 }
 
 func (f *Fetcher) Loop() {
+	logger := f.cfg.Logger
 	for {
-		f.cfg.Logger.Info("running digest emailer")
+		logger.Info("running digest emailer")
 
-		err := f.Run()
+		err := f.Run(logger)
 		if err != nil {
-			f.cfg.Logger.Error(err.Error())
+			logger.Error(err.Error())
 		}
 
-		f.cfg.Logger.Info("digest emailer finished, waiting 10 mins")
+		logger.Info("digest emailer finished, waiting 10 mins")
 		time.Sleep(10 * time.Minute)
 	}
 }
