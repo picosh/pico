@@ -21,50 +21,34 @@
 
 <hr />
 
-<article>
-  <p>
-    The simplest authenticated pubsub system.  Send messages through
-    user-defined channels.  By default, channels are private to the authenticated
-    ssh user.  The default pubsub model is multicast with bidirectional
-    blocking, meaning a publisher (<code>pub</code>) will send its message to all
-    subscribers (<code>sub</code>) on a channel.  Further, both <code>pub</code> and
-    <code>sub</code> will wait for at least one event to be sent or received on the channel.
-  </p>
-
-  <blockquote>This service is undergoing active development, expect bugs and restarts</blockquote>
-
+<article class="flex flex-col gap-2">
   <div>
-    <h2 class="text-xl">Examples</h2>
+    <p>
+      The simplest authenticated pubsub system.  Send messages through
+      user-defined channels.  By default, channels are private to the authenticated
+      ssh user.  The default pubsub model is multicast with bidirectional
+      blocking, meaning a publisher (<code>pub</code>) will send its message to all
+      subscribers (<code>sub</code>) on a channel.  Further, both <code>pub</code> and
+      <code>sub</code> will wait for at least one event to be sent or received on the channel.
+    </p>
 
-    <p>Simple output pub/sub</p>
-    <img src="/send-output.gif" />
-
-    <p>Send a file</p>
-    <img src="/send-file.gif" />
-
-    <p>Multiple subs</p>
-    <img src="/multi-sub.gif" />
-
-    <p>Multiple pubs</p>
-    <img src="/multi-pub.gif" />
-
-    <p>Multiple pubs and subs</p>
-    <img src="/multi-pub-sub.gif" />
-
-    <p>Pipe based chat</p>
-    <img src="/pipe-chat.gif" />
-
-    <p>Pipe based command output</p>
-    <img src="/pipe-cmd-output.gif" />
-
-    <p>Pipe based reverse shell</p>
-    <img src="/pipe-reverse-shell.gif" />
+    <blockquote>This service is undergoing active development, expect bugs and restarts</blockquote>
   </div>
 
   <div>
     <h2 class="text-xl">A basic API</h2>
     <pre>ssh {{.Site.Domain}} sub mykey</pre>
     <pre>echo "hello world!" | ssh {{.Site.Domain}} pub mykey</pre>
+
+    <details>
+      <summary>Demo</summary>
+      <script
+        src="https://asciinema.org/a/52qRVi77CTjfAoZj9IaGMygDr.js"
+        id="asciicast-52qRVi77CTjfAoZj9IaGMygDr"
+        async="true"
+        data-theme="dracula"
+      ></script>
+    </details>
   </div>
 
   <div>
@@ -77,12 +61,107 @@
     <h2 class="text-xl">File sharing</h2>
     <pre>cat doc.md | ssh {{.Site.Domain}} pub thedoc</pre>
     <pre>ssh {{.Site.Domain}} sub thedoc > ./important.md</pre>
+
+    <details>
+      <summary>Demo</summary>
+      <script
+        src="https://asciinema.org/a/TW0chshVssDj35hvr9NKNC2CK.js"
+        id="asciicast-TW0chshVssDj35hvr9NKNC2CK"
+        async="true"
+        data-theme="dracula"
+      ></script>
+    </details>
+  </div>
+
+  <div>
+    <h2 class="text-xl">Pipe command output</h2>
+    <p>Send command output through our <code>pipe</code> command.</p>
+
+    <details>
+      <summary>Demo</summary>
+      <script
+        src="https://asciinema.org/a/7e3SVyxKa31D0iZ4X5PJm8b6E.js"
+        id="asciicast-7e3SVyxKa31D0iZ4X5PJm8b6E"
+        async="true"
+        data-theme="dracula"
+      ></script>
+    </details>
+  </div>
+
+  <div>
+    <h2 class="text-xl">Chat</h2>
+    <p>Use our <code>pipe</code> command to have a chat with someone.</p>
+    <pre>htop | ssh {{.Site.Domain}} pipe mychan -p</pre>
+    <p>Now anyone with a <code>pico</code> account can subscribe to this channel:</p>
+    <pre>ssh send.pico.sh pipe mychan -p</pre>
+
+    <details>
+      <summary>Demo</summary>
+      <script
+        src="https://asciinema.org/a/fLBHAcPQqqawkrdpRdgEVFNrm.js"
+        id="asciicast-fLBHAcPQqqawkrdpRdgEVFNrm"
+        async="true"
+        data-theme="dracula"
+      ></script>
+    </details>
+  </div>
+
+  <div>
+    <h2 class="text-xl">Pipe reverse shell</h2>
+    <p>If you squint hard enough you can give users interactive access to your shell.</p>
+
+    <details>
+      <summary>Demo</summary>
+      <script
+        src="https://asciinema.org/a/S3LSLOi9mHQOPZHoK0xlkiKLM.js"
+        id="asciicast-S3LSLOi9mHQOPZHoK0xlkiKLM"
+        async="true"
+        data-theme="dracula"
+      ></script>
+    </details>
   </div>
 
   <div>
     <h2 class="text-xl">Simple CI/CD</h2>
     <pre>ssh {{.Site.Domain}} sub myimg; docker pull myimg && docker up -d dev</pre>
     <pre>docker buildx build --push -t myimg .; ssh {{.Site.Domain}} pub myimg -e</pre>
+  </div>
+
+  <div>
+    <h2 class="text-xl">Pubsub interactions</h2>
+
+    <h3 class="text-lg">Multiple subs</h3>
+    <details>
+      <summary>Demo</summary>
+      <script
+        src="https://asciinema.org/a/Ccee82V83EUyaZzFYbTn36BLF.js"
+        id="asciicast-Ccee82V83EUyaZzFYbTn36BLF"
+        async="true"
+        data-theme="dracula"
+      ></script>
+    </details>
+
+    <h3 class="text-lg">Multiple pubs</h3>
+    <details>
+      <summary>Demo</summary>
+      <script
+        src="https://asciinema.org/a/ONe1OphgsKUt9MMPVRBiSbwd0.js"
+        id="asciicast-ONe1OphgsKUt9MMPVRBiSbwd0"
+        async="true"
+        data-theme="dracula"
+      ></script>
+    </details>
+
+    <h3 class="text-lg">Multiple pubs and subs</h3>
+    <details>
+      <summary>Demo</summary>
+      <script
+        src="https://asciinema.org/a/HAlhNCLFLvuGjiqnEEUvWVi1h.js"
+        id="asciicast-HAlhNCLFLvuGjiqnEEUvWVi1h"
+        async="true"
+        data-theme="dracula"
+      ></script>
+    </details>
   </div>
 
   <div>
@@ -101,17 +180,16 @@
     </p>
   </div>
 
-  <p>
-    This project was heavily inspired by
-    <a href="https://patchbay.pub">patchbay.pub</a>
-  </p>
+  <div>
+    <h2 class="text-xl">Inspiration</h2>
+    <p>
+      A special thanks to <a href="https://patchbay.pub">patchbay.pub</a> for our inspiration.
+    </p>
+  </div>
 
-  <p>
-    built on our <a href="https://github.com/picosh/pubsub">go pkg</a>.
-  </p>
-
-  <div class="text-center">
-    <a href="https://pico.sh/getting-started" class="btn-link my-2 inline-block">GET STARTED</a>
+  <div class="text-center mb-2">
+    <p>built on our <a href="https://github.com/picosh/pubsub">go pkg</a>.</p>
+    <a href="https://pico.sh/getting-started" class="btn-link inline-block">GET STARTED</a>
   </div>
 </article>
 
