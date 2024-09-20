@@ -40,6 +40,14 @@ func createStaticRoutes() []shared.Route {
 		shared.NewRoute("GET", "/apple-touch-icon.png", serveFile("apple-touch-icon.png", "image/png")),
 		shared.NewRoute("GET", "/favicon.ico", serveFile("favicon.ico", "image/x-icon")),
 		shared.NewRoute("GET", "/robots.txt", serveFile("robots.txt", "text/plain")),
+		shared.NewRoute("GET", "/send-output.gif", serveFile("send-output.gif", "image/gif")),
+		shared.NewRoute("GET", "/send-file.gif", serveFile("send-file.gif", "image/gif")),
+		shared.NewRoute("GET", "/multi-sub.gif", serveFile("multi-sub.gif", "image/gif")),
+		shared.NewRoute("GET", "/multi-pub.gif", serveFile("multi-pub.gif", "image/gif")),
+		shared.NewRoute("GET", "/multi-pub-sub.gif", serveFile("multi-pub-sub.gif", "image/gif")),
+		shared.NewRoute("GET", "/pipe-chat.gif", serveFile("pipe-chat.gif", "image/gif")),
+		shared.NewRoute("GET", "/pipe-cmd-output.gif", serveFile("pipe-cmd-output.gif", "image/gif")),
+		shared.NewRoute("GET", "/pipe-reverse-shell.gif", serveFile("pipe-reverse-shell.gif", "image/gif")),
 	}
 }
 

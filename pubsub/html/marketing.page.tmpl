@@ -34,6 +34,34 @@
   <blockquote>This service is undergoing active development, expect bugs and restarts</blockquote>
 
   <div>
+    <h2 class="text-xl">Examples</h2>
+
+    <p>Simple output pub/sub</p>
+    <img src="/send-output.gif" />
+
+    <p>Send a file</p>
+    <img src="/send-file.gif" />
+
+    <p>Multiple subs</p>
+    <img src="/multi-sub.gif" />
+
+    <p>Multiple pubs</p>
+    <img src="/multi-pub.gif" />
+
+    <p>Multiple pubs and subs</p>
+    <img src="/multi-pub-sub.gif" />
+
+    <p>Pipe based chat</p>
+    <img src="/pipe-chat.gif" />
+
+    <p>Pipe based command output</p>
+    <img src="/pipe-cmd-output.gif" />
+
+    <p>Pipe based reverse shell</p>
+    <img src="/pipe-reverse-shell.gif" />
+  </div>
+
+  <div>
     <h2 class="text-xl">A basic API</h2>
     <pre>ssh {{.Site.Domain}} sub mykey</pre>
     <pre>echo "hello world!" | ssh {{.Site.Domain}} pub mykey</pre>
