@@ -15,7 +15,8 @@
 {{define "attrs"}}class="container-sm"{{end}}
 
 {{define "body"}}
-<header>
+<header class="flex flex-col items-center gap">
+  <img src="https://pico.sh/logo.svg" alt="pico logo" width="50" height="50" />
   <h1 class="text-2xl font-bold text-center">pubsub using ssh</h1>
 </header>
 
@@ -32,7 +33,7 @@
       <code>sub</code> will wait for at least one event to be sent or received on the channel.
     </p>
 
-    <blockquote>This service is undergoing active development, expect bugs and restarts</blockquote>
+    <blockquote>This service is undergoing active development, expect bugs, feature dev, and server restarts</blockquote>
   </div>
 
   <div>
