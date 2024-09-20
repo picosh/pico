@@ -48,6 +48,9 @@
         id="asciicast-52qRVi77CTjfAoZj9IaGMygDr"
         async="true"
         data-theme="dracula"
+        data-loop="true"
+        data-speed="1.5"
+        data-idle-time-limit="2"
       ></script>
     </details>
   </div>
@@ -70,6 +73,9 @@
         id="asciicast-TW0chshVssDj35hvr9NKNC2CK"
         async="true"
         data-theme="dracula"
+        data-loop="true"
+        data-speed="1.5"
+        data-idle-time-limit="2"
       ></script>
     </details>
   </div>
@@ -85,6 +91,9 @@
         id="asciicast-7e3SVyxKa31D0iZ4X5PJm8b6E"
         async="true"
         data-theme="dracula"
+        data-loop="true"
+        data-speed="1.5"
+        data-idle-time-limit="2"
       ></script>
     </details>
   </div>
@@ -92,9 +101,8 @@
   <div>
     <h2 class="text-xl">Chat</h2>
     <p>Use our <code>pipe</code> command to have a chat with someone.</p>
-    <pre>htop | ssh {{.Site.Domain}} pipe mychan -p</pre>
-    <p>Now anyone with a <code>pico</code> account can subscribe to this channel:</p>
-    <pre>ssh send.pico.sh pipe mychan -p</pre>
+    <pre>ssh {{.Site.Domain}} pipe mychan -p</pre>
+    <p>Now anyone with a <code>pico</code> account can subscribe to this channel using the same command.</p>
 
     <details>
       <summary>Demo</summary>
@@ -103,6 +111,9 @@
         id="asciicast-fLBHAcPQqqawkrdpRdgEVFNrm"
         async="true"
         data-theme="dracula"
+        data-loop="true"
+        data-speed="1.5"
+        data-idle-time-limit="2"
       ></script>
     </details>
   </div>
@@ -118,6 +129,9 @@
         id="asciicast-S3LSLOi9mHQOPZHoK0xlkiKLM"
         async="true"
         data-theme="dracula"
+        data-loop="true"
+        data-speed="1.5"
+        data-idle-time-limit="2"
       ></script>
     </details>
   </div>
@@ -139,6 +153,9 @@
         id="asciicast-Ccee82V83EUyaZzFYbTn36BLF"
         async="true"
         data-theme="dracula"
+        data-loop="true"
+        data-speed="1.5"
+        data-idle-time-limit="2"
       ></script>
     </details>
 
@@ -150,6 +167,9 @@
         id="asciicast-ONe1OphgsKUt9MMPVRBiSbwd0"
         async="true"
         data-theme="dracula"
+        data-loop="true"
+        data-speed="1.5"
+        data-idle-time-limit="2"
       ></script>
     </details>
 
@@ -161,15 +181,18 @@
         id="asciicast-HAlhNCLFLvuGjiqnEEUvWVi1h"
         async="true"
         data-theme="dracula"
+        data-loop="true"
+        data-speed="1.5"
+        data-idle-time-limit="2"
       ></script>
     </details>
   </div>
 
   <div>
     <h2 class="text-xl">Send a public message</h2>
-    <pre>echo "hello world!" | ssh send.pico.sh pub mychan -p</pre>
+    <pre>echo "hello world!" | ssh {{.Site.Domain}} pub mychan -p</pre>
     <p>Now anyone with a <code>pico</code> account can subscribe to this channel:</p>
-    <pre>ssh send.pico.sh sub mychan -p</pre>
+    <pre>ssh {{.Site.Domain}} sub mychan -p</pre>
   </div>
 
   <div>
