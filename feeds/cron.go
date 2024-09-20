@@ -134,14 +134,14 @@ func (f *Fetcher) Validate(lastDigest *time.Time, parsed *shared.ListParsedText)
 }
 
 func (f *Fetcher) RunPost(logger *slog.Logger, user *db.User, post *db.Post) error {
-	logger.Info("running feed post", "user", user.Name, "filename", post.Filename)
+	logger.Info("running feed post", "filename", post.Filename)
 
 	parsed := shared.ListParseText(post.Text)
 
-	logger.Info("last digest at", "user", user.Name, "lastDigest", post.Data.LastDigest)
+	logger.Info("last digest at", "lastDigest", post.Data.LastDigest)
 	err := f.Validate(post.Data.LastDigest, parsed)
 	if err != nil {
-		logger.Info(err.Error(), "user", user.Name)
+		logger.Info("validation failed", "err", err.Error())
 		return nil
 	}
 
@@ -186,13 +186,13 @@ func (f *Fetcher) RunUser(user *db.User) error {
 	}
 
 	if len(posts.Data) > 0 {
-		logger.Info("found feed posts", "user", user.Name, "len", len(posts.Data))
+		logger.Info("found feed posts", "len", len(posts.Data))
 	}
 
 	for _, post := range posts.Data {
 		err = f.RunPost(logger, user, post)
 		if err != nil {
-			logger.Info(err.Error(), "user", user)
+			logger.Info("RunPost failed", "err", err.Error())
 		}
 	}
 
@@ -230,7 +230,7 @@ func (f *Fetcher) ParseURL(fp *gofeed.Parser, url string) (*gofeed.Feed, error) 
 }
 
 func (f *Fetcher) Fetch(logger *slog.Logger, fp *gofeed.Parser, url string, username string, feedItems []*db.FeedItem) (*Feed, error) {
-	logger.Info("fetching feed", "user", username, "url", url)
+	logger.Info("fetching feed", "url", url)
 
 	feed, err := f.ParseURL(fp, url)
 	if err != nil {
@@ -261,8 +261,7 @@ func (f *Fetcher) Fetch(logger *slog.Logger, fp *gofeed.Parser, url string, user
 
 	if len(items) == 0 {
 		return nil, fmt.Errorf(
-			"(%s) %s %w, skipping",
-			username,
+			"%s %w, skipping",
 			url,
 			ErrNoRecentArticles,
 		)
@@ -326,9 +325,9 @@ func (f *Fetcher) FetchAll(logger *slog.Logger, urls []string, inlineContent boo
 		feedTmpl, err := f.Fetch(logger, fp, url, username, feedItems)
 		if err != nil {
 			if errors.Is(err, ErrNoRecentArticles) {
-				logger.Info(err.Error())
+				logger.Info("no recent articles", "err", err.Error())
 			} else {
-				logger.Error(err.Error())
+				logger.Error("fetch error", "err", err.Error())
 			}
 			continue
 		}
@@ -389,7 +388,7 @@ func (f *Fetcher) SendEmail(logger *slog.Logger, username, email string, subject
 	message := mail.NewSingleEmail(from, subject, to, msg.Text, msg.Html)
 	client := sendgrid.NewSendClient(f.cfg.SendgridKey)
 
-	logger.Info("sending email digest", "user", username)
+	logger.Info("sending email digest")
 	response, err := client.Send(message)
 	if err != nil {
 		return err
