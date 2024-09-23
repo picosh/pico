@@ -133,7 +133,7 @@ func (f *Fetcher) Validate(post *db.Post, parsed *shared.ListParsedText) error {
 
 	expiresAt := post.ExpiresAt
 	if expiresAt != nil {
-		if post.ExpiresAt.After(now) {
+		if post.ExpiresAt.Before(now) {
 			return fmt.Errorf("(%s) post has expired, skipping", post.ExpiresAt.Format(time.RFC3339))
 		}
 	}
