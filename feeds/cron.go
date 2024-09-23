@@ -334,7 +334,7 @@ func (f *Fetcher) FetchAll(logger *slog.Logger, urls []string, inlineContent boo
 	fp := gofeed.NewParser()
 	daysLeft := "90"
 	if post.ExpiresAt != nil {
-		diff := time.Since(*post.ExpiresAt)
+		diff := time.Until(*post.ExpiresAt)
 		daysLeft = fmt.Sprintf("%f", math.Ceil(diff.Hours()/24))
 	}
 	feeds := &DigestFeed{
