@@ -274,7 +274,7 @@ services:
     env_file:
       - .env.prod
     environment:
-      APP_DOMAIN: ${FEEDS_DOMAIN:-feeds.sh}
+      APP_DOMAIN: ${FEEDS_DOMAIN:-feeds.pico.sh}
       APP_EMAIL: ${FEEDS_EMAIL:-hello@pico.sh}
     volumes:
       - ${FEEDS_CADDYFILE}:/etc/caddy/Caddyfile

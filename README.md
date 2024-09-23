@@ -109,7 +109,7 @@ Create a blogs.txt file:
 Then upload it to us:
 
 ```bash
-scp blogs.txt feeds.sh:/
+scp blogs.txt feeds.pico.sh:/
 ```
 
 After the daily interval has been reached, you will receive an email with your

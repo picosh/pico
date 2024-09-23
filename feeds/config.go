@@ -6,7 +6,7 @@ import (
 
 func NewConfigSite() *shared.ConfigSite {
 	debug := shared.GetEnv("FEEDS_DEBUG", "0")
-	domain := shared.GetEnv("FEEDS_DOMAIN", "feeds.sh")
+	domain := shared.GetEnv("FEEDS_DOMAIN", "feeds.pico.sh")
 	port := shared.GetEnv("FEEDS_WEB_PORT", "3000")
 	protocol := shared.GetEnv("FEEDS_PROTOCOL", "https")
 	storageDir := shared.GetEnv("IMGS_STORAGE_DIR", ".storage")

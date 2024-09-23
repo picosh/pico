@@ -53,7 +53,7 @@ type ListMetaData struct {
 	ListType       string // https://developer.mozilla.org/en-US/docs/Web/CSS/list-style-type
 	DigestInterval string
 	Email          string
-	InlineContent  bool // allows content inlining to be disabled in feeds.sh emails
+	InlineContent  bool // allows content inlining to be disabled in feeds.pico.sh emails
 }
 
 var urlToken = "=>"
