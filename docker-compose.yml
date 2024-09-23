@@ -121,7 +121,7 @@ services:
       - services
       - all
   auth-web:
-    image: ghcr.io/picosh/pico/auth-web:latest
+    image: ghcr.io/picosh/pico/auth-web:main
     restart: always
     profiles:
       - auth
