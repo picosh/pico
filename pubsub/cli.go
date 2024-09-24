@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
@@ -181,6 +182,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				pubCmd := flagSet("pub", sesh)
 				empty := pubCmd.Bool("e", false, "Send an empty message to subs")
 				public := pubCmd.Bool("p", false, "Anyone can sub to this channel")
+				timeout := pubCmd.Duration("t", -1, "Timeout as a Go duration before cancelling the pub event. Valid time units are 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h'. Default is no timeout.")
 				if !flagCheck(pubCmd, repoName, cmdArgs) {
 					return
 				}
@@ -215,13 +217,30 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					})
 				}
 
+				tt := *timeout
+				str := "no subs found ... waiting"
+				if tt > 0 {
+					str += " " + tt.String()
+				}
+
 				if count == 0 {
-					wish.Println(sesh, "no subs found ... waiting")
+					wish.Println(sesh, str)
 				}
 
 				go func() {
 					<-ctx.Done()
 					pub.Cleanup()
+				}()
+
+				go func() {
+					// never cancel pub event
+					if tt == -1 {
+						return
+					}
+
+					<-time.After(tt)
+					pub.Cleanup()
+					sesh.Close()
 				}()
 
 				err = pubsub.PubSub.Pub(name, pub)
