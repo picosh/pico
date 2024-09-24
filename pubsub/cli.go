@@ -240,7 +240,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 
 					<-time.After(tt)
 					pub.Cleanup()
-					sesh.Close()
+					wish.Fatalln(sesh, "timeout reached, exiting ...")
 				}()
 
 				err = pubsub.PubSub.Pub(name, pub)
