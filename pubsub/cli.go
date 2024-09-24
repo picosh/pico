@@ -15,7 +15,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared"
-	"github.com/picosh/pico/shared/storage"
 	psub "github.com/picosh/pubsub"
 	"github.com/picosh/send/send/utils"
 )
@@ -80,11 +79,18 @@ for bidirectional messages to be sent between any clients connected
 to a pipe.`
 
 type CliHandler struct {
-	DBPool      db.DB
-	Logger      *slog.Logger
-	Storage     storage.StorageServe
-	RegistryUrl string
-	PubSub      *psub.Cfg
+	DBPool db.DB
+	Logger *slog.Logger
+	PubSub *psub.Cfg
+	Cfg    *shared.ConfigSite
+}
+
+func toSshCmd(cfg *shared.ConfigSite) string {
+	port := "22"
+	if cfg.Port != "" {
+		port = fmt.Sprintf("-p %s", cfg.Port)
+	}
+	return fmt.Sprintf("%s %s", port, cfg.Domain)
 }
 
 func WishMiddleware(handler *CliHandler) wish.Middleware {
@@ -112,69 +118,69 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 			}
 
 			cmd := strings.TrimSpace(args[0])
-			if len(args) == 1 {
-				if cmd == "help" {
-					wish.Println(sesh, helpStr)
-				} else if cmd == "ls" {
-					channelFilter := fmt.Sprintf("%s/", user.Name)
-					if handler.DBPool.HasFeatureForUser(user.ID, "admin") {
-						channelFilter = ""
-					}
-
-					channels := pubsub.PubSub.GetChannels(channelFilter)
-					pipes := pubsub.PubSub.GetPipes(channelFilter)
-
-					if len(channels) == 0 && len(pipes) == 0 {
-						wish.Println(sesh, "no pubsub channels or pipes found")
-					} else {
-						var outputData string
-						if len(channels) > 0 {
-							outputData += "Channel Information\r\n"
-							for _, channel := range channels {
-								outputData += fmt.Sprintf("- %s:\r\n", channel.Name)
-								outputData += "\tPubs:\r\n"
-
-								channel.Pubs.Range(func(I string, J *psub.Pub) bool {
-									outputData += fmt.Sprintf("\t- %s:\r\n", I)
-									return true
-								})
-
-								outputData += "\tSubs:\r\n"
-
-								channel.Subs.Range(func(I string, J *psub.Sub) bool {
-									outputData += fmt.Sprintf("\t- %s:\r\n", I)
-									return true
-								})
-							}
-						}
-
-						if len(pipes) > 0 {
-							outputData += "Pipe Information\r\n"
-							for _, pipe := range pipes {
-								outputData += fmt.Sprintf("- %s:\r\n", pipe.Name)
-								outputData += "\tClients:\r\n"
-
-								pipe.Clients.Range(func(I string, J *psub.PipeClient) bool {
-									outputData += fmt.Sprintf("\t- %s:\r\n", I)
-									return true
-								})
-							}
-						}
-
-						_, _ = sesh.Write([]byte(outputData))
-					}
+			if cmd == "help" {
+				wish.Println(sesh, helpStr)
+			} else if cmd == "ls" {
+				channelFilter := fmt.Sprintf("%s/", user.Name)
+				if handler.DBPool.HasFeatureForUser(user.ID, "admin") {
+					channelFilter = ""
 				}
-				next(sesh)
-				return
+
+				channels := pubsub.PubSub.GetChannels(channelFilter)
+				pipes := pubsub.PubSub.GetPipes(channelFilter)
+
+				if len(channels) == 0 && len(pipes) == 0 {
+					wish.Println(sesh, "no pubsub channels or pipes found")
+				} else {
+					var outputData string
+					if len(channels) > 0 {
+						outputData += "Channel Information\r\n"
+						for _, channel := range channels {
+							outputData += fmt.Sprintf("- %s:\r\n", channel.Name)
+							outputData += "\tPubs:\r\n"
+
+							channel.Pubs.Range(func(I string, J *psub.Pub) bool {
+								outputData += fmt.Sprintf("\t- %s:\r\n", I)
+								return true
+							})
+
+							outputData += "\tSubs:\r\n"
+
+							channel.Subs.Range(func(I string, J *psub.Sub) bool {
+								outputData += fmt.Sprintf("\t- %s:\r\n", I)
+								return true
+							})
+						}
+					}
+
+					if len(pipes) > 0 {
+						outputData += "Pipe Information\r\n"
+						for _, pipe := range pipes {
+							outputData += fmt.Sprintf("- %s:\r\n", pipe.Name)
+							outputData += "\tClients:\r\n"
+
+							pipe.Clients.Range(func(I string, J *psub.PipeClient) bool {
+								outputData += fmt.Sprintf("\t- %s:\r\n", I)
+								return true
+							})
+						}
+					}
+
+					_, _ = sesh.Write([]byte(outputData))
+				}
 			}
 
-			repoName := strings.TrimSpace(args[1])
-			cmdArgs := args[2:]
+			channelName := ""
+			cmdArgs := args[1:]
+			if len(args) > 1 {
+				channelName = strings.TrimSpace(args[1])
+				cmdArgs = args[2:]
+			}
 			logger.Info(
 				"imgs middleware detected command",
 				"args", args,
 				"cmd", cmd,
-				"repoName", repoName,
+				"channelName", channelName,
 				"cmdArgs", cmdArgs,
 			)
 
@@ -183,10 +189,9 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				empty := pubCmd.Bool("e", false, "Send an empty message to subs")
 				public := pubCmd.Bool("p", false, "Anyone can sub to this channel")
 				timeout := pubCmd.Duration("t", -1, "Timeout as a Go duration before cancelling the pub event. Valid time units are 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h'. Default is no timeout.")
-				if !flagCheck(pubCmd, repoName, cmdArgs) {
+				if !flagCheck(pubCmd, channelName, cmdArgs) {
 					return
 				}
-				channelName := repoName
 
 				var reader io.Reader
 				if *empty {
@@ -195,10 +200,19 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					reader = sesh
 				}
 
+				if channelName == "" {
+					channelName = uuid.NewString()
+				}
 				name := toChannel(user.Name, channelName)
 				if *public {
 					name = toPublicChannel(channelName)
 				}
+				wish.Printf(
+					sesh,
+					"subscribe to this channel:\n\tssh %s sub %s\n",
+					toSshCmd(handler.Cfg),
+					channelName,
+				)
 
 				wish.Println(sesh, "sending msg ...")
 				pub := &psub.Pub{
@@ -218,12 +232,11 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				}
 
 				tt := *timeout
-				str := "no subs found ... waiting"
-				if tt > 0 {
-					str += " " + tt.String()
-				}
-
 				if count == 0 {
+					str := "no subs found ... waiting"
+					if tt > 0 {
+						str += " " + tt.String()
+					}
 					wish.Println(sesh, str)
 				}
 
@@ -251,10 +264,10 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 			} else if cmd == "sub" {
 				pubCmd := flagSet("pub", sesh)
 				public := pubCmd.Bool("p", false, "Subscribe to a public channel")
-				if !flagCheck(pubCmd, repoName, cmdArgs) {
+				if !flagCheck(pubCmd, channelName, cmdArgs) {
 					return
 				}
-				channelName := repoName
+				channelName := channelName
 
 				name := toChannel(user.Name, channelName)
 				if *public {
@@ -280,14 +293,24 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				pipeCmd := flagSet("pipe", sesh)
 				public := pipeCmd.Bool("p", false, "Pipe to a public channel")
 				replay := pipeCmd.Bool("r", false, "Replay messages to the client that sent it")
-				if !flagCheck(pipeCmd, repoName, cmdArgs) {
+				if !flagCheck(pipeCmd, channelName, cmdArgs) {
 					return
 				}
-				channelName := repoName
-
+				isCreator := channelName == ""
+				if isCreator {
+					channelName = uuid.NewString()
+				}
 				name := toChannel(user.Name, channelName)
 				if *public {
 					name = toPublicChannel(channelName)
+				}
+				if isCreator {
+					wish.Printf(
+						sesh,
+						"subscribe to this channel:\n\tssh %s sub %s\n",
+						toSshCmd(handler.Cfg),
+						channelName,
+					)
 				}
 
 				pipe := &psub.PipeClient{

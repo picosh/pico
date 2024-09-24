@@ -27,6 +27,8 @@ func StartSshServer() {
 	dbh := postgres.NewDB(cfg.DbURL, cfg.Logger)
 	defer dbh.Close()
 
+	cfg.Port = port
+
 	pubsub := &psub.Cfg{
 		Logger: logger,
 		PubSub: &psub.PubSubMulticast{
@@ -40,6 +42,7 @@ func StartSshServer() {
 		Logger: logger,
 		DBPool: dbh,
 		PubSub: pubsub,
+		Cfg:    cfg,
 	}
 
 	sshAuth := util.NewSshAuthHandler(dbh, logger, cfg)
