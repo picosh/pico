@@ -185,10 +185,12 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 			)
 
 			if cmd == "pub" {
+				defaultTimeout, _ := time.ParseDuration("720h")
+
 				pubCmd := flagSet("pub", sesh)
 				empty := pubCmd.Bool("e", false, "Send an empty message to subs")
 				public := pubCmd.Bool("p", false, "Anyone can sub to this channel")
-				timeout := pubCmd.Duration("t", -1, "Timeout as a Go duration before cancelling the pub event. Valid time units are 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h'. Default is no timeout.")
+				timeout := pubCmd.Duration("t", defaultTimeout, "Timeout as a Go duration before cancelling the pub event. Valid time units are 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h'. Default is 30 days.")
 				if !flagCheck(pubCmd, channelName, cmdArgs) {
 					return
 				}
@@ -241,19 +243,13 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				}
 
 				go func() {
-					<-ctx.Done()
-					pub.Cleanup()
-				}()
-
-				go func() {
-					// never cancel pub event
-					if tt == -1 {
-						return
+					select {
+					case <-ctx.Done():
+						pub.Cleanup()
+					case <-time.After(tt):
+						wish.Fatalln(sesh, "timeout reached, exiting ...")
+						pub.Cleanup()
 					}
-
-					<-time.After(tt)
-					pub.Cleanup()
-					wish.Fatalln(sesh, "timeout reached, exiting ...")
 				}()
 
 				err = pubsub.PubSub.Pub(name, pub)
