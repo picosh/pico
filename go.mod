@@ -1,6 +1,6 @@
 module github.com/picosh/pico
 
-go 1.22.6
+go 1.23.1
 
 // replace github.com/picosh/tunkit => ../tunkit
 
@@ -37,12 +37,11 @@ require (
 	github.com/muesli/termenv v0.15.3-0.20240509142007-81b8f94111d5
 	github.com/neurosnap/go-exif-remove v0.0.0-20221010134343-50d1e3c35577
 	github.com/picosh/pobj v0.0.0-20240709135546-27097077b26a
-	github.com/picosh/pubsub v0.0.0-20240919210825-ed408c5349aa
+	github.com/picosh/pubsub v0.0.0-20241002203517-3ff0e5744b44
 	github.com/picosh/send v0.0.0-20240820031602-5d3b1a4494cc
 	github.com/picosh/tunkit v0.0.0-20240709033345-8315d4f3cd0e
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06
 	github.com/sendgrid/sendgrid-go v3.14.0+incompatible
-	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3
 	github.com/simplesurance/go-ip-anonymizer v0.0.0-20200429124537-35a880f8e87d
 	github.com/x-way/crawlerdetect v0.2.21
 	github.com/yuin/goldmark v1.7.1

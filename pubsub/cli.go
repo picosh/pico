@@ -2,6 +2,7 @@ package pubsub
 
 import (
 	"bytes"
+	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -126,43 +127,55 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					channelFilter = ""
 				}
 
-				channels := pubsub.PubSub.GetChannels(channelFilter)
-				pipes := pubsub.PubSub.GetPipes(channelFilter)
+				var channels []*psub.Channel
 
-				if len(channels) == 0 && len(pipes) == 0 {
-					wish.Println(sesh, "no pubsub channels or pipes found")
+				for channelID, channel := range pubsub.PubSub.GetChannels() {
+					if strings.HasPrefix(channelID, channelFilter) {
+						channels = append(channels, channel)
+					}
+				}
+
+				if len(channels) == 0 {
+					wish.Println(sesh, "no pubsub channels found")
 				} else {
 					var outputData string
 					if len(channels) > 0 {
 						outputData += "Channel Information\r\n"
 						for _, channel := range channels {
-							outputData += fmt.Sprintf("- %s:\r\n", channel.Name)
+							outputData += fmt.Sprintf("- %s:\r\n", channel.ID)
+							outputData += "\tClients:\r\n"
+
+							var pubs []*psub.Client
+							var subs []*psub.Client
+							var pipes []*psub.Client
+
+							for _, client := range channel.GetClients() {
+								if client.Direction == psub.ChannelDirectionInput {
+									pubs = append(pubs, client)
+								} else if client.Direction == psub.ChannelDirectionOutput {
+									subs = append(subs, client)
+								} else if client.Direction == psub.ChannelDirectionInputOutput {
+									pipes = append(pipes, client)
+								}
+							}
+
 							outputData += "\tPubs:\r\n"
 
-							channel.Pubs.Range(func(I string, J *psub.Pub) bool {
-								outputData += fmt.Sprintf("\t- %s:\r\n", I)
-								return true
-							})
+							for _, pub := range pubs {
+								outputData += fmt.Sprintf("\t- %s:\r\n", pub.ID)
+							}
 
 							outputData += "\tSubs:\r\n"
 
-							channel.Subs.Range(func(I string, J *psub.Sub) bool {
-								outputData += fmt.Sprintf("\t- %s:\r\n", I)
-								return true
-							})
-						}
-					}
+							for _, sub := range subs {
+								outputData += fmt.Sprintf("\t- %s:\r\n", sub.ID)
+							}
 
-					if len(pipes) > 0 {
-						outputData += "Pipe Information\r\n"
-						for _, pipe := range pipes {
-							outputData += fmt.Sprintf("- %s:\r\n", pipe.Name)
-							outputData += "\tClients:\r\n"
+							outputData += "\tPipes:\r\n"
 
-							pipe.Clients.Range(func(I string, J *psub.PipeClient) bool {
-								outputData += fmt.Sprintf("\t- %s:\r\n", I)
-								return true
-							})
+							for _, pipe := range pipes {
+								outputData += fmt.Sprintf("\t- %s:\r\n", pipe.ID)
+							}
 						}
 					}
 
@@ -185,21 +198,19 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 			)
 
 			if cmd == "pub" {
-				defaultTimeout, _ := time.ParseDuration("720h")
-
 				pubCmd := flagSet("pub", sesh)
 				empty := pubCmd.Bool("e", false, "Send an empty message to subs")
 				public := pubCmd.Bool("p", false, "Anyone can sub to this channel")
-				timeout := pubCmd.Duration("t", defaultTimeout, "Timeout as a Go duration before cancelling the pub event. Valid time units are 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h'. Default is 30 days.")
+				timeout := pubCmd.Duration("t", 30*24*time.Hour, "Timeout as a Go duration before cancelling the pub event. Valid time units are 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h'. Default is 30 days.")
 				if !flagCheck(pubCmd, channelName, cmdArgs) {
 					return
 				}
 
-				var reader io.Reader
+				var rw io.ReadWriter
 				if *empty {
-					reader = bytes.NewReader(make([]byte, 1))
+					rw = bytes.NewBuffer(make([]byte, 1))
 				} else {
-					reader = sesh
+					rw = sesh
 				}
 
 				if channelName == "" {
@@ -217,42 +228,78 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				)
 
 				wish.Println(sesh, "sending msg ...")
-				pub := &psub.Pub{
-					ID:     fmt.Sprintf("%s (%s@%s)", uuid.NewString(), user.Name, sesh.RemoteAddr().String()),
-					Done:   make(chan struct{}),
-					Reader: reader,
-				}
 
 				count := 0
-				channelInfo := pubsub.PubSub.GetChannel(name)
-
-				if channelInfo != nil {
-					channelInfo.Subs.Range(func(I string, J *psub.Sub) bool {
-						count++
-						return true
-					})
+				for channelID, channel := range pubsub.PubSub.GetChannels() {
+					if channelID == name {
+						for _, client := range channel.GetClients() {
+							if client.Direction == psub.ChannelDirectionOutput || client.Direction == psub.ChannelDirectionInputOutput {
+								count++
+							}
+						}
+						break
+					}
 				}
+
+				var pubCtx context.Context = ctx
 
 				tt := *timeout
 				if count == 0 {
-					str := "no subs found ... waiting"
+					termMsg := "no subs found ... waiting"
 					if tt > 0 {
-						str += " " + tt.String()
+						termMsg += " " + tt.String()
 					}
-					wish.Println(sesh, str)
+					wish.Println(sesh, termMsg)
+
+					downCtx, cancelFunc := context.WithCancel(ctx)
+					pubCtx = downCtx
+
+					ready := make(chan struct{})
+
+					go func() {
+						for {
+							select {
+							case <-ctx.Done():
+								cancelFunc()
+								return
+							default:
+								count := 0
+								for channelID, channel := range pubsub.PubSub.GetChannels() {
+									if channelID == name {
+										for _, client := range channel.GetClients() {
+											if client.Direction == psub.ChannelDirectionOutput || client.Direction == psub.ChannelDirectionInputOutput {
+												count++
+											}
+										}
+										break
+									}
+								}
+
+								if count > 0 {
+									close(ready)
+									return
+								}
+							}
+						}
+					}()
+
+					select {
+					case <-ready:
+					case <-time.After(tt):
+						cancelFunc()
+						wish.Fatalln(sesh, "timeout reached, exiting ...")
+					}
 				}
 
-				go func() {
-					select {
-					case <-ctx.Done():
-						pub.Cleanup()
-					case <-time.After(tt):
-						wish.Fatalln(sesh, "timeout reached, exiting ...")
-						pub.Cleanup()
-					}
-				}()
+				err = pubsub.PubSub.Pub(
+					pubCtx,
+					fmt.Sprintf("%s (%s@%s)", uuid.NewString(), user.Name, sesh.RemoteAddr().String()),
+					rw,
+					[]*psub.Channel{
+						psub.NewChannel(name),
+					},
+				)
 
-				err = pubsub.PubSub.Pub(name, pub)
 				wish.Println(sesh, "msg sent!")
 				if err != nil {
 					wish.Errorln(sesh, err)
@@ -270,18 +317,15 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					name = toPublicChannel(channelName)
 				}
 
-				sub := &psub.Sub{
-					ID:     fmt.Sprintf("%s (%s@%s)", uuid.NewString(), user.Name, sesh.RemoteAddr().String()),
-					Writer: sesh,
-					Done:   make(chan struct{}),
-					Data:   make(chan []byte),
-				}
+				err = pubsub.PubSub.Sub(
+					ctx,
+					fmt.Sprintf("%s (%s@%s)", uuid.NewString(), user.Name, sesh.RemoteAddr().String()),
+					sesh,
+					[]*psub.Channel{
+						psub.NewChannel(name),
+					},
+				)
 
-				go func() {
-					<-ctx.Done()
-					sub.Cleanup()
-				}()
-				err = pubsub.PubSub.Sub(name, sub)
 				if err != nil {
 					wish.Errorln(sesh, err)
 				}
@@ -309,24 +353,22 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					)
 				}
 
-				pipe := &psub.PipeClient{
-					ID:         fmt.Sprintf("%s (%s@%s)", uuid.NewString(), user.Name, sesh.RemoteAddr().String()),
-					Done:       make(chan struct{}),
-					Data:       make(chan psub.PipeMessage),
-					ReadWriter: sesh,
-					Replay:     *replay,
+				readErr, writeErr := pubsub.PubSub.Pipe(
+					ctx,
+					fmt.Sprintf("%s (%s@%s)", uuid.NewString(), user.Name, sesh.RemoteAddr().String()),
+					sesh,
+					[]*psub.Channel{
+						psub.NewChannel(name),
+					},
+					*replay,
+				)
+
+				if readErr != nil {
+					wish.Errorln(sesh, "error reading from pipe", readErr)
 				}
 
-				go func() {
-					<-ctx.Done()
-					pipe.Cleanup()
-				}()
-				readErr, writeErr := pubsub.PubSub.Pipe(name, pipe)
-				if readErr != nil {
-					wish.Errorln(sesh, readErr)
-				}
 				if writeErr != nil {
-					wish.Errorln(sesh, writeErr)
+					wish.Errorln(sesh, "error writing to pipe", writeErr)
 				}
 			}
 

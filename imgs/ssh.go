@@ -230,10 +230,8 @@ func createServeMux(handler *CliHandler, pubsub *psub.Cfg) func(ctx ssh.Context)
 				)
 				handler.Logger.Info("sending event", "url", furl)
 
-				err := pubsub.PubSub.Pub(fmt.Sprintf("%s@%s:%s", user.Name, img, tag), &psub.Pub{
-					ID:     uuid.NewString(),
-					Done:   make(chan struct{}),
-					Reader: strings.NewReader(furl),
+				err := pubsub.PubSub.Pub(ctx, uuid.NewString(), bytes.NewBufferString(furl), []*psub.Channel{
+					psub.NewChannel(fmt.Sprintf("%s/%s:%s", user.Name, img, tag)),
 				})
 
 				if err != nil {

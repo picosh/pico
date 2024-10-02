@@ -32,9 +32,10 @@ func StartSshServer() {
 	pubsub := &psub.Cfg{
 		Logger: logger,
 		PubSub: &psub.PubSubMulticast{
-			Logger:   logger,
-			Channels: syncmap.New[string, *psub.Channel](),
-			Pipes:    syncmap.New[string, *psub.Pipe](),
+			Logger: logger,
+			Connector: &psub.BaseConnector{
+				Channels: syncmap.New[string, *psub.Channel](),
+			},
 		},
 	}
 

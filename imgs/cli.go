@@ -259,11 +259,8 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				opts.bail(err)
 				return
 			} else if cmd == "sub" {
-				err = pubsub.PubSub.Sub(fmt.Sprintf("%s/%s", user.Name, repoName), &psub.Sub{
-					ID:     uuid.NewString(),
-					Writer: sesh,
-					Done:   make(chan struct{}),
-					Data:   make(chan []byte),
+				err = pubsub.PubSub.Sub(sesh.Context(), uuid.NewString(), sesh, []*psub.Channel{
+					psub.NewChannel(fmt.Sprintf("%s/%s", user.Name, repoName)),
 				})
 
 				if err != nil {
