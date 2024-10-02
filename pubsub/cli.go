@@ -68,6 +68,20 @@ func toPublicChannel(name string) string {
 	return fmt.Sprintf("public/%s", name)
 }
 
+func clientInfo(clients []*psub.Client, clientType string) string {
+	if len(clients) == 0 {
+		return ""
+	}
+
+	outputData := fmt.Sprintf("\t%s:\r\n", clientType)
+
+	for _, client := range clients {
+		outputData += fmt.Sprintf("\t- %s:\r\n", client.ID)
+	}
+
+	return outputData
+}
+
 var helpStr = `Commands: [pub, sub, ls, pipe]
 
 The simplest authenticated pubsub system.  Send messages through
@@ -158,24 +172,9 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 									pipes = append(pipes, client)
 								}
 							}
-
-							outputData += "\tPubs:\r\n"
-
-							for _, pub := range pubs {
-								outputData += fmt.Sprintf("\t- %s:\r\n", pub.ID)
-							}
-
-							outputData += "\tSubs:\r\n"
-
-							for _, sub := range subs {
-								outputData += fmt.Sprintf("\t- %s:\r\n", sub.ID)
-							}
-
-							outputData += "\tPipes:\r\n"
-
-							for _, pipe := range pipes {
-								outputData += fmt.Sprintf("\t- %s:\r\n", pipe.ID)
-							}
+							outputData += clientInfo(pubs, "Pubs")
+							outputData += clientInfo(subs, "Subs")
+							outputData += clientInfo(pipes, "Pipes")
 						}
 					}
 
