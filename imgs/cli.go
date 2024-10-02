@@ -261,7 +261,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 			} else if cmd == "sub" {
 				err = pubsub.PubSub.Sub(sesh.Context(), uuid.NewString(), sesh, []*psub.Channel{
 					psub.NewChannel(fmt.Sprintf("%s/%s", user.Name, repoName)),
-				})
+				}, false)
 
 				if err != nil {
 					wish.Errorln(sesh, err)

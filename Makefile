@@ -86,7 +86,7 @@ pico-plus:
 
 scripts:
 	# might need to set MINIO_URL
-	docker run --rm -it --env-file .env -v $(shell pwd):/app -w /app golang:1.22 /bin/bash
+	docker run --rm -it --env-file .env -v $(shell pwd):/app -w /app golang:1.23 /bin/bash
 .PHONY: scripts
 
 fmt:

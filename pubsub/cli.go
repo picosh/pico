@@ -190,7 +190,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				cmdArgs = args[2:]
 			}
 			logger.Info(
-				"imgs middleware detected command",
+				"pubsub middleware detected command",
 				"args", args,
 				"cmd", cmd,
 				"channelName", channelName,
@@ -307,6 +307,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 			} else if cmd == "sub" {
 				pubCmd := flagSet("pub", sesh)
 				public := pubCmd.Bool("p", false, "Subscribe to a public channel")
+				keepAlive := pubCmd.Bool("k", false, "Keep the sub alive even after the pub as died")
 				if !flagCheck(pubCmd, channelName, cmdArgs) {
 					return
 				}
@@ -324,6 +325,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					[]*psub.Channel{
 						psub.NewChannel(name),
 					},
+					*keepAlive,
 				)
 
 				if err != nil {

@@ -1,6 +1,6 @@
 ## development
 
-- `golang` >= 1.22.0
+- `golang` >= 1.23.1
 - `direnv` to load environment vars
 
 ```bash
