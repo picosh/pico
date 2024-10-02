@@ -25,8 +25,7 @@
 <meta itemprop="image" content="https://{{.Site.Domain}}/card.png" />
 <meta property="og:image" content="https://{{.Site.Domain}}/card.png" />
 
-<link rel="stylesheet" href="/smol.css" />
-<link rel="stylesheet" href="/main.css" />
+<link rel="stylesheet" href="/smol-v2.css" />
 {{end}}
 
 {{define "attrs"}}{{end}}
@@ -38,30 +37,15 @@
     <div>
       <a href="https://pico.sh/prose" class="btn-link mt inline-block">LEARN MORE</a>
     </div>
-    <hr />
+    <hr class="mt-2" />
 </header>
 <main>
-    <div class="flex items-center">
-        <div class="font-italic text-sm post-date">popular tags</div>
-        <div class="flex-1">
-        {{range .Tags}}
-        <span class="text-md"><a href="/read?tag={{.}}">#{{.}}</a></span>
-        {{end}}
-        </div>
-    </div>
-    {{if .HasFilter}}<a href="/read">clear filter</a>{{end}}
-
-    <div class="mt">
-        {{if .PrevPage}}<a href="{{.PrevPage}}">prev</a>{{else}}<span class="text-grey">prev</span>{{end}}
-        {{if .NextPage}}<a href="{{.NextPage}}">next</a>{{else}}<span class="text-grey">next</span>{{end}}
-    </div>
-
     {{range .Posts}}
-    <article class="my-2">
+    <article class="my">
         <div class="flex items-center">
             <time datetime="{{.PublishAtISO}}" class="font text-sm post-date">{{.PublishAt}}</time>
             <div class="flex-1">
-                <span class="text-md"><a href="{{.URL}}">{{.Title}}</a></span>
+                <a class="text-md transform-none" href="{{.URL}}" style="text-transform: lowercase;">{{.Title}}</a>
                 <address class="text-sm inline">
                     <a href="{{.BlogURL}}" class="link-grey">({{.Username}})</a>
                 </address>
@@ -69,6 +53,22 @@
         </div>
     </article>
     {{end}}
+
+    <div class="mt">
+        {{if .PrevPage}}<a href="{{.PrevPage}}" class="link-alt">prev</a>{{else}}<span class="text-grey">prev</span>{{end}}
+        {{if .NextPage}}<a href="{{.NextPage}}" class="link-alt">next</a>{{else}}<span class="text-grey">next</span>{{end}}
+    </div>
+
+    <div class="flex items-center">
+        <div class="post-date"></div>
+        <div class="flex-1">
+        {{range .Tags}}
+        <code class="pill"><a href="/read?tag={{.}}">#{{.}}</a></code>
+        {{end}}
+        </div>
+    </div>
+    {{if .HasFilter}}<a href="/read">clear filter</a>{{end}}
+
 </main>
 {{template "marketing-footer" .}}
 {{end}}

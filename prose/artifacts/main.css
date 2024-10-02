@@ -79,6 +79,10 @@ header blockquote {
   z-index: 1;
 }
 
+.text-grey {
+  color: var(--grey-light);
+}
+
 @media only screen and (max-width: 600px) {
   .layout-aside main {
     flex-direction: column;

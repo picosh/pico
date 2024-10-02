@@ -60,16 +60,18 @@
         <a href="{{.BlogURL}}">{{.BlogName}}</a>
     </p>
     {{if .Description}}<blockquote>{{.Description}}</blockquote>{{end}}
-    <div class="tags">
-    {{range .Tags}}
-        <a class="link-alt tag" href="{{$.BlogURL}}?tag={{.}}">#{{.}}</a>
-    {{end}}
-    </div>
     <hr />
 </header>
 <main>
     <article class="md">
         {{.Contents}}
+
+        <div class="tags">
+        {{range .Tags}}
+            <code class="pill tag"><a href="{{$.BlogURL}}?tag={{.}}">#{{.}}</a></code>
+        {{end}}
+        </div>
+
         <div id="post-footer">{{.Footer}}</div>
     </article>
 </main>

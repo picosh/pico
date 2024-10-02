@@ -639,7 +639,7 @@ h1 code, h2 code, h3 code, h4 code {
   padding: 8px 10px 10px 10px;
   border-radius: 10px;
   background-size: 100%;
-  margin: 0:
+  margin: 0;
   -webkit-background-clip: text;
   -moz-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -658,7 +658,7 @@ h1 code, h2 code, h3 code, h4 code {
 .btn-link:visited {
   border: 2px solid var(--link-color);
   color: var(--link-color);
-  padding: var(--grid-height) 1rem;
+  padding: var(--grid-height);
   text-decoration: none;
   font-weight: bold;
   display: inline-block;
@@ -666,7 +666,7 @@ h1 code, h2 code, h3 code, h4 code {
 
 .box {
   border: 2px solid var(--grey-light);
-  padding: var(--line-height);
+  padding: var(--grid-height);
 }
 
 .box-sm {
