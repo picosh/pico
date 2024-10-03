@@ -117,11 +117,11 @@ type CliHandler struct {
 }
 
 func toSshCmd(cfg *shared.ConfigSite) string {
-	port := "22"
-	if cfg.Port != "" {
-		port = fmt.Sprintf("-p %s", cfg.Port)
+	port := ""
+	if cfg.PortOverride != "22" {
+		port = fmt.Sprintf("-p %s ", cfg.PortOverride)
 	}
-	return fmt.Sprintf("%s %s", port, cfg.Domain)
+	return fmt.Sprintf("%s%s", port, cfg.Domain)
 }
 
 func WishMiddleware(handler *CliHandler) wish.Middleware {
