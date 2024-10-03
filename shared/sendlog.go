@@ -17,16 +17,17 @@ import (
 )
 
 type SendLogWriter struct {
-	SSHClient  *ssh.Client
-	Session    *ssh.Session
-	StdinPipe  io.WriteCloser
-	Done       chan struct{}
-	Messages   chan []byte
-	Timeout    time.Duration
-	BufferSize int
-	closeOnce  sync.Once
-	startOnce  sync.Once
-	connecMu   sync.Mutex
+	SSHClient        *ssh.Client
+	Session          *ssh.Session
+	StdinPipe        io.WriteCloser
+	Done             chan struct{}
+	Messages         chan []byte
+	Timeout          time.Duration
+	BufferSize       int
+	closeOnce        sync.Once
+	closeMessageOnce sync.Once
+	startOnce        sync.Once
+	connecMu         sync.Mutex
 }
 
 func (c *SendLogWriter) Close() error {
@@ -34,11 +35,15 @@ func (c *SendLogWriter) Close() error {
 	defer c.connecMu.Unlock()
 
 	if c.Done != nil {
-		close(c.Done)
+		c.closeOnce.Do(func() {
+			close(c.Done)
+		})
 	}
 
 	if c.Messages != nil {
-		close(c.Messages)
+		c.closeMessageOnce.Do(func() {
+			close(c.Messages)
+		})
 	}
 
 	var errs []error
@@ -111,22 +116,24 @@ func (c *SendLogWriter) Open() error {
 }
 
 func (c *SendLogWriter) Start() {
-	go func() {
-		defer c.Reconnect()
+	c.startOnce.Do(func() {
+		go func() {
+			defer c.Reconnect()
 
-		for {
-			select {
-			case data, ok := <-c.Messages:
-				_, err := c.StdinPipe.Write(data)
-				if !ok || err != nil {
-					slog.Error("received error on write, reopening logger", "error", err)
+			for {
+				select {
+				case data, ok := <-c.Messages:
+					_, err := c.StdinPipe.Write(data)
+					if !ok || err != nil {
+						slog.Error("received error on write, reopening logger", "error", err)
+						return
+					}
+				case <-c.Done:
 					return
 				}
-			case <-c.Done:
-				return
 			}
-		}
-	}()
+		}()
+	})
 }
 
 func (c *SendLogWriter) Write(data []byte) (int, error) {
