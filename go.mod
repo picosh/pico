@@ -40,7 +40,6 @@ require (
 	github.com/picosh/send v0.0.0-20240820031602-5d3b1a4494cc
 	github.com/picosh/tunkit v0.0.0-20240709033345-8315d4f3cd0e
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06
-	github.com/samber/slog-multi v1.2.3
 	github.com/sendgrid/sendgrid-go v3.14.0+incompatible
 	github.com/simplesurance/go-ip-anonymizer v0.0.0-20200429124537-35a880f8e87d
 	github.com/x-way/crawlerdetect v0.2.21
@@ -134,7 +133,6 @@ require (
 	github.com/rogpeppe/go-internal v1.11.0 // indirect
 	github.com/rs/xid v1.5.0 // indirect
 	github.com/safchain/ethtool v0.3.0 // indirect
-	github.com/samber/lo v1.47.0 // indirect
 	github.com/secure-io/sio-go v0.3.1 // indirect
 	github.com/sendgrid/rest v2.6.9+incompatible // indirect
 	github.com/shirou/gopsutil/v3 v3.24.5 // indirect

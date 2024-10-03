@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -8,13 +9,79 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
 
-	slogmulti "github.com/samber/slog-multi"
 	"golang.org/x/crypto/ssh"
 )
+
+type MultiHandler struct {
+	Handlers []slog.Handler
+	mu       sync.Mutex
+}
+
+func (m *MultiHandler) Enabled(ctx context.Context, l slog.Level) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for _, h := range m.Handlers {
+		if h.Enabled(ctx, l) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (m *MultiHandler) Handle(ctx context.Context, r slog.Record) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	var errs []error
+	for _, h := range m.Handlers {
+		if h.Enabled(ctx, r.Level) {
+			errs = append(errs, h.Handle(ctx, r.Clone()))
+		}
+	}
+
+	return errors.Join(errs...)
+}
+
+func (m *MultiHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	var handlers []slog.Handler
+
+	for _, h := range m.Handlers {
+		handlers = append(handlers, h.WithAttrs(slices.Clone(attrs)))
+	}
+
+	return &MultiHandler{
+		Handlers: handlers,
+	}
+}
+
+func (m *MultiHandler) WithGroup(name string) slog.Handler {
+	if name == "" {
+		return m
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	var handlers []slog.Handler
+
+	for _, h := range m.Handlers {
+		handlers = append(handlers, h.WithGroup(name))
+	}
+
+	return &MultiHandler{
+		Handlers: handlers,
+	}
+}
 
 type SendLogWriter struct {
 	SSHClient        *ssh.Client
@@ -244,14 +311,17 @@ func SendLogRegister(logger *slog.Logger, buffer int) (*slog.Logger, error) {
 	logWriter.Reconnect()
 
 	return slog.New(
-		slogmulti.Fanout(
-			currentHandler,
-			slog.NewJSONHandler(logWriter, &slog.HandlerOptions{
-				AddSource: true,
-				Level:     slog.LevelDebug,
-			}),
-		),
+		&MultiHandler{
+			Handlers: []slog.Handler{
+				currentHandler,
+				slog.NewJSONHandler(logWriter, &slog.HandlerOptions{
+					AddSource: true,
+					Level:     slog.LevelDebug,
+				}),
+			},
+		},
 	), nil
 }
 
 var _ io.Writer = (*SendLogWriter)(nil)
+var _ slog.Handler = (*MultiHandler)(nil)
