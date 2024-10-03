@@ -20,6 +20,7 @@ import (
 func StartSshServer() {
 	host := shared.GetEnv("PUBSUB_HOST", "0.0.0.0")
 	port := shared.GetEnv("PUBSUB_SSH_PORT", "2222")
+	portOverride := shared.GetEnv("PUBSUB_SSH_PORT_OVERRIDE", port)
 	promPort := shared.GetEnv("PUBSUB_PROM_PORT", "9222")
 	cfg := NewConfigSite()
 	logger := cfg.Logger
@@ -27,6 +28,7 @@ func StartSshServer() {
 	defer dbh.Close()
 
 	cfg.Port = port
+	cfg.PortOverride = portOverride
 
 	pubsub := psub.NewMulticast(logger)
 	handler := &CliHandler{

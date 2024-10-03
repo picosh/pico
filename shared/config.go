@@ -30,6 +30,7 @@ type ConfigSite struct {
 	Secret       string
 	Domain       string
 	Port         string
+	PortOverride string
 	Protocol     string
 	DbURL        string
 	StorageDir   string

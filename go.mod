@@ -19,12 +19,12 @@ require (
 	github.com/alecthomas/chroma/v2 v2.14.0
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
 	github.com/charmbracelet/bubbles v0.18.0
-	github.com/charmbracelet/bubbletea v0.27.0
+	github.com/charmbracelet/bubbletea v1.1.1
 	github.com/charmbracelet/glamour v0.7.0
-	github.com/charmbracelet/lipgloss v0.12.1
+	github.com/charmbracelet/lipgloss v0.13.0
 	github.com/charmbracelet/promwish v0.7.0
 	github.com/charmbracelet/ssh v0.0.0-20240725163421-eb71b85b27aa
-	github.com/charmbracelet/wish v1.4.2
+	github.com/charmbracelet/wish v1.4.3
 	github.com/google/go-cmp v0.6.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/feeds v1.1.2
@@ -36,7 +36,7 @@ require (
 	github.com/muesli/termenv v0.15.3-0.20240509142007-81b8f94111d5
 	github.com/neurosnap/go-exif-remove v0.0.0-20221010134343-50d1e3c35577
 	github.com/picosh/pobj v0.0.0-20240709135546-27097077b26a
-	github.com/picosh/pubsub v0.0.0-20241003035535-c319ff16a4ce
+	github.com/picosh/pubsub v0.0.0-20241003170126-d92d74f10efe
 	github.com/picosh/send v0.0.0-20240820031602-5d3b1a4494cc
 	github.com/picosh/tunkit v0.0.0-20240709033345-8315d4f3cd0e
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06
@@ -49,7 +49,7 @@ require (
 	go.abhg.dev/goldmark/anchor v0.1.1
 	go.abhg.dev/goldmark/hashtag v0.3.1
 	go.abhg.dev/goldmark/toc v0.10.0
-	golang.org/x/crypto v0.26.0
+	golang.org/x/crypto v0.27.0
 	gopkg.in/yaml.v2 v2.4.0
 )
 
@@ -67,14 +67,13 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/charmbracelet/keygen v0.5.1 // indirect
 	github.com/charmbracelet/log v0.4.0 // indirect
-	github.com/charmbracelet/x/ansi v0.1.4 // indirect
+	github.com/charmbracelet/x/ansi v0.3.2 // indirect
 	github.com/charmbracelet/x/conpty v0.1.0 // indirect
-	github.com/charmbracelet/x/errors v0.0.0-20240603171354-f37319acd141 // indirect
-	github.com/charmbracelet/x/input v0.1.3 // indirect
-	github.com/charmbracelet/x/term v0.1.1 // indirect
+	github.com/charmbracelet/x/errors v0.0.0-20240919170804-a4978c8e603a // indirect
+	github.com/charmbracelet/x/input v0.2.0 // indirect
+	github.com/charmbracelet/x/term v0.2.0 // indirect
 	github.com/charmbracelet/x/termios v0.1.0 // indirect
-	github.com/charmbracelet/x/windows v0.1.2 // indirect
-	github.com/creack/pty v1.1.21 // indirect
+	github.com/creack/pty v1.1.23 // indirect
 	github.com/delthas/go-libnp v0.0.0-20221222161248-0e45ece1f878 // indirect
 	github.com/delthas/go-localeinfo v0.0.0-20221116001557-686a1e185118 // indirect
 	github.com/dlclark/regexp2 v1.11.0 // indirect
@@ -109,7 +108,7 @@ require (
 	github.com/lufia/plan9stats v0.0.0-20240513124658-fba389f38bae // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-localereader v0.0.1 // indirect
-	github.com/mattn/go-runewidth v0.0.15 // indirect
+	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/minio/madmin-go/v3 v3.0.54 // indirect
 	github.com/minio/md5-simd v1.1.2 // indirect
@@ -144,12 +143,12 @@ require (
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	github.com/yuin/goldmark-emoji v1.0.2 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
-	golang.org/x/exp v0.0.0-20240531132922-fd00a4e0eefc // indirect
+	golang.org/x/exp v0.0.0-20240909161429-701f63a606c0 // indirect
 	golang.org/x/net v0.25.0 // indirect
 	golang.org/x/sync v0.8.0 // indirect
-	golang.org/x/sys v0.24.0 // indirect
-	golang.org/x/term v0.23.0 // indirect
-	golang.org/x/text v0.17.0 // indirect
+	golang.org/x/sys v0.25.0 // indirect
+	golang.org/x/term v0.24.0 // indirect
+	golang.org/x/text v0.18.0 // indirect
 	golang.org/x/time v0.6.0 // indirect
 	google.golang.org/protobuf v1.34.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect

@@ -232,7 +232,7 @@ func createServeMux(handler *CliHandler, pubsub psub.PubSub) func(ctx ssh.Contex
 
 				err := pubsub.Pub(ctx, uuid.NewString(), bytes.NewBufferString(furl), []*psub.Channel{
 					psub.NewChannel(fmt.Sprintf("%s/%s:%s", user.Name, img, tag)),
-				})
+				}, false)
 
 				if err != nil {
 					handler.Logger.Error("pub error", "err", err)

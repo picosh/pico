@@ -23,14 +23,20 @@ import (
 func flagSet(cmdName string, sesh ssh.Session) *flag.FlagSet {
 	cmd := flag.NewFlagSet(cmdName, flag.ContinueOnError)
 	cmd.SetOutput(sesh)
+	cmd.Usage = func() {
+		fmt.Fprintf(cmd.Output(), "Usage: %s <topic> [args...]\nArgs:\n", cmdName)
+		cmd.PrintDefaults()
+	}
 	return cmd
 }
 
 func flagCheck(cmd *flag.FlagSet, posArg string, cmdArgs []string) bool {
-	_ = cmd.Parse(cmdArgs)
+	err := cmd.Parse(cmdArgs)
 
-	if posArg == "-h" || posArg == "--help" || posArg == "-help" {
-		cmd.Usage()
+	if err != nil || posArg == "help" {
+		if posArg == "help" {
+			cmd.Usage()
+		}
 		return false
 	}
 	return true
@@ -82,7 +88,8 @@ func clientInfo(clients []*psub.Client, clientType string) string {
 	return outputData
 }
 
-var helpStr = `Commands: [pub, sub, ls, pipe]
+var helpStr = func(sshCmd string) string {
+	return fmt.Sprintf(`Command: ssh %s <help | ls | pub | sub | pipe> <topic> [-h | args...]
 
 The simplest authenticated pubsub system.  Send messages through
 user-defined topics.  Topics are private to the authenticated
@@ -99,7 +106,8 @@ data is being sent:
 - pub => writes to client
 - sub => reads from client
 - pipe => read and write between clients
-`
+`, sshCmd)
+}
 
 type CliHandler struct {
 	DBPool db.DB
@@ -135,14 +143,16 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 			args := sesh.Command()
 
 			if len(args) == 0 {
-				wish.Println(sesh, helpStr)
+				wish.Println(sesh, helpStr(toSshCmd(handler.Cfg)))
 				next(sesh)
 				return
 			}
 
 			cmd := strings.TrimSpace(args[0])
 			if cmd == "help" {
-				wish.Println(sesh, helpStr)
+				wish.Println(sesh, helpStr(toSshCmd(handler.Cfg)))
+				next(sesh)
+				return
 			} else if cmd == "ls" {
 				topicFilter := fmt.Sprintf("%s/", user.Name)
 				if handler.DBPool.HasFeatureForUser(user.ID, "admin") {
@@ -188,14 +198,18 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 
 					_, _ = sesh.Write([]byte(outputData))
 				}
+
+				next(sesh)
+				return
 			}
 
 			topic := ""
 			cmdArgs := args[1:]
-			if len(args) > 1 {
+			if len(args) > 1 && !strings.HasPrefix(args[1], "-") {
 				topic = strings.TrimSpace(args[1])
 				cmdArgs = args[2:]
 			}
+
 			logger.Info(
 				"pubsub middleware detected command",
 				"args", args,
@@ -208,10 +222,25 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				pubCmd := flagSet("pub", sesh)
 				empty := pubCmd.Bool("e", false, "Send an empty message to subs")
 				public := pubCmd.Bool("p", false, "Anyone can sub to this topic")
-				timeout := pubCmd.Duration("t", 30*24*time.Hour, "Timeout as a Go duration before cancelling the pub event. Valid time units are 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h'. Default is 30 days.")
+				block := pubCmd.Bool("b", true, "Block writes until a subscriber is available")
+				timeout := pubCmd.Duration("t", 30*24*time.Hour, "Timeout as a Go duration to block for a subscriber to be available. Valid time units are 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h'. Default is 30 days.")
 				if !flagCheck(pubCmd, topic, cmdArgs) {
 					return
 				}
+
+				if pubCmd.NArg() == 1 && topic == "" {
+					topic = pubCmd.Arg(0)
+				}
+
+				logger.Info(
+					"flags parsed",
+					"cmd", cmd,
+					"empty", *empty,
+					"public", *public,
+					"block", *block,
+					"timeout", *timeout,
+					"topic", topic,
+				)
 
 				var rw io.ReadWriter
 				if *empty {
@@ -236,65 +265,67 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 
 				wish.Println(sesh, "sending msg ...")
 
-				count := 0
-				for topic, channel := range pubsub.GetChannels() {
-					if topic == name {
-						for _, client := range channel.GetClients() {
-							if client.Direction == psub.ChannelDirectionOutput || client.Direction == psub.ChannelDirectionInputOutput {
-								count++
-							}
-						}
-						break
-					}
-				}
-
 				var pubCtx context.Context = ctx
 
-				tt := *timeout
-				if count == 0 {
-					termMsg := "no subs found ... waiting"
-					if tt > 0 {
-						termMsg += " " + tt.String()
-					}
-					wish.Println(sesh, termMsg)
-
-					downCtx, cancelFunc := context.WithCancel(ctx)
-					pubCtx = downCtx
-
-					ready := make(chan struct{})
-
-					go func() {
-						for {
-							select {
-							case <-ctx.Done():
-								cancelFunc()
-								return
-							default:
-								count := 0
-								for topic, channel := range pubsub.GetChannels() {
-									if topic == name {
-										for _, client := range channel.GetClients() {
-											if client.Direction == psub.ChannelDirectionOutput || client.Direction == psub.ChannelDirectionInputOutput {
-												count++
-											}
-										}
-										break
-									}
-								}
-
-								if count > 0 {
-									close(ready)
-									return
+				if *block {
+					count := 0
+					for topic, channel := range pubsub.GetChannels() {
+						if topic == name {
+							for _, client := range channel.GetClients() {
+								if client.Direction == psub.ChannelDirectionOutput || client.Direction == psub.ChannelDirectionInputOutput {
+									count++
 								}
 							}
+							break
 						}
-					}()
+					}
 
-					select {
-					case <-ready:
-					case <-time.After(tt):
-						cancelFunc()
-						wish.Fatalln(sesh, "timeout reached, exiting ...")
+					tt := *timeout
+					if count == 0 {
+						termMsg := "no subs found ... waiting"
+						if tt > 0 {
+							termMsg += " " + tt.String()
+						}
+						wish.Println(sesh, termMsg)
+
+						downCtx, cancelFunc := context.WithCancel(ctx)
+						pubCtx = downCtx
+
+						ready := make(chan struct{})
+
+						go func() {
+							for {
+								select {
+								case <-ctx.Done():
+									cancelFunc()
+									return
+								default:
+									count := 0
+									for topic, channel := range pubsub.GetChannels() {
+										if topic == name {
+											for _, client := range channel.GetClients() {
+												if client.Direction == psub.ChannelDirectionOutput || client.Direction == psub.ChannelDirectionInputOutput {
+													count++
+												}
+											}
+											break
+										}
+									}
+
+									if count > 0 {
+										close(ready)
+										return
+									}
+								}
+							}
+						}()
+
+						select {
+						case <-ready:
+						case <-time.After(tt):
+							cancelFunc()
+							wish.Fatalln(sesh, "timeout reached, exiting ...")
+						}
 					}
 				}
 
@@ -305,6 +336,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					[]*psub.Channel{
 						psub.NewChannel(name),
 					},
+					*block,
 				)
 
 				wish.Println(sesh, "msg sent!")
@@ -312,13 +344,24 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					wish.Errorln(sesh, err)
 				}
 			} else if cmd == "sub" {
-				pubCmd := flagSet("pub", sesh)
-				public := pubCmd.Bool("p", false, "Subscribe to a public topic")
-				keepAlive := pubCmd.Bool("k", false, "Keep the sub alive even after the pub as died")
-				if !flagCheck(pubCmd, topic, cmdArgs) {
+				subCmd := flagSet("sub", sesh)
+				public := subCmd.Bool("p", false, "Subscribe to a public topic")
+				keepAlive := subCmd.Bool("k", false, "Keep the subscription alive even after the publisher as died")
+				if !flagCheck(subCmd, topic, cmdArgs) {
 					return
 				}
-				topic := topic
+
+				if subCmd.NArg() == 1 && topic == "" {
+					topic = subCmd.Arg(0)
+				}
+
+				logger.Info(
+					"flags parsed",
+					"cmd", cmd,
+					"public", *public,
+					"keepAlive", *keepAlive,
+					"topic", topic,
+				)
 
 				name := toTopic(user.Name, topic)
 				if *public {
@@ -345,6 +388,19 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				if !flagCheck(pipeCmd, topic, cmdArgs) {
 					return
 				}
+
+				if pipeCmd.NArg() == 1 && topic == "" {
+					topic = pipeCmd.Arg(0)
+				}
+
+				logger.Info(
+					"flags parsed",
+					"cmd", cmd,
+					"public", *public,
+					"replay", *replay,
+					"topic", topic,
+				)
+
 				isCreator := topic == ""
 				if isCreator {
 					topic = uuid.NewString()
