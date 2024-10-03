@@ -81,7 +81,7 @@ func (e *ErrorHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, e.Err.Error(), http.StatusInternalServerError)
 }
 
-func createServeMux(handler *CliHandler, pubsub *psub.Cfg) func(ctx ssh.Context) http.Handler {
+func createServeMux(handler *CliHandler, pubsub psub.PubSub) func(ctx ssh.Context) http.Handler {
 	return func(ctx ssh.Context) http.Handler {
 		router := http.NewServeMux()
 
@@ -230,7 +230,7 @@ func createServeMux(handler *CliHandler, pubsub *psub.Cfg) func(ctx ssh.Context)
 				)
 				handler.Logger.Info("sending event", "url", furl)
 
-				err := pubsub.PubSub.Pub(ctx, uuid.NewString(), bytes.NewBufferString(furl), []*psub.Channel{
+				err := pubsub.Pub(ctx, uuid.NewString(), bytes.NewBufferString(furl), []*psub.Channel{
 					psub.NewChannel(fmt.Sprintf("%s/%s:%s", user.Name, img, tag)),
 				})
 
@@ -276,13 +276,7 @@ func StartSshServer() {
 		panic(err)
 	}
 
-	pubsub := &psub.Cfg{
-		Logger: logger,
-		PubSub: &psub.PubSubMulticast{
-			Logger: logger,
-		},
-	}
-
+	pubsub := psub.NewMulticast(logger)
 	handler := &CliHandler{
 		Logger:      logger,
 		DBPool:      dbh,

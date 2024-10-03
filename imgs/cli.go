@@ -188,7 +188,7 @@ type CliHandler struct {
 	Logger      *slog.Logger
 	Storage     storage.StorageServe
 	RegistryUrl string
-	PubSub      *psub.Cfg
+	PubSub      psub.PubSub
 }
 
 func WishMiddleware(handler *CliHandler) wish.Middleware {
@@ -259,7 +259,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				opts.bail(err)
 				return
 			} else if cmd == "sub" {
-				err = pubsub.PubSub.Sub(sesh.Context(), uuid.NewString(), sesh, []*psub.Channel{
+				err = pubsub.Sub(sesh.Context(), uuid.NewString(), sesh, []*psub.Channel{
 					psub.NewChannel(fmt.Sprintf("%s/%s", user.Name, repoName)),
 				}, false)
 
