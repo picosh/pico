@@ -5,3 +5,7 @@ body {
 .post-date {
   width: 110px;
 }
+
+.transform-none {
+  text-transform: none;
+}

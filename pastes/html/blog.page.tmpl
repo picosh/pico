@@ -27,8 +27,8 @@
 
 {{define "body"}}
 <header class="text-center">
-    <h1 class="text-2xl font-bold">{{.Header.Title}}</h1>
-    <hr />
+    <h1 class="text-2xl">{{.Header.Title}}</h1>
+    <hr class="my-2" />
 </header>
 <main>
     <section class="posts">
@@ -36,7 +36,7 @@
         <article class="my">
             <div class="flex items-center">
                 <time datetime="{{.PublishAtISO}}" class="font-italic text-sm post-date">{{.PublishAt}}</time>
-                <div class="text-md flex-1"><a href="{{.URL}}">{{.Title}}</a></div>
+                <div class="text-md flex-1 transform-none m-0"><a href="{{.URL}}">{{.Title}}</a></div>
             </div>
         </article>
         {{end}}
