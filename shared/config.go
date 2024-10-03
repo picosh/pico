@@ -271,7 +271,13 @@ func CreateLogger(space string) *slog.Logger {
 	log := slog.New(
 		slog.NewTextHandler(os.Stdout, opts),
 	)
-	return log.With("service", space)
+
+	newLog, err := SendLogRegister(log, 100)
+	if err != nil {
+		slog.Error("unable to start send logger", "error", err)
+	}
+
+	return newLog.With("service", space)
 }
 
 func LoggerWithUser(logger *slog.Logger, user *db.User) *slog.Logger {
