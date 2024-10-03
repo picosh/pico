@@ -139,11 +139,11 @@ func (c *SendLogWriter) Open() error {
 	c.Messages = make(chan []byte, c.BufferSize)
 
 	sshClient, err := createSSHClient(
-		"send.pico.sh:22",
-		"ssh_data/term_info_ed25519",
-		"",
-		"send.pico.sh",
-		"pico",
+		GetEnv("PICO_SENDLOG_ENDPOINT", "send.pico.sh:22"),
+		GetEnv("PICO_SENDLOG_KEY", "ssh_data/term_info_ed25519"),
+		GetEnv("PICO_SENDLOG_PASSPHRASE", ""),
+		GetEnv("PICO_SENDLOG_REMOTE_HOST", "send.pico.sh"),
+		GetEnv("PICO_SENDLOG_USER", "pico"),
 	)
 	if err != nil {
 		c.connecMu.Unlock()

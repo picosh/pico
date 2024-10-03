@@ -74,6 +74,8 @@ services:
           - web
     env_file:
       - .env.prod
+    volumes:
+      - ./data/pastes-ssh/data:/app/ssh_data
   pastes-ssh:
     networks:
       pastes:
@@ -116,6 +118,8 @@ services:
           - web
     env_file:
       - .env.prod
+    volumes:
+      - ./data/pubsub-ssh/data:/app/ssh_data
   pubsub-ssh:
     networks:
       pubsub:
@@ -158,6 +162,8 @@ services:
           - web
     env_file:
       - .env.prod
+    volumes:
+      - ./data/prose-ssh/data:/app/ssh_data
   prose-ssh:
     networks:
       prose:
@@ -202,6 +208,7 @@ services:
       - .env.prod
     volumes:
       - ./data/storage/data:/app/.storage
+      - ./data/imgs-ssh/data:/app/ssh_data
   imgs-ssh:
     networks:
       imgs:
@@ -248,6 +255,7 @@ services:
       - .env.prod
     volumes:
       - ./data/storage/data:/app/.storage
+      - ./data/pgs-ssh/data:/app/ssh_data
   pgs-ssh:
     networks:
       pgs:
@@ -296,6 +304,8 @@ services:
           - web
     env_file:
       - .env.prod
+    volumes:
+      - ./data/feeds-ssh/data:/app/ssh_data
   feeds-ssh:
     networks:
       feeds:
