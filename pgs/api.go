@@ -375,8 +375,8 @@ func ServeAsset(fname string, opts *storage.ImgProcessOpts, fromImgs bool, hasPe
 	logger := ologger.With(
 		"subdomain", subdomain,
 		"filename", fname,
-		"url", r.URL,
-		"host", r.Host,
+		"url", r.URL.Path,
+		"host", r.URL.Host,
 	)
 
 	props, err := getProjectFromSubdomain(subdomain)
