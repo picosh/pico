@@ -30,6 +30,10 @@ services:
     environment:
       - PROXY_URL=http://localhost:9000
     image: schmailzl/simple-reverse-proxy
+    profiles:
+      - bouncer
+      - services
+      - all
   bouncer:
     networks:
       - ${AUTH_NETWORK}
