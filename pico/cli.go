@@ -1,6 +1,8 @@
 package pico
 
 import (
+	"bufio"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -34,12 +36,13 @@ func getUser(s ssh.Session, dbpool db.DB) (*db.User, error) {
 }
 
 type Cmd struct {
-	User    *db.User
-	Session shared.CmdSession
-	Log     *slog.Logger
-	Dbpool  db.DB
-	Write   bool
-	Styles  common.Styles
+	User       *db.User
+	SshSession ssh.Session
+	Session    shared.CmdSession
+	Log        *slog.Logger
+	Dbpool     db.DB
+	Write      bool
+	Styles     common.Styles
 }
 
 func (c *Cmd) output(out string) {
@@ -60,6 +63,59 @@ func (c *Cmd) notifications() error {
 	md := notifications.NotificationsView(c.Dbpool, c.User.ID, 80)
 	c.output(md)
 	return nil
+}
+
+func (c *Cmd) logs() error {
+	sshClient, err := shared.CreateSSHClient(
+		shared.GetEnv("PICO_SENDLOG_ENDPOINT", "send.pico.sh:22"),
+		shared.GetEnv("PICO_SENDLOG_KEY", "ssh_data/term_info_ed25519"),
+		shared.GetEnv("PICO_SENDLOG_PASSPHRASE", ""),
+		shared.GetEnv("PICO_SENDLOG_REMOTE_HOST", "send.pico.sh"),
+		shared.GetEnv("PICO_SENDLOG_USER", "pico"),
+	)
+	if err != nil {
+		return err
+	}
+	defer sshClient.Close()
+
+	session, err := sshClient.NewSession()
+	defer func() {
+		_ = session.Close()
+	}()
+	if err != nil {
+		return err
+	}
+
+	stdoutPipe, err := session.StdoutPipe()
+	if err != nil {
+		return err
+	}
+
+	err = session.Start("sub log-drain -k")
+	if err != nil {
+		return err
+	}
+
+	scanner := bufio.NewScanner(stdoutPipe)
+	for scanner.Scan() {
+		line := scanner.Text()
+		parsedData := map[string]any{}
+
+		err := json.Unmarshal([]byte(line), &parsedData)
+		if err != nil {
+			c.Log.Error("json unmarshal", "err", err)
+			continue
+		}
+
+		if userName, ok := parsedData["user"]; ok {
+			if userName, ok := userName.(string); ok {
+				if userName == c.User.Name {
+					wish.Println(c.SshSession, line)
+				}
+			}
+		}
+	}
+	return scanner.Err()
 }
 
 type CliHandler struct {
@@ -113,17 +169,24 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 			}
 
 			opts := Cmd{
-				Session: sesh,
-				User:    user,
-				Log:     log,
-				Dbpool:  dbpool,
-				Write:   false,
+				Session:    sesh,
+				SshSession: sesh,
+				User:       user,
+				Log:        log,
+				Dbpool:     dbpool,
+				Write:      false,
 			}
 
 			cmd := strings.TrimSpace(args[0])
 			if len(args) == 1 {
 				if cmd == "help" {
 					opts.help()
+					return
+				} else if cmd == "logs" {
+					err = opts.logs()
+					if err != nil {
+						wish.Fatalln(sesh, err)
+					}
 					return
 				} else if cmd == "pico+" {
 					opts.plus()
