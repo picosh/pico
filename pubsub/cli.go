@@ -82,7 +82,7 @@ func clientInfo(clients []*psub.Client, clientType string) string {
 	outputData := fmt.Sprintf("\t%s:\r\n", clientType)
 
 	for _, client := range clients {
-		outputData += fmt.Sprintf("\t- %s:\r\n", client.ID)
+		outputData += fmt.Sprintf("\t- %s\r\n", client.ID)
 	}
 
 	return outputData
