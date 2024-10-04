@@ -138,7 +138,7 @@ func (c *SendLogWriter) Open() error {
 	c.Done = make(chan struct{})
 	c.Messages = make(chan []byte, c.BufferSize)
 
-	sshClient, err := createSSHClient(
+	sshClient, err := CreateSSHClient(
 		GetEnv("PICO_SENDLOG_ENDPOINT", "send.pico.sh:22"),
 		GetEnv("PICO_SENDLOG_KEY", "ssh_data/term_info_ed25519"),
 		GetEnv("PICO_SENDLOG_PASSPHRASE", ""),
@@ -248,7 +248,7 @@ func (c *SendLogWriter) Reconnect() {
 	}()
 }
 
-func createSSHClient(remoteHost string, keyLocation string, keyPassphrase string, remoteHostname string, remoteUser string) (*ssh.Client, error) {
+func CreateSSHClient(remoteHost string, keyLocation string, keyPassphrase string, remoteHostname string, remoteUser string) (*ssh.Client, error) {
 	if !strings.Contains(remoteHost, ":") {
 		remoteHost += ":22"
 	}
