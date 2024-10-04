@@ -222,7 +222,7 @@ func (c *SendLogWriter) Write(data []byte) (int, error) {
 	}
 
 	select {
-	case c.Messages <- data:
+	case c.Messages <- slices.Clone(data):
 		n = len(data)
 	case <-time.After(c.Timeout):
 		err = fmt.Errorf("unable to send data within timeout")
