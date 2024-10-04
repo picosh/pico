@@ -219,7 +219,11 @@ func (h *AssetHandler) handle(logger *slog.Logger, w http.ResponseWriter, r *htt
 			// fetch content from url and serve it
 			resp, err := http.Get(fp.Filepath)
 			if err != nil {
-				logger.Error("external service not found", "err", err)
+				logger.Error(
+					"external service not found",
+					"err", err,
+					"status", http.StatusNotFound,
+				)
 				http.Error(w, "404 not found", http.StatusNotFound)
 				return
 			}
@@ -258,6 +262,7 @@ func (h *AssetHandler) handle(logger *slog.Logger, w http.ResponseWriter, r *htt
 		logger.Info(
 			"asset not found in bucket",
 			"routes", strings.Join(attempts, ", "),
+			"status", http.StatusNotFound,
 		)
 		// track 404s
 		ch := shared.GetAnalyticsQueue(r)

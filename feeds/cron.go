@@ -151,10 +151,10 @@ func (f *Fetcher) RunPost(logger *slog.Logger, user *db.User, post *db.Post) err
 
 	parsed := shared.ListParseText(post.Text)
 
-	logger.Info("last digest at", "lastDigest", post.Data.LastDigest)
+	logger.Info("last digest at", "lastDigest", post.Data.LastDigest.Format(time.RFC3339))
 	err := f.Validate(post, parsed)
 	if err != nil {
-		logger.Info("validation failed", "err", err.Error())
+		logger.Info("validation failed", "err", err)
 		return nil
 	}
 
@@ -209,7 +209,7 @@ func (f *Fetcher) RunUser(user *db.User) error {
 	for _, post := range posts.Data {
 		err = f.RunPost(logger, user, post)
 		if err != nil {
-			logger.Info("RunPost failed", "err", err.Error())
+			logger.Error("run post failed", "err", err)
 		}
 	}
 
@@ -238,7 +238,6 @@ func (f *Fetcher) ParseURL(fp *gofeed.Parser, url string) (*gofeed.Feed, error) 
 	}
 
 	feed, err := fp.ParseString(string(body))
-
 	if err != nil {
 		return nil, err
 	}
@@ -351,9 +350,9 @@ func (f *Fetcher) FetchAll(logger *slog.Logger, urls []string, inlineContent boo
 		feedTmpl, err := f.Fetch(logger, fp, url, username, feedItems)
 		if err != nil {
 			if errors.Is(err, ErrNoRecentArticles) {
-				logger.Info("no recent articles", "err", err.Error())
+				logger.Info("no recent articles", "err", err)
 			} else {
-				logger.Error("fetch error", "err", err.Error())
+				logger.Error("fetch error", "err", err)
 			}
 			continue
 		}
@@ -447,7 +446,7 @@ func (f *Fetcher) Run(logger *slog.Logger) error {
 	for _, user := range users {
 		err := f.RunUser(user)
 		if err != nil {
-			logger.Error("RunUser failed", "err", err.Error())
+			logger.Error("run user failed", "err", err)
 			continue
 		}
 	}
@@ -462,7 +461,7 @@ func (f *Fetcher) Loop() {
 
 		err := f.Run(logger)
 		if err != nil {
-			logger.Error(err.Error())
+			logger.Error("run failed", "err", err)
 		}
 
 		logger.Info("digest emailer finished, waiting 10 mins")
