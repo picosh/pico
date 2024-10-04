@@ -76,6 +76,25 @@ jobs:
         platforms: ${{ env.PLATFORMS }}
         registry: ${{ env.REGISTRY }}
         ssh: false
+  build-pico:
+    runs-on: ubuntu-22.04
+    needs: test
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
+    - name: Setup docker
+      uses: ./.github/actions/setup
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    - name: Run docker build for pico
+      uses: ./.github/actions/build
+      with:
+        app: pico
+        platforms: ${{ env.PLATFORMS }}
+        registry: ${{ env.REGISTRY }}
+        web: false
   build-bouncer:
     runs-on: ubuntu-22.04
     needs: test

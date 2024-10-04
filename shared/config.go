@@ -271,7 +271,19 @@ func CreateLogger(space string) *slog.Logger {
 	log := slog.New(
 		slog.NewTextHandler(os.Stdout, opts),
 	)
-	return log.With("service", space)
+
+	newLogger := log
+
+	if strings.ToLower(GetEnv("PICO_SENDLOG_ENABLED", "true")) == "true" {
+		newLog, err := SendLogRegister(log, 100)
+		if err == nil {
+			newLogger = newLog
+		} else {
+			slog.Error("unable to start send logger", "error", err)
+		}
+	}
+
+	return newLogger.With("service", space)
 }
 
 func LoggerWithUser(logger *slog.Logger, user *db.User) *slog.Logger {
