@@ -166,7 +166,7 @@ func hasProtocol(url string) bool {
 	return isFullUrl
 }
 
-func (h *AssetHandler) handle(w http.ResponseWriter, r *http.Request) {
+func (h *AssetHandler) handle(logger *slog.Logger, w http.ResponseWriter, r *http.Request) {
 	var redirects []*RedirectRule
 	redirectFp, _, _, err := h.Storage.GetObject(h.Bucket, filepath.Join(h.ProjectDir, "_redirects"))
 	if err == nil {
@@ -174,14 +174,14 @@ func (h *AssetHandler) handle(w http.ResponseWriter, r *http.Request) {
 		buf := new(strings.Builder)
 		_, err := io.Copy(buf, redirectFp)
 		if err != nil {
-			h.Logger.Error("io copy", "err", err.Error())
+			logger.Error("io copy", "err", err.Error())
 			http.Error(w, "cannot read _redirects file", http.StatusInternalServerError)
 			return
 		}
 
 		redirects, err = parseRedirectText(buf.String())
 		if err != nil {
-			h.Logger.Error("could not parse redirect text", "err", err.Error())
+			logger.Error("could not parse redirect text", "err", err.Error())
 		}
 	}
 
@@ -203,19 +203,23 @@ func (h *AssetHandler) handle(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 			}
-			h.Logger.Info(
+			logger.Info(
 				"redirecting request",
-				"bucket", h.Bucket.Name,
-				"url", r.URL,
 				"destination", fp.Filepath,
 				"status", fp.Status,
 			)
 			http.Redirect(w, r, fp.Filepath, fp.Status)
 			return
 		} else if hasProtocol(fp.Filepath) {
+			logger.Info(
+				"fetching content from external service",
+				"destination", fp.Filepath,
+				"status", fp.Status,
+			)
 			// fetch content from url and serve it
 			resp, err := http.Get(fp.Filepath)
 			if err != nil {
+				logger.Error("external service not found", "err", err)
 				http.Error(w, "404 not found", http.StatusNotFound)
 				return
 			}
@@ -224,7 +228,7 @@ func (h *AssetHandler) handle(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(status)
 			_, err = io.Copy(w, resp.Body)
 			if err != nil {
-				h.Logger.Error("io copy", "err", err.Error())
+				logger.Error("io copy", "err", err.Error())
 			}
 			return
 		}
@@ -251,9 +255,8 @@ func (h *AssetHandler) handle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if assetFilepath == "" {
-		h.Logger.Info(
+		logger.Info(
 			"asset not found in bucket",
-			"bucket", h.Bucket.Name,
 			"routes", strings.Join(attempts, ", "),
 		)
 		// track 404s
@@ -265,7 +268,7 @@ func (h *AssetHandler) handle(w http.ResponseWriter, r *http.Request) {
 			ch <- view
 		} else {
 			if !errors.Is(err, shared.ErrAnalyticsDisabled) {
-				h.Logger.Error("could not record analytics view", "err", err)
+				logger.Error("could not record analytics view", "err", err)
 			}
 		}
 		http.Error(w, "404 not found", http.StatusNotFound)
@@ -284,14 +287,14 @@ func (h *AssetHandler) handle(w http.ResponseWriter, r *http.Request) {
 		buf := new(strings.Builder)
 		_, err := io.Copy(buf, headersFp)
 		if err != nil {
-			h.Logger.Error("io copy", "err", err.Error())
+			logger.Error("io copy", "err", err.Error())
 			http.Error(w, "cannot read _headers file", http.StatusInternalServerError)
 			return
 		}
 
 		headers, err = parseHeaderText(buf.String())
 		if err != nil {
-			h.Logger.Error("could not parse header text", "err", err.Error())
+			logger.Error("could not parse header text", "err", err.Error())
 		}
 	}
 
@@ -323,16 +326,13 @@ func (h *AssetHandler) handle(w http.ResponseWriter, r *http.Request) {
 			ch <- view
 		} else {
 			if !errors.Is(err, shared.ErrAnalyticsDisabled) {
-				h.Logger.Error("could not record analytics view", "err", err)
+				logger.Error("could not record analytics view", "err", err)
 			}
 		}
 	}
 
-	h.Logger.Info(
+	logger.Info(
 		"serving asset",
-		"host", r.Host,
-		"url", r.URL,
-		"bucket", h.Bucket.Name,
 		"asset", assetFilepath,
 		"status", status,
 		"contentType", finContentType,
@@ -342,7 +342,7 @@ func (h *AssetHandler) handle(w http.ResponseWriter, r *http.Request) {
 	_, err = io.Copy(w, contents)
 
 	if err != nil {
-		h.Logger.Error("io copy", "err", err.Error())
+		logger.Error("io copy", "err", err.Error())
 	}
 }
 
@@ -370,21 +370,40 @@ func ServeAsset(fname string, opts *storage.ImgProcessOpts, fromImgs bool, hasPe
 	cfg := shared.GetCfg(r)
 	dbpool := shared.GetDB(r)
 	st := shared.GetStorage(r)
-	logger := shared.GetLogger(r)
+	ologger := shared.GetLogger(r)
+
+	logger := ologger.With(
+		"subdomain", subdomain,
+		"filename", fname,
+		"url", r.URL,
+		"host", r.Host,
+	)
 
 	props, err := getProjectFromSubdomain(subdomain)
 	if err != nil {
-		logger.Info(err.Error(), "subdomain", subdomain, "filename", fname)
+		logger.Info(
+			"could parse project from subdomain",
+			"err", err,
+		)
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 
+	logger = logger.With(
+		"project", props.ProjectName,
+		"user", props.Username,
+	)
+
 	user, err := dbpool.FindUserForName(props.Username)
 	if err != nil {
-		logger.Info("user not found", "user", props.Username)
+		logger.Info("user not found")
 		http.Error(w, "user not found", http.StatusNotFound)
 		return
 	}
+
+	logger = logger.With(
+		"userId", user.ID,
+	)
 
 	projectID := ""
 	// TODO: this could probably be cleaned up more
@@ -398,10 +417,7 @@ func ServeAsset(fname string, opts *storage.ImgProcessOpts, fromImgs bool, hasPe
 		bucket, err = st.GetBucket(shared.GetAssetBucketName(user.ID))
 		project, err := dbpool.FindProjectByName(user.ID, props.ProjectName)
 		if err != nil {
-			logger.Info(
-				"project not found",
-				"projectName", props.ProjectName,
-			)
+			logger.Info("project not found")
 			http.Error(w, "project not found", http.StatusNotFound)
 			return
 		}
@@ -415,7 +431,7 @@ func ServeAsset(fname string, opts *storage.ImgProcessOpts, fromImgs bool, hasPe
 	}
 
 	if err != nil {
-		logger.Info("bucket not found", "user", props.Username)
+		logger.Info("bucket not found")
 		http.Error(w, "bucket not found", http.StatusNotFound)
 		return
 	}
@@ -435,7 +451,7 @@ func ServeAsset(fname string, opts *storage.ImgProcessOpts, fromImgs bool, hasPe
 		ProjectID:      projectID,
 	}
 
-	asset.handle(w, r)
+	asset.handle(logger, w, r)
 }
 
 type HasPerm = func(proj *db.Project) bool
@@ -526,7 +542,7 @@ func StartApiServer() {
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)
 	logger.Info(
-		"Starting server on port",
+		"starting server on port",
 		"port", cfg.Port,
 		"domain", cfg.Domain,
 	)
