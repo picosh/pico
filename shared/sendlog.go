@@ -162,7 +162,7 @@ func (c *SendLogWriter) Open() error {
 		return err
 	}
 
-	err = session.Start("pub log-sink -b=false")
+	err = session.Start("pub log-drain -b=false")
 	if err != nil {
 		c.connecMu.Unlock()
 		return err
