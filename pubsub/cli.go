@@ -148,6 +148,8 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				return
 			}
 
+			isAdmin := handler.DBPool.HasFeatureForUser(user.ID, "admin")
+
 			cmd := strings.TrimSpace(args[0])
 			if cmd == "help" {
 				wish.Println(sesh, helpStr(toSshCmd(handler.Cfg)))
@@ -155,7 +157,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				return
 			} else if cmd == "ls" {
 				topicFilter := fmt.Sprintf("%s/", user.Name)
-				if handler.DBPool.HasFeatureForUser(user.ID, "admin") {
+				if isAdmin {
 					topicFilter = ""
 				}
 
@@ -252,10 +254,18 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				if topic == "" {
 					topic = uuid.NewString()
 				}
-				name := toTopic(user.Name, topic)
-				if *public {
-					name = toPublicTopic(topic)
+
+				var name string
+
+				if isAdmin && strings.HasPrefix(topic, "/") {
+					name = strings.TrimPrefix(topic, "/")
+				} else {
+					name = toTopic(user.Name, topic)
+					if *public {
+						name = toPublicTopic(topic)
+					}
 				}
+
 				wish.Printf(
 					sesh,
 					"subscribe to this channel:\n\tssh %s sub %s\n",
@@ -363,9 +373,15 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					"topic", topic,
 				)
 
-				name := toTopic(user.Name, topic)
-				if *public {
-					name = toPublicTopic(topic)
+				var name string
+
+				if isAdmin && strings.HasPrefix(topic, "/") {
+					name = strings.TrimPrefix(topic, "/")
+				} else {
+					name = toTopic(user.Name, topic)
+					if *public {
+						name = toPublicTopic(topic)
+					}
 				}
 
 				err = pubsub.Sub(
@@ -405,10 +421,18 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				if isCreator {
 					topic = uuid.NewString()
 				}
-				name := toTopic(user.Name, topic)
-				if *public {
-					name = toPublicTopic(topic)
+
+				var name string
+
+				if isAdmin && strings.HasPrefix(topic, "/") {
+					name = strings.TrimPrefix(topic, "/")
+				} else {
+					name = toTopic(user.Name, topic)
+					if *public {
+						name = toPublicTopic(topic)
+					}
 				}
+
 				if isCreator {
 					wish.Printf(
 						sesh,

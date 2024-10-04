@@ -204,13 +204,18 @@ func (c *SendLogWriter) Start() {
 }
 
 func (c *SendLogWriter) Write(data []byte) (int, error) {
-	c.connecMu.Lock()
-	defer c.connecMu.Unlock()
-
 	var (
 		n   int
 		err error
 	)
+
+	ok := c.connecMu.TryLock()
+
+	if !ok {
+		return n, fmt.Errorf("unable to acquire lock to write")
+	}
+
+	defer c.connecMu.Unlock()
 
 	if c.Messages == nil || c.Done == nil {
 		return n, fmt.Errorf("logger not viable")
