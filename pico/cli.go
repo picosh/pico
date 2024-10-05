@@ -2,6 +2,7 @@ package pico
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -65,7 +66,7 @@ func (c *Cmd) notifications() error {
 	return nil
 }
 
-func (c *Cmd) logs() error {
+func (c *Cmd) logs(ctx context.Context) error {
 	sshClient, err := shared.CreateSSHClient(
 		shared.GetEnv("PICO_SENDLOG_ENDPOINT", "send.pico.sh:22"),
 		shared.GetEnv("PICO_SENDLOG_KEY", "ssh_data/term_info_ed25519"),
@@ -76,15 +77,15 @@ func (c *Cmd) logs() error {
 	if err != nil {
 		return err
 	}
+
 	defer sshClient.Close()
 
 	session, err := sshClient.NewSession()
-	defer func() {
-		_ = session.Close()
-	}()
 	if err != nil {
 		return err
 	}
+
+	defer session.Close()
 
 	stdoutPipe, err := session.StdoutPipe()
 	if err != nil {
@@ -95,6 +96,12 @@ func (c *Cmd) logs() error {
 	if err != nil {
 		return err
 	}
+
+	go func() {
+		<-ctx.Done()
+		session.Close()
+		sshClient.Close()
+	}()
 
 	scanner := bufio.NewScanner(stdoutPipe)
 	for scanner.Scan() {
@@ -183,7 +190,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					opts.help()
 					return
 				} else if cmd == "logs" {
-					err = opts.logs()
+					err = opts.logs(sesh.Context())
 					if err != nil {
 						wish.Fatalln(sesh, err)
 					}
