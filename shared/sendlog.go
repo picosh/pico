@@ -330,3 +330,57 @@ func SendLogRegister(logger *slog.Logger, buffer int) (*slog.Logger, error) {
 
 var _ io.Writer = (*SendLogWriter)(nil)
 var _ slog.Handler = (*MultiHandler)(nil)
+
+func AnyToStr(mp map[string]any, key string) string {
+	if value, ok := mp[key]; ok {
+		if value, ok := value.(string); ok {
+			return value
+		}
+	}
+	return ""
+}
+
+func AnyToInt(mp map[string]any, key string) int64 {
+	if value, ok := mp[key]; ok {
+		if value, ok := value.(int64); ok {
+			return value
+		}
+	}
+	return 0
+}
+
+func ConnectToLogs(ctx context.Context) (io.Reader, error) {
+	sshClient, err := CreateSSHClient(
+		GetEnv("PICO_SENDLOG_ENDPOINT", "send.pico.sh:22"),
+		GetEnv("PICO_SENDLOG_KEY", "ssh_data/term_info_ed25519"),
+		GetEnv("PICO_SENDLOG_PASSPHRASE", ""),
+		GetEnv("PICO_SENDLOG_REMOTE_HOST", "send.pico.sh"),
+		GetEnv("PICO_SENDLOG_USER", "pico"),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	session, err := sshClient.NewSession()
+	if err != nil {
+		return nil, err
+	}
+
+	stdoutPipe, err := session.StdoutPipe()
+	if err != nil {
+		return nil, err
+	}
+
+	err = session.Start("sub log-drain -k")
+	if err != nil {
+		return nil, err
+	}
+
+	go func() {
+		<-ctx.Done()
+		session.Close()
+		sshClient.Close()
+	}()
+
+	return stdoutPipe, nil
+}

@@ -19,6 +19,7 @@ const (
 	NotificationsChoice
 	PlusChoice
 	SettingsChoice
+	LogsChoice
 	ChatChoice
 	ExitChoice
 	UnsetChoice // set when no choice has been made
@@ -31,6 +32,7 @@ var menuChoices = map[menuChoice]string{
 	NotificationsChoice: "Notifications",
 	PlusChoice:          "Pico+",
 	SettingsChoice:      "Settings",
+	LogsChoice:          "Logs",
 	ChatChoice:          "Chat",
 	ExitChoice:          "Exit",
 }

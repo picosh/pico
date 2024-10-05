@@ -67,41 +67,10 @@ func (c *Cmd) notifications() error {
 }
 
 func (c *Cmd) logs(ctx context.Context) error {
-	sshClient, err := shared.CreateSSHClient(
-		shared.GetEnv("PICO_SENDLOG_ENDPOINT", "send.pico.sh:22"),
-		shared.GetEnv("PICO_SENDLOG_KEY", "ssh_data/term_info_ed25519"),
-		shared.GetEnv("PICO_SENDLOG_PASSPHRASE", ""),
-		shared.GetEnv("PICO_SENDLOG_REMOTE_HOST", "send.pico.sh"),
-		shared.GetEnv("PICO_SENDLOG_USER", "pico"),
-	)
+	stdoutPipe, err := shared.ConnectToLogs(ctx)
 	if err != nil {
 		return err
 	}
-
-	defer sshClient.Close()
-
-	session, err := sshClient.NewSession()
-	if err != nil {
-		return err
-	}
-
-	defer session.Close()
-
-	stdoutPipe, err := session.StdoutPipe()
-	if err != nil {
-		return err
-	}
-
-	err = session.Start("sub log-drain -k")
-	if err != nil {
-		return err
-	}
-
-	go func() {
-		<-ctx.Done()
-		session.Close()
-		sshClient.Close()
-	}()
 
 	scanner := bufio.NewScanner(stdoutPipe)
 	for scanner.Scan() {
@@ -114,12 +83,9 @@ func (c *Cmd) logs(ctx context.Context) error {
 			continue
 		}
 
-		if userName, ok := parsedData["user"]; ok {
-			if userName, ok := userName.(string); ok {
-				if userName == c.User.Name {
-					wish.Println(c.SshSession, line)
-				}
-			}
+		user := shared.AnyToStr(parsedData, "user")
+		if user == c.User.Name {
+			wish.Println(c.SshSession, line)
 		}
 	}
 	return scanner.Err()
