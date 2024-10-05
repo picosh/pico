@@ -76,7 +76,7 @@ func (h *UploadImgHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileI
 		return nil, nil, err
 	}
 
-	contents, _, _, err := h.Storage.GetObject(bucket, post.Filename)
+	contents, _, err := h.Storage.GetObject(bucket, post.Filename)
 	if err != nil {
 		return nil, nil, err
 	}

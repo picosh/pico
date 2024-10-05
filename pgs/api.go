@@ -168,7 +168,7 @@ func hasProtocol(url string) bool {
 
 func (h *AssetHandler) handle(logger *slog.Logger, w http.ResponseWriter, r *http.Request) {
 	var redirects []*RedirectRule
-	redirectFp, _, _, err := h.Storage.GetObject(h.Bucket, filepath.Join(h.ProjectDir, "_redirects"))
+	redirectFp, _, err := h.Storage.GetObject(h.Bucket, filepath.Join(h.ProjectDir, "_redirects"))
 	if err == nil {
 		defer redirectFp.Close()
 		buf := new(strings.Builder)
@@ -190,6 +190,7 @@ func (h *AssetHandler) handle(logger *slog.Logger, w http.ResponseWriter, r *htt
 	var contents io.ReadCloser
 	contentType := ""
 	assetFilepath := ""
+	info := &sst.ObjectInfo{}
 	status := http.StatusOK
 	attempts := []string{}
 	for _, fp := range routes {
@@ -198,7 +199,7 @@ func (h *AssetHandler) handle(logger *slog.Logger, w http.ResponseWriter, r *htt
 			// before redirecting, this saves a hop that will just end up a 404
 			if !hasProtocol(fp.Filepath) && strings.HasSuffix(fp.Filepath, "/") {
 				next := filepath.Join(h.ProjectDir, fp.Filepath, "index.html")
-				_, _, _, err := h.Storage.GetObject(h.Bucket, next)
+				_, _, err := h.Storage.GetObject(h.Bucket, next)
 				if err != nil {
 					continue
 				}
@@ -248,7 +249,7 @@ func (h *AssetHandler) handle(logger *slog.Logger, w http.ResponseWriter, r *htt
 				h.ImgProcessOpts,
 			)
 		} else {
-			c, _, _, err = h.Storage.GetObject(h.Bucket, fp.Filepath)
+			c, info, err = h.Storage.GetObject(h.Bucket, fp.Filepath)
 		}
 		if err == nil {
 			contents = c
@@ -286,7 +287,7 @@ func (h *AssetHandler) handle(logger *slog.Logger, w http.ResponseWriter, r *htt
 	}
 
 	var headers []*HeaderRule
-	headersFp, _, _, err := h.Storage.GetObject(h.Bucket, filepath.Join(h.ProjectDir, "_headers"))
+	headersFp, _, err := h.Storage.GetObject(h.Bucket, filepath.Join(h.ProjectDir, "_headers"))
 	if err == nil {
 		defer headersFp.Close()
 		buf := new(strings.Builder)
@@ -309,6 +310,16 @@ func (h *AssetHandler) handle(logger *slog.Logger, w http.ResponseWriter, r *htt
 		match := rr.FindStringSubmatch(assetFilepath)
 		if len(match) > 0 {
 			userHeaders = headerRule.Headers
+		}
+	}
+
+	if info != nil {
+		if info.ETag != "" {
+			w.Header().Add("etag", info.ETag)
+		}
+
+		if !info.LastModified.IsZero() {
+			w.Header().Add("last-modified", info.LastModified.Format(http.TimeFormat))
 		}
 	}
 

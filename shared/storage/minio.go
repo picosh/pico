@@ -26,7 +26,7 @@ func NewStorageMinio(address, user, pass string) (*StorageMinio, error) {
 func (s *StorageMinio) ServeObject(bucket sst.Bucket, fpath string, opts *ImgProcessOpts) (io.ReadCloser, string, error) {
 	if opts == nil || os.Getenv("IMGPROXY_URL") == "" {
 		contentType := GetMimeType(fpath)
-		rc, _, _, err := s.GetObject(bucket, fpath)
+		rc, _, err := s.GetObject(bucket, fpath)
 		return rc, contentType, err
 	}
 

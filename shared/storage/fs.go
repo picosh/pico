@@ -24,7 +24,7 @@ func NewStorageFS(dir string) (*StorageFS, error) {
 func (s *StorageFS) ServeObject(bucket sst.Bucket, fpath string, opts *ImgProcessOpts) (io.ReadCloser, string, error) {
 	if opts == nil || os.Getenv("IMGPROXY_URL") == "" {
 		contentType := GetMimeType(fpath)
-		rc, _, _, err := s.GetObject(bucket, fpath)
+		rc, _, err := s.GetObject(bucket, fpath)
 		return rc, contentType, err
 	}
 

@@ -135,13 +135,13 @@ func (h *UploadAssetHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.Fil
 	}
 
 	fname := shared.GetAssetFileName(entry)
-	contents, size, modTime, err := h.Storage.GetObject(bucket, fname)
+	contents, info, err := h.Storage.GetObject(bucket, fname)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	fileInfo.FSize = size
-	fileInfo.FModTime = modTime
+	fileInfo.FSize = info.Size
+	fileInfo.FModTime = info.LastModified
 
 	reader := pobj.NewAllReaderAt(contents)
 
@@ -226,7 +226,7 @@ func (h *UploadAssetHandler) Validate(s ssh.Session) error {
 }
 
 func (h *UploadAssetHandler) findDenylist(bucket sst.Bucket, project *db.Project, logger *slog.Logger) (string, error) {
-	fp, _, _, err := h.Storage.GetObject(bucket, filepath.Join(project.ProjectDir, "_pgs_ignore"))
+	fp, _, err := h.Storage.GetObject(bucket, filepath.Join(project.ProjectDir, "_pgs_ignore"))
 	if err != nil {
 		return "", fmt.Errorf("_pgs_ignore not found")
 	}
