@@ -197,7 +197,7 @@ func (f *Fetcher) RunPost(logger *slog.Logger, user *db.User, post *db.Post) err
 
 func (f *Fetcher) RunUser(user *db.User) error {
 	logger := shared.LoggerWithUser(f.cfg.Logger, user)
-	posts, err := f.db.FindPostsForUser(&db.Pager{Num: 1000}, user.ID, "feeds")
+	posts, err := f.db.FindPostsForUser(&db.Pager{Num: 100}, user.ID, "feeds")
 	if err != nil {
 		return err
 	}

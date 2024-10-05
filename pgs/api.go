@@ -380,7 +380,7 @@ func ServeAsset(fname string, opts *storage.ImgProcessOpts, fromImgs bool, hasPe
 	logger := ologger.With(
 		"subdomain", subdomain,
 		"filename", fname,
-		"url", r.URL.Path,
+		"url", fmt.Sprintf("%s%s", r.Host, r.URL.Path),
 		"host", r.Host,
 	)
 
