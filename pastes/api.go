@@ -78,30 +78,32 @@ type HeaderTxt struct {
 func blogHandler(w http.ResponseWriter, r *http.Request) {
 	username := shared.GetUsernameFromRequest(r)
 	dbpool := shared.GetDB(r)
-	logger := shared.GetLogger(r)
+	blogger := shared.GetLogger(r)
 	cfg := shared.GetCfg(r)
 
 	user, err := dbpool.FindUserForName(username)
 	if err != nil {
-		logger.Info("blog not found", "user", username)
-		http.Error(w, "blog not found", http.StatusNotFound)
+		blogger.Info("user not found", "user", username)
+		http.Error(w, "user not found", http.StatusNotFound)
 		return
 	}
-	pager, err := dbpool.FindPostsForUser(&db.Pager{Num: 1000, Page: 0}, user.ID, cfg.Space)
-	posts := pager.Data
+	logger := shared.LoggerWithUser(blogger, user)
 
+	pager, err := dbpool.FindPostsForUser(&db.Pager{Num: 1000, Page: 0}, user.ID, cfg.Space)
 	if err != nil {
-		logger.Error(err.Error())
+		logger.Error("could not find posts for user", "err", err.Error())
 		http.Error(w, "could not fetch posts for blog", http.StatusInternalServerError)
 		return
 	}
+
+	posts := pager.Data
 
 	ts, err := shared.RenderTemplate(cfg, []string{
 		cfg.StaticPath("html/blog.page.tmpl"),
 	})
 
 	if err != nil {
-		logger.Error(err.Error())
+		logger.Error("could not render template", "err", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -138,7 +140,7 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 
 	err = ts.Execute(w, data)
 	if err != nil {
-		logger.Error(err.Error())
+		logger.Error("could not execute tempalte", "err", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -168,14 +170,15 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	dbpool := shared.GetDB(r)
-	logger := shared.GetLogger(r)
+	blogger := shared.GetLogger(r)
 
 	user, err := dbpool.FindUserForName(username)
 	if err != nil {
-		logger.Info("blog not found", "user", username)
-		http.Error(w, "blog not found", http.StatusNotFound)
+		blogger.Info("paste not found", "user", username)
+		http.Error(w, "paste not found", http.StatusNotFound)
 		return
 	}
+	logger := shared.LoggerWithUser(blogger, user)
 
 	blogName := GetBlogName(username)
 
@@ -184,7 +187,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		parsedText, err := ParseText(post.Filename, post.Text)
 		if err != nil {
-			logger.Error(err.Error())
+			logger.Error("could not parse text", "err", err.Error())
 		}
 		expiresAt := "never"
 		if post.ExpiresAt != nil {
@@ -239,7 +242,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 
 	err = ts.Execute(w, data)
 	if err != nil {
-		logger.Error(err.Error())
+		logger.Error("could not execute template", "err", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -257,18 +260,19 @@ func postHandlerRaw(w http.ResponseWriter, r *http.Request) {
 	}
 
 	dbpool := shared.GetDB(r)
-	logger := shared.GetLogger(r)
+	blogger := shared.GetLogger(r)
 
 	user, err := dbpool.FindUserForName(username)
 	if err != nil {
-		logger.Info("blog not found", "user", username)
-		http.Error(w, "blog not found", http.StatusNotFound)
+		blogger.Info("paste not found", "user", username)
+		http.Error(w, "paste not found", http.StatusNotFound)
 		return
 	}
+	logger := shared.LoggerWithUser(blogger, user)
 
 	post, err := dbpool.FindPostWithSlug(slug, user.ID, cfg.Space)
 	if err != nil {
-		logger.Info("post not found", "user", username, "slug", slug)
+		logger.Info("post not found", "slug", slug)
 		http.Error(w, "post not found", http.StatusNotFound)
 		return
 	}
@@ -276,7 +280,7 @@ func postHandlerRaw(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
 	_, err = w.Write([]byte(post.Text))
 	if err != nil {
-		logger.Error(err.Error())
+		logger.Error("write error", "err", err)
 	}
 }
 
@@ -287,14 +291,14 @@ func serveFile(file string, contentType string) http.HandlerFunc {
 
 		contents, err := os.ReadFile(cfg.StaticPath(fmt.Sprintf("public/%s", file)))
 		if err != nil {
-			logger.Error(err.Error())
+			logger.Error("could not read file", "err", err)
 			http.Error(w, "file not found", 404)
 		}
 		w.Header().Add("Content-Type", contentType)
 
 		_, err = w.Write(contents)
 		if err != nil {
-			logger.Error(err.Error())
+			logger.Error("could not write contents", "err", err)
 			http.Error(w, "server error", 500)
 		}
 	}
@@ -371,7 +375,7 @@ func StartApiServer() {
 	}
 
 	if err != nil {
-		logger.Error(err.Error())
+		logger.Error("could not create storage adapter", "err", err.Error())
 		return
 	}
 
