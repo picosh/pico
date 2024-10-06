@@ -84,6 +84,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.viewport.Height = msg.Height - hh - inputHeight
 	case logLineLoadedMsg:
 		m.logData = append(m.logData, msg)
+		lng := len(m.logData)
+		if lng > 1000 {
+			m.logData = m.logData[lng-1000:]
+		}
 		wasAt := false
 		if m.viewport.AtBottom() {
 			wasAt = true
