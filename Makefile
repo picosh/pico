@@ -24,6 +24,10 @@ lint:
 	golangci-lint run -E goimports -E godot --timeout 10m
 .PHONY: lint
 
+test:
+	go test ./...
+.PHONY: test
+
 bp-setup:
 	$(DOCKER_CMD) buildx ls | grep pico || $(DOCKER_CMD) buildx create --name pico
 	$(DOCKER_CMD) buildx use pico

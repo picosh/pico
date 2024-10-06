@@ -2,6 +2,7 @@ package logs
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -23,6 +24,7 @@ const (
 )
 
 type logLineLoadedMsg map[string]any
+type errMsg error
 
 type Model struct {
 	shared   common.SharedModel
@@ -31,6 +33,9 @@ type Model struct {
 	viewport viewport.Model
 	input    input.Model
 	sub      chan map[string]any
+	ctx      context.Context
+	done     context.CancelFunc
+	errMsg   error
 }
 
 func headerHeight(shrd common.SharedModel) int {
@@ -59,20 +64,24 @@ func NewModel(shrd common.SharedModel) Model {
 	viewport.YPosition = hh
 	viewport.SetContent(defMsg)
 
+	ctx, cancel := context.WithCancel(shrd.Session.Context())
+
 	return Model{
 		shared:   shrd,
-		state:    stateReady,
+		state:    stateLoading,
 		viewport: viewport,
 		logData:  []map[string]any{},
 		input:    im,
 		sub:      make(chan map[string]any),
+		ctx:      ctx,
+		done:     cancel,
 	}
 }
 
 func (m Model) Init() tea.Cmd {
 	return tea.Batch(
 		m.connectLogs(m.sub),
-		waitForActivity(m.sub),
+		m.waitForActivity(m.sub),
 	)
 }
 
@@ -86,7 +95,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		hh := headerHeight(m.shared)
 		m.viewport.Height = msg.Height - hh - inputHeight
 		m.viewport.SetContent(logsToStr(m.shared.Styles, m.logData, m.input.Value()))
+
 	case logLineLoadedMsg:
+		m.state = stateReady
 		m.logData = append(m.logData, msg)
 		lng := len(m.logData)
 		if lng > 1000 {
@@ -100,7 +111,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if wasAt {
 			m.viewport.GotoBottom()
 		}
-		cmds = append(cmds, waitForActivity(m.sub))
+		cmds = append(cmds, m.waitForActivity(m.sub))
+
+	case errMsg:
+		m.errMsg = msg
+
+	case pages.NavigateMsg:
+		// cancel activity logger
+		m.done()
+		// reset model
+		next := NewModel(m.shared)
+		return next, nil
+
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "q", "esc":
@@ -124,25 +146,31 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) View() string {
+	if m.errMsg != nil {
+		return m.shared.Styles.Error.Render(m.errMsg.Error())
+	}
 	if m.state == stateLoading {
-		return "Loading ..."
+		return defMsg
 	}
 	return m.viewport.View() + "\n" + m.input.View()
 }
 
-func waitForActivity(sub chan map[string]any) tea.Cmd {
+func (m Model) waitForActivity(sub chan map[string]any) tea.Cmd {
 	return func() tea.Msg {
-		result := <-sub
-		return logLineLoadedMsg(result)
+		select {
+		case result := <-sub:
+			return logLineLoadedMsg(result)
+		case <-m.ctx.Done():
+			return nil
+		}
 	}
 }
 
 func (m Model) connectLogs(sub chan map[string]any) tea.Cmd {
 	return func() tea.Msg {
-		stdoutPipe, err := shared.ConnectToLogs(m.shared.Session.Context())
+		stdoutPipe, err := shared.ConnectToLogs(m.ctx)
 		if err != nil {
-			fmt.Println(err)
-			return nil
+			return errMsg(err)
 		}
 
 		scanner := bufio.NewScanner(stdoutPipe)
