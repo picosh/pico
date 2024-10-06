@@ -79,15 +79,16 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	username := shared.GetUsernameFromRequest(r)
 	dbpool := shared.GetDB(r)
 	blogger := shared.GetLogger(r)
+	logger := blogger.With("user", username)
 	cfg := shared.GetCfg(r)
 
 	user, err := dbpool.FindUserForName(username)
 	if err != nil {
-		blogger.Info("user not found", "user", username)
+		logger.Info("user not found")
 		http.Error(w, "user not found", http.StatusNotFound)
 		return
 	}
-	logger := shared.LoggerWithUser(blogger, user)
+	logger = shared.LoggerWithUser(blogger, user)
 
 	pager, err := dbpool.FindPostsForUser(&db.Pager{Num: 1000, Page: 0}, user.ID, cfg.Space)
 	if err != nil {
@@ -171,23 +172,26 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 
 	dbpool := shared.GetDB(r)
 	blogger := shared.GetLogger(r)
+	logger := blogger.With("slug", slug, "user", username)
 
 	user, err := dbpool.FindUserForName(username)
 	if err != nil {
-		blogger.Info("paste not found", "user", username)
+		logger.Info("paste not found")
 		http.Error(w, "paste not found", http.StatusNotFound)
 		return
 	}
-	logger := shared.LoggerWithUser(blogger, user)
+	logger = shared.LoggerWithUser(logger, user)
 
 	blogName := GetBlogName(username)
 
 	var data PostPageData
 	post, err := dbpool.FindPostWithSlug(slug, user.ID, cfg.Space)
 	if err == nil {
+		logger = logger.With("filename", post.Filename)
+		logger.Info("paste found")
 		parsedText, err := ParseText(post.Filename, post.Text)
 		if err != nil {
-			logger.Error("could not parse text", "err", err.Error())
+			logger.Error("could not parse text", "err", err)
 		}
 		expiresAt := "never"
 		if post.ExpiresAt != nil {
@@ -216,7 +220,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			Unlisted:     unlisted,
 		}
 	} else {
-		logger.Info("post not found", "user", username, "slug", slug)
+		logger.Info("paste not found")
 		data = PostPageData{
 			Site:         *cfg.GetSiteData(),
 			PageTitle:    "Paste not found",
@@ -240,9 +244,10 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
+	logger.Info("serving paste")
 	err = ts.Execute(w, data)
 	if err != nil {
-		logger.Error("could not execute template", "err", err.Error())
+		logger.Error("could not execute template", "err", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -261,21 +266,24 @@ func postHandlerRaw(w http.ResponseWriter, r *http.Request) {
 
 	dbpool := shared.GetDB(r)
 	blogger := shared.GetLogger(r)
+	logger := blogger.With("user", username, "slug", slug)
 
 	user, err := dbpool.FindUserForName(username)
 	if err != nil {
-		blogger.Info("paste not found", "user", username)
-		http.Error(w, "paste not found", http.StatusNotFound)
+		logger.Info("user not found")
+		http.Error(w, "user not found", http.StatusNotFound)
 		return
 	}
-	logger := shared.LoggerWithUser(blogger, user)
+	logger = shared.LoggerWithUser(blogger, user)
 
 	post, err := dbpool.FindPostWithSlug(slug, user.ID, cfg.Space)
 	if err != nil {
-		logger.Info("post not found", "slug", slug)
-		http.Error(w, "post not found", http.StatusNotFound)
+		logger.Info("paste not found")
+		http.Error(w, "paste not found", http.StatusNotFound)
 		return
 	}
+	logger = logger.With("filename", post.Filename)
+	logger.Info("raw paste found")
 
 	w.Header().Set("Content-Type", "text/plain")
 	_, err = w.Write([]byte(post.Text))
