@@ -41,6 +41,8 @@ func headerWidth(w int) int {
 	return w - 2
 }
 
+var defMsg = "Logs will show up here in realtime as they are generated.  There is no log buffer."
+
 func NewModel(shrd common.SharedModel) Model {
 	im := input.New()
 	im.Cursor.Style = shrd.Styles.Cursor
@@ -55,6 +57,7 @@ func NewModel(shrd common.SharedModel) Model {
 	inputHeight := lipgloss.Height(im.View())
 	viewport := viewport.New(ww, shrd.Height-hh-inputHeight)
 	viewport.YPosition = hh
+	viewport.SetContent(defMsg)
 
 	return Model{
 		shared:   shrd,
@@ -82,6 +85,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		inputHeight := lipgloss.Height(m.input.View())
 		hh := headerHeight(m.shared)
 		m.viewport.Height = msg.Height - hh - inputHeight
+		m.viewport.SetContent(logsToStr(m.shared.Styles, m.logData, m.input.Value()))
 	case logLineLoadedMsg:
 		m.logData = append(m.logData, msg)
 		lng := len(m.logData)
@@ -92,7 +96,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.viewport.AtBottom() {
 			wasAt = true
 		}
-		m.viewport.SetContent(logsToStr(m.logData, m.input.Value()))
+		m.viewport.SetContent(logsToStr(m.shared.Styles, m.logData, m.input.Value()))
 		if wasAt {
 			m.viewport.GotoBottom()
 		}
@@ -108,7 +112,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cmds = append(cmds, m.input.Focus())
 			}
 		default:
-			m.viewport.SetContent(logsToStr(m.logData, m.input.Value()))
+			m.viewport.SetContent(logsToStr(m.shared.Styles, m.logData, m.input.Value()))
 			m.viewport.GotoBottom()
 		}
 	}
@@ -168,13 +172,13 @@ func matched(str, match string) bool {
 	return strings.Contains(prim, mtch)
 }
 
-func logToStr(data map[string]any, match string) string {
+func logToStr(styles common.Styles, data map[string]any, match string) string {
 	time := shared.AnyToStr(data, "time")
 	service := shared.AnyToStr(data, "service")
 	level := shared.AnyToStr(data, "level")
 	msg := shared.AnyToStr(data, "msg")
 	errMsg := shared.AnyToStr(data, "err")
-	status := shared.AnyToInt(data, "status")
+	status := shared.AnyToFloat(data, "status")
 	url := shared.AnyToStr(data, "url")
 
 	if match != "" {
@@ -183,32 +187,57 @@ func logToStr(data map[string]any, match string) string {
 		serviceMatch := matched(service, match)
 		errMatch := matched(errMsg, match)
 		urlMatch := matched(url, match)
-		if !lvlMatch && !msgMatch && !serviceMatch && !errMatch && !urlMatch {
+		statusMatch := matched(fmt.Sprintf("%d", int(status)), match)
+		if !lvlMatch && !msgMatch && !serviceMatch && !errMatch && !urlMatch && !statusMatch {
 			return ""
 		}
 	}
 
 	acc := fmt.Sprintf(
-		"%s\t%s\t%s\t%s\t%s\t%d\t%s",
+		"%s %s %s %s %s %s %s",
 		time,
 		service,
-		level,
+		levelView(styles, level),
 		msg,
-		errMsg,
-		status,
+		styles.Error.Render(errMsg),
+		statusView(styles, int(status)),
 		url,
 	)
-	acc += "\n"
 	return acc
 }
 
-func logsToStr(data []map[string]any, filter string) string {
+func statusView(styles common.Styles, status int) string {
+	statusStr := fmt.Sprintf("%d", status)
+	if status >= 200 && status < 300 {
+		return statusStr
+	}
+	return styles.Error.Render(statusStr)
+}
+
+func levelView(styles common.Styles, level string) string {
+	if level == "ERROR" {
+		return styles.Error.Render(level)
+	}
+	return styles.Note.Render(level)
+}
+
+func logsToStr(styles common.Styles, data []map[string]any, filter string) string {
 	acc := ""
 	for _, d := range data {
-		res := logToStr(d, filter)
+		res := logToStr(styles, d, filter)
 		if res != "" {
 			acc += res
+			acc += "\n"
 		}
 	}
+
+	if acc == "" {
+		if filter == "" {
+			return defMsg
+		} else {
+			return "No results found for filter provided."
+		}
+	}
+
 	return acc
 }

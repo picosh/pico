@@ -340,9 +340,9 @@ func AnyToStr(mp map[string]any, key string) string {
 	return ""
 }
 
-func AnyToInt(mp map[string]any, key string) int64 {
+func AnyToFloat(mp map[string]any, key string) float64 {
 	if value, ok := mp[key]; ok {
-		if value, ok := value.(int64); ok {
+		if value, ok := value.(float64); ok {
 			return value
 		}
 	}
