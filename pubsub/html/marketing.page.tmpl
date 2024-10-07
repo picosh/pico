@@ -17,7 +17,7 @@
 {{define "body"}}
 <header class="flex flex-col items-center gap">
   <img src="https://pico.sh/logo.svg" alt="pico logo" width="50" height="50" />
-  <h1 class="text-2xl font-bold text-center">Authenticated <code>*nix</code> pipes over <code>ssh</code></h1>
+  <h1 class="text-2xl font-bold text-center">Authenticated *nix pipes over ssh</h1>
 </header>
 
 <hr />
@@ -26,12 +26,32 @@
   <div>
     <p>
       The simplest authenticated pubsub system.  Send messages through
-      user-defined channels.  By default, channels are private to the authenticated
+      user-defined topics.  By default, topics are private to the authenticated
       ssh user.  The default pubsub model is multicast with bidirectional
       blocking, meaning a publisher (<code>pub</code>) will send its message to all
-      subscribers (<code>sub</code>) on a channel.  Further, both <code>pub</code> and
-      <code>sub</code> will wait for at least one event to be sent or received on the channel.
+      subscribers (<code>sub</code>) on a topic.  Further, both <code>pub</code> and
+      <code>sub</code> will wait for at least one event to be sent or received on the topic.
     </p>
+
+    <h2 class="text-lg">Features</h2>
+
+    <ol>
+      <li>Familiar *nix pipes API</li>
+      <li>Zero-install</li>
+      <li>Authenticated pubsub using ssh</li>
+      <li>Private pubsub by default</li>
+      <li>Public pubsub by topic (opt-in)</li>
+      <li>Multicast (many pubs to many subs)</li>
+      <li>Bidirectional (e.g. chat)</li>
+      <li>Configurable blocking for both pubs and subs</li>
+      <li>Paradigms for connecting to a topic:
+        <ol>
+          <li>Read (sub)</li>
+          <li>Write (pub)</li>
+          <li>Read & Write (pipe)</li>
+        </ol>
+      </li>
+    </ol>
 
     <blockquote>This service is undergoing active development, expect bugs, feature dev, and server restarts</blockquote>
   </div>
@@ -209,6 +229,14 @@
     <p>
       A special thanks to <a href="https://patchbay.pub">patchbay.pub</a> for our inspiration.
     </p>
+  </div>
+
+  <div>
+    <h2 class="text-xl">Latest posts</h2>
+    <div class="flex items-center">
+      <div class="mr font-italic">2024-10-06</div>
+      <div><a href="https://blog.pico.sh/pubsub">announcing pubsub service</a></div>
+    </div>
   </div>
 
   <div class="text-center mb-2">
