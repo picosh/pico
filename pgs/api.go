@@ -450,6 +450,17 @@ func ServeAsset(fname string, opts *storage.ImgProcessOpts, fromImgs bool, hasPe
 			return
 		}
 
+		logger = logger.With(
+			"projectId", project.ID,
+			"project", project.Name,
+		)
+
+		if project.Blocked != "" {
+			logger.Error("project has been blocked")
+			http.Error(w, project.Blocked, http.StatusForbidden)
+			return
+		}
+
 		projectID = project.ID
 		projectDir = project.ProjectDir
 		if !hasPerm(project) {
