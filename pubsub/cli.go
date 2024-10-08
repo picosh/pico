@@ -223,7 +223,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 			if cmd == "pub" {
 				pubCmd := flagSet("pub", sesh)
 				empty := pubCmd.Bool("e", false, "Send an empty message to subs")
-				public := pubCmd.Bool("p", false, "Anyone can sub to this topic")
+				public := pubCmd.Bool("p", false, "Publish message to public topic")
 				block := pubCmd.Bool("b", true, "Block writes until a subscriber is available")
 				timeout := pubCmd.Duration("t", 30*24*time.Hour, "Timeout as a Go duration to block for a subscriber to be available. Valid time units are 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h'. Default is 30 days.")
 				if !flagCheck(pubCmd, topic, cmdArgs) {
