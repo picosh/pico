@@ -12,7 +12,7 @@ import (
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/filehandlers/util"
 	"github.com/picosh/pico/shared"
-	"github.com/picosh/send/send/utils"
+	"github.com/picosh/send/utils"
 )
 
 type ReadWriteHandler interface {

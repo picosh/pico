@@ -10,16 +10,16 @@ import (
 	"github.com/charmbracelet/wish"
 	bm "github.com/charmbracelet/wish/bubbletea"
 	"github.com/picosh/pico/db"
-	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/tui/common"
+	"github.com/picosh/utils"
 )
 
 func getUser(s ssh.Session, dbpool db.DB) (*db.User, error) {
-	var err error
-	key, err := shared.KeyText(s)
-	if err != nil {
+	if s.PublicKey() == nil {
 		return nil, fmt.Errorf("key not found")
 	}
+
+	key := utils.KeyForKeyText(s.PublicKey())
 
 	user, err := dbpool.FindUserForKey(s.User(), key)
 	if err != nil {
@@ -35,7 +35,7 @@ func getUser(s ssh.Session, dbpool db.DB) (*db.User, error) {
 
 type Cmd struct {
 	User    *db.User
-	Session shared.CmdSession
+	Session utils.CmdSession
 	Log     *slog.Logger
 	Dbpool  db.DB
 	Styles  common.Styles
@@ -62,7 +62,7 @@ func (c *Cmd) statsByPost(postSlug string) error {
 		FkID:     post.ID,
 		By:       "post_id",
 		Interval: "day",
-		Origin:   shared.StartOfMonth(),
+		Origin:   utils.StartOfMonth(),
 	}
 
 	summary, err := c.Dbpool.VisitSummary(opts)
@@ -90,7 +90,7 @@ func (c *Cmd) stats() error {
 		FkID:     c.User.ID,
 		By:       "user_id",
 		Interval: "day",
-		Origin:   shared.StartOfMonth(),
+		Origin:   utils.StartOfMonth(),
 		Where:    "AND (post_id IS NOT NULL OR (post_id IS NULL AND project_id IS NULL))",
 	}
 

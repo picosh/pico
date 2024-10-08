@@ -11,6 +11,7 @@ import (
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/filehandlers"
 	"github.com/picosh/pico/shared"
+	"github.com/picosh/utils"
 )
 
 var DEFAULT_EXPIRES_AT = 90
@@ -21,7 +22,7 @@ type FileHooks struct {
 }
 
 func (p *FileHooks) FileValidate(s ssh.Session, data *filehandlers.PostMetaData) (bool, error) {
-	if !shared.IsTextFile(string(data.Text)) {
+	if !utils.IsTextFile(string(data.Text)) {
 		err := fmt.Errorf(
 			"WARNING: (%s) invalid file must be plain text (utf-8), skipping",
 			data.Filename,
@@ -33,7 +34,7 @@ func (p *FileHooks) FileValidate(s ssh.Session, data *filehandlers.PostMetaData)
 }
 
 func (p *FileHooks) FileMeta(s ssh.Session, data *filehandlers.PostMetaData) error {
-	data.Title = shared.ToUpper(data.Slug)
+	data.Title = utils.ToUpper(data.Slug)
 	// we want the slug to be the filename for pastes
 	data.Slug = data.Filename
 

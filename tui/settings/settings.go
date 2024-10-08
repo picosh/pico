@@ -8,9 +8,9 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
 	"github.com/picosh/pico/db"
-	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/tui/common"
 	"github.com/picosh/pico/tui/pages"
+	"github.com/picosh/utils"
 )
 
 var maxWidth = 50
@@ -125,7 +125,7 @@ func (m Model) featuresView() string {
 
 	data := [][]string{}
 	for _, feature := range m.features {
-		storeMax := shared.BytesToGB(int(feature.FindStorageMax(0)))
+		storeMax := utils.BytesToGB(int(feature.FindStorageMax(0)))
 		row := []string{
 			feature.Name,
 			fmt.Sprintf("%.2f", storeMax),

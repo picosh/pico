@@ -14,20 +14,20 @@ import (
 	"github.com/charmbracelet/wish"
 	"github.com/google/uuid"
 	"github.com/picosh/pico/db"
-	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pico/tui/common"
 	sst "github.com/picosh/pobj/storage"
 	psub "github.com/picosh/pubsub"
-	"github.com/picosh/send/send/utils"
+	sendutils "github.com/picosh/send/utils"
+	"github.com/picosh/utils"
 )
 
 func getUser(s ssh.Session, dbpool db.DB) (*db.User, error) {
-	var err error
-	key, err := shared.KeyText(s)
-	if err != nil {
+	if s.PublicKey() == nil {
 		return nil, fmt.Errorf("key not found")
 	}
+
+	key := utils.KeyForKeyText(s.PublicKey())
 
 	user, err := dbpool.FindUserForKey(s.User(), key)
 	if err != nil {
@@ -60,7 +60,7 @@ func flagCheck(cmd *flag.FlagSet, posArg string, cmdArgs []string) bool {
 
 type Cmd struct {
 	User        *db.User
-	Session     shared.CmdSession
+	Session     utils.CmdSession
 	Log         *slog.Logger
 	Dbpool      db.DB
 	Write       bool
@@ -201,7 +201,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 		return func(sesh ssh.Session) {
 			user, err := getUser(sesh, dbpool)
 			if err != nil {
-				utils.ErrorHandler(sesh, err)
+				sendutils.ErrorHandler(sesh, err)
 				return
 			}
 

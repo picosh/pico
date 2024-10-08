@@ -12,16 +12,16 @@ import (
 	"github.com/charmbracelet/wish"
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/filehandlers/util"
-	"github.com/picosh/pico/shared"
 	wsh "github.com/picosh/pico/wish"
 	psub "github.com/picosh/pubsub"
+	"github.com/picosh/utils"
 )
 
 func StartSshServer() {
-	host := shared.GetEnv("PUBSUB_HOST", "0.0.0.0")
-	port := shared.GetEnv("PUBSUB_SSH_PORT", "2222")
-	portOverride := shared.GetEnv("PUBSUB_SSH_PORT_OVERRIDE", port)
-	promPort := shared.GetEnv("PUBSUB_PROM_PORT", "9222")
+	host := utils.GetEnv("PUBSUB_HOST", "0.0.0.0")
+	port := utils.GetEnv("PUBSUB_SSH_PORT", "2222")
+	portOverride := utils.GetEnv("PUBSUB_SSH_PORT_OVERRIDE", port)
+	promPort := utils.GetEnv("PUBSUB_PROM_PORT", "9222")
 	cfg := NewConfigSite()
 	logger := cfg.Logger
 	dbh := postgres.NewDB(cfg.DbURL, cfg.Logger)

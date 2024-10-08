@@ -10,7 +10,8 @@ import (
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/filehandlers/util"
 	"github.com/picosh/pico/shared"
-	"github.com/picosh/send/send/utils"
+	sendutils "github.com/picosh/send/utils"
+	"github.com/picosh/utils"
 )
 
 func (h *UploadImgHandler) validateImg(data *PostMetaData) (bool, error) {
@@ -29,7 +30,7 @@ func (h *UploadImgHandler) validateImg(data *PostMetaData) (bool, error) {
 		return false, fmt.Errorf("ERROR: user (%s) has exceeded (%d bytes) max (%d bytes)", data.User.Name, totalFileSize, storageMax)
 	}
 
-	if !shared.IsExtAllowed(data.Filepath, h.Cfg.AllowedExt) {
+	if !utils.IsExtAllowed(data.Filepath, h.Cfg.AllowedExt) {
 		extStr := strings.Join(h.Cfg.AllowedExt, ",")
 		err := fmt.Errorf(
 			"ERROR: (%s) invalid file, format must be (%s), skipping",
@@ -59,8 +60,8 @@ func (h *UploadImgHandler) metaImg(data *PostMetaData) error {
 	fname, _, err := h.Storage.PutObject(
 		bucket,
 		data.Filename,
-		utils.NopReaderAtCloser(reader),
-		&utils.FileEntry{},
+		sendutils.NopReaderAtCloser(reader),
+		&sendutils.FileEntry{},
 	)
 	if err != nil {
 		return err

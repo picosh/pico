@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/picosh/send/send/utils"
+	"github.com/picosh/send/utils"
 )
 
 func GetImgsBucketName(userID string) string {

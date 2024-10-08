@@ -11,17 +11,17 @@ import (
 	bm "github.com/charmbracelet/wish/bubbletea"
 	"github.com/picosh/pico/db"
 	uploadassets "github.com/picosh/pico/filehandlers/assets"
-	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/tui/common"
-	"github.com/picosh/send/send/utils"
+	sendutils "github.com/picosh/send/utils"
+	"github.com/picosh/utils"
 )
 
 func getUser(s ssh.Session, dbpool db.DB) (*db.User, error) {
-	var err error
-	key, err := shared.KeyText(s)
-	if err != nil {
+	if s.PublicKey() == nil {
 		return nil, fmt.Errorf("key not found")
 	}
+
+	key := utils.KeyForKeyText(s.PublicKey())
 
 	user, err := dbpool.FindUserForKey(s.User(), key)
 	if err != nil {
@@ -88,7 +88,7 @@ func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
 
 			user, err := getUser(sesh, dbpool)
 			if err != nil {
-				utils.ErrorHandler(sesh, err)
+				sendutils.ErrorHandler(sesh, err)
 				return
 			}
 

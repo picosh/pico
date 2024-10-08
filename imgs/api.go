@@ -17,6 +17,7 @@ import (
 	"github.com/picosh/pico/pgs"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
+	"github.com/picosh/utils"
 )
 
 type PostPageData struct {
@@ -219,7 +220,7 @@ func ImgRequest(w http.ResponseWriter, r *http.Request) {
 		if ext == fext {
 			// users might add the file extension when requesting an image
 			// but we want to remove that
-			slug = shared.SanitizeFileExt(slug)
+			slug = utils.SanitizeFileExt(slug)
 			break
 		}
 	}

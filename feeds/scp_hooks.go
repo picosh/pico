@@ -11,6 +11,7 @@ import (
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/filehandlers"
 	"github.com/picosh/pico/shared"
+	"github.com/picosh/utils"
 )
 
 type FeedHooks struct {
@@ -19,7 +20,7 @@ type FeedHooks struct {
 }
 
 func (p *FeedHooks) FileValidate(s ssh.Session, data *filehandlers.PostMetaData) (bool, error) {
-	if !shared.IsTextFile(string(data.Text)) {
+	if !utils.IsTextFile(string(data.Text)) {
 		err := fmt.Errorf(
 			"WARNING: (%s) invalid file must be plain text (utf-8), skipping",
 			data.Filename,
@@ -27,7 +28,7 @@ func (p *FeedHooks) FileValidate(s ssh.Session, data *filehandlers.PostMetaData)
 		return false, err
 	}
 
-	if !shared.IsExtAllowed(data.Filename, p.Cfg.AllowedExt) {
+	if !utils.IsExtAllowed(data.Filename, p.Cfg.AllowedExt) {
 		extStr := strings.Join(p.Cfg.AllowedExt, ",")
 		err := fmt.Errorf(
 			"WARNING: (%s) invalid file, format must be (%s), skipping",
@@ -44,7 +45,7 @@ func (p *FeedHooks) FileMeta(s ssh.Session, data *filehandlers.PostMetaData) err
 	parsedText := shared.ListParseText(string(data.Text))
 
 	if parsedText.Title == "" {
-		data.Title = shared.ToUpper(data.Slug)
+		data.Title = utils.ToUpper(data.Slug)
 	} else {
 		data.Title = parsedText.Title
 	}

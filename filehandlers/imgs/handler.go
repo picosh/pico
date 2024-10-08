@@ -18,7 +18,8 @@ import (
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pobj"
-	"github.com/picosh/send/send/utils"
+	sendutils "github.com/picosh/send/utils"
+	"github.com/picosh/utils"
 )
 
 var Space = "imgs"
@@ -29,7 +30,7 @@ type PostMetaData struct {
 	Cur      *db.Post
 	Tags     []string
 	User     *db.User
-	*utils.FileEntry
+	*sendutils.FileEntry
 	FeatureFlag *db.FeatureFlag
 }
 
@@ -47,7 +48,7 @@ func NewUploadImgHandler(dbpool db.DB, cfg *shared.ConfigSite, storage storage.S
 	}
 }
 
-func (h *UploadImgHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileInfo, utils.ReaderAtCloser, error) {
+func (h *UploadImgHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os.FileInfo, sendutils.ReaderAtCloser, error) {
 	user, err := util.GetUser(s.Context())
 	if err != nil {
 		return nil, nil, err
@@ -64,7 +65,7 @@ func (h *UploadImgHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileI
 		return nil, nil, err
 	}
 
-	fileInfo := &utils.VirtualFile{
+	fileInfo := &sendutils.VirtualFile{
 		FName:    post.Filename,
 		FIsDir:   false,
 		FSize:    int64(post.FileSize),
@@ -86,7 +87,7 @@ func (h *UploadImgHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileI
 	return fileInfo, reader, nil
 }
 
-func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string, error) {
+func (h *UploadImgHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (string, error) {
 	logger := h.Cfg.Logger
 	user, err := util.GetUser(s.Context())
 	if err != nil {
@@ -123,8 +124,8 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 
 	now := time.Now()
 	fileSize := binary.Size(text)
-	shasum := shared.Shasum(text)
-	slug := shared.SanitizeFileExt(filename)
+	shasum := utils.Shasum(text)
+	slug := utils.SanitizeFileExt(filename)
 
 	nextPost := db.Post{
 		Filename:  filename,
@@ -184,14 +185,14 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 	str := fmt.Sprintf(
 		"%s (space: %.2f/%.2fGB, %.2f%%)",
 		url,
-		shared.BytesToGB(totalFileSize),
-		shared.BytesToGB(maxSize),
+		utils.BytesToGB(totalFileSize),
+		utils.BytesToGB(maxSize),
 		(float32(totalFileSize)/float32(maxSize))*100,
 	)
 	return str, nil
 }
 
-func (h *UploadImgHandler) Delete(s ssh.Session, entry *utils.FileEntry) error {
+func (h *UploadImgHandler) Delete(s ssh.Session, entry *sendutils.FileEntry) error {
 	user, err := util.GetUser(s.Context())
 	if err != nil {
 		return err

@@ -2,10 +2,11 @@ package pico
 
 import (
 	"github.com/picosh/pico/shared"
+	"github.com/picosh/utils"
 )
 
 func NewConfigSite() *shared.ConfigSite {
-	dbURL := shared.GetEnv("DATABASE_URL", "")
+	dbURL := utils.GetEnv("DATABASE_URL", "")
 
 	return &shared.ConfigSite{
 		DbURL:  dbURL,
