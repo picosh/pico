@@ -256,6 +256,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				}
 
 				var name string
+				msgFlag := ""
 
 				if isAdmin && strings.HasPrefix(topic, "/") {
 					name = strings.TrimPrefix(topic, "/")
@@ -263,13 +264,15 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					name = toTopic(user.Name, topic)
 					if *public {
 						name = toPublicTopic(topic)
+						msgFlag = "-p "
 					}
 				}
 
 				wish.Printf(
 					sesh,
-					"subscribe to this channel:\n\tssh %s sub %s\n",
+					"subscribe to this channel:\n\tssh %s sub %s%s\n",
 					toSshCmd(handler.Cfg),
+					msgFlag,
 					topic,
 				)
 
@@ -423,6 +426,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				}
 
 				var name string
+				flagMsg := ""
 
 				if isAdmin && strings.HasPrefix(topic, "/") {
 					name = strings.TrimPrefix(topic, "/")
@@ -430,14 +434,16 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					name = toTopic(user.Name, topic)
 					if *public {
 						name = toPublicTopic(topic)
+						flagMsg = "-p "
 					}
 				}
 
 				if isCreator {
 					wish.Printf(
 						sesh,
-						"subscribe to this topic:\n\tssh %s sub %s\n",
+						"subscribe to this topic:\n\tssh %s sub %s%s\n",
 						toSshCmd(handler.Cfg),
+						flagMsg,
 						topic,
 					)
 				}
