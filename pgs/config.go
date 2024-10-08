@@ -2,21 +2,22 @@ package pgs
 
 import (
 	"github.com/picosh/pico/shared"
+	"github.com/picosh/utils"
 )
 
-var maxSize = uint64(25 * shared.MB)
-var maxAssetSize = int64(10 * shared.MB)
+var maxSize = uint64(25 * utils.MB)
+var maxAssetSize = int64(10 * utils.MB)
 
 func NewConfigSite() *shared.ConfigSite {
-	domain := shared.GetEnv("PGS_DOMAIN", "pgs.sh")
-	port := shared.GetEnv("PGS_WEB_PORT", "3000")
-	protocol := shared.GetEnv("PGS_PROTOCOL", "https")
-	storageDir := shared.GetEnv("PGS_STORAGE_DIR", ".storage")
-	minioURL := shared.GetEnv("MINIO_URL", "")
-	minioUser := shared.GetEnv("MINIO_ROOT_USER", "")
-	minioPass := shared.GetEnv("MINIO_ROOT_PASSWORD", "")
-	dbURL := shared.GetEnv("DATABASE_URL", "")
-	secret := shared.GetEnv("PICO_SECRET", "")
+	domain := utils.GetEnv("PGS_DOMAIN", "pgs.sh")
+	port := utils.GetEnv("PGS_WEB_PORT", "3000")
+	protocol := utils.GetEnv("PGS_PROTOCOL", "https")
+	storageDir := utils.GetEnv("PGS_STORAGE_DIR", ".storage")
+	minioURL := utils.GetEnv("MINIO_URL", "")
+	minioUser := utils.GetEnv("MINIO_ROOT_USER", "")
+	minioPass := utils.GetEnv("MINIO_ROOT_PASSWORD", "")
+	dbURL := utils.GetEnv("DATABASE_URL", "")
+	secret := utils.GetEnv("PICO_SECRET", "")
 	if secret == "" {
 		panic("must provide PICO_SECRET environment variable")
 	}

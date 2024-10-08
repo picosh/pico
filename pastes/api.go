@@ -12,6 +12,7 @@ import (
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
+	"github.com/picosh/utils"
 )
 
 type PageData struct {
@@ -123,7 +124,7 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 			Title:          post.Filename,
 			PublishAt:      post.PublishAt.Format(time.DateOnly),
 			PublishAtISO:   post.PublishAt.Format(time.RFC3339),
-			UpdatedTimeAgo: shared.TimeAgo(post.UpdatedAt),
+			UpdatedTimeAgo: utils.TimeAgo(post.UpdatedAt),
 			UpdatedAtISO:   post.UpdatedAt.Format(time.RFC3339),
 		}
 		postCollection = append(postCollection, p)

@@ -15,14 +15,17 @@ import (
 	"github.com/picosh/pico/tui/common"
 	"github.com/picosh/pico/tui/notifications"
 	"github.com/picosh/pico/tui/plus"
+	"github.com/picosh/utils"
+
+	pipeLogger "github.com/picosh/pubsub/log"
 )
 
 func getUser(s ssh.Session, dbpool db.DB) (*db.User, error) {
-	var err error
-	key, err := shared.KeyText(s)
-	if err != nil {
+	if s.PublicKey() == nil {
 		return nil, fmt.Errorf("key not found")
 	}
+
+	key := utils.KeyForKeyText(s.PublicKey())
 
 	user, err := dbpool.FindUserForKey(s.User(), key)
 	if err != nil {
@@ -39,7 +42,7 @@ func getUser(s ssh.Session, dbpool db.DB) (*db.User, error) {
 type Cmd struct {
 	User       *db.User
 	SshSession ssh.Session
-	Session    shared.CmdSession
+	Session    utils.CmdSession
 	Log        *slog.Logger
 	Dbpool     db.DB
 	Write      bool
@@ -67,7 +70,14 @@ func (c *Cmd) notifications() error {
 }
 
 func (c *Cmd) logs(ctx context.Context) error {
-	stdoutPipe, err := shared.ConnectToLogs(ctx)
+	stdoutPipe, err := pipeLogger.ConnectToLogs(ctx, &pipeLogger.PubSubConnectionInfo{
+		RemoteHost:     utils.GetEnv("PICO_PIPE_ENDPOINT", "pipe.pico.sh:22"),
+		KeyLocation:    utils.GetEnv("PICO_PIPE_KEY", "ssh_data/term_info_ed25519"),
+		KeyPassphrase:  utils.GetEnv("PICO_PIPE_PASSPHRASE", ""),
+		RemoteHostname: utils.GetEnv("PICO_PIPE_REMOTE_HOST", "pipe.pico.sh"),
+		RemoteUser:     utils.GetEnv("PICO_PIPE_USER", "pico"),
+	})
+
 	if err != nil {
 		return err
 	}
@@ -83,7 +93,7 @@ func (c *Cmd) logs(ctx context.Context) error {
 			continue
 		}
 
-		user := shared.AnyToStr(parsedData, "user")
+		user := utils.AnyToStr(parsedData, "user")
 		if user == c.User.Name {
 			wish.Println(c.SshSession, line)
 		}

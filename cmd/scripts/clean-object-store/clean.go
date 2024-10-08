@@ -10,6 +10,7 @@ import (
 	"github.com/picosh/pico/pgs"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
+	"github.com/picosh/utils"
 )
 
 func bail(err error) {
@@ -27,7 +28,7 @@ type RmProject struct {
 // have a corresponding project inside our database.
 func main() {
 	// to actually commit changes, set to true
-	writeEnv := shared.GetEnv("WRITE", "0")
+	writeEnv := utils.GetEnv("WRITE", "0")
 	write := false
 	if writeEnv == "1" {
 		write = true
@@ -102,7 +103,7 @@ func main() {
 		}
 	}
 
-	session := &shared.CmdSessionLogger{
+	session := &utils.CmdSessionLogger{
 		Log: logger,
 	}
 

@@ -17,13 +17,14 @@ import (
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/tui"
 	wsh "github.com/picosh/pico/wish"
+	"github.com/picosh/send/auth"
 	"github.com/picosh/send/list"
 	"github.com/picosh/send/pipe"
+	wishrsync "github.com/picosh/send/protocols/rsync"
+	"github.com/picosh/send/protocols/scp"
+	"github.com/picosh/send/protocols/sftp"
 	"github.com/picosh/send/proxy"
-	"github.com/picosh/send/send/auth"
-	wishrsync "github.com/picosh/send/send/rsync"
-	"github.com/picosh/send/send/scp"
-	"github.com/picosh/send/send/sftp"
+	"github.com/picosh/utils"
 )
 
 func authHandler(ctx ssh.Context, key ssh.PublicKey) bool {
@@ -58,9 +59,9 @@ func withProxy(cfg *shared.ConfigSite, handler *UploadHandler, cliHandler *CliHa
 }
 
 func StartSshServer() {
-	host := shared.GetEnv("PICO_HOST", "0.0.0.0")
-	port := shared.GetEnv("PICO_SSH_PORT", "2222")
-	promPort := shared.GetEnv("PICO_PROM_PORT", "9222")
+	host := utils.GetEnv("PICO_HOST", "0.0.0.0")
+	port := utils.GetEnv("PICO_SSH_PORT", "2222")
+	promPort := utils.GetEnv("PICO_PROM_PORT", "9222")
 	cfg := NewConfigSite()
 	logger := cfg.Logger
 	dbpool := postgres.NewDB(cfg.DbURL, cfg.Logger)

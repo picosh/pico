@@ -18,6 +18,7 @@ import (
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
+	"github.com/picosh/utils"
 )
 
 type Client struct {
@@ -647,13 +648,13 @@ type AuthCfg struct {
 }
 
 func StartApiServer() {
-	debug := shared.GetEnv("AUTH_DEBUG", "0")
+	debug := utils.GetEnv("AUTH_DEBUG", "0")
 	cfg := &AuthCfg{
-		DbURL:  shared.GetEnv("DATABASE_URL", ""),
+		DbURL:  utils.GetEnv("DATABASE_URL", ""),
 		Debug:  debug == "1",
-		Issuer: shared.GetEnv("AUTH_ISSUER", "pico.sh"),
-		Domain: shared.GetEnv("AUTH_DOMAIN", "http://0.0.0.0:3000"),
-		Port:   shared.GetEnv("AUTH_WEB_PORT", "3000"),
+		Issuer: utils.GetEnv("AUTH_ISSUER", "pico.sh"),
+		Domain: utils.GetEnv("AUTH_DOMAIN", "http://0.0.0.0:3000"),
+		Port:   utils.GetEnv("AUTH_WEB_PORT", "3000"),
 	}
 
 	logger := shared.CreateLogger("auth")

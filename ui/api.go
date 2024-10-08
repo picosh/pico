@@ -12,6 +12,7 @@ import (
 	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared"
+	"github.com/picosh/utils"
 )
 
 type registerPayload struct {
@@ -35,13 +36,7 @@ func registerUser(apiConfig *shared.ApiConfig, ctx ssh.Context, pubkey ssh.Publi
 		body, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(body, &payload)
 
-		pubkeyStr, err := shared.KeyForKeyText(pubkey)
-		if err != nil {
-			errMsg := fmt.Sprintf("could not get pubkey text: %s", err.Error())
-			logger.Error("could not get pubkey text", "err", err.Error())
-			shared.JSONError(w, errMsg, http.StatusUnprocessableEntity)
-			return
-		}
+		pubkeyStr := utils.KeyForKeyText(pubkey)
 
 		user, err := dbpool.RegisterUser(payload.Name, pubkeyStr, "")
 		if err != nil {
@@ -130,7 +125,7 @@ func toFingerprint(pubkey string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return shared.KeyForSha256(kk), nil
+	return utils.KeyForSha256(kk), nil
 }
 
 func getPublicKeys(httpCtx *shared.ApiConfig, ctx ssh.Context) http.HandlerFunc {
@@ -636,8 +631,8 @@ func getAnalytics(apiConfig *shared.ApiConfig, ctx ssh.Context, sumtype, bytype,
 			by = "post_id"
 		}
 
-		year := &db.SummaryOpts{FkID: fkID, By: by, Interval: "month", Origin: shared.StartOfYear(), Where: where}
-		month := &db.SummaryOpts{FkID: fkID, By: by, Interval: "day", Origin: shared.StartOfMonth(), Where: where}
+		year := &db.SummaryOpts{FkID: fkID, By: by, Interval: "month", Origin: utils.StartOfYear(), Where: where}
+		month := &db.SummaryOpts{FkID: fkID, By: by, Interval: "day", Origin: utils.StartOfMonth(), Where: where}
 
 		opts := year
 		if sumtype == "month" {

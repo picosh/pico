@@ -8,8 +8,8 @@ import (
 	input "github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/picosh/pico/db"
-	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/tui/common"
+	"github.com/picosh/utils"
 )
 
 type state int
@@ -200,7 +200,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // View renders current view from the model.
 func (m Model) View() string {
 	s := common.LogoView() + "\n\n"
-	pubkey := fmt.Sprintf("pubkey: %s", shared.KeyForSha256(m.shared.Session.PublicKey()))
+	pubkey := fmt.Sprintf("pubkey: %s", utils.KeyForSha256(m.shared.Session.PublicKey()))
 	s += m.shared.Styles.Label.SetString(pubkey).String()
 	s += "\n\n" + m.input.View() + "\n\n"
 
@@ -228,10 +228,7 @@ func (m *Model) createAccount() tea.Cmd {
 			return NameInvalidMsg{}
 		}
 
-		key, err := shared.KeyForKeyText(m.shared.Session.PublicKey())
-		if err != nil {
-			return errMsg{err}
-		}
+		key := utils.KeyForKeyText(m.shared.Session.PublicKey())
 
 		user, err := m.shared.Dbpool.RegisterUser(m.newName, key, "")
 		if err != nil {

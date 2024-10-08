@@ -15,7 +15,8 @@ import (
 	"github.com/picosh/pico/filehandlers/util"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
-	"github.com/picosh/send/send/utils"
+	sendutils "github.com/picosh/send/utils"
+	"github.com/picosh/utils"
 )
 
 type PostMetaData struct {
@@ -23,7 +24,7 @@ type PostMetaData struct {
 	Cur       *db.Post
 	Tags      []string
 	User      *db.User
-	FileEntry *utils.FileEntry
+	FileEntry *sendutils.FileEntry
 	Aliases   []string
 }
 
@@ -46,7 +47,7 @@ func NewScpPostHandler(dbpool db.DB, cfg *shared.ConfigSite, hooks ScpFileHooks,
 	}
 }
 
-func (h *ScpUploadHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileInfo, utils.ReaderAtCloser, error) {
+func (h *ScpUploadHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os.FileInfo, sendutils.ReaderAtCloser, error) {
 	user, err := util.GetUser(s.Context())
 	if err != nil {
 		return nil, nil, err
@@ -62,19 +63,19 @@ func (h *ScpUploadHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileI
 		return nil, nil, err
 	}
 
-	fileInfo := &utils.VirtualFile{
+	fileInfo := &sendutils.VirtualFile{
 		FName:    post.Filename,
 		FIsDir:   false,
 		FSize:    int64(post.FileSize),
 		FModTime: *post.UpdatedAt,
 	}
 
-	reader := utils.NopReaderAtCloser(strings.NewReader(post.Text))
+	reader := sendutils.NopReaderAtCloser(strings.NewReader(post.Text))
 
 	return fileInfo, reader, nil
 }
 
-func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string, error) {
+func (h *ScpUploadHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (string, error) {
 	logger := h.Cfg.Logger
 	user, err := util.GetUser(s.Context())
 	if err != nil {
@@ -106,9 +107,9 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 	}
 
 	now := time.Now()
-	slug := shared.SanitizeFileExt(filename)
+	slug := utils.SanitizeFileExt(filename)
 	fileSize := binary.Size(origText)
-	shasum := shared.Shasum(origText)
+	shasum := utils.Shasum(origText)
 
 	nextPost := db.Post{
 		Filename:  filename,
@@ -261,7 +262,7 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string,
 	return h.Cfg.FullPostURL(curl, user.Name, metadata.Slug), nil
 }
 
-func (h *ScpUploadHandler) Delete(s ssh.Session, entry *utils.FileEntry) error {
+func (h *ScpUploadHandler) Delete(s ssh.Session, entry *sendutils.FileEntry) error {
 	logger := h.Cfg.Logger
 	user, err := util.GetUser(s.Context())
 	if err != nil {

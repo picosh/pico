@@ -22,7 +22,8 @@ import (
 	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pobj"
 	sst "github.com/picosh/pobj/storage"
-	"github.com/picosh/send/send/utils"
+	sendutils "github.com/picosh/send/utils"
+	"github.com/picosh/utils"
 	ignore "github.com/sabhiram/go-gitignore"
 )
 
@@ -91,7 +92,7 @@ func shouldIgnoreFile(fp, ignoreStr string) bool {
 }
 
 type FileData struct {
-	*utils.FileEntry
+	*sendutils.FileEntry
 	User     *db.User
 	Bucket   sst.Bucket
 	Project  *db.Project
@@ -116,13 +117,13 @@ func (h *UploadAssetHandler) GetLogger() *slog.Logger {
 	return h.Cfg.Logger
 }
 
-func (h *UploadAssetHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileInfo, utils.ReaderAtCloser, error) {
+func (h *UploadAssetHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os.FileInfo, sendutils.ReaderAtCloser, error) {
 	user, err := futil.GetUser(s.Context())
 	if err != nil {
 		return nil, nil, err
 	}
 
-	fileInfo := &utils.VirtualFile{
+	fileInfo := &sendutils.VirtualFile{
 		FName:    filepath.Base(entry.Filepath),
 		FIsDir:   false,
 		FSize:    entry.Size,
@@ -170,7 +171,7 @@ func (h *UploadAssetHandler) List(s ssh.Session, fpath string, isDir bool, recur
 			name = "/"
 		}
 
-		info := &utils.VirtualFile{
+		info := &sendutils.VirtualFile{
 			FName:  name,
 			FIsDir: true,
 		}
@@ -243,7 +244,7 @@ func (h *UploadAssetHandler) findDenylist(bucket sst.Bucket, project *db.Project
 	return str, nil
 }
 
-func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (string, error) {
+func (h *UploadAssetHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (string, error) {
 	user, err := futil.GetUser(s.Context())
 	if err != nil {
 		h.Cfg.Logger.Error("user not found in ctx", "err", err.Error())
@@ -365,7 +366,7 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 	)
 
 	fsize, err := h.writeAsset(
-		shared.NewMaxBytesReader(data.Reader, int64(sizeRemaining)),
+		utils.NewMaxBytesReader(data.Reader, int64(sizeRemaining)),
 		data,
 	)
 	if err != nil {
@@ -373,9 +374,9 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 		cerr := fmt.Errorf(
 			"%s: storage size %.2fmb, storage max %.2fmb, file max %.2fmb",
 			err,
-			shared.BytesToMB(int(curStorageSize)),
-			shared.BytesToMB(int(storageMax)),
-			shared.BytesToMB(int(fileMax)),
+			utils.BytesToMB(int(curStorageSize)),
+			utils.BytesToMB(int(storageMax)),
+			utils.BytesToMB(int(fileMax)),
 		)
 		return "", cerr
 	}
@@ -393,15 +394,15 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *utils.FileEntry) (strin
 	str := fmt.Sprintf(
 		"%s (space: %.2f/%.2fGB, %.2f%%)",
 		url,
-		shared.BytesToGB(int(nextStorageSize)),
-		shared.BytesToGB(maxSize),
+		utils.BytesToGB(int(nextStorageSize)),
+		utils.BytesToGB(maxSize),
 		(float32(nextStorageSize)/float32(maxSize))*100,
 	)
 
 	return str, nil
 }
 
-func (h *UploadAssetHandler) Delete(s ssh.Session, entry *utils.FileEntry) error {
+func (h *UploadAssetHandler) Delete(s ssh.Session, entry *sendutils.FileEntry) error {
 	user, err := futil.GetUser(s.Context())
 	if err != nil {
 		h.Cfg.Logger.Error("user not found in ctx", "err", err.Error())

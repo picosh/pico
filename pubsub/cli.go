@@ -17,7 +17,7 @@ import (
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared"
 	psub "github.com/picosh/pubsub"
-	"github.com/picosh/send/send/utils"
+	"github.com/picosh/send/utils"
 )
 
 func flagSet(cmdName string, sesh ssh.Session) *flag.FlagSet {
@@ -48,7 +48,7 @@ func NewTabWriter(out io.Writer) *tabwriter.Writer {
 
 func getUser(s ssh.Session, dbpool db.DB) (*db.User, error) {
 	var err error
-	key, err := shared.KeyText(s)
+	key, err := utils.KeyText(s)
 	if err != nil {
 		return nil, fmt.Errorf("key not found")
 	}

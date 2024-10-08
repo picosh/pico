@@ -20,6 +20,7 @@ import (
 	"github.com/picosh/pico/imgs"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
+	"github.com/picosh/utils"
 )
 
 type PageData struct {
@@ -260,10 +261,10 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 		p := PostItemData{
 			URL:            template.URL(cfg.FullPostURL(curl, post.Username, post.Slug)),
 			BlogURL:        template.URL(cfg.FullBlogURL(curl, post.Username)),
-			Title:          shared.FilenameToTitle(post.Filename, post.Title),
+			Title:          utils.FilenameToTitle(post.Filename, post.Title),
 			PublishAt:      post.PublishAt.Format(time.DateOnly),
 			PublishAtISO:   post.PublishAt.Format(time.RFC3339),
-			UpdatedTimeAgo: shared.TimeAgo(post.UpdatedAt),
+			UpdatedTimeAgo: utils.TimeAgo(post.UpdatedAt),
 			UpdatedAtISO:   post.UpdatedAt.Format(time.RFC3339),
 		}
 		postCollection = append(postCollection, p)
@@ -446,7 +447,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			URL:          template.URL(cfg.FullPostURL(curl, post.Username, post.Slug)),
 			BlogURL:      template.URL(cfg.FullBlogURL(curl, username)),
 			Description:  post.Description,
-			Title:        shared.FilenameToTitle(post.Filename, post.Title),
+			Title:        utils.FilenameToTitle(post.Filename, post.Title),
 			Slug:         post.Slug,
 			PublishAt:    post.PublishAt.Format(time.DateOnly),
 			PublishAtISO: post.PublishAt.Format(time.RFC3339),
@@ -595,12 +596,12 @@ func readHandler(w http.ResponseWriter, r *http.Request) {
 		item := PostItemData{
 			URL:            template.URL(cfg.FullPostURL(curl, post.Username, post.Slug)),
 			BlogURL:        template.URL(cfg.FullBlogURL(curl, post.Username)),
-			Title:          shared.FilenameToTitle(post.Filename, post.Title),
+			Title:          utils.FilenameToTitle(post.Filename, post.Title),
 			Description:    post.Description,
 			Username:       post.Username,
 			PublishAt:      post.PublishAt.Format(time.DateOnly),
 			PublishAtISO:   post.PublishAt.Format(time.RFC3339),
-			UpdatedTimeAgo: shared.TimeAgo(post.UpdatedAt),
+			UpdatedTimeAgo: utils.TimeAgo(post.UpdatedAt),
 			UpdatedAtISO:   post.UpdatedAt.Format(time.RFC3339),
 		}
 		data.Posts = append(data.Posts, item)
@@ -725,7 +726,7 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 
 		item := &feeds.Item{
 			Id:          feedId,
-			Title:       shared.FilenameToTitle(post.Filename, post.Title),
+			Title:       utils.FilenameToTitle(post.Filename, post.Title),
 			Link:        &feeds.Link{Href: realUrl},
 			Content:     tpl.String(),
 			Updated:     *post.UpdatedAt,

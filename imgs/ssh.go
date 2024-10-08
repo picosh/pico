@@ -27,6 +27,7 @@ import (
 	"github.com/picosh/pico/shared/storage"
 	psub "github.com/picosh/pubsub"
 	"github.com/picosh/tunkit"
+	"github.com/picosh/utils"
 )
 
 type ctxUserKey struct{}
@@ -44,11 +45,7 @@ func setUserCtx(ctx ssh.Context, user *db.User) {
 
 func AuthHandler(dbh db.DB, log *slog.Logger) func(ssh.Context, ssh.PublicKey) bool {
 	return func(ctx ssh.Context, key ssh.PublicKey) bool {
-		kk, err := shared.KeyForKeyText(key)
-		if err != nil {
-			log.Error("cannot get pubkey", "err", err)
-			return false
-		}
+		kk := utils.KeyForKeyText(key)
 
 		user, err := dbh.FindUserForKey("", kk)
 		if err != nil {
@@ -263,10 +260,10 @@ func StartSshServer() {
 		port = "2222"
 	}
 	dbUrl := os.Getenv("DATABASE_URL")
-	registryUrl := shared.GetEnv("REGISTRY_URL", "0.0.0.0:5000")
-	minioUrl := shared.GetEnv("MINIO_URL", "http://0.0.0.0:9000")
-	minioUser := shared.GetEnv("MINIO_ROOT_USER", "")
-	minioPass := shared.GetEnv("MINIO_ROOT_PASSWORD", "")
+	registryUrl := utils.GetEnv("REGISTRY_URL", "0.0.0.0:5000")
+	minioUrl := utils.GetEnv("MINIO_URL", "http://0.0.0.0:9000")
+	minioUser := utils.GetEnv("MINIO_ROOT_USER", "")
+	minioPass := utils.GetEnv("MINIO_ROOT_PASSWORD", "")
 
 	logger := shared.CreateLogger("imgs")
 	logger.Info("bootup", "registry", registryUrl, "minio", minioUrl)

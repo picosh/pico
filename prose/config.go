@@ -2,21 +2,22 @@ package prose
 
 import (
 	"github.com/picosh/pico/shared"
+	"github.com/picosh/utils"
 )
 
 func NewConfigSite() *shared.ConfigSite {
-	debug := shared.GetEnv("PROSE_DEBUG", "0")
-	domain := shared.GetEnv("PROSE_DOMAIN", "prose.sh")
-	port := shared.GetEnv("PROSE_WEB_PORT", "3000")
-	protocol := shared.GetEnv("PROSE_PROTOCOL", "https")
-	storageDir := shared.GetEnv("IMGS_STORAGE_DIR", ".storage")
-	minioURL := shared.GetEnv("MINIO_URL", "")
-	minioUser := shared.GetEnv("MINIO_ROOT_USER", "")
-	minioPass := shared.GetEnv("MINIO_ROOT_PASSWORD", "")
-	dbURL := shared.GetEnv("DATABASE_URL", "")
-	maxSize := uint64(500 * shared.MB)
-	maxImgSize := int64(10 * shared.MB)
-	secret := shared.GetEnv("PICO_SECRET", "")
+	debug := utils.GetEnv("PROSE_DEBUG", "0")
+	domain := utils.GetEnv("PROSE_DOMAIN", "prose.sh")
+	port := utils.GetEnv("PROSE_WEB_PORT", "3000")
+	protocol := utils.GetEnv("PROSE_PROTOCOL", "https")
+	storageDir := utils.GetEnv("IMGS_STORAGE_DIR", ".storage")
+	minioURL := utils.GetEnv("MINIO_URL", "")
+	minioUser := utils.GetEnv("MINIO_ROOT_USER", "")
+	minioPass := utils.GetEnv("MINIO_ROOT_PASSWORD", "")
+	dbURL := utils.GetEnv("DATABASE_URL", "")
+	maxSize := uint64(500 * utils.MB)
+	maxImgSize := int64(10 * utils.MB)
+	secret := utils.GetEnv("PICO_SECRET", "")
 	if secret == "" {
 		panic("must provide PICO_SECRET environment variable")
 	}

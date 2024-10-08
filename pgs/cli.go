@@ -15,6 +15,7 @@ import (
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pico/tui/common"
+	"github.com/picosh/utils"
 )
 
 func projectTable(styles common.Styles, projects []*db.Project, width int) *table.Table {
@@ -117,7 +118,7 @@ func getHelpText(styles common.Styles, userName string, width int) string {
 
 type Cmd struct {
 	User    *db.User
-	Session shared.CmdSession
+	Session utils.CmdSession
 	Log     *slog.Logger
 	Store   storage.StorageServe
 	Dbpool  db.DB
@@ -209,7 +210,7 @@ func (c *Cmd) statsByProject(projectName string) error {
 		FkID:     project.ID,
 		By:       "project_id",
 		Interval: "day",
-		Origin:   shared.StartOfMonth(),
+		Origin:   utils.StartOfMonth(),
 	}
 
 	summary, err := c.Dbpool.VisitSummary(opts)
@@ -237,7 +238,7 @@ func (c *Cmd) statsSites() error {
 		FkID:     c.User.ID,
 		By:       "user_id",
 		Interval: "day",
-		Origin:   shared.StartOfMonth(),
+		Origin:   utils.StartOfMonth(),
 	}
 
 	summary, err := c.Dbpool.VisitSummary(opts)
@@ -325,8 +326,8 @@ func (c *Cmd) stats(cfgMaxSize uint64) error {
 
 	headers := []string{"Used (GB)", "Quota (GB)", "Used (%)", "Projects (#)"}
 	data := []string{
-		fmt.Sprintf("%.4f", shared.BytesToGB(int(totalFileSize))),
-		fmt.Sprintf("%.4f", shared.BytesToGB(int(storageMax))),
+		fmt.Sprintf("%.4f", utils.BytesToGB(int(totalFileSize))),
+		fmt.Sprintf("%.4f", utils.BytesToGB(int(storageMax))),
 		fmt.Sprintf("%.4f", (float32(totalFileSize)/float32(storageMax))*100),
 		fmt.Sprintf("%d", len(projects)),
 	}

@@ -16,7 +16,8 @@ import (
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/filehandlers/util"
 	"github.com/picosh/pico/shared"
-	"github.com/picosh/send/send/utils"
+	sendutils "github.com/picosh/send/utils"
+	"github.com/picosh/utils"
 )
 
 type UploadHandler struct {
@@ -31,7 +32,7 @@ func NewUploadHandler(dbpool db.DB, cfg *shared.ConfigSite) *UploadHandler {
 	}
 }
 
-func (h *UploadHandler) getAuthorizedKeyFile(user *db.User) (*utils.VirtualFile, string, error) {
+func (h *UploadHandler) getAuthorizedKeyFile(user *db.User) (*sendutils.VirtualFile, string, error) {
 	keys, err := h.DBPool.FindKeysForUser(user)
 	text := ""
 	var modTime time.Time
@@ -42,7 +43,7 @@ func (h *UploadHandler) getAuthorizedKeyFile(user *db.User) (*utils.VirtualFile,
 	if err != nil {
 		return nil, "", err
 	}
-	fileInfo := &utils.VirtualFile{
+	fileInfo := &sendutils.VirtualFile{
 		FName:    "authorized_keys",
 		FIsDir:   false,
 		FSize:    int64(len(text)),
@@ -51,11 +52,11 @@ func (h *UploadHandler) getAuthorizedKeyFile(user *db.User) (*utils.VirtualFile,
 	return fileInfo, text, nil
 }
 
-func (h *UploadHandler) Delete(s ssh.Session, entry *utils.FileEntry) error {
+func (h *UploadHandler) Delete(s ssh.Session, entry *sendutils.FileEntry) error {
 	return errors.New("unsupported")
 }
 
-func (h *UploadHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileInfo, utils.ReaderAtCloser, error) {
+func (h *UploadHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os.FileInfo, sendutils.ReaderAtCloser, error) {
 	user, err := util.GetUser(s.Context())
 	if err != nil {
 		return nil, nil, err
@@ -71,7 +72,7 @@ func (h *UploadHandler) Read(s ssh.Session, entry *utils.FileEntry) (os.FileInfo
 		if err != nil {
 			return nil, nil, err
 		}
-		reader := utils.NopReaderAtCloser(strings.NewReader(text))
+		reader := sendutils.NopReaderAtCloser(strings.NewReader(text))
 		return fileInfo, reader, nil
 	}
 
@@ -92,7 +93,7 @@ func (h *UploadHandler) List(s ssh.Session, fpath string, isDir bool, recursive 
 			name = "/"
 		}
 
-		fileList = append(fileList, &utils.VirtualFile{
+		fileList = append(fileList, &sendutils.VirtualFile{
 			FName:  name,
 			FIsDir: true,
 		})
@@ -121,7 +122,7 @@ func (h *UploadHandler) GetLogger() *slog.Logger {
 
 func (h *UploadHandler) Validate(s ssh.Session) error {
 	var err error
-	key, err := utils.KeyText(s)
+	key, err := sendutils.KeyText(s)
 	if err != nil {
 		return fmt.Errorf("key not found")
 	}
@@ -231,10 +232,7 @@ func (h *UploadHandler) ProcessAuthorizedKeys(text []byte, logger *slog.Logger, 
 	diff := authorizedKeysDiff(s.PublicKey(), curKeys, nextKeys)
 
 	for _, pk := range diff.Add {
-		key, err := shared.KeyForKeyText(pk.Pk)
-		if err != nil {
-			continue
-		}
+		key := utils.KeyForKeyText(pk.Pk)
 
 		wish.Errorf(s, "adding pubkey (%s)\n", key)
 		logger.Info("adding pubkey", "pubkey", key)
@@ -247,10 +245,7 @@ func (h *UploadHandler) ProcessAuthorizedKeys(text []byte, logger *slog.Logger, 
 	}
 
 	for _, pk := range diff.Update {
-		key, err := shared.KeyForKeyText(pk.Pk)
-		if err != nil {
-			continue
-		}
+		key := utils.KeyForKeyText(pk.Pk)
 
 		wish.Errorf(s, "updating pubkey with comment: %s (%s)\n", pk.Comment, key)
 		logger.Info(
@@ -280,7 +275,7 @@ func (h *UploadHandler) ProcessAuthorizedKeys(text []byte, logger *slog.Logger, 
 	return nil
 }
 
-func (h *UploadHandler) Write(s ssh.Session, entry *utils.FileEntry) (string, error) {
+func (h *UploadHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (string, error) {
 	logger := h.Cfg.Logger
 	user, err := util.GetUser(s.Context())
 	if err != nil {

@@ -6,7 +6,7 @@ import (
 
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
-	"github.com/picosh/pico/shared"
+	"github.com/picosh/utils"
 )
 
 func main() {
@@ -23,7 +23,7 @@ func main() {
 			// By:   "post_id",
 			By:       "user_id",
 			Interval: "day",
-			Origin:   shared.StartOfMonth(),
+			Origin:   utils.StartOfMonth(),
 			// Where:    "AND (post_id IS NOT NULL OR (post_id IS NULL AND project_id IS NULL))",
 		},
 	)

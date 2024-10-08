@@ -11,6 +11,9 @@ import (
 	"strings"
 
 	"github.com/picosh/pico/db"
+	"github.com/picosh/utils"
+
+	pipeLogger "github.com/picosh/pubsub/log"
 )
 
 var DefaultEmail = "hello@pico.sh"
@@ -274,8 +277,15 @@ func CreateLogger(space string) *slog.Logger {
 
 	newLogger := log
 
-	if strings.ToLower(GetEnv("PICO_SENDLOG_ENABLED", "true")) == "true" {
-		newLog, err := SendLogRegister(log, 100)
+	if strings.ToLower(utils.GetEnv("PICO_PIPE_ENABLED", "true")) == "true" {
+		newLog, err := pipeLogger.SendLogRegister(log, &pipeLogger.PubSubConnectionInfo{
+			RemoteHost:     utils.GetEnv("PICO_PIPE_ENDPOINT", "pipe.pico.sh:22"),
+			KeyLocation:    utils.GetEnv("PICO_PIPE_KEY", "ssh_data/term_info_ed25519"),
+			KeyPassphrase:  utils.GetEnv("PICO_PIPE_PASSPHRASE", ""),
+			RemoteHostname: utils.GetEnv("PICO_PIPE_REMOTE_HOST", "pipe.pico.sh"),
+			RemoteUser:     utils.GetEnv("PICO_PIPE_USER", "pico"),
+		}, 100)
+
 		if err == nil {
 			newLogger = newLog
 		} else {

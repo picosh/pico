@@ -6,6 +6,7 @@ import (
 	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared"
+	"github.com/picosh/utils"
 )
 
 type SshAuthHandler struct {
@@ -25,10 +26,7 @@ func NewSshAuthHandler(dbpool db.DB, logger *slog.Logger, cfg *shared.ConfigSite
 func (r *SshAuthHandler) PubkeyAuthHandler(ctx ssh.Context, key ssh.PublicKey) bool {
 	shared.SetPublicKeyCtx(ctx, key)
 
-	pubkey, err := shared.KeyForKeyText(key)
-	if err != nil {
-		return false
-	}
+	pubkey := utils.KeyForKeyText(key)
 
 	user, err := r.DBPool.FindUserForKey(ctx.User(), pubkey)
 	if err != nil {

@@ -10,6 +10,7 @@ import (
 
 	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
+	"github.com/picosh/utils"
 )
 
 func CorsHeaders(headers http.Header) {
@@ -43,7 +44,7 @@ type UserApi struct {
 func NewUserApi(user *db.User, pubkey ssh.PublicKey) *UserApi {
 	return &UserApi{
 		User:        user,
-		Fingerprint: KeyForSha256(pubkey),
+		Fingerprint: utils.KeyForSha256(pubkey),
 	}
 }
 

@@ -7,9 +7,9 @@ import (
 	input "github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/picosh/pico/db"
-	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/tui/common"
 	"github.com/picosh/pico/tui/pages"
+	"github.com/picosh/utils"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -239,10 +239,8 @@ func (m *Model) addPublicKey() tea.Cmd {
 			return KeyInvalidMsg{}
 		}
 
-		key, err := shared.KeyForKeyText(pk)
-		if err != nil {
-			return KeyInvalidMsg{}
-		}
+		key := utils.KeyForKeyText(pk)
+
 		err = m.shared.Dbpool.InsertPublicKey(m.shared.User.ID, key, comment, nil)
 		if err != nil {
 			if errors.Is(err, db.ErrPublicKeyTaken) {

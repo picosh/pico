@@ -2,18 +2,19 @@ package imgs
 
 import (
 	"github.com/picosh/pico/shared"
+	"github.com/picosh/utils"
 )
 
 func NewConfigSite() *shared.ConfigSite {
-	debug := shared.GetEnv("IMGS_DEBUG", "0")
-	domain := shared.GetEnv("IMGS_DOMAIN", "prose.sh")
-	port := shared.GetEnv("IMGS_WEB_PORT", "3000")
-	protocol := shared.GetEnv("IMGS_PROTOCOL", "https")
-	storageDir := shared.GetEnv("IMGS_STORAGE_DIR", ".storage")
-	minioURL := shared.GetEnv("MINIO_URL", "")
-	minioUser := shared.GetEnv("MINIO_ROOT_USER", "")
-	minioPass := shared.GetEnv("MINIO_ROOT_PASSWORD", "")
-	dbURL := shared.GetEnv("DATABASE_URL", "")
+	debug := utils.GetEnv("IMGS_DEBUG", "0")
+	domain := utils.GetEnv("IMGS_DOMAIN", "prose.sh")
+	port := utils.GetEnv("IMGS_WEB_PORT", "3000")
+	protocol := utils.GetEnv("IMGS_PROTOCOL", "https")
+	storageDir := utils.GetEnv("IMGS_STORAGE_DIR", ".storage")
+	minioURL := utils.GetEnv("MINIO_URL", "")
+	minioUser := utils.GetEnv("MINIO_ROOT_USER", "")
+	minioPass := utils.GetEnv("MINIO_ROOT_PASSWORD", "")
+	dbURL := utils.GetEnv("DATABASE_URL", "")
 
 	cfg := shared.ConfigSite{
 		Debug:      debug == "1",

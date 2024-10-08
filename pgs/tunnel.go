@@ -10,6 +10,7 @@ import (
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/ui"
+	"github.com/picosh/utils"
 )
 
 func allowPerm(proj *db.Project) bool {
@@ -42,11 +43,9 @@ func createHttpHandler(apiConfig *shared.ApiConfig) CtxHttpBridge {
 			log.Error(err.Error(), "subdomain", subdomain)
 			return http.HandlerFunc(shared.UnauthorizedHandler)
 		}
-		pubkeyStr, err := shared.KeyForKeyText(pubkey)
-		if err != nil {
-			log.Error(err.Error())
-			return http.HandlerFunc(shared.UnauthorizedHandler)
-		}
+
+		pubkeyStr := utils.KeyForKeyText(pubkey)
+
 		log = log.With(
 			"pubkey", pubkeyStr,
 		)

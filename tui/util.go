@@ -2,10 +2,11 @@ package tui
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/picosh/pico/db"
-	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/tui/common"
+	"github.com/picosh/utils"
 )
 
 func findUser(shrd common.SharedModel) (*db.User, error) {
@@ -13,12 +14,13 @@ func findUser(shrd common.SharedModel) (*db.User, error) {
 	var user *db.User
 	usr := shrd.Session.User()
 
-	key, err := shared.KeyForKeyText(shrd.Session.PublicKey())
-	if err != nil {
-		return nil, err
+	if shrd.Session.PublicKey() == nil {
+		return nil, fmt.Errorf("unable to find public key")
 	}
 
-	user, err = shrd.Dbpool.FindUserForKey(usr, key)
+	key := utils.KeyForKeyText(shrd.Session.PublicKey())
+
+	user, err := shrd.Dbpool.FindUserForKey(usr, key)
 	if err != nil {
 		logger.Error("no user found for public key", "err", err.Error())
 		// we only want to throw an error for specific cases

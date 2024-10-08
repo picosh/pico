@@ -14,16 +14,16 @@ import (
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/filehandlers"
 	"github.com/picosh/pico/filehandlers/util"
-	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
 	wsh "github.com/picosh/pico/wish"
+	"github.com/picosh/send/auth"
 	"github.com/picosh/send/list"
 	"github.com/picosh/send/pipe"
+	wishrsync "github.com/picosh/send/protocols/rsync"
+	"github.com/picosh/send/protocols/scp"
+	"github.com/picosh/send/protocols/sftp"
 	"github.com/picosh/send/proxy"
-	"github.com/picosh/send/send/auth"
-	wishrsync "github.com/picosh/send/send/rsync"
-	"github.com/picosh/send/send/scp"
-	"github.com/picosh/send/send/sftp"
+	"github.com/picosh/utils"
 )
 
 func createRouter(handler *filehandlers.FileHandlerRouter) proxy.Router {
@@ -52,9 +52,9 @@ func withProxy(handler *filehandlers.FileHandlerRouter, otherMiddleware ...wish.
 }
 
 func StartSshServer() {
-	host := shared.GetEnv("LISTS_HOST", "0.0.0.0")
-	port := shared.GetEnv("LISTS_SSH_PORT", "2222")
-	promPort := shared.GetEnv("LISTS_PROM_PORT", "9222")
+	host := utils.GetEnv("LISTS_HOST", "0.0.0.0")
+	port := utils.GetEnv("LISTS_SSH_PORT", "2222")
+	promPort := utils.GetEnv("LISTS_PROM_PORT", "9222")
 	cfg := NewConfigSite()
 	logger := cfg.Logger
 	dbh := postgres.NewDB(cfg.DbURL, cfg.Logger)
