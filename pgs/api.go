@@ -36,6 +36,7 @@ type AssetHandler struct {
 	Bucket         sst.Bucket
 	ImgProcessOpts *storage.ImgProcessOpts
 	ProjectID      string
+	HasPicoPlus    bool
 }
 
 func checkHandler(w http.ResponseWriter, r *http.Request) {
@@ -212,6 +213,17 @@ func (h *AssetHandler) handle(logger *slog.Logger, w http.ResponseWriter, r *htt
 			http.Redirect(w, r, fp.Filepath, fp.Status)
 			return
 		} else if hasProtocol(fp.Filepath) {
+			if !h.HasPicoPlus {
+				msg := "must be pico+ user to fetch content from external source"
+				logger.Error(
+					msg,
+					"destination", fp.Filepath,
+					"status", fp.Status,
+				)
+				http.Error(w, msg, http.StatusUnauthorized)
+				return
+			}
+
 			logger.Info(
 				"fetching content from external service",
 				"destination", fp.Filepath,
@@ -452,6 +464,8 @@ func ServeAsset(fname string, opts *storage.ImgProcessOpts, fromImgs bool, hasPe
 		return
 	}
 
+	hasPicoPlus := dbpool.HasFeatureForUser(user.ID, "plus")
+
 	asset := &AssetHandler{
 		Username:       props.Username,
 		UserID:         user.ID,
@@ -465,6 +479,7 @@ func ServeAsset(fname string, opts *storage.ImgProcessOpts, fromImgs bool, hasPe
 		Bucket:         bucket,
 		ImgProcessOpts: opts,
 		ProjectID:      projectID,
+		HasPicoPlus:    hasPicoPlus,
 	}
 
 	asset.handle(logger, w, r)
