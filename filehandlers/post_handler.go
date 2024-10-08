@@ -12,7 +12,6 @@ import (
 
 	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
-	"github.com/picosh/pico/filehandlers/util"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
 	sendutils "github.com/picosh/send/utils"
@@ -48,7 +47,7 @@ func NewScpPostHandler(dbpool db.DB, cfg *shared.ConfigSite, hooks ScpFileHooks,
 }
 
 func (h *ScpUploadHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os.FileInfo, sendutils.ReaderAtCloser, error) {
-	user, err := util.GetUser(s.Context())
+	user, err := shared.GetUser(s.Context())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -77,7 +76,7 @@ func (h *ScpUploadHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os.F
 
 func (h *ScpUploadHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (string, error) {
 	logger := h.Cfg.Logger
-	user, err := util.GetUser(s.Context())
+	user, err := shared.GetUser(s.Context())
 	if err != nil {
 		logger.Error("error getting user from ctx", "err", err.Error())
 		return "", err
@@ -264,7 +263,7 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (str
 
 func (h *ScpUploadHandler) Delete(s ssh.Session, entry *sendutils.FileEntry) error {
 	logger := h.Cfg.Logger
-	user, err := util.GetUser(s.Context())
+	user, err := shared.GetUser(s.Context())
 	if err != nil {
 		logger.Error("could not get user from ctx", "err", err.Error())
 		return err

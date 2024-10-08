@@ -12,7 +12,7 @@ import (
 	"github.com/charmbracelet/promwish"
 	"github.com/charmbracelet/wish"
 	"github.com/picosh/pico/db/postgres"
-	"github.com/picosh/pico/filehandlers/util"
+	"github.com/picosh/pico/shared"
 	wsh "github.com/picosh/pico/wish"
 	psub "github.com/picosh/pubsub"
 	"github.com/picosh/utils"
@@ -40,7 +40,7 @@ func StartSshServer() {
 		Waiters: syncmap.New[string, []string](),
 	}
 
-	sshAuth := util.NewSshAuthHandler(dbh, logger, cfg)
+	sshAuth := shared.NewSshAuthHandler(dbh, logger, cfg)
 	s, err := wish.NewServer(
 		wish.WithAddress(fmt.Sprintf("%s:%s", host, port)),
 		wish.WithHostKeyPath("ssh_data/term_info_ed25519"),
