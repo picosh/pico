@@ -29,7 +29,8 @@
       user-defined topics.  By default, topics are private to the authenticated
       ssh user.  The default pubsub model is multicast with bidirectional
       blocking, meaning a publisher (<code>pub</code>) will send its message to all
-      subscribers (<code>sub</code>) on a topic.  Further, both <code>pub</code> and
+      subscribers (<code>sub</code>) for a topic (channels).  There can be many publishers
+      and many subscribers on a topic. Further, both <code>pub</code> and
       <code>sub</code> will wait for at least one event to be sent or received on the topic.
     </p>
 
@@ -46,9 +47,9 @@
       <li>Configurable blocking for both pubs and subs</li>
       <li>Paradigms for connecting to a topic:
         <ol>
-          <li>Read (sub)</li>
-          <li>Write (pub)</li>
-          <li>Read & Write (pipe)</li>
+          <li>Read (<code>sub</code>)</li>
+          <li>Write (<code>pub</code>)</li>
+          <li>Read & Write (<code>pipe</code>)</li>
         </ol>
       </li>
     </ol>
@@ -102,7 +103,14 @@
 
   <div>
     <h2 class="text-xl">Pipe command output</h2>
-    <p>Send command output through our <code>pipe</code> command.</p>
+    <p>
+      Send command output through our <code>pipe</code> command.  The
+      <code>pipe</code> command is just like <code>pub</code> except it
+      is non-blocking and also acts like a <code>sub</code>.  So a client
+      that can read and write to the topic.
+    </p>
+    <pre>ssh {{.Site.Domain}} sub htop</pre>
+    <pre>htop | ssh {{.Site.Domain}} pipe htop</pre>
 
     <details>
       <summary>Demo</summary>
@@ -122,7 +130,10 @@
     <h2 class="text-xl">Chat</h2>
     <p>Use our <code>pipe</code> command to have a chat with someone.</p>
     <pre>ssh {{.Site.Domain}} pipe mychan -p</pre>
-    <p>Now anyone with a <code>pico</code> account can subscribe to this channel using the same command.</p>
+    <p>
+      Now anyone with a <code>pico</code> account can subscribe to this
+      topic using the same command and start typing!
+    </p>
 
     <details>
       <summary>Demo</summary>
@@ -141,6 +152,8 @@
   <div>
     <h2 class="text-xl">Pipe reverse shell</h2>
     <p>If you squint hard enough you can give users interactive access to your shell.</p>
+    <pre>mkfifo /tmp/f; cat /tmp/f | /bin/sh -i 2>&1 | ssh {{.Site.Domain}} pipe myshell > /tmp/f</pre>
+    <pre>ssh {{.Site.Domain}} pipe myshell</pre>
 
     <details>
       <summary>Demo</summary>
@@ -158,6 +171,11 @@
 
   <div>
     <h2 class="text-xl">Simple CI/CD</h2>
+    <p>
+      I'm always looking for easy ways to simplify deploying apps
+      automatically.  Having an authenticated, zero-install event system
+      seems handy for this purpose.
+    </p>
     <pre>ssh {{.Site.Domain}} sub myimg; docker pull myimg && docker up -d dev</pre>
     <pre>docker buildx build --push -t myimg .; ssh {{.Site.Domain}} pub myimg -e</pre>
   </div>
@@ -166,6 +184,13 @@
     <h2 class="text-xl">Pubsub interactions</h2>
 
     <h3 class="text-lg">Multiple subs</h3>
+    <p>
+      Have many subscribers, they will all receive the message.
+    </p>
+    <pre>ssh {{.Site.Domain}} sub foobar</pre>
+    <pre>ssh {{.Site.Domain}} sub foobar</pre>
+    <pre>while true; do echo "foobar1"; sleep 1; done | ssh {{.Site.Domain}} pub foobar</pre>
+
     <details>
       <summary>Demo</summary>
       <script
@@ -180,6 +205,11 @@
     </details>
 
     <h3 class="text-lg">Multiple pubs</h3>
+    <p>Have many publishers send messages to subscribers.</p>
+    <pre>while true; do echo "foobar1"; sleep 1; done | ssh {{.Site.Domain}} pub foobar</pre>
+    <pre>while true; do echo "foobar2"; sleep 1; done | ssh {{.Site.Domain}} pub foobar</pre>
+    <pre>ssh {{.Site.Domain}} sub foobar</pre>
+
     <details>
       <summary>Demo</summary>
       <script
@@ -194,6 +224,12 @@
     </details>
 
     <h3 class="text-lg">Multiple pubs and subs</h3>
+    <p>Have many publishers send messages to many subscribers.</p>
+    <pre>ssh {{.Site.Domain}} sub foobar</pre>
+    <pre>ssh {{.Site.Domain}} sub foobar</pre>
+    <pre>while true; do echo "foobar1"; sleep 1; done | ssh {{.Site.Domain}} pub foobar</pre>
+    <pre>while true; do echo "foobar2"; sleep 1; done | ssh {{.Site.Domain}} pub foobar</pre>
+
     <details>
       <summary>Demo</summary>
       <script
@@ -211,7 +247,7 @@
   <div>
     <h2 class="text-xl">Send a public message</h2>
     <pre>echo "hello world!" | ssh {{.Site.Domain}} pub mychan -p</pre>
-    <p>Now anyone with a <code>pico</code> account can subscribe to this channel:</p>
+    <p>Now anyone with a <code>pico</code> account can subscribe to this topic:</p>
     <pre>ssh {{.Site.Domain}} sub mychan -p</pre>
   </div>
 

@@ -356,7 +356,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 			} else if cmd == "sub" {
 				subCmd := flagSet("sub", sesh)
 				public := subCmd.Bool("p", false, "Subscribe to a public topic")
-				keepAlive := subCmd.Bool("k", false, "Keep the subscription alive even after the publisher as died")
+				keepAlive := subCmd.Bool("k", false, "Keep the subscription alive even after the publisher has died")
 				if !flagCheck(subCmd, topic, cmdArgs) {
 					return
 				}
