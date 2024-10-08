@@ -15,12 +15,14 @@
 {{define "attrs"}}class="container-sm"{{end}}
 
 {{define "body"}}
-<header class="flex flex-col items-center gap">
-  <img src="https://pico.sh/logo.svg" alt="pico logo" width="50" height="50" />
+<header class="flex flex-col items-center gap-2">
+  <div class="flex flex-col">
+    <img src="https://pico.sh/logo.svg" alt="pico logo" width="50" height="50" />
+    <canvas id="canvas" width="50" height="50"></canvas>
+    <hr width="100%" class="m-0" />
+  </div>
   <h1 class="text-2xl font-bold text-center">Authenticated *nix pipes over ssh</h1>
 </header>
-
-<hr />
 
 <article class="flex flex-col gap-2">
   <div>
@@ -271,7 +273,7 @@
     <h2 class="text-xl">Latest posts</h2>
     <div class="flex items-center">
       <div class="mr font-italic">2024-10-06</div>
-      <div><a href="https://blog.pico.sh/pubsub">announcing pubsub service</a></div>
+      <div><a href="https://blog.pico.sh/pubsub">pipe: our pubsub ssh service</a></div>
     </div>
   </div>
 
