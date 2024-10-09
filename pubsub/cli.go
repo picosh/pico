@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"slices"
 	"strings"
 	"text/tabwriter"
 	"time"
 
+	"github.com/antoniomika/syncmap"
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
 	"github.com/google/uuid"
@@ -79,10 +81,10 @@ func clientInfo(clients []*psub.Client, clientType string) string {
 		return ""
 	}
 
-	outputData := fmt.Sprintf("\t%s:\r\n", clientType)
+	outputData := fmt.Sprintf("    %s:\r\n", clientType)
 
 	for _, client := range clients {
-		outputData += fmt.Sprintf("\t- %s\r\n", client.ID)
+		outputData += fmt.Sprintf("    - %s\r\n", client.ID)
 	}
 
 	return outputData
@@ -110,10 +112,11 @@ data is being sent:
 }
 
 type CliHandler struct {
-	DBPool db.DB
-	Logger *slog.Logger
-	PubSub psub.PubSub
-	Cfg    *shared.ConfigSite
+	DBPool  db.DB
+	Logger  *slog.Logger
+	PubSub  psub.PubSub
+	Cfg     *shared.ConfigSite
+	Waiters *syncmap.Map[string, []string]
 }
 
 func toSshCmd(cfg *shared.ConfigSite) string {
@@ -162,6 +165,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				}
 
 				var channels []*psub.Channel
+				waitingChannels := map[string][]string{}
 
 				for topic, channel := range pubsub.GetChannels() {
 					if strings.HasPrefix(topic, topicFilter) {
@@ -169,15 +173,21 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					}
 				}
 
-				if len(channels) == 0 {
+				for channel, clients := range handler.Waiters.Range {
+					if strings.HasPrefix(channel, topicFilter) {
+						waitingChannels[channel] = clients
+					}
+				}
+
+				if len(channels) == 0 && len(waitingChannels) == 0 {
 					wish.Println(sesh, "no pubsub channels found")
 				} else {
 					var outputData string
-					if len(channels) > 0 {
+					if len(channels) > 0 || len(waitingChannels) > 0 {
 						outputData += "Channel Information\r\n"
 						for _, channel := range channels {
 							outputData += fmt.Sprintf("- %s:\r\n", channel.Topic)
-							outputData += "\tClients:\r\n"
+							outputData += "  Clients:\r\n"
 
 							var pubs []*psub.Client
 							var subs []*psub.Client
@@ -195,6 +205,15 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 							outputData += clientInfo(pubs, "Pubs")
 							outputData += clientInfo(subs, "Subs")
 							outputData += clientInfo(pipes, "Pipes")
+						}
+
+						for waitingChannel, channelPubs := range waitingChannels {
+							outputData += fmt.Sprintf("- %s:\r\n", waitingChannel)
+							outputData += "  Clients:\r\n"
+							outputData += fmt.Sprintf("    %s:\r\n", "Waiting Pubs")
+							for _, client := range channelPubs {
+								outputData += fmt.Sprintf("    - %s\r\n", client)
+							}
 						}
 					}
 
@@ -219,6 +238,14 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				"topic", topic,
 				"cmdArgs", cmdArgs,
 			)
+
+			userName := user.Name
+
+			if user.PublicKey.Name != "" {
+				userName += fmt.Sprintf("-%s", user.PublicKey.Name)
+			}
+
+			clientID := fmt.Sprintf("%s (%s@%s)", uuid.NewString(), userName, sesh.RemoteAddr().String())
 
 			if cmd == "pub" {
 				pubCmd := flagSet("pub", sesh)
@@ -270,13 +297,11 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 
 				wish.Printf(
 					sesh,
-					"subscribe to this channel:\n\tssh %s sub %s%s\n",
+					"subscribe to this channel:\n  ssh %s sub %s%s\n",
 					toSshCmd(handler.Cfg),
 					msgFlag,
 					topic,
 				)
-
-				wish.Println(sesh, "sending msg ...")
 
 				var pubCtx context.Context = ctx
 
@@ -295,6 +320,9 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 
 					tt := *timeout
 					if count == 0 {
+						currentWaiters, _ := handler.Waiters.LoadOrStore(name, nil)
+						handler.Waiters.Store(name, append(currentWaiters, clientID))
+
 						termMsg := "no subs found ... waiting"
 						if tt > 0 {
 							termMsg += " " + tt.String()
@@ -335,16 +363,37 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 
 						select {
 						case <-ready:
+						case <-ctx.Done():
 						case <-time.After(tt):
 							cancelFunc()
 							wish.Fatalln(sesh, "timeout reached, exiting ...")
 						}
+
+						newWaiters, _ := handler.Waiters.LoadOrStore(name, nil)
+						newWaiters = slices.DeleteFunc(newWaiters, func(cl string) bool {
+							return cl == clientID
+						})
+						handler.Waiters.Store(name, newWaiters)
+
+						var toDelete []string
+
+						for channel, clients := range handler.Waiters.Range {
+							if len(clients) == 0 {
+								toDelete = append(toDelete, channel)
+							}
+						}
+
+						for _, channel := range toDelete {
+							handler.Waiters.Delete(channel)
+						}
 					}
 				}
 
+				wish.Println(sesh, "sending msg ...")
+
 				err = pubsub.Pub(
 					pubCtx,
-					fmt.Sprintf("%s (%s@%s)", uuid.NewString(), user.Name, sesh.RemoteAddr().String()),
+					clientID,
 					rw,
 					[]*psub.Channel{
 						psub.NewChannel(name),
@@ -389,7 +438,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 
 				err = pubsub.Sub(
 					ctx,
-					fmt.Sprintf("%s (%s@%s)", uuid.NewString(), user.Name, sesh.RemoteAddr().String()),
+					clientID,
 					sesh,
 					[]*psub.Channel{
 						psub.NewChannel(name),
@@ -441,7 +490,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				if isCreator {
 					wish.Printf(
 						sesh,
-						"subscribe to this topic:\n\tssh %s sub %s%s\n",
+						"subscribe to this topic:\n  ssh %s sub %s%s\n",
 						toSshCmd(handler.Cfg),
 						flagMsg,
 						topic,
@@ -450,7 +499,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 
 				readErr, writeErr := pubsub.Pipe(
 					ctx,
-					fmt.Sprintf("%s (%s@%s)", uuid.NewString(), user.Name, sesh.RemoteAddr().String()),
+					clientID,
 					sesh,
 					[]*psub.Channel{
 						psub.NewChannel(name),
