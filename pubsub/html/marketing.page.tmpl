@@ -1,9 +1,9 @@
 {{template "base" .}}
 
-{{define "title"}}pubsub using ssh{{end}}
+{{define "title"}}pipe: pubsub using ssh{{end}}
 
 {{define "meta"}}
-<meta name="description" content="pubsub using ssh" />
+<meta name="description" content="pico's managed pubsub service using ssh" />
 
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="{{.Site.Domain}}">
@@ -28,10 +28,10 @@
   <div>
     <p>
       The simplest authenticated pubsub system.  Send messages through
-      user-defined topics.  By default, topics are private to the authenticated
+      user-defined topics (aka channels).  By default, topics are private to the authenticated
       ssh user.  The default pubsub model is multicast with bidirectional
       blocking, meaning a publisher (<code>pub</code>) will send its message to all
-      subscribers (<code>sub</code>) for a topic (channels).  There can be many publishers
+      subscribers (<code>sub</code>) for a topic.  There can be many publishers
       and many subscribers on a topic. Further, both <code>pub</code> and
       <code>sub</code> will wait for at least one event to be sent or received on the topic.
     </p>
@@ -47,6 +47,7 @@
       <li>Multicast (many pubs to many subs)</li>
       <li>Bidirectional (e.g. chat)</li>
       <li>Configurable blocking characteristics for pubs</li>
+      <li>Configurable timeout for <code>pub</code></li>
       <li>Paradigms for connecting to a topic:
         <ol>
           <li>Read (<code>sub</code>)</li>

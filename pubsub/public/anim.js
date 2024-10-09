@@ -16,9 +16,9 @@ function init() {
     maxY: canvas.height + 20,
     // balls
     entities: [
-      { x: 20, y: 0, mod: 1 },
+      { x: 18, y: 0, mod: 1 },
       // { x: 25, y: canvas.height / 2, mod: 1 },
-      { x: 35, y: canvas.height, mod: -1 },
+      { x: 32, y: canvas.height, mod: -1 },
     ],
   };
 
