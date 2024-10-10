@@ -47,7 +47,7 @@ func registerUser(apiConfig *shared.ApiConfig, ctx ssh.Context, pubkey ssh.Publi
 		}
 
 		picoApi := shared.NewUserApi(user, pubkey)
-		shared.SetUserCtx(ctx, user)
+		shared.SetUser(ctx, user)
 		err = json.NewEncoder(w).Encode(picoApi)
 		if err != nil {
 			logger.Error("json encoding error", "err", err.Error())
@@ -63,7 +63,7 @@ func getFeatures(apiConfig *shared.ApiConfig, ctx ssh.Context) http.HandlerFunc 
 	logger := apiConfig.Cfg.Logger
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		user, _ := shared.GetUserCtx(ctx)
+		user, _ := shared.GetUser(ctx)
 		if !ensureUser(w, user) {
 			return
 		}
@@ -93,7 +93,7 @@ func findOrCreateRssToken(apiConfig *shared.ApiConfig, ctx ssh.Context) http.Han
 	logger := apiConfig.Cfg.Logger
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		user, _ := shared.GetUserCtx(ctx)
+		user, _ := shared.GetUser(ctx)
 		if !ensureUser(w, user) {
 			return
 		}
@@ -132,7 +132,7 @@ func getPublicKeys(httpCtx *shared.ApiConfig, ctx ssh.Context) http.HandlerFunc 
 	logger := httpCtx.Cfg.Logger
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		user, _ := shared.GetUserCtx(ctx)
+		user, _ := shared.GetUser(ctx)
 		if !ensureUser(w, user) {
 			return
 		}
@@ -169,7 +169,7 @@ func createPubkey(httpCtx *shared.ApiConfig, ctx ssh.Context) http.HandlerFunc {
 	logger := httpCtx.Cfg.Logger
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		user, _ := shared.GetUserCtx(ctx)
+		user, _ := shared.GetUser(ctx)
 		if !ensureUser(w, user) {
 			return
 		}
@@ -207,7 +207,7 @@ func deletePubkey(httpCtx *shared.ApiConfig, ctx ssh.Context) http.HandlerFunc {
 	logger := httpCtx.Cfg.Logger
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		user, _ := shared.GetUserCtx(ctx)
+		user, _ := shared.GetUser(ctx)
 		if !ensureUser(w, user) {
 			return
 		}
@@ -249,7 +249,7 @@ func patchPubkey(httpCtx *shared.ApiConfig, ctx ssh.Context) http.HandlerFunc {
 	logger := httpCtx.Cfg.Logger
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		user, _ := shared.GetUserCtx(ctx)
+		user, _ := shared.GetUser(ctx)
 		if !ensureUser(w, user) {
 			return
 		}
@@ -303,7 +303,7 @@ func getTokens(httpCtx *shared.ApiConfig, ctx ssh.Context) http.HandlerFunc {
 	logger := httpCtx.Cfg.Logger
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		user, _ := shared.GetUserCtx(ctx)
+		user, _ := shared.GetUser(ctx)
 		if !ensureUser(w, user) {
 			return
 		}
@@ -339,7 +339,7 @@ func createToken(httpCtx *shared.ApiConfig, ctx ssh.Context) http.HandlerFunc {
 	logger := httpCtx.Cfg.Logger
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		user, _ := shared.GetUserCtx(ctx)
+		user, _ := shared.GetUser(ctx)
 		if !ensureUser(w, user) {
 			return
 		}
@@ -379,7 +379,7 @@ func deleteToken(httpCtx *shared.ApiConfig, ctx ssh.Context) http.HandlerFunc {
 	logger := httpCtx.Cfg.Logger
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		user, _ := shared.GetUserCtx(ctx)
+		user, _ := shared.GetUser(ctx)
 		if !ensureUser(w, user) {
 			return
 		}
@@ -425,7 +425,7 @@ func getProjects(httpCtx *shared.ApiConfig, ctx ssh.Context) http.HandlerFunc {
 	logger := httpCtx.Cfg.Logger
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		user, _ := shared.GetUserCtx(ctx)
+		user, _ := shared.GetUser(ctx)
 		if !ensureUser(w, user) {
 			return
 		}
@@ -456,7 +456,7 @@ func getPosts(httpCtx *shared.ApiConfig, ctx ssh.Context, space string) http.Han
 	logger := httpCtx.Cfg.Logger
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		user, _ := shared.GetUserCtx(ctx)
+		user, _ := shared.GetUser(ctx)
 		if !ensureUser(w, user) {
 			return
 		}
@@ -502,7 +502,7 @@ func createFeature(httpCtx *shared.ApiConfig, ctx ssh.Context) http.HandlerFunc 
 	logger := httpCtx.Cfg.Logger
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		user, _ := shared.GetUserCtx(ctx)
+		user, _ := shared.GetUser(ctx)
 		if !ensureUser(w, user) {
 			return
 		}
@@ -542,7 +542,7 @@ func deleteFeature(httpCtx *shared.ApiConfig, ctx ssh.Context) http.HandlerFunc 
 	logger := httpCtx.Cfg.Logger
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		user, _ := shared.GetUserCtx(ctx)
+		user, _ := shared.GetUser(ctx)
 		if !ensureUser(w, user) {
 			return
 		}
@@ -574,7 +574,7 @@ func getProjectObjects(apiConfig *shared.ApiConfig, ctx ssh.Context) http.Handle
 	storage := apiConfig.Storage
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		user, _ := shared.GetUserCtx(ctx)
+		user, _ := shared.GetUser(ctx)
 		if !ensureUser(w, user) {
 			return
 		}
@@ -616,7 +616,7 @@ func getAnalytics(apiConfig *shared.ApiConfig, ctx ssh.Context, sumtype, bytype,
 	dbpool := apiConfig.Dbpool
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		user, _ := shared.GetUserCtx(ctx)
+		user, _ := shared.GetUser(ctx)
 		if !ensureUser(w, user) {
 			return
 		}
@@ -655,7 +655,7 @@ func getAnalytics(apiConfig *shared.ApiConfig, ctx ssh.Context, sumtype, bytype,
 
 func CreateRoutes(apiConfig *shared.ApiConfig, ctx ssh.Context) []shared.Route {
 	logger := apiConfig.Cfg.Logger
-	pubkey, err := shared.GetPublicKeyCtx(ctx)
+	pubkey, err := shared.GetPublicKey(ctx)
 	if err != nil {
 		logger.Error("could not get pubkey from ctx", "err", err.Error())
 		return []shared.Route{}

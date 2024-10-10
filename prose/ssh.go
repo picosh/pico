@@ -14,7 +14,7 @@ import (
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/filehandlers"
 	uploadimgs "github.com/picosh/pico/filehandlers/imgs"
-	"github.com/picosh/pico/filehandlers/util"
+	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
 	wsh "github.com/picosh/pico/wish"
 	"github.com/picosh/send/auth"
@@ -92,7 +92,7 @@ func StartSshServer() {
 		DBPool: dbh,
 	}
 
-	sshAuth := util.NewSshAuthHandler(dbh, logger, cfg)
+	sshAuth := shared.NewSshAuthHandler(dbh, logger, cfg)
 	s, err := wish.NewServer(
 		wish.WithAddress(fmt.Sprintf("%s:%s", host, port)),
 		wish.WithHostKeyPath("ssh_data/term_info_ed25519"),

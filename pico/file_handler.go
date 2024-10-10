@@ -14,7 +14,6 @@ import (
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
 	"github.com/picosh/pico/db"
-	"github.com/picosh/pico/filehandlers/util"
 	"github.com/picosh/pico/shared"
 	sendutils "github.com/picosh/send/utils"
 	"github.com/picosh/utils"
@@ -57,7 +56,7 @@ func (h *UploadHandler) Delete(s ssh.Session, entry *sendutils.FileEntry) error 
 }
 
 func (h *UploadHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os.FileInfo, sendutils.ReaderAtCloser, error) {
-	user, err := util.GetUser(s.Context())
+	user, err := shared.GetUser(s.Context())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -81,7 +80,7 @@ func (h *UploadHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os.File
 
 func (h *UploadHandler) List(s ssh.Session, fpath string, isDir bool, recursive bool) ([]os.FileInfo, error) {
 	var fileList []os.FileInfo
-	user, err := util.GetUser(s.Context())
+	user, err := shared.GetUser(s.Context())
 	if err != nil {
 		return fileList, err
 	}
@@ -136,7 +135,7 @@ func (h *UploadHandler) Validate(s ssh.Session) error {
 		return fmt.Errorf("must have username set")
 	}
 
-	util.SetUser(s.Context(), user)
+	shared.SetUser(s.Context(), user)
 	return nil
 }
 
@@ -277,7 +276,7 @@ func (h *UploadHandler) ProcessAuthorizedKeys(text []byte, logger *slog.Logger, 
 
 func (h *UploadHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (string, error) {
 	logger := h.Cfg.Logger
-	user, err := util.GetUser(s.Context())
+	user, err := shared.GetUser(s.Context())
 	if err != nil {
 		logger.Error(err.Error())
 		return "", err

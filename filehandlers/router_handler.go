@@ -10,7 +10,6 @@ import (
 
 	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
-	"github.com/picosh/pico/filehandlers/util"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/send/utils"
 )
@@ -83,7 +82,7 @@ func (r *FileHandlerRouter) Read(s ssh.Session, entry *utils.FileEntry) (os.File
 
 func BaseList(s ssh.Session, fpath string, isDir bool, recursive bool, spaces []string, dbpool db.DB) ([]os.FileInfo, error) {
 	var fileList []os.FileInfo
-	user, err := util.GetUser(s.Context())
+	user, err := shared.GetUser(s.Context())
 	if err != nil {
 		return fileList, err
 	}
@@ -154,7 +153,7 @@ func (r *FileHandlerRouter) GetLogger() *slog.Logger {
 }
 
 func (r *FileHandlerRouter) Validate(s ssh.Session) error {
-	user, err := util.GetUser(s.Context())
+	user, err := shared.GetUser(s.Context())
 	if err != nil {
 		return err
 	}

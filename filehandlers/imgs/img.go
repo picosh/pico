@@ -8,7 +8,6 @@ import (
 
 	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
-	"github.com/picosh/pico/filehandlers/util"
 	"github.com/picosh/pico/shared"
 	sendutils "github.com/picosh/send/utils"
 	"github.com/picosh/utils"
@@ -81,7 +80,7 @@ func (h *UploadImgHandler) writeImg(s ssh.Session, data *PostMetaData) error {
 	if !valid {
 		return err
 	}
-	user, err := util.GetUser(s.Context())
+	user, err := shared.GetUser(s.Context())
 	if err != nil {
 		return err
 	}
