@@ -88,50 +88,50 @@ services:
     ports:
       - "${PASTES_SSH_V4:-22}:2222"
       - "${PASTES_SSH_V6:-[::1]:22}:2222"
-  pubsub-caddy:
+  pipe-caddy:
     image: ghcr.io/picosh/pico/caddy:latest
     restart: always
     networks:
-      - pubsub
+      - pipe
     env_file:
       - .env.prod
     environment:
-      APP_DOMAIN: ${PUBSUB_DOMAIN:-pipe.pico.sh}
-      APP_EMAIL: ${PUBSUB_EMAIL:-hello@pico.sh}
+      APP_DOMAIN: ${PIPE_DOMAIN:-pipe.pico.sh}
+      APP_EMAIL: ${PIPE_EMAIL:-hello@pico.sh}
     volumes:
-      - ${PUBSUB_CADDYFILE}:/etc/caddy/Caddyfile
-      - ./data/pubsub-caddy/data:/data
-      - ./data/pubsub-caddy/config:/config
+      - ${PIPE_CADDYFILE}:/etc/caddy/Caddyfile
+      - ./data/pipe-caddy/data:/data
+      - ./data/pipe-caddy/config:/config
     ports:
-      - "${PUBSUB_HTTPS_V4:-443}:443"
-      - "${PUBSUB_HTTP_V4:-80}:80"
-      - "${PUBSUB_HTTPS_V6:-[::1]:443}:443"
-      - "${PUBSUB_HTTP_V6:-[::1]:80}:80"
+      - "${PIPE_HTTPS_V4:-443}:443"
+      - "${PIPE_HTTP_V4:-80}:80"
+      - "${PIPE_HTTPS_V6:-[::1]:443}:443"
+      - "${PIPE_HTTP_V6:-[::1]:80}:80"
     profiles:
-      - pubsub
+      - pipe
       - caddy
       - all
-  pubsub-web:
+  pipe-web:
     networks:
-      pubsub:
+      pipe:
         aliases:
           - web
     env_file:
       - .env.prod
     volumes:
-      - ./data/pubsub-ssh/data:/app/ssh_data
-  pubsub-ssh:
+      - ./data/pipe-ssh/data:/app/ssh_data
+  pipe-ssh:
     networks:
-      pubsub:
+      pipe:
         aliases:
           - ssh
     env_file:
       - .env.prod
     volumes:
-      - ./data/pubsub-ssh/data:/app/ssh_data
+      - ./data/pipe-ssh/data:/app/ssh_data
     ports:
-      - "${PUBSUB_SSH_V4:-22}:2222"
-      - "${PUBSUB_SSH_V6:-[::1]:22}:2222"
+      - "${PIPE_SSH_V4:-22}:2222"
+      - "${PIPE_SSH_V6:-[::1]:22}:2222"
   prose-caddy:
     image: ghcr.io/picosh/pico/caddy:latest
     restart: always
@@ -396,9 +396,9 @@ networks:
     ipam:
       config:
         - subnet: 172.25.0.0/16
-  pubsub:
+  pipe:
     driver_opts:
-      com.docker.network.bridge.name: pubsub
+      com.docker.network.bridge.name: pipe
     ipam:
       config:
         - subnet: 172.27.0.0/16

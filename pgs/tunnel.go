@@ -38,7 +38,7 @@ func createHttpHandler(apiConfig *shared.ApiConfig) CtxHttpBridge {
 			"impersonating", asUser,
 		)
 
-		pubkey, err := shared.GetPublicKeyCtx(ctx)
+		pubkey, err := shared.GetPublicKey(ctx)
 		if err != nil {
 			log.Error(err.Error(), "subdomain", subdomain)
 			return http.HandlerFunc(shared.UnauthorizedHandler)
@@ -88,7 +88,7 @@ func createHttpHandler(apiConfig *shared.ApiConfig) CtxHttpBridge {
 			requester, _ = dbh.FindUserForName(asUser)
 		}
 
-		shared.SetUserCtx(ctx, requester)
+		shared.SetUser(ctx, requester)
 
 		if !HasProjectAccess(project, owner, requester, pubkey) {
 			log.Error("no access")
@@ -101,7 +101,7 @@ func createHttpHandler(apiConfig *shared.ApiConfig) CtxHttpBridge {
 			// special API endpoint for tunnel users accessing site
 			shared.NewCorsRoute("GET", "/api/current_user", func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
-				user, err := shared.GetUserCtx(ctx)
+				user, err := shared.GetUser(ctx)
 				if err != nil {
 					logger.Error("could not find user", "err", err.Error())
 					shared.JSONError(w, err.Error(), http.StatusNotFound)

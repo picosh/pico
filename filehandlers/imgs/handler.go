@@ -14,7 +14,6 @@ import (
 	"github.com/charmbracelet/ssh"
 	exifremove "github.com/neurosnap/go-exif-remove"
 	"github.com/picosh/pico/db"
-	"github.com/picosh/pico/filehandlers/util"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pobj"
@@ -49,7 +48,7 @@ func NewUploadImgHandler(dbpool db.DB, cfg *shared.ConfigSite, storage storage.S
 }
 
 func (h *UploadImgHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os.FileInfo, sendutils.ReaderAtCloser, error) {
-	user, err := util.GetUser(s.Context())
+	user, err := shared.GetUser(s.Context())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -89,7 +88,7 @@ func (h *UploadImgHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os.F
 
 func (h *UploadImgHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (string, error) {
 	logger := h.Cfg.Logger
-	user, err := util.GetUser(s.Context())
+	user, err := shared.GetUser(s.Context())
 	if err != nil {
 		logger.Error("could not get user from ctx", "err", err.Error())
 		return "", err
@@ -146,7 +145,7 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (str
 		logger.Info("unable to find image, continuing", "filename", nextPost.Filename, "err", err.Error())
 	}
 
-	featureFlag, err := util.GetFeatureFlag(s.Context())
+	featureFlag, err := shared.GetFeatureFlag(s.Context())
 	if err != nil {
 		return "", err
 	}
@@ -193,7 +192,7 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (str
 }
 
 func (h *UploadImgHandler) Delete(s ssh.Session, entry *sendutils.FileEntry) error {
-	user, err := util.GetUser(s.Context())
+	user, err := shared.GetUser(s.Context())
 	if err != nil {
 		return err
 	}
