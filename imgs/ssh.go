@@ -18,6 +18,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/charmbracelet/promwish"
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
 	"github.com/google/uuid"
@@ -25,6 +26,7 @@ import (
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
+	wsh "github.com/picosh/pico/wish"
 	psub "github.com/picosh/pubsub"
 	"github.com/picosh/tunkit"
 	"github.com/picosh/utils"
@@ -251,14 +253,9 @@ func createServeMux(handler *CliHandler, pubsub psub.PubSub) func(ctx ssh.Contex
 }
 
 func StartSshServer() {
-	host := os.Getenv("SSH_HOST")
-	if host == "" {
-		host = "0.0.0.0"
-	}
-	port := os.Getenv("SSH_PORT")
-	if port == "" {
-		port = "2222"
-	}
+	host := utils.GetEnv("IMGS_HOST", "0.0.0.0")
+	port := utils.GetEnv("IMGS_SSH_PORT", "2222")
+	promPort := utils.GetEnv("IMGS_PROM_PORT", "9222")
 	dbUrl := os.Getenv("DATABASE_URL")
 	registryUrl := utils.GetEnv("REGISTRY_URL", "0.0.0.0:5000")
 	minioUrl := utils.GetEnv("MINIO_URL", "http://0.0.0.0:9000")
@@ -286,7 +283,11 @@ func StartSshServer() {
 		wish.WithAddress(fmt.Sprintf("%s:%s", host, port)),
 		wish.WithHostKeyPath("ssh_data/term_info_ed25519"),
 		wish.WithPublicKeyAuth(AuthHandler(dbh, logger)),
-		wish.WithMiddleware(WishMiddleware(handler)),
+		wish.WithMiddleware(
+			WishMiddleware(handler),
+			promwish.Middleware(fmt.Sprintf("%s:%s", host, promPort), "imgs-ssh"),
+			wsh.LogMiddleware(logger),
+		),
 		tunkit.WithWebTunnel(
 			tunkit.NewWebTunnelHandler(createServeMux(handler, pubsub), logger),
 		),
