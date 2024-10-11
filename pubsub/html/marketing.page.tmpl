@@ -1,9 +1,9 @@
 {{template "base" .}}
 
-{{define "title"}}pipe: pubsub using ssh{{end}}
+{{define "title"}}pipe: authenticated pubsub over ssh{{end}}
 
 {{define "meta"}}
-<meta name="description" content="pico's managed pubsub service using ssh" />
+<meta name="description" content="authenticated *nix pipes over ssh" />
 
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="{{.Site.Domain}}">
@@ -46,7 +46,7 @@
       <li>Public pubsub by topic (opt-in)</li>
       <li>Multicast (many pubs to many subs)</li>
       <li>Bidirectional (e.g. chat)</li>
-      <li>Configurable blocking characteristics for pubs</li>
+      <li>Configurable blocking characteristics for <code>pub</code></li>
       <li>Configurable timeout for <code>pub</code></li>
       <li>Paradigms for connecting to a topic:
         <ol>
@@ -62,6 +62,7 @@
 
   <div>
     <h2 class="text-xl">A basic API</h2>
+    <p>Pipe some data into our ssh app and we will send it to anyone listening.</p>
     <pre>ssh {{.Site.Domain}} sub mykey</pre>
     <pre>echo "hello world!" | ssh {{.Site.Domain}} pub mykey</pre>
 
@@ -81,12 +82,14 @@
 
   <div>
     <h2 class="text-xl">Simple desktop notifications</h2>
+    <p>Want to quickly receive a notification when a job is done?  It can be as simple as:</p>
     <pre>ssh {{.Site.Domain}} sub notify; notify-send "job done!"</pre>
     <pre>./longjob.sh; ssh {{.Site.Domain}} pub notify -e</pre>
   </div>
 
   <div>
     <h2 class="text-xl">File sharing</h2>
+    <p>Sometimes you need data exfiltration and all you have is SSH:</p>
     <pre>cat doc.md | ssh {{.Site.Domain}} pub thedoc</pre>
     <pre>ssh {{.Site.Domain}} sub thedoc > ./important.md</pre>
 
