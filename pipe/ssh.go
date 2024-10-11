@@ -1,4 +1,4 @@
-package pubsub
+package pipe
 
 import (
 	"context"
@@ -19,10 +19,10 @@ import (
 )
 
 func StartSshServer() {
-	host := utils.GetEnv("PUBSUB_HOST", "0.0.0.0")
-	port := utils.GetEnv("PUBSUB_SSH_PORT", "2222")
-	portOverride := utils.GetEnv("PUBSUB_SSH_PORT_OVERRIDE", port)
-	promPort := utils.GetEnv("PUBSUB_PROM_PORT", "9222")
+	host := utils.GetEnv("PIPE_HOST", "0.0.0.0")
+	port := utils.GetEnv("PIPE_SSH_PORT", "2222")
+	portOverride := utils.GetEnv("PIPE_SSH_PORT_OVERRIDE", port)
+	promPort := utils.GetEnv("PIPE_PROM_PORT", "9222")
 	cfg := NewConfigSite()
 	logger := cfg.Logger
 	dbh := postgres.NewDB(cfg.DbURL, cfg.Logger)
@@ -47,7 +47,7 @@ func StartSshServer() {
 		wish.WithPublicKeyAuth(sshAuth.PubkeyAuthHandler),
 		wish.WithMiddleware(
 			WishMiddleware(handler),
-			promwish.Middleware(fmt.Sprintf("%s:%s", host, promPort), "pubsub-ssh"),
+			promwish.Middleware(fmt.Sprintf("%s:%s", host, promPort), "pipe-ssh"),
 			wsh.LogMiddleware(logger),
 		),
 	)

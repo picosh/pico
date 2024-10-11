@@ -43,18 +43,18 @@ services:
       - pastes
       - services
       - all
-  pubsub-web:
-    image: ghcr.io/picosh/pico/pubsub-web:latest
+  pipe-web:
+    image: ghcr.io/picosh/pico/pipe-web:latest
     restart: always
     profiles:
-      - pubsub
+      - pipe
       - services
       - all
-  pubsub-ssh:
-    image: ghcr.io/picosh/pico/pubsub-ssh:latest
+  pipe-ssh:
+    image: ghcr.io/picosh/pico/pipe-ssh:latest
     restart: always
     profiles:
-      - pubsub
+      - pipe
       - services
       - all
   prose-web:
