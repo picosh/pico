@@ -465,6 +465,53 @@ func TestCalcRoutes(t *testing.T) {
 				{Filepath: "public/404.html", Status: 404},
 			},
 		},
+		{
+			Name: "wildcard-with-word",
+			Actual: calcRoutes(
+				"public",
+				"/pictures/soup",
+				[]*RedirectRule{
+					{
+						From:   "/pictures*",
+						To:     "https://super.fly.sh/:splat",
+						Status: 200,
+					},
+					{
+						From:   "/*",
+						To:     "https://super.fly.sh/:splat",
+						Status: 302,
+					},
+				},
+			),
+			Expected: []*HttpReply{
+				{Filepath: "public/pictures/soup", Status: 200},
+				{Filepath: "public/pictures/soup.html", Status: 200},
+				{Filepath: "https://super.fly.sh/soup", Status: 200},
+			},
+		},
+		{
+			Name: "wildcard-multiple",
+			Actual: calcRoutes(
+				"public",
+				"/super/ficial.html",
+				[]*RedirectRule{
+					{
+						From:   "/pictures*",
+						To:     "https://super.fly.sh/:splat",
+						Status: 200,
+					},
+					{
+						From:   "/*",
+						To:     "https://super.fly.sh/:splat",
+						Status: 302,
+					},
+				},
+			),
+			Expected: []*HttpReply{
+				{Filepath: "public/super/ficial.html", Status: 200},
+				{Filepath: "https://super.fly.sh/super/ficial.html", Status: 302},
+			},
+		},
 	}
 
 	for _, fixture := range fixtures {
