@@ -10,6 +10,7 @@ type RedirectFixture struct {
 	name   string
 	input  string
 	expect []*RedirectRule
+	shouldError bool
 }
 
 func TestParseRedirectText(t *testing.T) {
@@ -56,16 +57,39 @@ func TestParseRedirectText(t *testing.T) {
 		},
 	}
 
+	absoluteUriNoProto := RedirectFixture{
+		name:  "absolute-uri-no-proto",
+		input: "/*  www.example.com  301",
+		expect: []*RedirectRule{},
+		shouldError: true,
+	}
+
+	absoluteUriWithProto := RedirectFixture{
+		name:  "absolute-uri-no-proto",
+		input: "/*  https://www.example.com  301",
+		expect: []*RedirectRule{
+			{
+				From:       "/*",
+				To:         "https://www.example.com",
+				Status:     301,
+				Query:      empty,
+				Conditions: empty,
+			},
+		},
+	}
+
 	fixtures := []RedirectFixture{
 		spa,
 		withStatus,
 		noStatus,
+		absoluteUriNoProto,
+		absoluteUriWithProto,
 	}
 
 	for _, fixture := range fixtures {
 		t.Run(fixture.name, func(t *testing.T) {
 			results, err := parseRedirectText(fixture.input)
-			if err != nil {
+			if err != nil && !fixture.shouldError {
 				t.Error(err)
 			}
 			if cmp.Equal(results, fixture.expect) == false {

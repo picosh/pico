@@ -98,7 +98,7 @@ func parseRedirectText(text string) ([]*RedirectRule, error) {
 		}
 
 		from := parts[0]
-		rest := parts[0:]
+		rest := parts[1:]
 		status, forced := hasStatusCode(rest[0])
 		if status != 0 {
 			rules = append(rules, &RedirectRule{
@@ -118,9 +118,9 @@ func parseRedirectText(text string) ([]*RedirectRule, error) {
 				return rules, fmt.Errorf("the destination path/URL must start with '/', 'http:' or 'https:'")
 			}
 
-			queryParts := parts[:toIndex]
-			to := parts[toIndex]
-			lastParts := parts[toIndex+1:]
+			queryParts := rest[:toIndex]
+			to := rest[toIndex]
+			lastParts := rest[toIndex+1:]
 			conditions := map[string]string{}
 			sts := http.StatusOK
 			frcd := false
