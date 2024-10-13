@@ -63,6 +63,7 @@ type DigestFeed struct {
 	Options      DigestOptions
 	KeepAliveURL string
 	DaysLeft     string
+	ShowBanner   bool
 }
 
 type DigestOptions struct {
@@ -187,7 +188,7 @@ func (f *Fetcher) RunPost(logger *slog.Logger, user *db.User, post *db.Post) err
 
 	now := time.Now().UTC()
 	if post.ExpiresAt == nil {
-		expiresAt := time.Now().AddDate(0, 3, 0)
+		expiresAt := time.Now().AddDate(0, 6, 0)
 		post.ExpiresAt = &expiresAt
 	}
 	post.Data.LastDigest = &now
@@ -331,14 +332,20 @@ type MsgBody struct {
 
 func (f *Fetcher) FetchAll(logger *slog.Logger, urls []string, inlineContent bool, username string, post *db.Post) (*MsgBody, error) {
 	fp := gofeed.NewParser()
-	daysLeft := "90"
+	daysLeft := ""
+	showBanner := false
 	if post.ExpiresAt != nil {
 		diff := time.Until(*post.ExpiresAt)
-		daysLeft = fmt.Sprintf("%f", math.Ceil(diff.Hours()/24))
+		daysLeftInt := int(math.Ceil(diff.Hours() / 24))
+		daysLeft = fmt.Sprintf("%d", daysLeftInt)
+		if daysLeftInt <= 30 {
+			showBanner = true
+		}
 	}
 	feeds := &DigestFeed{
 		KeepAliveURL: fmt.Sprintf("https://feeds.pico.sh/keep-alive/%s", post.ID),
 		DaysLeft:     daysLeft,
+		ShowBanner:   showBanner,
 		Options:      DigestOptions{InlineContent: inlineContent},
 	}
 	feedItems, err := f.db.FindFeedItemsByPostID(post.ID)
