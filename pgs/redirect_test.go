@@ -7,9 +7,9 @@ import (
 )
 
 type RedirectFixture struct {
-	name   string
-	input  string
-	expect []*RedirectRule
+	name        string
+	input       string
+	expect      []*RedirectRule
 	shouldError bool
 }
 
@@ -58,9 +58,9 @@ func TestParseRedirectText(t *testing.T) {
 	}
 
 	absoluteUriNoProto := RedirectFixture{
-		name:  "absolute-uri-no-proto",
-		input: "/*  www.example.com  301",
-		expect: []*RedirectRule{},
+		name:        "absolute-uri-no-proto",
+		input:       "/*  www.example.com  301",
+		expect:      []*RedirectRule{},
 		shouldError: true,
 	}
 
