@@ -169,11 +169,18 @@ func hasProtocol(url string) bool {
 
 func (h *AssetHandler) handle(logger *slog.Logger, w http.ResponseWriter, r *http.Request) {
 	var redirects []*RedirectRule
-	redirectFp, _, err := h.Storage.GetObject(h.Bucket, filepath.Join(h.ProjectDir, "_redirects"))
+	redirectFp, redirectInfo, err := h.Storage.GetObject(h.Bucket, filepath.Join(h.ProjectDir, "_redirects"))
 	if err == nil {
 		defer redirectFp.Close()
+		if redirectInfo != nil && redirectInfo.Size > h.Cfg.MaxSpecialFileSize {
+			errMsg := fmt.Sprintf("_redirects file is too large (%d > %d)", redirectInfo.Size, h.Cfg.MaxSpecialFileSize)
+			logger.Error(errMsg)
+			http.Error(w, errMsg, http.StatusInternalServerError)
+			return
+		}
 		buf := new(strings.Builder)
-		_, err := io.Copy(buf, redirectFp)
+		lr := io.LimitReader(redirectFp, h.Cfg.MaxSpecialFileSize)
+		_, err := io.Copy(buf, lr)
 		if err != nil {
 			logger.Error("io copy", "err", err.Error())
 			http.Error(w, "cannot read _redirects file", http.StatusInternalServerError)
@@ -299,11 +306,18 @@ func (h *AssetHandler) handle(logger *slog.Logger, w http.ResponseWriter, r *htt
 	}
 
 	var headers []*HeaderRule
-	headersFp, _, err := h.Storage.GetObject(h.Bucket, filepath.Join(h.ProjectDir, "_headers"))
+	headersFp, headersInfo, err := h.Storage.GetObject(h.Bucket, filepath.Join(h.ProjectDir, "_headers"))
 	if err == nil {
 		defer headersFp.Close()
+		if headersInfo != nil && headersInfo.Size > h.Cfg.MaxSpecialFileSize {
+			errMsg := fmt.Sprintf("_headers file is too large (%d > %d)", headersInfo.Size, h.Cfg.MaxSpecialFileSize)
+			logger.Error(errMsg)
+			http.Error(w, errMsg, http.StatusInternalServerError)
+			return
+		}
 		buf := new(strings.Builder)
-		_, err := io.Copy(buf, headersFp)
+		lr := io.LimitReader(headersFp, h.Cfg.MaxSpecialFileSize)
+		_, err := io.Copy(buf, lr)
 		if err != nil {
 			logger.Error("io copy", "err", err.Error())
 			http.Error(w, "cannot read _headers file", http.StatusInternalServerError)

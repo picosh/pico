@@ -28,24 +28,25 @@ type PageData struct {
 }
 
 type ConfigSite struct {
-	Debug        bool
-	SendgridKey  string
-	Secret       string
-	Domain       string
-	Port         string
-	PortOverride string
-	Protocol     string
-	DbURL        string
-	StorageDir   string
-	MinioURL     string
-	MinioUser    string
-	MinioPass    string
-	Space        string
-	AllowedExt   []string
-	HiddenPosts  []string
-	MaxSize      uint64
-	MaxAssetSize int64
-	Logger       *slog.Logger
+	Debug              bool
+	SendgridKey        string
+	Secret             string
+	Domain             string
+	Port               string
+	PortOverride       string
+	Protocol           string
+	DbURL              string
+	StorageDir         string
+	MinioURL           string
+	MinioUser          string
+	MinioPass          string
+	Space              string
+	AllowedExt         []string
+	HiddenPosts        []string
+	MaxSize            uint64
+	MaxAssetSize       int64
+	MaxSpecialFileSize int64
+	Logger             *slog.Logger
 }
 
 func NewConfigSite() *ConfigSite {
