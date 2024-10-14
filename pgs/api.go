@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"net/http/httputil"
 	_ "net/http/pprof"
 
 	"github.com/gorilla/feeds"
@@ -229,24 +230,20 @@ func (h *AssetHandler) handle(logger *slog.Logger, w http.ResponseWriter, r *htt
 				"destination", fp.Filepath,
 				"status", fp.Status,
 			)
-			// fetch content from url and serve it
-			resp, err := http.Get(fp.Filepath)
+
+			destUrl, err := url.Parse(fp.Filepath)
 			if err != nil {
-				logger.Error(
-					"external service not found",
-					"err", err,
-					"status", http.StatusNotFound,
-				)
-				http.Error(w, "404 not found", http.StatusNotFound)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-
-			w.Header().Set("content-type", resp.Header.Get("content-type"))
-			w.WriteHeader(status)
-			_, err = io.Copy(w, resp.Body)
-			if err != nil {
-				logger.Error("io copy", "err", err.Error())
+			proxy := httputil.NewSingleHostReverseProxy(destUrl)
+			oldDirector := proxy.Director
+			proxy.Director = func(r *http.Request) {
+				oldDirector(r)
+				r.Host = destUrl.Host
+				r.URL = destUrl
 			}
+			proxy.ServeHTTP(w, r)
 			return
 		}
 
