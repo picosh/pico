@@ -16,7 +16,7 @@ echo dotenv > .envrc && direnv allow
 Boot up database (or bring your own)
 
 ```bash
-docker compose up -f docker-compose.yml -f docker-compose.override.yml --profile db -d
+docker compose -f docker-compose.yml -f docker-compose.override.yml --profile db up -d
 ```
 
 Create db and migrate

@@ -17,6 +17,7 @@ func NewConfigSite() *shared.ConfigSite {
 	dbURL := utils.GetEnv("DATABASE_URL", "")
 	maxSize := uint64(500 * utils.MB)
 	maxImgSize := int64(10 * utils.MB)
+	maxSpecialFileSize := int64(5 * utils.KB)
 	secret := utils.GetEnv("PICO_SECRET", "")
 	if secret == "" {
 		panic("must provide PICO_SECRET environment variable")
@@ -44,9 +45,10 @@ func NewConfigSite() *shared.ConfigSite {
 			".svg",
 			".ico",
 		},
-		HiddenPosts:  []string{"_readme.md", "_styles.css", "_footer.md", "_404.md"},
-		Logger:       shared.CreateLogger("prose"),
-		MaxSize:      maxSize,
-		MaxAssetSize: maxImgSize,
+		HiddenPosts:        []string{"_readme.md", "_styles.css", "_footer.md", "_404.md"},
+		Logger:             shared.CreateLogger("prose"),
+		MaxSize:            maxSize,
+		MaxAssetSize:       maxImgSize,
+		MaxSpecialFileSize: maxSpecialFileSize,
 	}
 }
