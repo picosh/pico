@@ -1,6 +1,8 @@
 package pgs
 
 import (
+	"strconv"
+
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/utils"
 )
@@ -21,6 +23,16 @@ func NewConfigSite() *shared.ConfigSite {
 	minioPass := utils.GetEnv("MINIO_ROOT_PASSWORD", "")
 	dbURL := utils.GetEnv("DATABASE_URL", "")
 	secret := utils.GetEnv("PICO_SECRET", "")
+	cacheSizeStr := utils.GetEnv("PGS_CACHE_SIZE", "4096")
+	cacheSize, err := strconv.Atoi(cacheSizeStr)
+	if err != nil {
+		panic(err)
+	}
+	cacheExpireStr := utils.GetEnv("PGS_CACHE_EXPIRE_SECONDS", "3600")
+	cacheExpireSeconds, err := strconv.Atoi(cacheExpireStr)
+	if err != nil {
+		panic(err)
+	}
 	if secret == "" {
 		panic("must provide PICO_SECRET environment variable")
 	}
@@ -39,6 +51,8 @@ func NewConfigSite() *shared.ConfigSite {
 		MaxSize:            maxSize,
 		MaxAssetSize:       maxAssetSize,
 		MaxSpecialFileSize: maxSpecialFileSize,
+		CacheSize:          cacheSize,
+		CacheExpireSeconds: cacheExpireSeconds,
 		Logger:             shared.CreateLogger("pgs"),
 	}
 

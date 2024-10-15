@@ -46,6 +46,8 @@ type ConfigSite struct {
 	MaxSize            uint64
 	MaxAssetSize       int64
 	MaxSpecialFileSize int64
+	CacheSize          int
+	CacheExpireSeconds int
 	Logger             *slog.Logger
 }
 

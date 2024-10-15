@@ -16,6 +16,7 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/gorilla/feeds"
+	"github.com/hashicorp/golang-lru/v2/expirable"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
@@ -37,6 +38,16 @@ type AssetHandler struct {
 	ImgProcessOpts *storage.ImgProcessOpts
 	ProjectID      string
 	HasPicoPlus    bool
+}
+
+// CachedContext holds slow-to-fetch data for a particular project
+// which gets saved in the LRU cache.
+type CachedContext struct {
+	User        *db.User
+	Project     *db.Project
+	Routes      []*HttpReply
+	Headers     []*HeaderRule
+	HasPicoPlus bool
 }
 
 func checkHandler(w http.ResponseWriter, r *http.Request) {
@@ -167,33 +178,8 @@ func hasProtocol(url string) bool {
 	return isFullUrl
 }
 
-func (h *AssetHandler) handle(logger *slog.Logger, w http.ResponseWriter, r *http.Request) {
-	var redirects []*RedirectRule
-	redirectFp, redirectInfo, err := h.Storage.GetObject(h.Bucket, filepath.Join(h.ProjectDir, "_redirects"))
-	if err == nil {
-		defer redirectFp.Close()
-		if redirectInfo != nil && redirectInfo.Size > h.Cfg.MaxSpecialFileSize {
-			errMsg := fmt.Sprintf("_redirects file is too large (%d > %d)", redirectInfo.Size, h.Cfg.MaxSpecialFileSize)
-			logger.Error(errMsg)
-			http.Error(w, errMsg, http.StatusInternalServerError)
-			return
-		}
-		buf := new(strings.Builder)
-		lr := io.LimitReader(redirectFp, h.Cfg.MaxSpecialFileSize)
-		_, err := io.Copy(buf, lr)
-		if err != nil {
-			logger.Error("io copy", "err", err.Error())
-			http.Error(w, "cannot read _redirects file", http.StatusInternalServerError)
-			return
-		}
-
-		redirects, err = parseRedirectText(buf.String())
-		if err != nil {
-			logger.Error("could not parse redirect text", "err", err.Error())
-		}
-	}
-
-	routes := calcRoutes(h.ProjectDir, h.Filepath, redirects)
+func (h *AssetHandler) handle(logger *slog.Logger, w http.ResponseWriter, r *http.Request, cache CachedContext) {
+	routes := cache.Routes
 
 	var contents io.ReadCloser
 	contentType := ""
@@ -286,7 +272,7 @@ func (h *AssetHandler) handle(logger *slog.Logger, w http.ResponseWriter, r *htt
 		)
 		// track 404s
 		ch := shared.GetAnalyticsQueue(r)
-		view, err := shared.AnalyticsVisitFromRequest(r, h.UserID, h.Cfg.Secret)
+		view, err := shared.AnalyticsVisitFromRequest(r, h.UserID, h.Cfg.Secret) // TODO: this checks analytics flag from DB
 		if err == nil {
 			view.ProjectID = h.ProjectID
 			view.Status = http.StatusNotFound
@@ -305,30 +291,7 @@ func (h *AssetHandler) handle(logger *slog.Logger, w http.ResponseWriter, r *htt
 		contentType = storage.GetMimeType(assetFilepath)
 	}
 
-	var headers []*HeaderRule
-	headersFp, headersInfo, err := h.Storage.GetObject(h.Bucket, filepath.Join(h.ProjectDir, "_headers"))
-	if err == nil {
-		defer headersFp.Close()
-		if headersInfo != nil && headersInfo.Size > h.Cfg.MaxSpecialFileSize {
-			errMsg := fmt.Sprintf("_headers file is too large (%d > %d)", headersInfo.Size, h.Cfg.MaxSpecialFileSize)
-			logger.Error(errMsg)
-			http.Error(w, errMsg, http.StatusInternalServerError)
-			return
-		}
-		buf := new(strings.Builder)
-		lr := io.LimitReader(headersFp, h.Cfg.MaxSpecialFileSize)
-		_, err := io.Copy(buf, lr)
-		if err != nil {
-			logger.Error("io copy", "err", err.Error())
-			http.Error(w, "cannot read _headers file", http.StatusInternalServerError)
-			return
-		}
-
-		headers, err = parseHeaderText(buf.String())
-		if err != nil {
-			logger.Error("could not parse header text", "err", err.Error())
-		}
-	}
+	headers := cache.Headers
 
 	userHeaders := []*HeaderLine{}
 	for _, headerRule := range headers {
@@ -381,7 +344,7 @@ func (h *AssetHandler) handle(logger *slog.Logger, w http.ResponseWriter, r *htt
 	)
 
 	w.WriteHeader(status)
-	_, err = io.Copy(w, contents)
+	_, err := io.Copy(w, contents)
 
 	if err != nil {
 		logger.Error("io copy", "err", err.Error())
@@ -413,6 +376,7 @@ func ServeAsset(fname string, opts *storage.ImgProcessOpts, fromImgs bool, hasPe
 	dbpool := shared.GetDB(r)
 	st := shared.GetStorage(r)
 	ologger := shared.GetLogger(r)
+	cache := shared.GetCache(r)
 
 	logger := ologger.With(
 		"subdomain", subdomain,
@@ -436,13 +400,13 @@ func ServeAsset(fname string, opts *storage.ImgProcessOpts, fromImgs bool, hasPe
 		"user", props.Username,
 	)
 
-	user, err := dbpool.FindUserForName(props.Username)
+	cachedData, err := populateCache(r, logger, fromImgs)
 	if err != nil {
-		logger.Info("user not found")
-		http.Error(w, "user not found", http.StatusNotFound)
-		return
+		// TODO throw the correct error code
 	}
+	cache.Add(subdomain, cachedData)
 
+	user := cachedData.User
 	logger = logger.With(
 		"userId", user.ID,
 	)
@@ -457,13 +421,7 @@ func ServeAsset(fname string, opts *storage.ImgProcessOpts, fromImgs bool, hasPe
 		bucket, err = st.GetBucket(shared.GetImgsBucketName(user.ID))
 	} else {
 		bucket, err = st.GetBucket(shared.GetAssetBucketName(user.ID))
-		project, err := dbpool.FindProjectByName(user.ID, props.ProjectName)
-		if err != nil {
-			logger.Info("project not found")
-			http.Error(w, "project not found", http.StatusNotFound)
-			return
-		}
-
+		project := cachedData.Project
 		logger = logger.With(
 			"projectId", project.ID,
 			"project", project.Name,
@@ -489,8 +447,6 @@ func ServeAsset(fname string, opts *storage.ImgProcessOpts, fromImgs bool, hasPe
 		return
 	}
 
-	hasPicoPlus := dbpool.HasFeatureForUser(user.ID, "plus")
-
 	asset := &AssetHandler{
 		Username:       props.Username,
 		UserID:         user.ID,
@@ -504,13 +460,96 @@ func ServeAsset(fname string, opts *storage.ImgProcessOpts, fromImgs bool, hasPe
 		Bucket:         bucket,
 		ImgProcessOpts: opts,
 		ProjectID:      projectID,
-		HasPicoPlus:    hasPicoPlus,
+		HasPicoPlus:    cachedData.HasPicoPlus,
+		// Or maybe just put cache in here and remove other stuff?
 	}
 
 	asset.handle(logger, w, r)
 }
 
 type HasPerm = func(proj *db.Project) bool
+
+// populateCache is called for any request where there is no existing cache.
+// Any expensive operations should be performed here and saved to CachedContext.
+func populateCache(r *http.Request, logger *slog.Logger, fromImgs bool, fname string) (CachedContext, error) {
+	dbpool := shared.GetDB(r)
+	st := shared.GetStorage(r)
+	cfg := shared.GetCfg(r)
+
+	user, err := dbpool.FindUserForName(props.Username)
+	if err != nil {
+		return CachedContext{}, err // 404
+	}
+
+	project, err := dbpool.FindProjectByName(user.ID, props.ProjectName)
+	if err != nil {
+		return CachedContext{}, err // 404
+	}
+
+	// imgs has a different bucket directory
+	if fromImgs {
+		bucket, err = st.GetBucket(shared.GetImgsBucketName(user.ID)) // Probably these bucket should just be created once, or dynamically from Bucket structs
+	} else {
+		bucket, err = st.GetBucket(shared.GetAssetBucketName(user.ID))
+	}
+
+	var redirects []*RedirectRule
+	redirectFp, redirectInfo, err := st.GetObject(bucket, filepath.Join(project.ProjectDir, "_redirects"))
+	if err == nil {
+		defer redirectFp.Close()
+		if redirectInfo != nil && redirectInfo.Size > cfg.MaxSpecialFileSize {
+			errMsg := fmt.Sprintf("_redirects file is too large (%d > %d)", redirectInfo.Size, cfg.MaxSpecialFileSize)
+			return CachedContext{}, err // 500
+		}
+		buf := new(strings.Builder)
+		lr := io.LimitReader(redirectFp, h.Cfg.MaxSpecialFileSize)
+		_, err := io.Copy(buf, lr)
+		if err != nil {
+			logger.Error("io copy", "err", err.Error())
+			http.Error(w, "cannot read _redirects file", http.StatusInternalServerError)
+			return CachedContext{}, err // 500
+		}
+
+		redirects, err = parseRedirectText(buf.String())
+		if err != nil {
+			logger.Error("could not parse redirect text", "err", err.Error())
+		}
+	}
+
+	routes := calcRoutes(project.ProjectDir, fname, redirects)
+
+	var headers []*HeaderRule
+	headersFp, headersInfo, err := st.GetObject(bucket, filepath.Join(project.ProjectDir, "_headers"))
+	if err == nil {
+		defer headersFp.Close()
+		if headersInfo != nil && headersInfo.Size > cfg.MaxSpecialFileSize {
+			errMsg := fmt.Sprintf("_headers file is too large (%d > %d)", headersInfo.Size, cfg.MaxSpecialFileSize)
+			return CachedContext{}, err // 500
+		}
+		buf := new(strings.Builder)
+		lr := io.LimitReader(headersFp, h.Cfg.MaxSpecialFileSize)
+		_, err := io.Copy(buf, lr)
+		if err != nil {
+			logger.Error("io copy", "err", err.Error())
+			http.Error(w, "cannot read _headers file", http.StatusInternalServerError)
+			return CachedContext{}, err // 500
+		}
+
+		headers, err = parseHeaderText(buf.String())
+		if err != nil {
+			logger.Error("could not parse header text", "err", err.Error())
+			// continue
+		}
+	}
+
+	return CachedContext{
+		User:        user,
+		Project:     project,
+		Routes:      routes,
+		Headers:     headers,
+		HasPicoPlus: dbpool.HasFeatureForUser(user.ID, "plus"),
+	}, nil
+}
 
 func ImgAssetRequest(hasPerm HasPerm) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -572,6 +611,8 @@ func StartApiServer() {
 	dbpool := postgres.NewDB(cfg.DbURL, cfg.Logger)
 	defer dbpool.Close()
 
+	cache := expirable.NewLRU[string, any](cfg.CacheSize, nil, time.Second*time.Duration(cfg.CacheExpireSeconds))
+
 	var st storage.StorageServe
 	var err error
 	if cfg.MinioURL == "" {
@@ -592,6 +633,7 @@ func StartApiServer() {
 		Dbpool:         dbpool,
 		Storage:        st,
 		AnalyticsQueue: ch,
+		Cache:          cache,
 	}
 	handler := shared.CreateServe(mainRoutes, createSubdomainRoutes(publicPerm), apiConfig)
 	router := http.HandlerFunc(handler)

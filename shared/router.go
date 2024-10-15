@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/ssh"
+	"github.com/hashicorp/golang-lru/v2/expirable"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared/storage"
 )
@@ -61,6 +62,7 @@ type ApiConfig struct {
 	Dbpool         db.DB
 	Storage        storage.StorageServe
 	AnalyticsQueue chan *db.AnalyticsVisits
+	Cache          *expirable.LRU[string, any]
 }
 
 func (hc *ApiConfig) CreateCtx(prevCtx context.Context, subdomain string) context.Context {
@@ -70,6 +72,7 @@ func (hc *ApiConfig) CreateCtx(prevCtx context.Context, subdomain string) contex
 	ctx = context.WithValue(ctx, ctxStorageKey{}, hc.Storage)
 	ctx = context.WithValue(ctx, ctxCfg{}, hc.Cfg)
 	ctx = context.WithValue(ctx, ctxAnalyticsQueue{}, hc.AnalyticsQueue)
+	ctx = context.WithValue(ctx, ctxCacheKey{}, hc.Cache)
 	return ctx
 }
 
@@ -149,6 +152,7 @@ type ctxSubdomainKey struct{}
 type ctxCfg struct{}
 type ctxAnalyticsQueue struct{}
 type CtxSshKey struct{}
+type ctxCacheKey struct{}
 
 func GetSshCtx(r *http.Request) (ssh.Context, error) {
 	payload, ok := r.Context().Value(CtxSshKey{}).(ssh.Context)
@@ -202,4 +206,8 @@ func GetCustomDomain(host string, space string) string {
 
 func GetAnalyticsQueue(r *http.Request) chan *db.AnalyticsVisits {
 	return r.Context().Value(ctxAnalyticsQueue{}).(chan *db.AnalyticsVisits)
+}
+
+func GetCache(r *http.Request) *expirable.LRU[string, any] {
+	return r.Context().Value(ctxCacheKey{}).(*expirable.LRU[string, any])
 }
