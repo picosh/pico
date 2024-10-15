@@ -1892,26 +1892,28 @@ func (me *PsqlDB) AddPicoPlusUser(username, paymentType, txId string) error {
 		err = tx.Rollback()
 	}()
 
+	var paymentHistoryId sql.NullString
 	if paymentType != "" {
 		data := db.PaymentHistoryData{
 			Notes: "",
 			TxID:  txId,
 		}
-		_, err := tx.Exec(
-			`INSERT INTO payment_history (user_id, payment_type, amount, data) VALUES ($1, $2, 24 * 1000000, $3);`,
+
+		err := tx.QueryRow(
+			`INSERT INTO payment_history (user_id, payment_type, amount, data) VALUES ($1, $2, 24 * 1000000, $3) RETURNING id;`,
 			user.ID,
 			paymentType,
 			data,
-		)
+		).Scan(&paymentHistoryId)
 		if err != nil {
 			return err
 		}
 	}
 
 	plus := me.createFeatureExpiresAt(user.ID, "plus")
-	plusQuery := `INSERT INTO feature_flags (user_id, name, data, expires_at)
-	VALUES ($1, 'plus', '{"storage_max":20000000000, "file_max":50000000}'::jsonb, $2);`
-	_, err = tx.Exec(plusQuery, user.ID, plus)
+	plusQuery := `INSERT INTO feature_flags (user_id, name, data, expires_at, payment_history_id)
+		VALUES ($1, 'plus', '{"storage_max":20000000000, "file_max":50000000}'::jsonb, $2, $3);`
+	_, err = tx.Exec(plusQuery, user.ID, plus, paymentHistoryId)
 	if err != nil {
 		return err
 	}
