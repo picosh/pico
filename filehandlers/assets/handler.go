@@ -244,7 +244,7 @@ func (h *UploadAssetHandler) findDenylist(bucket sst.Bucket, project *db.Project
 
 func (h *UploadAssetHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (string, error) {
 	user, err := shared.GetUser(s.Context())
-	if err != nil {
+	if user == nil || err != nil {
 		h.Cfg.Logger.Error("user not found in ctx", "err", err.Error())
 		return "", err
 	}
