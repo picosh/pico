@@ -34,7 +34,7 @@ jobs:
         args: -E goimports -E godot --timeout 10m
     - name: Run tests
       run: |
-        go test -v ./... -cover -race -coverprofile=coverage.out
+        PICO_SECRET="danger" go test -v ./... -cover -race -coverprofile=coverage.out
         go tool cover -func=coverage.out -o=coverage.out
   build-main:
     runs-on: ubuntu-22.04

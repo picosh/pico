@@ -613,7 +613,7 @@ func createMainRoutes() []shared.Route {
 	return routes
 }
 
-func handler(routes []shared.Route, client *Client) shared.ServeFn {
+func handler(routes []shared.Route, client *Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var allow []string
 
