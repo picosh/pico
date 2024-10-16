@@ -249,6 +249,7 @@ func (h *AssetHandler) handle(logger *slog.Logger, w http.ResponseWriter, r *htt
 
 		attempts = append(attempts, fp.Filepath)
 		mimeType := storage.GetMimeType(fp.Filepath)
+		logger = logger.With("filename", fp.Filepath)
 		var c io.ReadCloser
 		var err error
 		if strings.HasPrefix(mimeType, "image/") {

@@ -265,8 +265,8 @@ github.com/philhofer/fwd v1.1.3-0.20240916144458-20a13a1f6b7c h1:dAMKvw0MlJT1Gsh
 github.com/philhofer/fwd v1.1.3-0.20240916144458-20a13a1f6b7c/go.mod h1:RqIHx9QI14HlwKwm98g9Re5prTQ6LdeRQn+gXJFxsJM=
 github.com/picosh/go-rsync-receiver v0.0.0-20240709135253-1daf4b12a9fc h1:bvcsoOvaNHPquFnRkdraEo7+8t6bW7nWEhlALnwZPdI=
 github.com/picosh/go-rsync-receiver v0.0.0-20240709135253-1daf4b12a9fc/go.mod h1:i0iR3W4GSm1PuvVxB9OH32E5jP+CYkVb2NQSe0JCtlo=
-github.com/picosh/pobj v0.0.0-20241008013754-bbbfc341e2cf h1:Ul+LuTVXRimpIneOHez05k7VOV/lDVw37I18rceEplw=
-github.com/picosh/pobj v0.0.0-20241008013754-bbbfc341e2cf/go.mod h1:cF+eAl4G1vU+WOD8cYCKaxokHo6MWmbR8J4/SJnvESg=
+github.com/picosh/pobj v0.0.0-20241016194248-c39198b2ff23 h1:NEJ5a4UXeF0/X7xmYNzXcwLQID9DwgazlqkMMC5zZ3M=
+github.com/picosh/pobj v0.0.0-20241016194248-c39198b2ff23/go.mod h1:cF+eAl4G1vU+WOD8cYCKaxokHo6MWmbR8J4/SJnvESg=
 github.com/picosh/pubsub v0.0.0-20241008010300-a63fd95dc8ed h1:aBJeQoLvq/V3hX6bgWjuuTmGzgbPNYuuwaCWU4aSJcU=
 github.com/picosh/pubsub v0.0.0-20241008010300-a63fd95dc8ed/go.mod h1:ajolgob5MxlHdp5HllF7u3rTlCgER4InqfP7M/xl6HQ=
 github.com/picosh/send v0.0.0-20241008013240-6fdbff00f848 h1:VWbjNNOqpJ8AB3zdw+M5+XC/SINooWLGi6WCozKwt1o=

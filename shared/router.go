@@ -55,7 +55,6 @@ func CreatePProfRoutes(routes []Route) []Route {
 	)
 }
 
-type ServeFn func(http.ResponseWriter, *http.Request)
 type ApiConfig struct {
 	Cfg            *ConfigSite
 	Dbpool         db.DB
@@ -73,7 +72,7 @@ func (hc *ApiConfig) CreateCtx(prevCtx context.Context, subdomain string) contex
 	return ctx
 }
 
-func CreateServeBasic(routes []Route, ctx context.Context) ServeFn {
+func CreateServeBasic(routes []Route, ctx context.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var allow []string
 		for _, route := range routes {
@@ -132,7 +131,7 @@ func findRouteConfig(r *http.Request, routes []Route, subdomainRoutes []Route, c
 	return curRoutes, subdomain
 }
 
-func CreateServe(routes []Route, subdomainRoutes []Route, apiConfig *ApiConfig) ServeFn {
+func CreateServe(routes []Route, subdomainRoutes []Route, apiConfig *ApiConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		curRoutes, subdomain := findRouteConfig(r, routes, subdomainRoutes, apiConfig.Cfg)
 		ctx := apiConfig.CreateCtx(r.Context(), subdomain)
@@ -143,11 +142,12 @@ func CreateServe(routes []Route, subdomainRoutes []Route, apiConfig *ApiConfig) 
 
 type ctxDBKey struct{}
 type ctxStorageKey struct{}
-type ctxKey struct{}
 type ctxLoggerKey struct{}
-type ctxSubdomainKey struct{}
 type ctxCfg struct{}
 type ctxAnalyticsQueue struct{}
+
+type ctxSubdomainKey struct{}
+type ctxKey struct{}
 type CtxSshKey struct{}
 
 func GetSshCtx(r *http.Request) (ssh.Context, error) {
