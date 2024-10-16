@@ -82,6 +82,104 @@ func TestApiBasic(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:        "direct-file",
+			path:        "/test.html",
+			want:        "hello world!",
+			status:      http.StatusOK,
+			contentType: "text/html",
+
+			dbpool: NewPgsDb(cfg.Logger),
+			storage: map[string]map[string]string{
+				bucketName: {
+					"test/test.html": "hello world!",
+				},
+			},
+		},
+		{
+			name:        "subdir-301-redirect",
+			path:        "/subdir",
+			want:        `<a href="/subdir/">Moved Permanently</a>.`,
+			status:      http.StatusMovedPermanently,
+			contentType: "text/html; charset=utf-8",
+
+			dbpool: NewPgsDb(cfg.Logger),
+			storage: map[string]map[string]string{
+				bucketName: {
+					"test/subdir/index.html": "hello world!",
+				},
+			},
+		},
+		{
+			name:        "redirects-file-301",
+			path:        "/anything",
+			want:        `<a href="/about.html">Moved Permanently</a>.`,
+			status:      http.StatusMovedPermanently,
+			contentType: "text/html; charset=utf-8",
+
+			dbpool: NewPgsDb(cfg.Logger),
+			storage: map[string]map[string]string{
+				bucketName: {
+					"test/_redirects": "/anything /about.html 301",
+					"test/about.html": "hello world!",
+				},
+			},
+		},
+		{
+			name:        "subdir-direct",
+			path:        "/subdir/index.html",
+			want:        "hello world!",
+			status:      http.StatusOK,
+			contentType: "text/html",
+
+			dbpool: NewPgsDb(cfg.Logger),
+			storage: map[string]map[string]string{
+				bucketName: {
+					"test/subdir/index.html": "hello world!",
+				},
+			},
+		},
+		{
+			name:        "spa",
+			path:        "/anything",
+			want:        "hello world!",
+			status:      http.StatusOK,
+			contentType: "text/html",
+
+			dbpool: NewPgsDb(cfg.Logger),
+			storage: map[string]map[string]string{
+				bucketName: {
+					"test/_redirects": "/* /index.html 200",
+					"test/index.html": "hello world!",
+				},
+			},
+		},
+		{
+			name:        "not-found",
+			path:        "/anything",
+			want:        "404 not found",
+			status:      http.StatusNotFound,
+			contentType: "text/plain; charset=utf-8",
+
+			dbpool: NewPgsDb(cfg.Logger),
+			storage: map[string]map[string]string{
+				bucketName: {},
+			},
+		},
+		{
+			name:        "not-found-custom",
+			path:        "/anything",
+			want:        "boom!",
+			status:      http.StatusNotFound,
+			contentType: "text/html",
+
+			dbpool: NewPgsDb(cfg.Logger),
+			storage: map[string]map[string]string{
+				bucketName: {
+					"test/404.html": "boom!",
+				},
+			},
+		},
 	}
 
 	for _, tc := range tt {
