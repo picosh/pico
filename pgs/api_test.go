@@ -66,6 +66,7 @@ func mkpath(path string) string {
 func TestApiBasic(t *testing.T) {
 	bucketName := shared.GetAssetBucketName(testUserID)
 	cfg := NewConfigSite()
+	cfg.Domain = "pgs.test"
 	tt := []*ApiExample{
 		{
 			name:        "basic",
