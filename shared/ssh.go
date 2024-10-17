@@ -93,11 +93,13 @@ func (r *SshAuthHandler) PubkeyAuthHandler(ctx ssh.Context, key ssh.PublicKey) b
 			"plus",
 			r.Cfg.MaxSize,
 			r.Cfg.MaxAssetSize,
+			r.Cfg.MaxSpecialFileSize,
 		)
 	}
 	// this is jank
 	ff.Data.StorageMax = ff.FindStorageMax(r.Cfg.MaxSize)
 	ff.Data.FileMax = ff.FindFileMax(r.Cfg.MaxAssetSize)
+	ff.Data.SpecialFileMax = ff.FindSpecialFileMax(r.Cfg.MaxSpecialFileSize)
 
 	SetUser(ctx, user)
 	SetFeatureFlag(ctx, ff)

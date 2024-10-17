@@ -224,13 +224,14 @@ type FeatureFlag struct {
 	Data             FeatureFlagData `json:"data"`
 }
 
-func NewFeatureFlag(userID, name string, storageMax uint64, fileMax int64) *FeatureFlag {
+func NewFeatureFlag(userID, name string, storageMax uint64, fileMax int64, specialFileMax int64) *FeatureFlag {
 	return &FeatureFlag{
 		UserID: userID,
 		Name:   name,
 		Data: FeatureFlagData{
-			StorageMax: storageMax,
-			FileMax:    fileMax,
+			StorageMax:     storageMax,
+			FileMax:        fileMax,
+			SpecialFileMax: specialFileMax,
 		},
 	}
 }
@@ -249,6 +250,13 @@ func (ff *FeatureFlag) FindFileMax(defaultSize int64) int64 {
 	return ff.Data.FileMax
 }
 
+func (ff *FeatureFlag) FindSpecialFileMax(defaultSize int64) int64 {
+	if ff.Data.SpecialFileMax == 0 {
+		return defaultSize
+	}
+	return ff.Data.SpecialFileMax
+}
+
 func (ff *FeatureFlag) IsValid() bool {
 	if ff.ExpiresAt.IsZero() {
 		return false
@@ -257,8 +265,9 @@ func (ff *FeatureFlag) IsValid() bool {
 }
 
 type FeatureFlagData struct {
-	StorageMax uint64 `json:"storage_max"`
-	FileMax    int64  `json:"file_max"`
+	StorageMax     uint64 `json:"storage_max"`
+	FileMax        int64  `json:"file_max"`
+	SpecialFileMax int64  `json:"special_file_max"`
 }
 
 // Make the Attrs struct implement the driver.Valuer interface. This method

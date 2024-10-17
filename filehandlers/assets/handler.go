@@ -363,6 +363,11 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (s
 		"sizeRemaining", sizeRemaining,
 	)
 
+	specialFileMax := featureFlag.Data.SpecialFileMax
+	if isSpecialFile(entry) {
+		sizeRemaining = min(sizeRemaining, specialFileMax)
+	}
+
 	fsize, err := h.writeAsset(
 		utils.NewMaxBytesReader(data.Reader, int64(sizeRemaining)),
 		data,
@@ -370,11 +375,12 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (s
 	if err != nil {
 		logger.Error("could not write asset", "err", err.Error())
 		cerr := fmt.Errorf(
-			"%s: storage size %.2fmb, storage max %.2fmb, file max %.2fmb",
+			"%s: storage size %.2fmb, storage max %.2fmb, file max %.2fmb, special file max %.2fmb",
 			err,
 			utils.BytesToMB(int(curStorageSize)),
 			utils.BytesToMB(int(storageMax)),
 			utils.BytesToMB(int(fileMax)),
+			utils.BytesToMB(int(specialFileMax)),
 		)
 		return "", cerr
 	}
@@ -398,6 +404,11 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (s
 	)
 
 	return str, nil
+}
+
+func isSpecialFile(entry *sendutils.FileEntry) bool {
+	fname := filepath.Base(entry.Filepath)
+	return fname == "_headers" || fname == "_redirects"
 }
 
 func (h *UploadAssetHandler) Delete(s ssh.Session, entry *sendutils.FileEntry) error {
