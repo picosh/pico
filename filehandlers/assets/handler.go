@@ -357,9 +357,9 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (s
 		return "", fmt.Errorf("storage quota reached")
 	}
 	logger = logger.With(
-		"storage max", storageMax,
-		"current storage max", curStorageSize,
-		"file max", fileMax,
+		"storageMax", storageMax,
+		"currentStorageMax", curStorageSize,
+		"fileMax", fileMax,
 		"sizeRemaining", sizeRemaining,
 	)
 
@@ -375,7 +375,7 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (s
 	if err != nil {
 		logger.Error("could not write asset", "err", err.Error())
 		cerr := fmt.Errorf(
-			"%s: storage size %.2fmb, storage max %.2fmb, file max %.2fmb, special file max %.2fmb",
+			"%s: storage size %.2fmb, storage max %.2fmb, file max %.2fmb, special file max %.4fmb",
 			err,
 			utils.BytesToMB(int(curStorageSize)),
 			utils.BytesToMB(int(storageMax)),
