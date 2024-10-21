@@ -216,6 +216,9 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("content-type", contentType)
 	}
 
+	// Allows us to invalidate the cache when files are modified
+	w.Header().Set("surrogate-key", h.Subdomain)
+
 	finContentType := w.Header().Get("content-type")
 
 	logger.Info(

@@ -8,6 +8,14 @@
 		metrics
 		trusted_proxies static 0.0.0.0/0
 	}
+	cache {
+		ttl 300s
+		max_cacheable_body_bytes 1000000
+		otter
+		api {
+			souin
+		}
+	}
 }
 
 *.{$APP_DOMAIN}, {$APP_DOMAIN} {
@@ -21,6 +29,19 @@
 		dns cloudflare {$CF_API_TOKEN}
 		resolvers 1.1.1.1
 	}
+	route {
+		@souinApi path /souin-api/*
+		basic_auth @souinApi {
+			testuser $2a$14$i1G0lil5qti7qahb4.Kte.wP/3O8uaStduzhBBtuDUZhMJeSjxbqm
+		}
+		cache {
+			regex {
+				exclude /check
+			}
+		}
+		reverse_proxy web:3000
+	}
+
 	encode zstd gzip
 
 	header {
