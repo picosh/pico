@@ -16,6 +16,8 @@ func NewConfigSite() *shared.ConfigSite {
 	port := utils.GetEnv("PGS_WEB_PORT", "3000")
 	protocol := utils.GetEnv("PGS_PROTOCOL", "https")
 	storageDir := utils.GetEnv("PGS_STORAGE_DIR", ".storage")
+	pgsCacheUser := utils.GetEnv("PGS_CACHE_USER", "")
+	pgsCachePass := utils.GetEnv("PGS_CACHE_PASSWORD", "")
 	minioURL := utils.GetEnv("MINIO_URL", "")
 	minioUser := utils.GetEnv("MINIO_ROOT_USER", "")
 	minioPass := utils.GetEnv("MINIO_ROOT_PASSWORD", "")
@@ -27,6 +29,8 @@ func NewConfigSite() *shared.ConfigSite {
 		Protocol:           protocol,
 		DbURL:              dbURL,
 		StorageDir:         storageDir,
+		CacheUser:          pgsCacheUser,
+		CachePassword:      pgsCachePass,
 		MinioURL:           minioURL,
 		MinioUser:          minioUser,
 		MinioPass:          minioPass,
