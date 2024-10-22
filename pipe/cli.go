@@ -340,7 +340,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 								case <-ctx.Done():
 									cancelFunc()
 									return
-								default:
+								case <-time.After(1 * time.Millisecond):
 									count := 0
 									for topic, channel := range pubsub.GetChannels() {
 										if topic == name {
