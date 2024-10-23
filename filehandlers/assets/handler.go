@@ -6,11 +6,13 @@ import (
 	"io"
 	"io/fs"
 	"log/slog"
+	"net/http"
 	"os"
 	"path"
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/charmbracelet/ssh"
@@ -98,16 +100,21 @@ type FileData struct {
 }
 
 type UploadAssetHandler struct {
-	DBPool  db.DB
-	Cfg     *shared.ConfigSite
-	Storage storage.StorageServe
+	DBPool             db.DB
+	Cfg                *shared.ConfigSite
+	Storage            storage.StorageServe
+	CacheClearingQueue chan string
 }
 
 func NewUploadAssetHandler(dbpool db.DB, cfg *shared.ConfigSite, storage storage.StorageServe) *UploadAssetHandler {
+	// Enable buffering so we don't slow down uploads.
+	ch := make(chan string, 100)
+	go runCacheQueue(ch, cfg)
 	return &UploadAssetHandler{
-		DBPool:  dbpool,
-		Cfg:     cfg,
-		Storage: storage,
+		DBPool:             dbpool,
+		Cfg:                cfg,
+		Storage:            storage,
+		CacheClearingQueue: ch,
 	}
 }
 
@@ -402,6 +409,7 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (s
 		utils.BytesToGB(maxSize),
 		(float32(nextStorageSize)/float32(maxSize))*100,
 	)
+	h.CacheClearingQueue <- fmt.Sprintf("%s-%s", user.Name, projectName)
 
 	return str, nil
 }
@@ -468,8 +476,9 @@ func (h *UploadAssetHandler) Delete(s ssh.Session, entry *sendutils.FileEntry) e
 			return err
 		}
 	}
-
-	return h.Storage.DeleteObject(bucket, assetFilepath)
+	err = h.Storage.DeleteObject(bucket, assetFilepath)
+	h.CacheClearingQueue <- fmt.Sprintf("%s-%s", user.Name, projectName)
+	return err
 }
 
 func (h *UploadAssetHandler) validateAsset(data *FileData) (bool, error) {
@@ -514,4 +523,57 @@ func (h *UploadAssetHandler) writeAsset(reader io.Reader, data *FileData) (int64
 		data.FileEntry,
 	)
 	return fsize, err
+}
+
+// runCacheQueue processes requests to purge the cache for a single site.
+// One message arrives per file that is written/deleted during uploads.
+// Repeated messages for the same site are grouped so that we only flush once
+// per site per 5 seconds.
+func runCacheQueue(ch chan string, cfg *shared.ConfigSite) {
+	cacheApiUrl := fmt.Sprintf("https://%s/souin-api/souin/", cfg.Domain)
+	var pendingFlushes sync.Map
+	tick := time.Tick(5 * time.Second)
+	for {
+		select {
+		case host := <-ch:
+			pendingFlushes.Store(host, host)
+		case <-tick:
+			go func() {
+				pendingFlushes.Range(func(key, value any) bool {
+					pendingFlushes.Delete(key)
+					err := purgeCache(key.(string), cacheApiUrl, cfg.CacheUser, cfg.CachePassword)
+					if err != nil {
+						cfg.Logger.Error("failed to clear cache", "err", err.Error())
+					}
+					return true
+				})
+			}()
+		}
+	}
+}
+
+// purgeCache send an HTTP request to the pgs Caddy instance which purges
+// cached entries for a given subdomain (like "fakeuser-www-proj"). We set a
+// "surrogate-key: <subdomain>" header on every pgs response which ensures all
+// cached assets for a given subdomain are grouped under a single key (which is
+// separate from the "GET-https-example.com-/path" key used for serving files
+// from the cache).
+func purgeCache(subdomain string, cacheApiUrl string, username string, password string) error {
+	client := &http.Client{
+		Timeout: time.Second * 5,
+	}
+	req, err := http.NewRequest("PURGE", cacheApiUrl, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Add("Surrogate-Key", subdomain)
+	req.SetBasicAuth(username, password)
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode != 204 {
+		return fmt.Errorf("received unexpected response code %d", resp.StatusCode)
+	}
+	return nil
 }

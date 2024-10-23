@@ -354,6 +354,9 @@ func (h *AssetHandler) handle(logger *slog.Logger, w http.ResponseWriter, r *htt
 		w.Header().Set("content-type", contentType)
 	}
 
+	// Allows us to invalidate the cache when files are modified
+	w.Header().Set("surrogate-key", h.Subdomain)
+
 	finContentType := w.Header().Get("content-type")
 
 	// only track pages, not individual assets
