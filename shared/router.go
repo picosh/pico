@@ -64,7 +64,7 @@ type ApiConfig struct {
 
 func (hc *ApiConfig) CreateCtx(prevCtx context.Context, subdomain string) context.Context {
 	ctx := context.WithValue(prevCtx, ctxLoggerKey{}, hc.Cfg.Logger)
-	ctx = context.WithValue(ctx, ctxSubdomainKey{}, subdomain)
+	ctx = context.WithValue(ctx, CtxSubdomainKey{}, subdomain)
 	ctx = context.WithValue(ctx, ctxDBKey{}, hc.Dbpool)
 	ctx = context.WithValue(ctx, ctxStorageKey{}, hc.Storage)
 	ctx = context.WithValue(ctx, ctxCfg{}, hc.Cfg)
@@ -105,30 +105,29 @@ func CreateServeBasic(routes []Route, ctx context.Context) http.HandlerFunc {
 	}
 }
 
-func findRouteConfig(r *http.Request, routes []Route, subdomainRoutes []Route, cfg *ConfigSite) ([]Route, string) {
-	var subdomain string
-	curRoutes := routes
+func GetSubdomainFromRequest(r *http.Request, domain, space string) string {
+	hostDomain := strings.ToLower(strings.Split(r.Host, ":")[0])
+	appDomain := strings.ToLower(strings.Split(domain, ":")[0])
 
-	if cfg.IsCustomdomains() || cfg.IsSubdomains() {
-		hostDomain := strings.ToLower(strings.Split(r.Host, ":")[0])
-		appDomain := strings.ToLower(strings.Split(cfg.Domain, ":")[0])
-
-		if hostDomain != appDomain {
-			if strings.Contains(hostDomain, appDomain) {
-				subdomain = strings.TrimSuffix(hostDomain, fmt.Sprintf(".%s", appDomain))
-				if subdomain != "" {
-					curRoutes = subdomainRoutes
-				}
-			} else {
-				subdomain = GetCustomDomain(hostDomain, cfg.Space)
-				if subdomain != "" {
-					curRoutes = subdomainRoutes
-				}
-			}
+	if hostDomain != appDomain {
+		if strings.Contains(hostDomain, appDomain) {
+			subdomain := strings.TrimSuffix(hostDomain, fmt.Sprintf(".%s", appDomain))
+			return subdomain
+		} else {
+			subdomain := GetCustomDomain(hostDomain, space)
+			return subdomain
 		}
 	}
 
-	return curRoutes, subdomain
+	return ""
+}
+
+func findRouteConfig(r *http.Request, routes []Route, subdomainRoutes []Route, cfg *ConfigSite) ([]Route, string) {
+	subdomain := GetSubdomainFromRequest(r, cfg.Domain, cfg.Space)
+	if subdomain == "" {
+		return routes, subdomain
+	}
+	return subdomainRoutes, subdomain
 }
 
 func CreateServe(routes []Route, subdomainRoutes []Route, apiConfig *ApiConfig) http.HandlerFunc {
@@ -146,7 +145,7 @@ type ctxLoggerKey struct{}
 type ctxCfg struct{}
 type ctxAnalyticsQueue struct{}
 
-type ctxSubdomainKey struct{}
+type CtxSubdomainKey struct{}
 type ctxKey struct{}
 type CtxSshKey struct{}
 
@@ -183,7 +182,7 @@ func GetField(r *http.Request, index int) string {
 }
 
 func GetSubdomain(r *http.Request) string {
-	return r.Context().Value(ctxSubdomainKey{}).(string)
+	return r.Context().Value(CtxSubdomainKey{}).(string)
 }
 
 func GetCustomDomain(host string, space string) string {

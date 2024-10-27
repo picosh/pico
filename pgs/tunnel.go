@@ -1,19 +1,20 @@
 package pgs
 
 import (
-	"context"
-	"encoding/json"
 	"net/http"
 	"strings"
 
 	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared"
-	"github.com/picosh/pico/ui"
 	"github.com/picosh/utils"
 )
 
-func allowPerm(proj *db.Project) bool {
+type TunnelWebRouter struct {
+	*WebRouter
+}
+
+func (web *TunnelWebRouter) Perm(proj *db.Project) bool {
 	return true
 }
 
@@ -97,7 +98,7 @@ func createHttpHandler(apiConfig *shared.ApiConfig) CtxHttpBridge {
 
 		log.Info("user has access to site")
 
-		routes := []shared.Route{
+		/* routes := []shared.Route{
 			// special API endpoint for tunnel users accessing site
 			shared.NewCorsRoute("GET", "/api/current_user", func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
@@ -113,19 +114,27 @@ func createHttpHandler(apiConfig *shared.ApiConfig) CtxHttpBridge {
 					log.Error(err.Error())
 				}
 			}),
-		}
+		} */
 
-		if subdomain == "pico-ui" || subdomain == "erock-ui" {
-			rts := ui.CreateRoutes(apiConfig, ctx)
-			routes = append(routes, rts...)
-		}
+		routes := NewWebRouter(
+			apiConfig.Cfg,
+			logger,
+			apiConfig.Dbpool,
+			apiConfig.Storage,
+			apiConfig.AnalyticsQueue,
+		)
+		tunnelRouter := TunnelWebRouter{routes}
+		router := http.NewServeMux()
+		router.HandleFunc("GET /{fname}/{options}...", tunnelRouter.ImageRequest)
+		router.HandleFunc("GET /{fname}", tunnelRouter.AssetRequest)
+		router.HandleFunc("GET /{$}", tunnelRouter.AssetRequest)
 
-		subdomainRoutes := createSubdomainRoutes(allowPerm)
+		/* subdomainRoutes := createSubdomainRoutes(allowPerm)
 		routes = append(routes, subdomainRoutes...)
 		finctx := apiConfig.CreateCtx(context.Background(), subdomain)
 		finctx = context.WithValue(finctx, shared.CtxSshKey{}, ctx)
 		httpHandler := shared.CreateServeBasic(routes, finctx)
-		httpRouter := http.HandlerFunc(httpHandler)
-		return httpRouter
+		httpRouter := http.HandlerFunc(httpHandler) */
+		return router
 	}
 }

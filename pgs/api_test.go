@@ -220,15 +220,8 @@ func TestApiBasic(t *testing.T) {
 
 			st, _ := storage.NewStorageMemory(tc.storage)
 			ch := make(chan *db.AnalyticsVisits)
-			apiConfig := &shared.ApiConfig{
-				Cfg:            cfg,
-				Dbpool:         tc.dbpool,
-				Storage:        st,
-				AnalyticsQueue: ch,
-			}
-			handler := shared.CreateServe(mainRoutes, createSubdomainRoutes(publicPerm), apiConfig)
-			router := http.HandlerFunc(handler)
-			router(responseRecorder, request)
+			router := NewWebRouter(cfg, cfg.Logger, tc.dbpool, st, ch)
+			router.ServeHTTP(responseRecorder, request)
 
 			if responseRecorder.Code != tc.status {
 				t.Errorf("Want status '%d', got '%d'", tc.status, responseRecorder.Code)
@@ -263,14 +256,7 @@ func TestAnalytics(t *testing.T) {
 	st, _ := storage.NewStorageMemory(sto)
 	ch := make(chan *db.AnalyticsVisits)
 	dbpool := NewPgsAnalticsDb(cfg.Logger)
-	apiConfig := &shared.ApiConfig{
-		Cfg:            cfg,
-		Dbpool:         dbpool,
-		Storage:        st,
-		AnalyticsQueue: ch,
-	}
-	handler := shared.CreateServe(mainRoutes, createSubdomainRoutes(publicPerm), apiConfig)
-	router := http.HandlerFunc(handler)
+	router := NewWebRouter(cfg, cfg.Logger, dbpool, st, ch)
 
 	go func() {
 		for analytics := range ch {
@@ -281,7 +267,7 @@ func TestAnalytics(t *testing.T) {
 		}
 	}()
 
-	router(responseRecorder, request)
+	router.ServeHTTP(responseRecorder, request)
 
 	select {
 	case <-ch:
@@ -307,38 +293,77 @@ func TestImageManipulation(t *testing.T) {
 	bucketName := shared.GetAssetBucketName(testUserID)
 	cfg := NewConfigSite()
 	cfg.Domain = "pgs.test"
-	expectedPath := "/app.jpg/s:500/rt:90"
-	request := httptest.NewRequest("GET", mkpath(expectedPath), strings.NewReader(""))
-	responseRecorder := httptest.NewRecorder()
 
-	sto := map[string]map[string]string{
-		bucketName: {
-			"test/app.jpg": "hello world!",
+	tt := []ApiExample{
+		{
+			name:        "root-img",
+			path:        "/app.jpg/s:500/rt:90",
+			want:        "hello world!",
+			status:      http.StatusOK,
+			contentType: "image/jpeg",
+
+			dbpool: NewPgsDb(cfg.Logger),
+			storage: map[string]map[string]string{
+				bucketName: {
+					"test/app.jpg": "hello world!",
+				},
+			},
+		},
+		{
+			name:        "root-subdir-img",
+			path:        "/subdir/app.jpg/rt:90/s:500",
+			want:        "hello world!",
+			status:      http.StatusOK,
+			contentType: "image/jpeg",
+
+			dbpool: NewPgsDb(cfg.Logger),
+			storage: map[string]map[string]string{
+				bucketName: {
+					"test/subdir/app.jpg": "hello world!",
+				},
+			},
 		},
 	}
-	memst, _ := storage.NewStorageMemory(sto)
-	st := &ImageStorageMemory{StorageMemory: memst}
-	ch := make(chan *db.AnalyticsVisits)
-	dbpool := NewPgsAnalticsDb(cfg.Logger)
-	apiConfig := &shared.ApiConfig{
-		Cfg:            cfg,
-		Dbpool:         dbpool,
-		Storage:        st,
-		AnalyticsQueue: ch,
-	}
-	handler := shared.CreateServe(mainRoutes, createSubdomainRoutes(publicPerm), apiConfig)
-	router := http.HandlerFunc(handler)
-	router(responseRecorder, request)
 
-	if st.Fpath != "test/app.jpg" {
-		t.Errorf("Want path '%s', got '%s'", "test/app.jpg", st.Fpath)
-	}
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			request := httptest.NewRequest("GET", mkpath(tc.path), strings.NewReader(""))
+			responseRecorder := httptest.NewRecorder()
 
-	if st.Opts.Ratio.Width != 500 {
-		t.Errorf("Want ratio width '500', got '%d'", st.Opts.Ratio.Width)
-	}
+			memst, _ := storage.NewStorageMemory(tc.storage)
+			st := &ImageStorageMemory{
+				StorageMemory: memst,
+				Opts: &storage.ImgProcessOpts{
+					Ratio: &storage.Ratio{},
+				},
+			}
+			ch := make(chan *db.AnalyticsVisits)
+			router := NewWebRouter(cfg, cfg.Logger, tc.dbpool, st, ch)
+			router.ServeHTTP(responseRecorder, request)
 
-	if st.Opts.Rotate != 90 {
-		t.Errorf("Want rotate '90', got '%d'", st.Opts.Rotate)
+			if responseRecorder.Code != tc.status {
+				t.Errorf("Want status '%d', got '%d'", tc.status, responseRecorder.Code)
+			}
+
+			ct := responseRecorder.Header().Get("content-type")
+			if ct != tc.contentType {
+				t.Errorf("Want status '%s', got '%s'", tc.contentType, ct)
+			}
+
+			body := strings.TrimSpace(responseRecorder.Body.String())
+			if body != tc.want {
+				t.Errorf("Want '%s', got '%s'", tc.want, body)
+			}
+
+			if st.Opts.Ratio.Width != 500 {
+				t.Errorf("Want ratio width '500', got '%d'", st.Opts.Ratio.Width)
+				return
+			}
+
+			if st.Opts.Rotate != 90 {
+				t.Errorf("Want rotate '90', got '%d'", st.Opts.Rotate)
+				return
+			}
+		})
 	}
 }
