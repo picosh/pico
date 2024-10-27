@@ -79,8 +79,7 @@ func cleanReferer(ref string) (string, error) {
 
 var ErrAnalyticsDisabled = errors.New("owner does not have site analytics enabled")
 
-func AnalyticsVisitFromRequest(r *http.Request, userID string, secret string) (*db.AnalyticsVisits, error) {
-	dbpool := GetDB(r)
+func AnalyticsVisitFromRequest(r *http.Request, dbpool db.DB, userID string, secret string) (*db.AnalyticsVisits, error) {
 	if !dbpool.HasFeatureForUser(userID, "analytics") {
 		return nil, ErrAnalyticsDisabled
 	}
