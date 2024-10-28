@@ -290,6 +290,8 @@ type WebRouter struct {
 	Dbpool         db.DB
 	Storage        storage.StorageServe
 	AnalyticsQueue chan *db.AnalyticsVisits
+	RootRouter     *http.ServeMux
+	UserRouter     *http.ServeMux
 }
 
 func NewWebRouter(cfg *shared.ConfigSite, logger *slog.Logger, dbpool db.DB, st storage.StorageServe, analytics chan *db.AnalyticsVisits) *WebRouter {
@@ -546,27 +548,42 @@ func (web *WebRouter) ServeAsset(fname string, opts *storage.ImgProcessOpts, fro
 	asset.ServeHTTP(w, r)
 }
 
-func (web *WebRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	router := http.NewServeMux()
-	subdomain := shared.GetSubdomainFromRequest(r, web.Cfg.Domain, web.Cfg.Space)
+func (web *WebRouter) InitRouters() {
+	// root domain
+	rootRouter := http.NewServeMux()
+	rootRouter.HandleFunc("GET /check", web.checkHandler)
+	rootRouter.Handle("GET /main.css", shared.ServeFile("main.css", "text/css"))
+	rootRouter.Handle("GET /card.png", shared.ServeFile("card.png", "image/png"))
+	rootRouter.Handle("GET /favicon-16x16.png", shared.ServeFile("favicon-16x16.png", "image/png"))
+	rootRouter.Handle("GET /apple-touch-icon.png", shared.ServeFile("apple-touch-icon.png", "image/png"))
+	rootRouter.Handle("GET /favicon.ico", shared.ServeFile("favicon.ico", "image/x-icon"))
+	rootRouter.Handle("GET /robots.txt", shared.ServeFile("robots.txt", "text/plain"))
+	rootRouter.Handle("GET /rss/updated", web.createRssHandler("updated_at"))
+	rootRouter.Handle("GET /rss", web.createRssHandler("created_at"))
+	rootRouter.Handle("GET /{$}", shared.CreatePageHandler("html/marketing.page.tmpl"))
+	web.RootRouter = rootRouter
 
+	// subdomain or custom domains
+	userRouter := http.NewServeMux()
+	userRouter.HandleFunc("GET /{fname}/{options...}", web.ImageRequest)
+	userRouter.HandleFunc("GET /{fname}", web.AssetRequest)
+	userRouter.HandleFunc("GET /{$}", web.AssetRequest)
+	web.UserRouter = userRouter
+}
+
+func (web *WebRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	subdomain := shared.GetSubdomainFromRequest(r, web.Cfg.Domain, web.Cfg.Space)
+	if web.RootRouter == nil || web.UserRouter == nil {
+		web.Logger.Error("routers not initialized")
+		http.Error(w, "routers not initialized", http.StatusInternalServerError)
+		return
+	}
+
+	var router *http.ServeMux
 	if subdomain == "" {
-		// root routes
-		router.HandleFunc("GET /check", web.checkHandler)
-		router.Handle("GET /main.css", shared.ServeFile("main.css", "text/css"))
-		router.Handle("GET /card.png", shared.ServeFile("card.png", "image/png"))
-		router.Handle("GET /favicon-16x16.png", shared.ServeFile("favicon-16x16.png", "image/png"))
-		router.Handle("GET /apple-touch-icon.png", shared.ServeFile("apple-touch-icon.png", "image/png"))
-		router.Handle("GET /favicon.ico", shared.ServeFile("favicon.ico", "image/x-icon"))
-		router.Handle("GET /robots.txt", shared.ServeFile("robots.txt", "text/plain"))
-		router.Handle("GET /rss/updated", web.createRssHandler("updated_at"))
-		router.Handle("GET /rss", web.createRssHandler("created_at"))
-		router.Handle("GET /{$}", shared.CreatePageHandler("html/marketing.page.tmpl"))
+		router = web.RootRouter
 	} else {
-		// user routes
-		router.HandleFunc("GET /{fname}/{options...}", web.ImageRequest)
-		router.HandleFunc("GET /{fname}", web.AssetRequest)
-		router.HandleFunc("GET /{$}", web.AssetRequest)
+		router = web.UserRouter
 	}
 
 	ctx := r.Context()
@@ -598,6 +615,7 @@ func StartApiServer() {
 	go shared.AnalyticsCollect(ch, dbpool, logger)
 
 	routes := NewWebRouter(cfg, logger, dbpool, st, ch)
+	routes.InitRouters()
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)
 	logger.Info(
