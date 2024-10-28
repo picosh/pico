@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -60,19 +61,78 @@ func NewWebRouter(cfg *shared.ConfigSite, logger *slog.Logger, dbpool db.DB, st 
 	return router
 }
 
+func (web *WebRouter) serveFile(file string, contentType string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		logger := web.Logger
+		cfg := web.Cfg
+
+		contents, err := os.ReadFile(cfg.StaticPath(fmt.Sprintf("public/%s", file)))
+		if err != nil {
+			logger.Error(
+				"could not read file",
+				"fname", file,
+				"err", err.Error(),
+			)
+			http.Error(w, "file not found", 404)
+		}
+
+		w.Header().Add("Content-Type", contentType)
+
+		_, err = w.Write(contents)
+		if err != nil {
+			logger.Error(
+				"could not write http response",
+				"file", file,
+				"err", err.Error(),
+			)
+		}
+	}
+}
+
+func (web *WebRouter) createPageHandler(fname string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		logger := web.Logger
+		cfg := web.Cfg
+		ts, err := shared.RenderTemplate(cfg, []string{cfg.StaticPath(fname)})
+
+		if err != nil {
+			logger.Error(
+				"could not render template",
+				"fname", fname,
+				"err", err.Error(),
+			)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		data := shared.PageData{
+			Site: *cfg.GetSiteData(),
+		}
+		err = ts.Execute(w, data)
+		if err != nil {
+			logger.Error(
+				"could not execute template",
+				"fname", fname,
+				"err", err.Error(),
+			)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	}
+}
+
 func (web *WebRouter) initRouters() {
 	// root domain
 	rootRouter := http.NewServeMux()
 	rootRouter.HandleFunc("GET /check", web.checkHandler)
-	rootRouter.Handle("GET /main.css", shared.ServeFile("main.css", "text/css"))
-	rootRouter.Handle("GET /card.png", shared.ServeFile("card.png", "image/png"))
-	rootRouter.Handle("GET /favicon-16x16.png", shared.ServeFile("favicon-16x16.png", "image/png"))
-	rootRouter.Handle("GET /apple-touch-icon.png", shared.ServeFile("apple-touch-icon.png", "image/png"))
-	rootRouter.Handle("GET /favicon.ico", shared.ServeFile("favicon.ico", "image/x-icon"))
-	rootRouter.Handle("GET /robots.txt", shared.ServeFile("robots.txt", "text/plain"))
+	rootRouter.Handle("GET /main.css", web.serveFile("main.css", "text/css"))
+	rootRouter.Handle("GET /card.png", web.serveFile("card.png", "image/png"))
+	rootRouter.Handle("GET /favicon-16x16.png", web.serveFile("favicon-16x16.png", "image/png"))
+	rootRouter.Handle("GET /apple-touch-icon.png", web.serveFile("apple-touch-icon.png", "image/png"))
+	rootRouter.Handle("GET /favicon.ico", web.serveFile("favicon.ico", "image/x-icon"))
+	rootRouter.Handle("GET /robots.txt", web.serveFile("robots.txt", "text/plain"))
 	rootRouter.Handle("GET /rss/updated", web.createRssHandler("updated_at"))
 	rootRouter.Handle("GET /rss", web.createRssHandler("created_at"))
-	rootRouter.Handle("GET /{$}", shared.CreatePageHandler("html/marketing.page.tmpl"))
+	rootRouter.Handle("GET /{$}", web.createPageHandler("html/marketing.page.tmpl"))
 	web.RootRouter = rootRouter
 
 	// subdomain or custom domains
