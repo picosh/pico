@@ -13,7 +13,6 @@ import (
 	"github.com/charmbracelet/wish"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
-	uploadassets "github.com/picosh/pico/filehandlers/assets"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
 	wsh "github.com/picosh/pico/wish"
@@ -28,7 +27,7 @@ import (
 	"github.com/picosh/utils"
 )
 
-func createRouter(cfg *shared.ConfigSite, handler *uploadassets.UploadAssetHandler) proxy.Router {
+func createRouter(handler *UploadAssetHandler) proxy.Router {
 	return func(sh ssh.Handler, s ssh.Session) []wish.Middleware {
 		return []wish.Middleware{
 			pipe.Middleware(handler, ""),
@@ -43,14 +42,14 @@ func createRouter(cfg *shared.ConfigSite, handler *uploadassets.UploadAssetHandl
 	}
 }
 
-func withProxy(cfg *shared.ConfigSite, handler *uploadassets.UploadAssetHandler, otherMiddleware ...wish.Middleware) ssh.Option {
+func withProxy(handler *UploadAssetHandler, otherMiddleware ...wish.Middleware) ssh.Option {
 	return func(server *ssh.Server) error {
 		err := sftp.SSHOption(handler)(server)
 		if err != nil {
 			return err
 		}
 
-		return proxy.WithProxy(createRouter(cfg, handler), otherMiddleware...)(server)
+		return proxy.WithProxy(createRouter(handler), otherMiddleware...)(server)
 	}
 }
 
@@ -76,7 +75,7 @@ func StartSshServer() {
 		return
 	}
 
-	handler := uploadassets.NewUploadAssetHandler(
+	handler := NewUploadAssetHandler(
 		dbpool,
 		cfg,
 		st,
@@ -103,7 +102,6 @@ func StartSshServer() {
 		wish.WithPublicKeyAuth(sshAuth.PubkeyAuthHandler),
 		tunkit.WithWebTunnel(webTunnel),
 		withProxy(
-			cfg,
 			handler,
 			promwish.Middleware(fmt.Sprintf("%s:%s", host, promPort), "pgs-ssh"),
 		),

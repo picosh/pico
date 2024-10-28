@@ -125,11 +125,11 @@ func (web *WebRouter) initRouters() {
 	rootRouter := http.NewServeMux()
 	rootRouter.HandleFunc("GET /check", web.checkHandler)
 	rootRouter.Handle("GET /main.css", web.serveFile("main.css", "text/css"))
-	rootRouter.Handle("GET /card.png", web.serveFile("card.png", "image/png"))
 	rootRouter.Handle("GET /favicon-16x16.png", web.serveFile("favicon-16x16.png", "image/png"))
 	rootRouter.Handle("GET /apple-touch-icon.png", web.serveFile("apple-touch-icon.png", "image/png"))
 	rootRouter.Handle("GET /favicon.ico", web.serveFile("favicon.ico", "image/x-icon"))
 	rootRouter.Handle("GET /robots.txt", web.serveFile("robots.txt", "text/plain"))
+
 	rootRouter.Handle("GET /rss/updated", web.createRssHandler("updated_at"))
 	rootRouter.Handle("GET /rss", web.createRssHandler("created_at"))
 	rootRouter.Handle("GET /{$}", web.createPageHandler("html/marketing.page.tmpl"))

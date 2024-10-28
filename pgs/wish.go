@@ -10,7 +10,6 @@ import (
 	"github.com/charmbracelet/wish"
 	bm "github.com/charmbracelet/wish/bubbletea"
 	"github.com/picosh/pico/db"
-	uploadassets "github.com/picosh/pico/filehandlers/assets"
 	"github.com/picosh/pico/tui/common"
 	sendutils "github.com/picosh/send/utils"
 	"github.com/picosh/utils"
@@ -63,7 +62,7 @@ func flagCheck(cmd *flag.FlagSet, posArg string, cmdArgs []string) bool {
 	return true
 }
 
-func WishMiddleware(handler *uploadassets.UploadAssetHandler) wish.Middleware {
+func WishMiddleware(handler *UploadAssetHandler) wish.Middleware {
 	dbpool := handler.DBPool
 	log := handler.Cfg.Logger
 	cfg := handler.Cfg
