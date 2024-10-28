@@ -20,21 +20,42 @@ import (
 	sst "github.com/picosh/pobj/storage"
 )
 
-type SubdomainProps struct {
-	ProjectName string
-	Username    string
-}
+func StartApiServer() {
+	cfg := NewConfigSite()
+	logger := cfg.Logger
 
-func getProjectFromSubdomain(subdomain string) (*SubdomainProps, error) {
-	props := &SubdomainProps{}
-	strs := strings.SplitN(subdomain, "-", 2)
-	props.Username = strs[0]
-	if len(strs) == 2 {
-		props.ProjectName = strs[1]
+	dbpool := postgres.NewDB(cfg.DbURL, cfg.Logger)
+	defer dbpool.Close()
+
+	var st storage.StorageServe
+	var err error
+	if cfg.MinioURL == "" {
+		st, err = storage.NewStorageFS(cfg.StorageDir)
 	} else {
-		props.ProjectName = props.Username
+		st, err = storage.NewStorageMinio(cfg.MinioURL, cfg.MinioUser, cfg.MinioPass)
 	}
-	return props, nil
+
+	if err != nil {
+		logger.Error("could not connect to object storage", "err", err.Error())
+		return
+	}
+
+	ch := make(chan *db.AnalyticsVisits)
+	go shared.AnalyticsCollect(ch, dbpool, logger)
+
+	routes := NewWebRouter(cfg, logger, dbpool, st, ch)
+
+	portStr := fmt.Sprintf(":%s", cfg.Port)
+	logger.Info(
+		"starting server on port",
+		"port", cfg.Port,
+		"domain", cfg.Domain,
+	)
+	err = http.ListenAndServe(portStr, routes)
+	logger.Error(
+		"listen and serve",
+		"err", err.Error(),
+	)
 }
 
 type HasPerm = func(proj *db.Project) bool
@@ -59,6 +80,28 @@ func NewWebRouter(cfg *shared.ConfigSite, logger *slog.Logger, dbpool db.DB, st 
 	}
 	router.initRouters()
 	return router
+}
+
+func (web *WebRouter) initRouters() {
+	// root domain
+	rootRouter := http.NewServeMux()
+	rootRouter.HandleFunc("GET /check", web.checkHandler)
+	rootRouter.Handle("GET /main.css", web.serveFile("main.css", "text/css"))
+	rootRouter.Handle("GET /favicon-16x16.png", web.serveFile("favicon-16x16.png", "image/png"))
+	rootRouter.Handle("GET /apple-touch-icon.png", web.serveFile("apple-touch-icon.png", "image/png"))
+	rootRouter.Handle("GET /favicon.ico", web.serveFile("favicon.ico", "image/x-icon"))
+	rootRouter.Handle("GET /robots.txt", web.serveFile("robots.txt", "text/plain"))
+
+	rootRouter.Handle("GET /rss/updated", web.createRssHandler("updated_at"))
+	rootRouter.Handle("GET /rss", web.createRssHandler("created_at"))
+	rootRouter.Handle("GET /{$}", web.createPageHandler("html/marketing.page.tmpl"))
+	web.RootRouter = rootRouter
+
+	// subdomain or custom domains
+	userRouter := http.NewServeMux()
+	userRouter.HandleFunc("GET /{fname...}", web.AssetRequest)
+	userRouter.HandleFunc("GET /{$}", web.AssetRequest)
+	web.UserRouter = userRouter
 }
 
 func (web *WebRouter) serveFile(file string, contentType string) http.HandlerFunc {
@@ -118,28 +161,6 @@ func (web *WebRouter) createPageHandler(fname string) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	}
-}
-
-func (web *WebRouter) initRouters() {
-	// root domain
-	rootRouter := http.NewServeMux()
-	rootRouter.HandleFunc("GET /check", web.checkHandler)
-	rootRouter.Handle("GET /main.css", web.serveFile("main.css", "text/css"))
-	rootRouter.Handle("GET /favicon-16x16.png", web.serveFile("favicon-16x16.png", "image/png"))
-	rootRouter.Handle("GET /apple-touch-icon.png", web.serveFile("apple-touch-icon.png", "image/png"))
-	rootRouter.Handle("GET /favicon.ico", web.serveFile("favicon.ico", "image/x-icon"))
-	rootRouter.Handle("GET /robots.txt", web.serveFile("robots.txt", "text/plain"))
-
-	rootRouter.Handle("GET /rss/updated", web.createRssHandler("updated_at"))
-	rootRouter.Handle("GET /rss", web.createRssHandler("created_at"))
-	rootRouter.Handle("GET /{$}", web.createPageHandler("html/marketing.page.tmpl"))
-	web.RootRouter = rootRouter
-
-	// subdomain or custom domains
-	userRouter := http.NewServeMux()
-	userRouter.HandleFunc("GET /{fname...}", web.AssetRequest)
-	userRouter.HandleFunc("GET /{$}", web.AssetRequest)
-	web.UserRouter = userRouter
 }
 
 func (web *WebRouter) checkHandler(w http.ResponseWriter, r *http.Request) {
@@ -427,40 +448,19 @@ func (web *WebRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	router.ServeHTTP(w, r.WithContext(ctx))
 }
 
-func StartApiServer() {
-	cfg := NewConfigSite()
-	logger := cfg.Logger
+type SubdomainProps struct {
+	ProjectName string
+	Username    string
+}
 
-	dbpool := postgres.NewDB(cfg.DbURL, cfg.Logger)
-	defer dbpool.Close()
-
-	var st storage.StorageServe
-	var err error
-	if cfg.MinioURL == "" {
-		st, err = storage.NewStorageFS(cfg.StorageDir)
+func getProjectFromSubdomain(subdomain string) (*SubdomainProps, error) {
+	props := &SubdomainProps{}
+	strs := strings.SplitN(subdomain, "-", 2)
+	props.Username = strs[0]
+	if len(strs) == 2 {
+		props.ProjectName = strs[1]
 	} else {
-		st, err = storage.NewStorageMinio(cfg.MinioURL, cfg.MinioUser, cfg.MinioPass)
+		props.ProjectName = props.Username
 	}
-
-	if err != nil {
-		logger.Error("could not connect to object storage", "err", err.Error())
-		return
-	}
-
-	ch := make(chan *db.AnalyticsVisits)
-	go shared.AnalyticsCollect(ch, dbpool, logger)
-
-	routes := NewWebRouter(cfg, logger, dbpool, st, ch)
-
-	portStr := fmt.Sprintf(":%s", cfg.Port)
-	logger.Info(
-		"starting server on port",
-		"port", cfg.Port,
-		"domain", cfg.Domain,
-	)
-	err = http.ListenAndServe(portStr, routes)
-	logger.Error(
-		"listen and serve",
-		"err", err.Error(),
-	)
+	return props, nil
 }
