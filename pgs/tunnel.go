@@ -10,7 +10,11 @@ import (
 	"github.com/picosh/utils"
 )
 
-func allowPerm(proj *db.Project) bool {
+type TunnelWebRouter struct {
+	*WebRouter
+}
+
+func (web *TunnelWebRouter) Perm(proj *db.Project) bool {
 	return true
 }
 
@@ -112,11 +116,18 @@ func createHttpHandler(apiConfig *shared.ApiConfig) CtxHttpBridge {
 			}),
 		} */
 
-		routes := NewWebRouter(apiConfig.Cfg, logger, apiConfig.Dbpool, apiConfig.Storage, apiConfig.AnalyticsQueue)
+		routes := NewWebRouter(
+			apiConfig.Cfg,
+			logger,
+			apiConfig.Dbpool,
+			apiConfig.Storage,
+			apiConfig.AnalyticsQueue,
+		)
+		tunnelRouter := TunnelWebRouter{routes}
 		router := http.NewServeMux()
-		router.HandleFunc("GET /{fname}/{options}...", routes.ImageRequest)
-		router.HandleFunc("GET /{fname}", routes.AssetRequest)
-		router.HandleFunc("GET /{$}", routes.AssetRequest)
+		router.HandleFunc("GET /{fname}/{options}...", tunnelRouter.ImageRequest)
+		router.HandleFunc("GET /{fname}", tunnelRouter.AssetRequest)
+		router.HandleFunc("GET /{$}", tunnelRouter.AssetRequest)
 
 		/* subdomainRoutes := createSubdomainRoutes(allowPerm)
 		routes = append(routes, subdomainRoutes...)

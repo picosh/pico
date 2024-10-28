@@ -173,14 +173,16 @@ func anyPerm(proj *db.Project) bool {
 func ImgRequest(w http.ResponseWriter, r *http.Request) {
 	subdomain := shared.GetSubdomain(r)
 	cfg := shared.GetCfg(r)
+	st := shared.GetStorage(r)
 	dbpool := shared.GetDB(r)
 	logger := shared.GetLogger(r)
 	username := shared.GetUsernameFromRequest(r)
+	analytics := shared.GetAnalyticsQueue(r)
 
 	user, err := dbpool.FindUserForName(username)
 	if err != nil {
-		logger.Info("rss feed not found", "user", username)
-		http.Error(w, "rss feed not found", http.StatusNotFound)
+		logger.Info("user not found", "user", username)
+		http.Error(w, "user not found", http.StatusNotFound)
 		return
 	}
 
@@ -234,7 +236,14 @@ func ImgRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fname := post.Filename
-	pgs.ServeAsset(fname, opts, true, anyPerm, w, r)
+	router := pgs.NewWebRouter(
+		cfg,
+		logger,
+		dbpool,
+		st,
+		analytics,
+	)
+	router.ServeAsset(fname, opts, true, anyPerm, w, r)
 }
 
 func FindImgPost(r *http.Request, user *db.User, slug string) (*db.Post, error) {

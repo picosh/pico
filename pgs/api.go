@@ -2,19 +2,13 @@ package pgs
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"html/template"
-	"io"
 	"log/slog"
 	"net/http"
-	"net/url"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
 
-	"net/http/httputil"
 	_ "net/http/pprof"
 
 	"github.com/gorilla/feeds"
@@ -25,244 +19,6 @@ import (
 	sst "github.com/picosh/pobj/storage"
 )
 
-type AssetHandler struct {
-	*WebRouter
-	Logger         *slog.Logger
-	Username       string
-	Subdomain      string
-	Filepath       string
-	ProjectDir     string
-	UserID         string
-	Bucket         sst.Bucket
-	ImgProcessOpts *storage.ImgProcessOpts
-	ProjectID      string
-	HasPicoPlus    bool
-}
-
-func hasProtocol(url string) bool {
-	isFullUrl := strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://")
-	return isFullUrl
-}
-
-func (h *AssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	logger := h.Logger
-	var redirects []*RedirectRule
-	redirectFp, redirectInfo, err := h.Storage.GetObject(h.Bucket, filepath.Join(h.ProjectDir, "_redirects"))
-	if err == nil {
-		defer redirectFp.Close()
-		if redirectInfo != nil && redirectInfo.Size > h.Cfg.MaxSpecialFileSize {
-			errMsg := fmt.Sprintf("_redirects file is too large (%d > %d)", redirectInfo.Size, h.Cfg.MaxSpecialFileSize)
-			logger.Error(errMsg)
-			http.Error(w, errMsg, http.StatusInternalServerError)
-			return
-		}
-		buf := new(strings.Builder)
-		lr := io.LimitReader(redirectFp, h.Cfg.MaxSpecialFileSize)
-		_, err := io.Copy(buf, lr)
-		if err != nil {
-			logger.Error("io copy", "err", err.Error())
-			http.Error(w, "cannot read _redirects file", http.StatusInternalServerError)
-			return
-		}
-
-		redirects, err = parseRedirectText(buf.String())
-		if err != nil {
-			logger.Error("could not parse redirect text", "err", err.Error())
-		}
-	}
-
-	routes := calcRoutes(h.ProjectDir, h.Filepath, redirects)
-
-	var contents io.ReadCloser
-	contentType := ""
-	assetFilepath := ""
-	info := &sst.ObjectInfo{}
-	status := http.StatusOK
-	attempts := []string{}
-	for _, fp := range routes {
-		if checkIsRedirect(fp.Status) {
-			// hack: check to see if there's an index file in the requested directory
-			// before redirecting, this saves a hop that will just end up a 404
-			if !hasProtocol(fp.Filepath) && strings.HasSuffix(fp.Filepath, "/") {
-				next := filepath.Join(h.ProjectDir, fp.Filepath, "index.html")
-				_, _, err := h.Storage.GetObject(h.Bucket, next)
-				if err != nil {
-					continue
-				}
-			}
-			logger.Info(
-				"redirecting request",
-				"destination", fp.Filepath,
-				"status", fp.Status,
-			)
-			http.Redirect(w, r, fp.Filepath, fp.Status)
-			return
-		} else if hasProtocol(fp.Filepath) {
-			if !h.HasPicoPlus {
-				msg := "must be pico+ user to fetch content from external source"
-				logger.Error(
-					msg,
-					"destination", fp.Filepath,
-					"status", fp.Status,
-				)
-				http.Error(w, msg, http.StatusUnauthorized)
-				return
-			}
-
-			logger.Info(
-				"fetching content from external service",
-				"destination", fp.Filepath,
-				"status", fp.Status,
-			)
-
-			destUrl, err := url.Parse(fp.Filepath)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			proxy := httputil.NewSingleHostReverseProxy(destUrl)
-			oldDirector := proxy.Director
-			proxy.Director = func(r *http.Request) {
-				oldDirector(r)
-				r.Host = destUrl.Host
-				r.URL = destUrl
-			}
-			proxy.ServeHTTP(w, r)
-			return
-		}
-
-		attempts = append(attempts, fp.Filepath)
-		mimeType := storage.GetMimeType(fp.Filepath)
-		logger = logger.With("filename", fp.Filepath)
-		var c io.ReadCloser
-		var err error
-		if strings.HasPrefix(mimeType, "image/") {
-			c, contentType, err = h.Storage.ServeObject(
-				h.Bucket,
-				fp.Filepath,
-				h.ImgProcessOpts,
-			)
-		} else {
-			c, info, err = h.Storage.GetObject(h.Bucket, fp.Filepath)
-		}
-		if err == nil {
-			contents = c
-			assetFilepath = fp.Filepath
-			status = fp.Status
-			break
-		}
-	}
-
-	if assetFilepath == "" {
-		logger.Info(
-			"asset not found in bucket",
-			"routes", strings.Join(attempts, ", "),
-			"status", http.StatusNotFound,
-		)
-		// track 404s
-		ch := h.AnalyticsQueue
-		view, err := shared.AnalyticsVisitFromRequest(r, h.Dbpool, h.UserID, h.Cfg.Secret)
-		if err == nil {
-			view.ProjectID = h.ProjectID
-			view.Status = http.StatusNotFound
-			ch <- view
-		} else {
-			if !errors.Is(err, shared.ErrAnalyticsDisabled) {
-				logger.Error("could not record analytics view", "err", err)
-			}
-		}
-		http.Error(w, "404 not found", http.StatusNotFound)
-		return
-	}
-	defer contents.Close()
-
-	if contentType == "" {
-		contentType = storage.GetMimeType(assetFilepath)
-	}
-
-	var headers []*HeaderRule
-	headersFp, headersInfo, err := h.Storage.GetObject(h.Bucket, filepath.Join(h.ProjectDir, "_headers"))
-	if err == nil {
-		defer headersFp.Close()
-		if headersInfo != nil && headersInfo.Size > h.Cfg.MaxSpecialFileSize {
-			errMsg := fmt.Sprintf("_headers file is too large (%d > %d)", headersInfo.Size, h.Cfg.MaxSpecialFileSize)
-			logger.Error(errMsg)
-			http.Error(w, errMsg, http.StatusInternalServerError)
-			return
-		}
-		buf := new(strings.Builder)
-		lr := io.LimitReader(headersFp, h.Cfg.MaxSpecialFileSize)
-		_, err := io.Copy(buf, lr)
-		if err != nil {
-			logger.Error("io copy", "err", err.Error())
-			http.Error(w, "cannot read _headers file", http.StatusInternalServerError)
-			return
-		}
-
-		headers, err = parseHeaderText(buf.String())
-		if err != nil {
-			logger.Error("could not parse header text", "err", err.Error())
-		}
-	}
-
-	userHeaders := []*HeaderLine{}
-	for _, headerRule := range headers {
-		rr := regexp.MustCompile(headerRule.Path)
-		match := rr.FindStringSubmatch(assetFilepath)
-		if len(match) > 0 {
-			userHeaders = headerRule.Headers
-		}
-	}
-
-	if info != nil {
-		if info.ETag != "" {
-			w.Header().Add("etag", info.ETag)
-		}
-
-		if !info.LastModified.IsZero() {
-			w.Header().Add("last-modified", info.LastModified.Format(http.TimeFormat))
-		}
-	}
-
-	for _, hdr := range userHeaders {
-		w.Header().Add(hdr.Name, hdr.Value)
-	}
-	if w.Header().Get("content-type") == "" {
-		w.Header().Set("content-type", contentType)
-	}
-
-	finContentType := w.Header().Get("content-type")
-
-	// only track pages, not individual assets
-	if finContentType == "text/html" {
-		// track visit
-		ch := h.AnalyticsQueue
-		view, err := shared.AnalyticsVisitFromRequest(r, h.Dbpool, h.UserID, h.Cfg.Secret)
-		if err == nil {
-			view.ProjectID = h.ProjectID
-			ch <- view
-		} else {
-			if !errors.Is(err, shared.ErrAnalyticsDisabled) {
-				logger.Error("could not record analytics view", "err", err)
-			}
-		}
-	}
-
-	logger.Info(
-		"serving asset",
-		"asset", assetFilepath,
-		"status", status,
-		"contentType", finContentType,
-	)
-
-	w.WriteHeader(status)
-	_, err = io.Copy(w, contents)
-
-	if err != nil {
-		logger.Error("io copy", "err", err.Error())
-	}
-}
-
 type SubdomainProps struct {
 	ProjectName string
 	Username    string
@@ -272,13 +28,11 @@ func getProjectFromSubdomain(subdomain string) (*SubdomainProps, error) {
 	props := &SubdomainProps{}
 	strs := strings.SplitN(subdomain, "-", 2)
 	props.Username = strs[0]
-
 	if len(strs) == 2 {
 		props.ProjectName = strs[1]
 	} else {
 		props.ProjectName = props.Username
 	}
-
 	return props, nil
 }
 
@@ -295,13 +49,37 @@ type WebRouter struct {
 }
 
 func NewWebRouter(cfg *shared.ConfigSite, logger *slog.Logger, dbpool db.DB, st storage.StorageServe, analytics chan *db.AnalyticsVisits) *WebRouter {
-	return &WebRouter{
+	router := &WebRouter{
 		Cfg:            cfg,
 		Logger:         logger,
 		Dbpool:         dbpool,
 		Storage:        st,
 		AnalyticsQueue: analytics,
 	}
+	router.initRouters()
+	return router
+}
+
+func (web *WebRouter) initRouters() {
+	// root domain
+	rootRouter := http.NewServeMux()
+	rootRouter.HandleFunc("GET /check", web.checkHandler)
+	rootRouter.Handle("GET /main.css", shared.ServeFile("main.css", "text/css"))
+	rootRouter.Handle("GET /card.png", shared.ServeFile("card.png", "image/png"))
+	rootRouter.Handle("GET /favicon-16x16.png", shared.ServeFile("favicon-16x16.png", "image/png"))
+	rootRouter.Handle("GET /apple-touch-icon.png", shared.ServeFile("apple-touch-icon.png", "image/png"))
+	rootRouter.Handle("GET /favicon.ico", shared.ServeFile("favicon.ico", "image/x-icon"))
+	rootRouter.Handle("GET /robots.txt", shared.ServeFile("robots.txt", "text/plain"))
+	rootRouter.Handle("GET /rss/updated", web.createRssHandler("updated_at"))
+	rootRouter.Handle("GET /rss", web.createRssHandler("created_at"))
+	rootRouter.Handle("GET /{$}", shared.CreatePageHandler("html/marketing.page.tmpl"))
+	web.RootRouter = rootRouter
+
+	// subdomain or custom domains
+	userRouter := http.NewServeMux()
+	userRouter.HandleFunc("GET /{fname...}", web.AssetRequest)
+	userRouter.HandleFunc("GET /{$}", web.AssetRequest)
+	web.UserRouter = userRouter
 }
 
 func (web *WebRouter) checkHandler(w http.ResponseWriter, r *http.Request) {
@@ -357,10 +135,6 @@ func (web *WebRouter) checkHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNotFound)
-}
-
-type RssData struct {
-	Contents template.HTML
 }
 
 func (web *WebRouter) createRssHandler(by string) http.HandlerFunc {
@@ -431,14 +205,29 @@ func (web *WebRouter) Perm(proj *db.Project) bool {
 	return proj.Acl.Type == "public"
 }
 
+var imgRegex = regexp.MustCompile("(.+.(?:jpg|jpeg|png|gif|webp|svg))(/.+)")
+
 func (web *WebRouter) AssetRequest(w http.ResponseWriter, r *http.Request) {
 	fname := r.PathValue("fname")
+	if imgRegex.MatchString(fname) {
+		web.ImageRequest(w, r)
+		return
+	}
 	web.ServeAsset(fname, nil, false, web.Perm, w, r)
 }
 
 func (web *WebRouter) ImageRequest(w http.ResponseWriter, r *http.Request) {
-	fname := r.PathValue("fname")
-	imgOpts := r.PathValue("options")
+	rawname := r.PathValue("fname")
+	matches := imgRegex.FindStringSubmatch(rawname)
+	fname := rawname
+	imgOpts := ""
+	if len(matches) >= 2 {
+		fname = matches[1]
+	}
+	if len(matches) >= 3 {
+		imgOpts = matches[2]
+	}
+
 	opts, err := storage.UriToImgProcessOpts(imgOpts)
 	if err != nil {
 		errMsg := fmt.Sprintf("error processing img options: %s", err.Error())
@@ -463,7 +252,7 @@ func (web *WebRouter) ServeAsset(fname string, opts *storage.ImgProcessOpts, fro
 	props, err := getProjectFromSubdomain(subdomain)
 	if err != nil {
 		logger.Info(
-			"could parse project from subdomain",
+			"could not determine project from subdomain",
 			"err", err,
 		)
 		http.Error(w, err.Error(), http.StatusNotFound)
@@ -530,7 +319,7 @@ func (web *WebRouter) ServeAsset(fname string, opts *storage.ImgProcessOpts, fro
 
 	hasPicoPlus := web.Dbpool.HasFeatureForUser(user.ID, "plus")
 
-	asset := &AssetHandler{
+	asset := &ApiAssetHandler{
 		WebRouter: web,
 		Logger:    logger,
 
@@ -548,29 +337,6 @@ func (web *WebRouter) ServeAsset(fname string, opts *storage.ImgProcessOpts, fro
 	asset.ServeHTTP(w, r)
 }
 
-func (web *WebRouter) InitRouters() {
-	// root domain
-	rootRouter := http.NewServeMux()
-	rootRouter.HandleFunc("GET /check", web.checkHandler)
-	rootRouter.Handle("GET /main.css", shared.ServeFile("main.css", "text/css"))
-	rootRouter.Handle("GET /card.png", shared.ServeFile("card.png", "image/png"))
-	rootRouter.Handle("GET /favicon-16x16.png", shared.ServeFile("favicon-16x16.png", "image/png"))
-	rootRouter.Handle("GET /apple-touch-icon.png", shared.ServeFile("apple-touch-icon.png", "image/png"))
-	rootRouter.Handle("GET /favicon.ico", shared.ServeFile("favicon.ico", "image/x-icon"))
-	rootRouter.Handle("GET /robots.txt", shared.ServeFile("robots.txt", "text/plain"))
-	rootRouter.Handle("GET /rss/updated", web.createRssHandler("updated_at"))
-	rootRouter.Handle("GET /rss", web.createRssHandler("created_at"))
-	rootRouter.Handle("GET /{$}", shared.CreatePageHandler("html/marketing.page.tmpl"))
-	web.RootRouter = rootRouter
-
-	// subdomain or custom domains
-	userRouter := http.NewServeMux()
-	userRouter.HandleFunc("GET /{fname}/{options...}", web.ImageRequest)
-	userRouter.HandleFunc("GET /{fname}", web.AssetRequest)
-	userRouter.HandleFunc("GET /{$}", web.AssetRequest)
-	web.UserRouter = userRouter
-}
-
 func (web *WebRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	subdomain := shared.GetSubdomainFromRequest(r, web.Cfg.Domain, web.Cfg.Space)
 	if web.RootRouter == nil || web.UserRouter == nil {
@@ -585,6 +351,16 @@ func (web *WebRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	} else {
 		router = web.UserRouter
 	}
+
+	// enable cors
+	// TODO: I don't think we want this for pgs as a default
+	// users can enable cors headers using `_headers` file
+	/* if r.Method == "OPTIONS" {
+		shared.CorsHeaders(w.Header())
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	shared.CorsHeaders(w.Header()) */
 
 	ctx := r.Context()
 	ctx = context.WithValue(ctx, shared.CtxSubdomainKey{}, subdomain)
@@ -615,7 +391,6 @@ func StartApiServer() {
 	go shared.AnalyticsCollect(ch, dbpool, logger)
 
 	routes := NewWebRouter(cfg, logger, dbpool, st, ch)
-	routes.InitRouters()
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)
 	logger.Info(
