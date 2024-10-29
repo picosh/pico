@@ -15,15 +15,13 @@ rsync, scp, or sftp. Hopefully you see the trend.
 
 - [tuns](https://pico.sh/tuns): https/wss/tcp tunnels to localhost using only
 - [pages](https://pico.sh/pgs): A static site hosting platform using SSH for
-  site deployments.
-  SSH.
+  site deployments. SSH.
+- [pipes](https://pipe.pico.sh): Authenticated `*nix` pipes over SSH
 - [prose](https://pico.sh/prose): A blog platform using SSH for content
   management.
 - [pastes](https://pico.sh/pastes): Upload code snippets using rsync, scp, and
   sftp.
 - [feeds](https://pico.sh/feeds): An RSS email notification service using SSH.
-- [docker registry](https://pico.sh/imgs): Docker image registry using SSH for
-  authentication.
 
 ## Deploy a site with a single command
 
@@ -47,6 +45,19 @@ ssh -R dev:80:localhost:8000 tuns.sh
 
 Now your local dev server is availble on the web: https://dev.tuns.sh
 
+## Authenticated *nix pipes over ssh
+
+Have one terminal listen for an event and another terminal send the event:
+
+```bash
+# term 1
+ssh pipe.pico.sh sub mytopic
+# term 2
+echo "Hello world!" | ssh pipe.pico.sh pub mytopic
+```
+
+The `sub` will receive "Hello world!"
+
 ## Publish blog articles with a single command
 
 Create your first post, (e.g. `hello-world.md`):
@@ -67,23 +78,6 @@ scp hello-world.md prose.sh:/
 
 Congrats! You just published a blog article, accessible here:
 https://{user}.prose.sh/hello-world
-
-## Push and pull docker images using SSH
-
-Open a tunnel to our docker registry:
-
-```bash
-ssh -L 1338:localhost:80 -N imgs.sh
-```
-
-Now you are authenticated! You are now able to push and pull like normal:
-
-```bash
-docker push localhost:1338/alpine:latest
-docker pull localhost:1338/alpine:latest
-```
-
-All images sent to us are private and scoped to your user automatically.
 
 ## Easily share code snippets
 
