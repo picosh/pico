@@ -121,6 +121,11 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				r.Host = destUrl.Host
 				r.URL = destUrl
 			}
+			// Disable caching
+			proxy.ModifyResponse = func(r *http.Response) error {
+				r.Header.Set("cache-control", "no-cache")
+				return nil
+			}
 			proxy.ServeHTTP(w, r)
 			return
 		}
