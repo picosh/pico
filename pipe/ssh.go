@@ -10,6 +10,7 @@ import (
 
 	"github.com/antoniomika/syncmap"
 	"github.com/charmbracelet/promwish"
+	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
@@ -38,13 +39,17 @@ func StartSshServer() {
 		PubSub:  pubsub,
 		Cfg:     cfg,
 		Waiters: syncmap.New[string, []string](),
+		Access:  syncmap.New[string, []string](),
 	}
 
 	sshAuth := shared.NewSshAuthHandler(dbh, logger, cfg)
 	s, err := wish.NewServer(
 		wish.WithAddress(fmt.Sprintf("%s:%s", host, port)),
 		wish.WithHostKeyPath("ssh_data/term_info_ed25519"),
-		wish.WithPublicKeyAuth(sshAuth.PubkeyAuthHandler),
+		wish.WithPublicKeyAuth(func(ctx ssh.Context, key ssh.PublicKey) bool {
+			sshAuth.PubkeyAuthHandler(ctx, key)
+			return true
+		}),
 		wish.WithMiddleware(
 			WishMiddleware(handler),
 			promwish.Middleware(fmt.Sprintf("%s:%s", host, promPort), "pipe-ssh"),

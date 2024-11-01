@@ -19,7 +19,7 @@ import (
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared"
 	psub "github.com/picosh/pubsub"
-	"github.com/picosh/send/utils"
+	gossh "golang.org/x/crypto/ssh"
 )
 
 func flagSet(cmdName string, sesh ssh.Session) *flag.FlagSet {
@@ -46,25 +46,6 @@ func flagCheck(cmd *flag.FlagSet, posArg string, cmdArgs []string) bool {
 
 func NewTabWriter(out io.Writer) *tabwriter.Writer {
 	return tabwriter.NewWriter(out, 0, 0, 1, ' ', tabwriter.TabIndent)
-}
-
-func getUser(s ssh.Session, dbpool db.DB) (*db.User, error) {
-	var err error
-	key, err := utils.KeyText(s)
-	if err != nil {
-		return nil, fmt.Errorf("key not found")
-	}
-
-	user, err := dbpool.FindUserForKey(s.User(), key)
-	if err != nil {
-		return nil, err
-	}
-
-	if user.Name == "" {
-		return nil, fmt.Errorf("must have username set")
-	}
-
-	return user, nil
 }
 
 // scope topic to user by prefixing name.
@@ -117,6 +98,7 @@ type CliHandler struct {
 	PubSub  psub.PubSub
 	Cfg     *shared.ConfigSite
 	Waiters *syncmap.Map[string, []string]
+	Access  *syncmap.Map[string, []string]
 }
 
 func toSshCmd(cfg *shared.ConfigSite) string {
@@ -128,20 +110,21 @@ func toSshCmd(cfg *shared.ConfigSite) string {
 }
 
 func WishMiddleware(handler *CliHandler) wish.Middleware {
-	dbpool := handler.DBPool
 	pubsub := handler.PubSub
 
 	return func(next ssh.Handler) ssh.Handler {
 		return func(sesh ssh.Session) {
 			logger := handler.Logger
 			ctx := sesh.Context()
-			user, err := getUser(sesh, dbpool)
+
+			user, err := shared.GetUser(ctx)
 			if err != nil {
-				utils.ErrorHandler(sesh, err)
-				return
+				logger.Info("user not found", "err", err)
 			}
 
-			logger = shared.LoggerWithUser(logger, user)
+			if user != nil {
+				logger = shared.LoggerWithUser(logger, user)
+			}
 
 			args := sesh.Command()
 
@@ -151,7 +134,19 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				return
 			}
 
-			isAdmin := handler.DBPool.HasFeatureForUser(user.ID, "admin")
+			userName := "public"
+
+			userNameAddition := ""
+
+			isAdmin := false
+			if user != nil {
+				isAdmin = handler.DBPool.HasFeatureForUser(user.ID, "admin")
+
+				userName = user.Name
+				if user.PublicKey.Name != "" {
+					userNameAddition = fmt.Sprintf("-%s", user.PublicKey.Name)
+				}
+			}
 
 			cmd := strings.TrimSpace(args[0])
 			if cmd == "help" {
@@ -159,7 +154,12 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				next(sesh)
 				return
 			} else if cmd == "ls" {
-				topicFilter := fmt.Sprintf("%s/", user.Name)
+				if userName == "public" {
+					wish.Fatalln(sesh, "access denied")
+					return
+				}
+
+				topicFilter := fmt.Sprintf("%s/", userName)
 				if isAdmin {
 					topicFilter = ""
 				}
@@ -239,16 +239,11 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				"cmdArgs", cmdArgs,
 			)
 
-			userName := user.Name
-
-			if user.PublicKey.Name != "" {
-				userName += fmt.Sprintf("-%s", user.PublicKey.Name)
-			}
-
-			clientID := fmt.Sprintf("%s (%s@%s)", uuid.NewString(), userName, sesh.RemoteAddr().String())
+			clientID := fmt.Sprintf("%s (%s%s@%s)", uuid.NewString(), userName, userNameAddition, sesh.RemoteAddr().String())
 
 			if cmd == "pub" {
 				pubCmd := flagSet("pub", sesh)
+				access := pubCmd.String("a", "", "Comma separated list of pico usernames or ssh-key fingerprints to allow access to a topic")
 				empty := pubCmd.Bool("e", false, "Send an empty message to subs")
 				public := pubCmd.Bool("p", false, "Publish message to public topic")
 				block := pubCmd.Bool("b", true, "Block writes until a subscriber is available")
@@ -269,7 +264,17 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					"block", *block,
 					"timeout", *timeout,
 					"topic", topic,
+					"access", *access,
 				)
+
+				var accessList []string
+
+				if *access != "" {
+					accessList = strings.Split(*access, ",")
+					for i, acc := range accessList {
+						accessList[i] = strings.TrimSpace(acc)
+					}
+				}
 
 				var rw io.ReadWriter
 				if *empty {
@@ -288,10 +293,19 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				if isAdmin && strings.HasPrefix(topic, "/") {
 					name = strings.TrimPrefix(topic, "/")
 				} else {
-					name = toTopic(user.Name, topic)
+					name = toTopic(userName, topic)
 					if *public {
 						name = toPublicTopic(topic)
 						msgFlag = "-p "
+					}
+				}
+
+				if len(accessList) > 0 && !*public {
+					_, loaded := handler.Access.LoadOrStore(name, accessList)
+					if !loaded {
+						defer func() {
+							handler.Access.Delete(name)
+						}()
 					}
 				}
 
@@ -430,9 +444,36 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				if isAdmin && strings.HasPrefix(topic, "/") {
 					name = strings.TrimPrefix(topic, "/")
 				} else {
-					name = toTopic(user.Name, topic)
+					name = toTopic(userName, topic)
 					if *public {
 						name = toPublicTopic(topic)
+					}
+				}
+
+				if accessList, ok := handler.Access.Load(name); !isAdmin && !*public && ok {
+					allowed := false
+					for _, acc := range accessList {
+						if acc == userName {
+							allowed = true
+							break
+						}
+
+						if user != nil {
+							pk, _, _, _, err := ssh.ParseAuthorizedKey([]byte(user.PublicKey.Key))
+							if err != nil {
+								wish.Errorln(sesh, err)
+							} else {
+								if acc == gossh.FingerprintSHA256(pk) {
+									allowed = true
+									break
+								}
+							}
+						}
+					}
+
+					if !allowed {
+						wish.Fatalln(sesh, "access denied")
+						return
 					}
 				}
 
@@ -451,6 +492,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				}
 			} else if cmd == "pipe" {
 				pipeCmd := flagSet("pipe", sesh)
+				access := pipeCmd.String("a", "", "Comma separated list of pico usernames or ssh-key fingerprints to allow access to a topic")
 				public := pipeCmd.Bool("p", false, "Pipe to a public topic")
 				replay := pipeCmd.Bool("r", false, "Replay messages to the client that sent it")
 				if !flagCheck(pipeCmd, topic, cmdArgs) {
@@ -467,7 +509,17 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					"public", *public,
 					"replay", *replay,
 					"topic", topic,
+					"access", *access,
 				)
+
+				var accessList []string
+
+				if *access != "" {
+					accessList = strings.Split(*access, ",")
+					for i, acc := range accessList {
+						accessList[i] = strings.TrimSpace(acc)
+					}
+				}
 
 				isCreator := topic == ""
 				if isCreator {
@@ -480,10 +532,19 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				if isAdmin && strings.HasPrefix(topic, "/") {
 					name = strings.TrimPrefix(topic, "/")
 				} else {
-					name = toTopic(user.Name, topic)
+					name = toTopic(userName, topic)
 					if *public {
 						name = toPublicTopic(topic)
 						flagMsg = "-p "
+					}
+				}
+
+				if len(accessList) > 0 && !*public {
+					_, loaded := handler.Access.LoadOrStore(name, accessList)
+					if !loaded {
+						defer func() {
+							handler.Access.Delete(name)
+						}()
 					}
 				}
 

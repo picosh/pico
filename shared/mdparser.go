@@ -413,7 +413,7 @@ func AstTitle(doc ast.Node, src []byte, clean bool) string {
 					p := h.Parent()
 					p.RemoveChild(p, n)
 				}
-				out = string(h.Text(src))
+				out = string(h.Lines().Value(src))
 			}
 			return ast.WalkStop, nil
 		}
