@@ -21,6 +21,8 @@ services:
       - "[${AUTH_V6:-::1}]:443:443"
       - "[${AUTH_V6:-::1}]:80:80"
   auth-web:
+    volumes:
+      - ./data/auth-web/data:/app/ssh_data
     networks:
       - ${AUTH_NETWORK}
     env_file:
