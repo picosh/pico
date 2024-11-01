@@ -287,6 +287,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					topic = uuid.NewString()
 				}
 
+				var withoutUser string
 				var name string
 				msgFlag := ""
 
@@ -297,6 +298,8 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					if *public {
 						name = toPublicTopic(topic)
 						msgFlag = "-p "
+					} else {
+						withoutUser = topic
 					}
 				}
 
@@ -316,6 +319,37 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					msgFlag,
 					topic,
 				)
+
+				if accessList, ok := handler.Access.Load(withoutUser); !isAdmin && !*public && ok {
+					allowed := false
+					for _, acc := range accessList {
+						if acc == userName {
+							allowed = true
+							break
+						}
+
+						if user != nil {
+							pk, _, _, _, err := ssh.ParseAuthorizedKey([]byte(user.PublicKey.Key))
+							if err != nil {
+								wish.Errorln(sesh, err)
+							} else {
+								if acc == gossh.FingerprintSHA256(pk) {
+									allowed = true
+									break
+								}
+							}
+						} else {
+							if acc == gossh.FingerprintSHA256(sesh.PublicKey()) {
+								allowed = true
+								break
+							}
+						}
+					}
+
+					if allowed {
+						name = withoutUser
+					}
+				}
 
 				var pubCtx context.Context = ctx
 
@@ -439,6 +473,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					"topic", topic,
 				)
 
+				var withoutUser string
 				var name string
 
 				if isAdmin && strings.HasPrefix(topic, "/") {
@@ -447,10 +482,12 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					name = toTopic(userName, topic)
 					if *public {
 						name = toPublicTopic(topic)
+					} else {
+						withoutUser = topic
 					}
 				}
 
-				if accessList, ok := handler.Access.Load(name); !isAdmin && !*public && ok {
+				if accessList, ok := handler.Access.Load(withoutUser); !isAdmin && !*public && ok {
 					allowed := false
 					for _, acc := range accessList {
 						if acc == userName {
@@ -468,12 +505,16 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 									break
 								}
 							}
+						} else {
+							if acc == gossh.FingerprintSHA256(sesh.PublicKey()) {
+								allowed = true
+								break
+							}
 						}
 					}
 
-					if !allowed {
-						wish.Fatalln(sesh, "access denied")
-						return
+					if allowed {
+						name = withoutUser
 					}
 				}
 
@@ -526,6 +567,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					topic = uuid.NewString()
 				}
 
+				var withoutUser string
 				var name string
 				flagMsg := ""
 
@@ -536,6 +578,8 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					if *public {
 						name = toPublicTopic(topic)
 						flagMsg = "-p "
+					} else {
+						withoutUser = topic
 					}
 				}
 
@@ -556,6 +600,37 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 						flagMsg,
 						topic,
 					)
+				}
+
+				if accessList, ok := handler.Access.Load(withoutUser); !isAdmin && !*public && ok {
+					allowed := false
+					for _, acc := range accessList {
+						if acc == userName {
+							allowed = true
+							break
+						}
+
+						if user != nil {
+							pk, _, _, _, err := ssh.ParseAuthorizedKey([]byte(user.PublicKey.Key))
+							if err != nil {
+								wish.Errorln(sesh, err)
+							} else {
+								if acc == gossh.FingerprintSHA256(pk) {
+									allowed = true
+									break
+								}
+							}
+						} else {
+							if acc == gossh.FingerprintSHA256(sesh.PublicKey()) {
+								allowed = true
+								break
+							}
+						}
+					}
+
+					if allowed {
+						name = withoutUser
+					}
 				}
 
 				readErr, writeErr := pubsub.Pipe(
