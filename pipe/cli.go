@@ -109,6 +109,30 @@ func toSshCmd(cfg *shared.ConfigSite) string {
 	return fmt.Sprintf("%s%s", port, cfg.Domain)
 }
 
+// parseArgList parses a comma separated list of arguments
+func parseArgList(arg string) []string {
+	argList := strings.Split(arg, ",")
+	for i, acc := range argList {
+		argList[i] = strings.TrimSpace(acc)
+	}
+	return argList
+}
+
+// checkAccess checks if the user has access to a topic based on an access list
+func checkAccess(accessList []string, userName string, sesh ssh.Session) bool {
+	for _, acc := range accessList {
+		if acc == userName {
+			return true
+		}
+
+		if key := sesh.PublicKey(); key != nil && acc == gossh.FingerprintSHA256(key) {
+			return true
+		}
+	}
+
+	return false
+}
+
 func WishMiddleware(handler *CliHandler) wish.Middleware {
 	pubsub := handler.PubSub
 
@@ -270,10 +294,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				var accessList []string
 
 				if *access != "" {
-					accessList = strings.Split(*access, ",")
-					for i, acc := range accessList {
-						accessList[i] = strings.TrimSpace(acc)
-					}
+					accessList = parseArgList(*access)
 				}
 
 				var rw io.ReadWriter
@@ -321,32 +342,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				)
 
 				if accessList, ok := handler.Access.Load(withoutUser); !isAdmin && !*public && ok {
-					allowed := false
-					for _, acc := range accessList {
-						if acc == userName {
-							allowed = true
-							break
-						}
-
-						if user != nil {
-							pk, _, _, _, err := ssh.ParseAuthorizedKey([]byte(user.PublicKey.Key))
-							if err != nil {
-								wish.Errorln(sesh, err)
-							} else {
-								if acc == gossh.FingerprintSHA256(pk) {
-									allowed = true
-									break
-								}
-							}
-						} else {
-							if acc == gossh.FingerprintSHA256(sesh.PublicKey()) {
-								allowed = true
-								break
-							}
-						}
-					}
-
-					if allowed {
+					if checkAccess(accessList, userName, sesh) {
 						name = withoutUser
 					}
 				}
@@ -488,32 +484,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				}
 
 				if accessList, ok := handler.Access.Load(withoutUser); !isAdmin && !*public && ok {
-					allowed := false
-					for _, acc := range accessList {
-						if acc == userName {
-							allowed = true
-							break
-						}
-
-						if user != nil {
-							pk, _, _, _, err := ssh.ParseAuthorizedKey([]byte(user.PublicKey.Key))
-							if err != nil {
-								wish.Errorln(sesh, err)
-							} else {
-								if acc == gossh.FingerprintSHA256(pk) {
-									allowed = true
-									break
-								}
-							}
-						} else {
-							if acc == gossh.FingerprintSHA256(sesh.PublicKey()) {
-								allowed = true
-								break
-							}
-						}
-					}
-
-					if allowed {
+					if checkAccess(accessList, userName, sesh) {
 						name = withoutUser
 					}
 				}
@@ -556,10 +527,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				var accessList []string
 
 				if *access != "" {
-					accessList = strings.Split(*access, ",")
-					for i, acc := range accessList {
-						accessList[i] = strings.TrimSpace(acc)
-					}
+					accessList = parseArgList(*access)
 				}
 
 				isCreator := topic == ""
@@ -603,32 +571,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				}
 
 				if accessList, ok := handler.Access.Load(withoutUser); !isAdmin && !*public && ok {
-					allowed := false
-					for _, acc := range accessList {
-						if acc == userName {
-							allowed = true
-							break
-						}
-
-						if user != nil {
-							pk, _, _, _, err := ssh.ParseAuthorizedKey([]byte(user.PublicKey.Key))
-							if err != nil {
-								wish.Errorln(sesh, err)
-							} else {
-								if acc == gossh.FingerprintSHA256(pk) {
-									allowed = true
-									break
-								}
-							}
-						} else {
-							if acc == gossh.FingerprintSHA256(sesh.PublicKey()) {
-								allowed = true
-								break
-							}
-						}
-					}
-
-					if allowed {
+					if checkAccess(accessList, userName, sesh) {
 						name = withoutUser
 					}
 				}
