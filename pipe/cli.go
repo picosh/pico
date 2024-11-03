@@ -109,7 +109,7 @@ func toSshCmd(cfg *shared.ConfigSite) string {
 	return fmt.Sprintf("%s%s", port, cfg.Domain)
 }
 
-// parseArgList parses a comma separated list of arguments
+// parseArgList parses a comma separated list of arguments.
 func parseArgList(arg string) []string {
 	argList := strings.Split(arg, ",")
 	for i, acc := range argList {
@@ -118,7 +118,7 @@ func parseArgList(arg string) []string {
 	return argList
 }
 
-// checkAccess checks if the user has access to a topic based on an access list
+// checkAccess checks if the user has access to a topic based on an access list.
 func checkAccess(accessList []string, userName string, sesh ssh.Session) bool {
 	for _, acc := range accessList {
 		if acc == userName {
