@@ -210,7 +210,13 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					if len(channels) > 0 || len(waitingChannels) > 0 {
 						outputData += "Channel Information\r\n"
 						for _, channel := range channels {
-							outputData += fmt.Sprintf("- %s:\r\n", channel.Topic)
+							extraData := ""
+
+							if accessList, ok := handler.Access.Load(channel.Topic); ok {
+								extraData += fmt.Sprintf(" (Access List: %s)", strings.Join(accessList, ", "))
+							}
+
+							outputData += fmt.Sprintf("- %s:%s\r\n", channel.Topic, extraData)
 							outputData += "  Clients:\r\n"
 
 							var pubs []*psub.Client
@@ -232,7 +238,13 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 						}
 
 						for waitingChannel, channelPubs := range waitingChannels {
-							outputData += fmt.Sprintf("- %s:\r\n", waitingChannel)
+							extraData := ""
+
+							if accessList, ok := handler.Access.Load(waitingChannel); ok {
+								extraData += fmt.Sprintf(" (Access List: %s)", strings.Join(accessList, ", "))
+							}
+
+							outputData += fmt.Sprintf("- %s:%s\r\n", waitingChannel, extraData)
 							outputData += "  Clients:\r\n"
 							outputData += fmt.Sprintf("    %s:\r\n", "Waiting Pubs")
 							for _, client := range channelPubs {
