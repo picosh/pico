@@ -38,7 +38,7 @@ require (
 	github.com/neurosnap/go-exif-remove v0.0.0-20221010134343-50d1e3c35577
 	github.com/picosh/pobj v0.0.0-20241016194248-c39198b2ff23
 	github.com/picosh/pubsub v0.0.0-20241030185810-e24d08b67ab8
-	github.com/picosh/send v0.0.0-20241008013240-6fdbff00f848
+	github.com/picosh/send v0.0.0-20241107150437-0febb0049b4f
 	github.com/picosh/tunkit v0.0.0-20240905223921-532404cef9d9
 	github.com/picosh/utils v0.0.0-20241018143404-b351d5d765f3
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06
@@ -141,7 +141,6 @@ require (
 	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/neurosnap/go-jpeg-image-structure v0.0.0-20221010133817-70b1c1ff679e // indirect
-	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/philhofer/fwd v1.1.3-0.20240916144458-20a13a1f6b7c // indirect
 	github.com/picosh/go-rsync-receiver v0.0.0-20240709135253-1daf4b12a9fc // indirect
 	github.com/pkg/sftp v1.13.7 // indirect
