@@ -121,14 +121,14 @@ services:
       - services
       - all
   auth-web:
-    image: ghcr.io/picosh/pico/auth-web:main
+    image: ghcr.io/picosh/pico/auth-web:latest
     restart: always
     profiles:
       - auth
       - services
       - all
   bouncer:
-    image: ghcr.io/picosh/pico/bouncer:main
+    image: ghcr.io/picosh/pico/bouncer:latest
     restart: always
     profiles:
       - bouncer
