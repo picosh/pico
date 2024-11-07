@@ -325,6 +325,7 @@ var DenyList = []string{
 	"new",
 	"create",
 	"www",
+	"public",
 }
 
 type DB interface {
