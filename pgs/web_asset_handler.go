@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"net/http/httputil"
@@ -210,6 +211,9 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if info != nil {
+		if info.Size != 0 {
+			w.Header().Add("content-length", strconv.Itoa(int(info.Size)))
+		}
 		if info.ETag != "" {
 			w.Header().Add("etag", info.ETag)
 		}
