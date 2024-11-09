@@ -32,12 +32,3 @@ func (s *StorageFS) ServeObject(bucket sst.Bucket, fpath string, opts *ImgProces
 	dataURL := fmt.Sprintf("local://%s", filePath)
 	return HandleProxy(dataURL, opts)
 }
-
-func (s *StorageFS) GetObjectSize(bucket sst.Bucket, fpath string) (int64, error) {
-	fi, err := os.Stat(filepath.Join(bucket.Path, fpath))
-	if err != nil {
-		return 0, err
-	}
-	size := fi.Size()
-	return size, nil
-}

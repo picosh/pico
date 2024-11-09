@@ -1,13 +1,11 @@
 package storage
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 
-	"github.com/minio/minio-go/v7"
 	sst "github.com/picosh/pobj/storage"
 )
 
@@ -33,12 +31,4 @@ func (s *StorageMinio) ServeObject(bucket sst.Bucket, fpath string, opts *ImgPro
 	filePath := filepath.Join(bucket.Name, fpath)
 	dataURL := fmt.Sprintf("s3://%s", filePath)
 	return HandleProxy(dataURL, opts)
-}
-
-func (s *StorageMinio) GetObjectSize(bucket sst.Bucket, fpath string) (int64, error) {
-	info, err := s.Client.StatObject(context.Background(), bucket.Name, fpath, minio.StatObjectOptions{})
-	if err != nil {
-		return 0, err
-	}
-	return info.Size, nil
 }

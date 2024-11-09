@@ -13,8 +13,8 @@ import (
 	"github.com/charmbracelet/lipgloss/table"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared"
-	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pico/tui/common"
+	sst "github.com/picosh/pobj/storage"
 	"github.com/picosh/utils"
 )
 
@@ -120,7 +120,7 @@ type Cmd struct {
 	User    *db.User
 	Session utils.CmdSession
 	Log     *slog.Logger
-	Store   storage.StorageServe
+	Store   sst.ObjectStorage
 	Dbpool  db.DB
 	Write   bool
 	Styles  common.Styles

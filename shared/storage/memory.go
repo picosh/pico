@@ -22,8 +22,3 @@ func (s *StorageMemory) ServeObject(bucket sst.Bucket, fpath string, opts *ImgPr
 	obj, _, err := s.GetObject(bucket, fpath)
 	return obj, GetMimeType(fpath), err
 }
-
-func (s *StorageMemory) GetObjectSize(bucket sst.Bucket, fpath string) (int64, error) {
-	_, info, err := s.GetObject(bucket, fpath)
-	return info.Size, err
-}

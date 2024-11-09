@@ -17,7 +17,6 @@ import (
 	"github.com/charmbracelet/wish"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared"
-	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pobj"
 	sst "github.com/picosh/pobj/storage"
 	sendutils "github.com/picosh/send/utils"
@@ -100,10 +99,10 @@ type FileData struct {
 type UploadAssetHandler struct {
 	DBPool  db.DB
 	Cfg     *shared.ConfigSite
-	Storage storage.StorageServe
+	Storage sst.ObjectStorage
 }
 
-func NewUploadAssetHandler(dbpool db.DB, cfg *shared.ConfigSite, storage storage.StorageServe) *UploadAssetHandler {
+func NewUploadAssetHandler(dbpool db.DB, cfg *shared.ConfigSite, storage sst.ObjectStorage) *UploadAssetHandler {
 	return &UploadAssetHandler{
 		DBPool:  dbpool,
 		Cfg:     cfg,
@@ -317,7 +316,11 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (s
 	// calculate the filsize difference between the same file already
 	// stored and the updated file being uploaded
 	assetFilename := shared.GetAssetFileName(entry)
-	curFileSize, _ := h.Storage.GetObjectSize(bucket, assetFilename)
+	_, info, _ := h.Storage.GetObject(bucket, assetFilename)
+	var curFileSize int64
+	if info != nil {
+		curFileSize = info.Size
+	}
 
 	denylist := getDenylist(s)
 	if denylist == nil {
