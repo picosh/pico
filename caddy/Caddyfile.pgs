@@ -6,6 +6,7 @@
 	}
 	servers {
 		metrics
+		trusted_proxies static 0.0.0.0/0 ::/:
 	}
 }
 
