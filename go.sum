@@ -269,8 +269,8 @@ github.com/picosh/go-rsync-receiver v0.0.0-20240709135253-1daf4b12a9fc h1:bvcsoO
 github.com/picosh/go-rsync-receiver v0.0.0-20240709135253-1daf4b12a9fc/go.mod h1:i0iR3W4GSm1PuvVxB9OH32E5jP+CYkVb2NQSe0JCtlo=
 github.com/picosh/pobj v0.0.0-20241016194248-c39198b2ff23 h1:NEJ5a4UXeF0/X7xmYNzXcwLQID9DwgazlqkMMC5zZ3M=
 github.com/picosh/pobj v0.0.0-20241016194248-c39198b2ff23/go.mod h1:cF+eAl4G1vU+WOD8cYCKaxokHo6MWmbR8J4/SJnvESg=
-github.com/picosh/pubsub v0.0.0-20241030185810-e24d08b67ab8 h1:E/eQsxdHBctPArAzjSHUAVZtDXjsD1AduGD94mbUJQg=
-github.com/picosh/pubsub v0.0.0-20241030185810-e24d08b67ab8/go.mod h1:ajolgob5MxlHdp5HllF7u3rTlCgER4InqfP7M/xl6HQ=
+github.com/picosh/pubsub v0.0.0-20241114162342-5138571dceda h1:0prs4E8ai30JhQm6ZH2b9NYD5NcKGElnmP21XiS2IH8=
+github.com/picosh/pubsub v0.0.0-20241114162342-5138571dceda/go.mod h1:m6ZZpg+lZB3XTIKlbSqQgi4NrBPtARv23b8vGYDoCo4=
 github.com/picosh/send v0.0.0-20241107150437-0febb0049b4f h1:pdEh1Z7zH5Og9nS7jRuqwup3bcPsC6faDNQ6mgrV9ws=
 github.com/picosh/send v0.0.0-20241107150437-0febb0049b4f/go.mod h1:RAgLDK3LrDK6pNeXtU9tjo28obl5DxShcTUk2nm/KCM=
 github.com/picosh/senpai v0.0.0-20240503200611-af89e73973b0 h1:pBRIbiCj7K6rGELijb//dYhyCo8A3fvxW5dijrJVtjs=

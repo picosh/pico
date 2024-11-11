@@ -30,7 +30,6 @@ type PageData struct {
 type ConfigSite struct {
 	Debug              bool
 	SendgridKey        string
-	Secret             string
 	Domain             string
 	Port               string
 	PortOverride       string
@@ -279,13 +278,8 @@ func CreateLogger(space string) *slog.Logger {
 	newLogger := log
 
 	if strings.ToLower(utils.GetEnv("PICO_PIPE_ENABLED", "true")) == "true" {
-		newLog, err := pipeLogger.SendLogRegister(log, &pipeLogger.PubSubConnectionInfo{
-			RemoteHost:     utils.GetEnv("PICO_PIPE_ENDPOINT", "pipe.pico.sh:22"),
-			KeyLocation:    utils.GetEnv("PICO_PIPE_KEY", "ssh_data/term_info_ed25519"),
-			KeyPassphrase:  utils.GetEnv("PICO_PIPE_PASSPHRASE", ""),
-			RemoteHostname: utils.GetEnv("PICO_PIPE_REMOTE_HOST", "pipe.pico.sh"),
-			RemoteUser:     utils.GetEnv("PICO_PIPE_USER", "pico"),
-		}, 100)
+		conn := NewPicoPipeClient()
+		newLog, err := pipeLogger.SendLogRegister(log, conn, 100)
 
 		if err == nil {
 			newLogger = newLog

@@ -984,18 +984,19 @@ func newNullString(s string) sql.NullString {
 	}
 }
 
-func (me *PsqlDB) InsertVisit(view *db.AnalyticsVisits) error {
+func (me *PsqlDB) InsertVisit(visit *db.AnalyticsVisits) error {
 	_, err := me.Db.Exec(
-		`INSERT INTO analytics_visits (user_id, project_id, post_id, host, path, ip_address, user_agent, referer, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);`,
-		view.UserID,
-		newNullString(view.ProjectID),
-		newNullString(view.PostID),
-		view.Host,
-		view.Path,
-		view.IpAddress,
-		view.UserAgent,
-		view.Referer,
-		view.Status,
+		`INSERT INTO analytics_visits (user_id, project_id, post_id, namespace, host, path, ip_address, user_agent, referer, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);`,
+		visit.UserID,
+		newNullString(visit.ProjectID),
+		newNullString(visit.PostID),
+		newNullString(visit.Namespace),
+		visit.Host,
+		visit.Path,
+		visit.IpAddress,
+		visit.UserAgent,
+		visit.Referer,
+		visit.Status,
 	)
 	return err
 }

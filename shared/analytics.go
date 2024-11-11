@@ -4,6 +4,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -12,6 +13,7 @@ import (
 	"net/url"
 
 	"github.com/picosh/pico/db"
+	"github.com/picosh/pubsub"
 	"github.com/simplesurance/go-ip-anonymizer/ipanonymizer"
 	"github.com/x-way/crawlerdetect"
 )
@@ -23,8 +25,7 @@ func HmacString(secret, data string) string {
 	return hex.EncodeToString(dataHmac)
 }
 
-func trackableRequest(r *http.Request) error {
-	agent := r.UserAgent()
+func trackableUserAgent(agent string) error {
 	// dont store requests from bots
 	if crawlerdetect.IsCrawler(agent) {
 		return fmt.Errorf(
@@ -33,6 +34,11 @@ func trackableRequest(r *http.Request) error {
 		)
 	}
 	return nil
+}
+
+func trackableRequest(r *http.Request) error {
+	agent := r.UserAgent()
+	return trackableUserAgent(agent)
 }
 
 func cleanIpAddress(ip string) (string, error) {
@@ -50,10 +56,21 @@ func cleanIpAddress(ip string) (string, error) {
 	return anonIp, err
 }
 
-func cleanUrl(r *http.Request) (string, string) {
+func cleanUrl(orig string) (string, string) {
+	u, err := url.Parse(orig)
+	if err != nil {
+		return "", ""
+	}
+	return u.Host, u.Path
+}
+
+func cleanUrlFromRequest(r *http.Request) (string, string) {
 	host := r.Header.Get("x-forwarded-host")
 	if host == "" {
 		host = r.URL.Host
+	}
+	if host == "" {
+		host = r.Host
 	}
 	// we don't want query params in the url for security reasons
 	return host, r.URL.Path
@@ -79,16 +96,35 @@ func cleanReferer(ref string) (string, error) {
 
 var ErrAnalyticsDisabled = errors.New("owner does not have site analytics enabled")
 
-func AnalyticsVisitFromRequest(r *http.Request, dbpool db.DB, userID string, secret string) (*db.AnalyticsVisits, error) {
-	if !dbpool.HasFeatureForUser(userID, "analytics") {
-		return nil, ErrAnalyticsDisabled
+func AnalyticsVisitFromVisit(visit *db.AnalyticsVisits, dbpool db.DB, secret string) error {
+	if !dbpool.HasFeatureForUser(visit.UserID, "analytics") {
+		return ErrAnalyticsDisabled
 	}
 
-	err := trackableRequest(r)
+	err := trackableUserAgent(visit.UserAgent)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
+	ipAddress, err := cleanIpAddress(visit.IpAddress)
+	if err != nil {
+		return err
+	}
+	visit.IpAddress = HmacString(secret, ipAddress)
+	_, path := cleanUrl(visit.Path)
+	visit.Path = path
+
+	referer, err := cleanReferer(visit.Referer)
+	if err != nil {
+		return err
+	}
+	visit.Referer = referer
+	visit.UserAgent = cleanUserAgent(visit.UserAgent)
+
+	return nil
+}
+
+func ipFromRequest(r *http.Request) string {
 	// https://caddyserver.com/docs/caddyfile/directives/reverse_proxy#defaults
 	ipOrig := r.Header.Get("x-forwarded-for")
 	if ipOrig == "" {
@@ -101,33 +137,48 @@ func AnalyticsVisitFromRequest(r *http.Request, dbpool db.DB, userID string, sec
 			ipOrig = sshCtx.RemoteAddr().String()
 		}
 	}
-	ipAddress, err := cleanIpAddress(ipOrig)
-	if err != nil {
-		return nil, err
-	}
-	host, path := cleanUrl(r)
 
-	referer, err := cleanReferer(r.Referer())
+	return ipOrig
+}
+
+func AnalyticsVisitFromRequest(r *http.Request, dbpool db.DB, userID string) (*db.AnalyticsVisits, error) {
+	if !dbpool.HasFeatureForUser(userID, "analytics") {
+		return nil, ErrAnalyticsDisabled
+	}
+
+	err := trackableRequest(r)
 	if err != nil {
 		return nil, err
 	}
+
+	ipAddress := ipFromRequest(r)
+	host, path := cleanUrlFromRequest(r)
 
 	return &db.AnalyticsVisits{
 		UserID:    userID,
 		Host:      host,
 		Path:      path,
-		IpAddress: HmacString(secret, ipAddress),
-		UserAgent: cleanUserAgent(r.UserAgent()),
-		Referer:   referer,
+		IpAddress: ipAddress,
+		UserAgent: r.UserAgent(),
+		Referer:   r.Referer(),
 		Status:    http.StatusOK,
 	}, nil
 }
 
 func AnalyticsCollect(ch chan *db.AnalyticsVisits, dbpool db.DB, logger *slog.Logger) {
-	for view := range ch {
-		err := dbpool.InsertVisit(view)
+	info := NewPicoPipeClient()
+	metricDrain := pubsub.NewRemoteClientWriter(info, logger, 0)
+	go metricDrain.KeepAlive("pub metric-drain -b=false")
+
+	for visit := range ch {
+		data, err := json.Marshal(visit)
 		if err != nil {
-			logger.Error("could not insert view record", "err", err)
+			logger.Error("could not json marshall visit record", "err", err)
+		}
+		data = append(data, '\n')
+		_, err = metricDrain.Write(data)
+		if err != nil {
+			logger.Error("could not write to metric-drain", "err", err)
 		}
 	}
 }

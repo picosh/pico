@@ -17,14 +17,9 @@ func NewConfigSite() *shared.ConfigSite {
 	dbURL := utils.GetEnv("DATABASE_URL", "")
 	maxSize := uint64(500 * utils.MB)
 	maxImgSize := int64(10 * utils.MB)
-	secret := utils.GetEnv("PICO_SECRET", "")
-	if secret == "" {
-		panic("must provide PICO_SECRET environment variable")
-	}
 
 	return &shared.ConfigSite{
 		Debug:      debug == "1",
-		Secret:     secret,
 		Domain:     domain,
 		Port:       port,
 		Protocol:   protocol,

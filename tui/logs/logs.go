@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/tui/common"
 	"github.com/picosh/pico/tui/pages"
 	"github.com/picosh/utils"
@@ -170,14 +171,8 @@ func (m Model) waitForActivity(sub chan map[string]any) tea.Cmd {
 
 func (m Model) connectLogs(sub chan map[string]any) tea.Cmd {
 	return func() tea.Msg {
-		stdoutPipe, err := pipeLogger.ConnectToLogs(m.ctx, &pipeLogger.PubSubConnectionInfo{
-			RemoteHost:     utils.GetEnv("PICO_PIPE_ENDPOINT", "pipe.pico.sh:22"),
-			KeyLocation:    utils.GetEnv("PICO_PIPE_KEY", "ssh_data/term_info_ed25519"),
-			KeyPassphrase:  utils.GetEnv("PICO_PIPE_PASSPHRASE", ""),
-			RemoteHostname: utils.GetEnv("PICO_PIPE_REMOTE_HOST", "pipe.pico.sh"),
-			RemoteUser:     utils.GetEnv("PICO_PIPE_USER", "pico"),
-		})
-
+		conn := shared.NewPicoPipeClient()
+		stdoutPipe, err := pipeLogger.ConnectToLogs(m.ctx, conn)
 		if err != nil {
 			return errMsg(err)
 		}

@@ -20,13 +20,8 @@ func NewConfigSite() *shared.ConfigSite {
 	minioUser := utils.GetEnv("MINIO_ROOT_USER", "")
 	minioPass := utils.GetEnv("MINIO_ROOT_PASSWORD", "")
 	dbURL := utils.GetEnv("DATABASE_URL", "")
-	secret := utils.GetEnv("PICO_SECRET", "")
-	if secret == "" {
-		panic("must provide PICO_SECRET environment variable")
-	}
 
 	cfg := shared.ConfigSite{
-		Secret:             secret,
 		Domain:             domain,
 		Port:               port,
 		Protocol:           protocol,

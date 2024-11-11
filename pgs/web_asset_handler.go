@@ -157,7 +157,7 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		)
 		// track 404s
 		ch := h.AnalyticsQueue
-		view, err := shared.AnalyticsVisitFromRequest(r, h.Dbpool, h.UserID, h.Cfg.Secret)
+		view, err := shared.AnalyticsVisitFromRequest(r, h.Dbpool, h.UserID)
 		if err == nil {
 			view.ProjectID = h.ProjectID
 			view.Status = http.StatusNotFound
@@ -236,7 +236,7 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if finContentType == "text/html" {
 		// track visit
 		ch := h.AnalyticsQueue
-		view, err := shared.AnalyticsVisitFromRequest(r, h.Dbpool, h.UserID, h.Cfg.Secret)
+		view, err := shared.AnalyticsVisitFromRequest(r, h.Dbpool, h.UserID)
 		if err == nil {
 			view.ProjectID = h.ProjectID
 			ch <- view

@@ -31,13 +31,12 @@ require (
 	github.com/gorilla/feeds v1.2.0
 	github.com/lib/pq v1.10.9
 	github.com/microcosm-cc/bluemonday v1.0.27
-	github.com/minio/minio-go/v7 v7.0.80
 	github.com/mmcdole/gofeed v1.3.0
 	github.com/muesli/reflow v0.3.0
 	github.com/muesli/termenv v0.15.3-0.20240912151726-82936c5ea257
 	github.com/neurosnap/go-exif-remove v0.0.0-20221010134343-50d1e3c35577
 	github.com/picosh/pobj v0.0.0-20241016194248-c39198b2ff23
-	github.com/picosh/pubsub v0.0.0-20241030185810-e24d08b67ab8
+	github.com/picosh/pubsub v0.0.0-20241114162342-5138571dceda
 	github.com/picosh/send v0.0.0-20241107150437-0febb0049b4f
 	github.com/picosh/tunkit v0.0.0-20240905223921-532404cef9d9
 	github.com/picosh/utils v0.0.0-20241018143404-b351d5d765f3
@@ -133,6 +132,7 @@ require (
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/minio/madmin-go/v3 v3.0.75 // indirect
 	github.com/minio/md5-simd v1.1.2 // indirect
+	github.com/minio/minio-go/v7 v7.0.80 // indirect
 	github.com/mmcdole/goxpp v1.1.1 // indirect
 	github.com/mmcloughlin/md4 v0.1.2 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect

@@ -161,16 +161,17 @@ type PostAnalytics struct {
 }
 
 type AnalyticsVisits struct {
-	ID        string
-	UserID    string
-	ProjectID string
-	PostID    string
-	Host      string
-	Path      string
-	IpAddress string
-	UserAgent string
-	Referer   string
-	Status    int
+	ID        string `json:"id"`
+	UserID    string `json:"user_id"`
+	ProjectID string `json:"project_id"`
+	PostID    string `json:"post_id"`
+	Namespace string `json:"namespace"`
+	Host      string `json:"host"`
+	Path      string `json:"path"`
+	IpAddress string `json:"ip_adress"`
+	UserAgent string `json:"user_agent"`
+	Referer   string `json:"referer"`
+	Status    int    `json:"status"`
 }
 
 type VisitInterval struct {

@@ -1,9 +1,11 @@
 package auth
 
 import (
+	"bufio"
 	"context"
 	"crypto/hmac"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"io"
@@ -18,6 +20,7 @@ import (
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
+	"github.com/picosh/pubsub"
 	"github.com/picosh/utils"
 )
 
@@ -639,12 +642,47 @@ func handler(routes []shared.Route, client *Client) http.HandlerFunc {
 	}
 }
 
+func metricDrainSub(ctx context.Context, dbpool db.DB, logger *slog.Logger, secret string) {
+	conn := shared.NewPicoPipeClient()
+	stdoutPipe, err := pubsub.RemoteSub("sub metric-drain -k", ctx, conn)
+
+	if err != nil {
+		logger.Error("could not sub to metric-drain", "err", err)
+		return
+	}
+
+	scanner := bufio.NewScanner(stdoutPipe)
+	for scanner.Scan() {
+		line := scanner.Text()
+		visit := db.AnalyticsVisits{}
+		err := json.Unmarshal([]byte(line), &visit)
+		if err != nil {
+			logger.Error("json unmarshal", "err", err)
+			continue
+		}
+
+		err = shared.AnalyticsVisitFromVisit(&visit, dbpool, secret)
+		if err != nil {
+			if !errors.Is(err, shared.ErrAnalyticsDisabled) {
+				logger.Info("could not record analytics visit", "reason", err)
+			}
+		}
+
+		logger.Info("inserting visit", "visit", visit)
+		err = dbpool.InsertVisit(&visit)
+		if err != nil {
+			logger.Error("could not insert visit record", "err", err)
+		}
+	}
+}
+
 type AuthCfg struct {
 	Debug  bool
 	Port   string
 	DbURL  string
 	Domain string
 	Issuer string
+	Secret string
 }
 
 func StartApiServer() {
@@ -655,6 +693,10 @@ func StartApiServer() {
 		Issuer: utils.GetEnv("AUTH_ISSUER", "pico.sh"),
 		Domain: utils.GetEnv("AUTH_DOMAIN", "http://0.0.0.0:3000"),
 		Port:   utils.GetEnv("AUTH_WEB_PORT", "3000"),
+		Secret: utils.GetEnv("PICO_SECRET", ""),
+	}
+	if cfg.Secret == "" {
+		panic("must provide PICO_SECRET environment variable")
 	}
 
 	logger := shared.CreateLogger("auth")
@@ -666,6 +708,11 @@ func StartApiServer() {
 		Dbpool: db,
 		Logger: logger,
 	}
+
+	ctx := context.Background()
+	// gather metrics in the auth service
+	go metricDrainSub(ctx, db, logger, cfg.Secret)
+	defer ctx.Done()
 
 	routes := createMainRoutes()
 
@@ -679,6 +726,6 @@ func StartApiServer() {
 	client.Logger.Info("starting server on port", "port", cfg.Port)
 	err := http.ListenAndServe(portStr, router)
 	if err != nil {
-		client.Logger.Info(err.Error())
+		client.Logger.Info("http-serve", "err", err.Error())
 	}
 }
