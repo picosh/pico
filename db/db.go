@@ -168,7 +168,7 @@ type AnalyticsVisits struct {
 	Namespace string `json:"namespace"`
 	Host      string `json:"host"`
 	Path      string `json:"path"`
-	IpAddress string `json:"ip_adress"`
+	IpAddress string `json:"ip_address"`
 	UserAgent string `json:"user_agent"`
 	Referer   string `json:"referer"`
 	Status    int    `json:"status"`
