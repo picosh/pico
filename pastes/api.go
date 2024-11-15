@@ -59,11 +59,6 @@ type PostPageData struct {
 	Unlisted     bool
 }
 
-type TransparencyPageData struct {
-	Site      shared.SitePageData
-	Analytics *db.Analytics
-}
-
 type Link struct {
 	URL  string
 	Text string

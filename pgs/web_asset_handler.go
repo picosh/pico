@@ -1,7 +1,6 @@
 package pgs
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -15,7 +14,6 @@ import (
 	"net/http/httputil"
 	_ "net/http/pprof"
 
-	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
 	sst "github.com/picosh/pobj/storage"
 )
@@ -155,22 +153,6 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			"routes", strings.Join(attempts, ", "),
 			"status", http.StatusNotFound,
 		)
-		// track 404s
-		ch := h.AnalyticsQueue
-		view, err := shared.AnalyticsVisitFromRequest(r, h.Dbpool, h.UserID)
-		if err == nil {
-			view.ProjectID = h.ProjectID
-			view.Status = http.StatusNotFound
-			select {
-			case ch <- view:
-			default:
-				logger.Error("could not send analytics view to channel", "view", view)
-			}
-		} else {
-			if !errors.Is(err, shared.ErrAnalyticsDisabled) {
-				logger.Error("could not record analytics view", "err", err, "view", view)
-			}
-		}
 		http.Error(w, "404 not found", http.StatusNotFound)
 		return
 	}
@@ -235,25 +217,6 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	finContentType := w.Header().Get("content-type")
-
-	// only track pages, not individual assets
-	if finContentType == "text/html" {
-		// track visit
-		ch := h.AnalyticsQueue
-		view, err := shared.AnalyticsVisitFromRequest(r, h.Dbpool, h.UserID)
-		if err == nil {
-			view.ProjectID = h.ProjectID
-			select {
-			case ch <- view:
-			default:
-				logger.Error("could not send analytics view to channel", "view", view)
-			}
-		} else {
-			if !errors.Is(err, shared.ErrAnalyticsDisabled) {
-				logger.Error("could not record analytics view", "err", err, "view", view)
-			}
-		}
-	}
 
 	logger.Info(
 		"serving asset",

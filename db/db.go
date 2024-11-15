@@ -161,17 +161,18 @@ type PostAnalytics struct {
 }
 
 type AnalyticsVisits struct {
-	ID        string `json:"id"`
-	UserID    string `json:"user_id"`
-	ProjectID string `json:"project_id"`
-	PostID    string `json:"post_id"`
-	Namespace string `json:"namespace"`
-	Host      string `json:"host"`
-	Path      string `json:"path"`
-	IpAddress string `json:"ip_address"`
-	UserAgent string `json:"user_agent"`
-	Referer   string `json:"referer"`
-	Status    int    `json:"status"`
+	ID          string `json:"id"`
+	UserID      string `json:"user_id"`
+	ProjectID   string `json:"project_id"`
+	PostID      string `json:"post_id"`
+	Namespace   string `json:"namespace"`
+	Host        string `json:"host"`
+	Path        string `json:"path"`
+	IpAddress   string `json:"ip_address"`
+	UserAgent   string `json:"user_agent"`
+	Referer     string `json:"referer"`
+	Status      int    `json:"status"`
+	ContentType string `json:"content_type"`
 }
 
 type VisitInterval struct {

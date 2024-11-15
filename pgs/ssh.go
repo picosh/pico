@@ -11,7 +11,6 @@ import (
 	"github.com/charmbracelet/promwish"
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
-	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
@@ -81,13 +80,10 @@ func StartSshServer() {
 		st,
 	)
 
-	ch := make(chan *db.AnalyticsVisits, 100)
-	go shared.AnalyticsCollect(ch, dbpool, logger)
 	apiConfig := &shared.ApiConfig{
-		Cfg:            cfg,
-		Dbpool:         dbpool,
-		Storage:        st,
-		AnalyticsQueue: ch,
+		Cfg:     cfg,
+		Dbpool:  dbpool,
+		Storage: st,
 	}
 
 	webTunnel := &tunkit.WebTunnelHandler{

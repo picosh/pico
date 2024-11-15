@@ -40,10 +40,7 @@ func StartApiServer() {
 		return
 	}
 
-	ch := make(chan *db.AnalyticsVisits, 100)
-	go shared.AnalyticsCollect(ch, dbpool, logger)
-
-	routes := NewWebRouter(cfg, logger, dbpool, st, ch)
+	routes := NewWebRouter(cfg, logger, dbpool, st)
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)
 	logger.Info(
@@ -61,22 +58,20 @@ func StartApiServer() {
 type HasPerm = func(proj *db.Project) bool
 
 type WebRouter struct {
-	Cfg            *shared.ConfigSite
-	Logger         *slog.Logger
-	Dbpool         db.DB
-	Storage        storage.StorageServe
-	AnalyticsQueue chan *db.AnalyticsVisits
-	RootRouter     *http.ServeMux
-	UserRouter     *http.ServeMux
+	Cfg        *shared.ConfigSite
+	Logger     *slog.Logger
+	Dbpool     db.DB
+	Storage    storage.StorageServe
+	RootRouter *http.ServeMux
+	UserRouter *http.ServeMux
 }
 
-func NewWebRouter(cfg *shared.ConfigSite, logger *slog.Logger, dbpool db.DB, st storage.StorageServe, analytics chan *db.AnalyticsVisits) *WebRouter {
+func NewWebRouter(cfg *shared.ConfigSite, logger *slog.Logger, dbpool db.DB, st storage.StorageServe) *WebRouter {
 	router := &WebRouter{
-		Cfg:            cfg,
-		Logger:         logger,
-		Dbpool:         dbpool,
-		Storage:        st,
-		AnalyticsQueue: analytics,
+		Cfg:     cfg,
+		Logger:  logger,
+		Dbpool:  dbpool,
+		Storage: st,
 	}
 	router.initRouters()
 	return router
@@ -177,7 +172,7 @@ func (web *WebRouter) checkHandler(w http.ResponseWriter, r *http.Request) {
 
 		if !strings.Contains(hostDomain, appDomain) {
 			subdomain := shared.GetCustomDomain(hostDomain, cfg.Space)
-			props, err := getProjectFromSubdomain(subdomain)
+			props, err := shared.GetProjectFromSubdomain(subdomain)
 			if err != nil {
 				logger.Error(
 					"could not get project from subdomain",
@@ -333,7 +328,7 @@ func (web *WebRouter) ServeAsset(fname string, opts *storage.ImgProcessOpts, fro
 		"host", r.Host,
 	)
 
-	props, err := getProjectFromSubdomain(subdomain)
+	props, err := shared.GetProjectFromSubdomain(subdomain)
 	if err != nil {
 		logger.Info(
 			"could not determine project from subdomain",
@@ -449,21 +444,4 @@ func (web *WebRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	ctx = context.WithValue(ctx, shared.CtxSubdomainKey{}, subdomain)
 	router.ServeHTTP(w, r.WithContext(ctx))
-}
-
-type SubdomainProps struct {
-	ProjectName string
-	Username    string
-}
-
-func getProjectFromSubdomain(subdomain string) (*SubdomainProps, error) {
-	props := &SubdomainProps{}
-	strs := strings.SplitN(subdomain, "-", 2)
-	props.Username = strs[0]
-	if len(strs) == 2 {
-		props.ProjectName = strs[1]
-	} else {
-		props.ProjectName = props.Username
-	}
-	return props, nil
 }

@@ -2,7 +2,6 @@ package prose
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -87,11 +86,6 @@ type PostPageData struct {
 	Favicon      template.URL
 	Unlisted     bool
 	Diff         template.HTML
-}
-
-type TransparencyPageData struct {
-	Site      shared.SitePageData
-	Analytics *db.Analytics
 }
 
 type HeaderTxt struct {
@@ -270,21 +264,6 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 		postCollection = append(postCollection, p)
 	}
 
-	// track visit
-	ch := shared.GetAnalyticsQueue(r)
-	view, err := shared.AnalyticsVisitFromRequest(r, dbpool, user.ID)
-	if err == nil {
-		select {
-		case ch <- view:
-		default:
-			logger.Error("could not send analytics view to channel", "view", view)
-		}
-	} else {
-		if !errors.Is(err, shared.ErrAnalyticsDisabled) {
-			logger.Error("could not record analytics view", "err", err, "view", view)
-		}
-	}
-
 	data := BlogPageData{
 		Site:       *cfg.GetSiteData(),
 		PageTitle:  headerTxt.Title,
@@ -350,7 +329,6 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	username := shared.GetUsernameFromRequest(r)
 	subdomain := shared.GetSubdomain(r)
 	cfg := shared.GetCfg(r)
-	ch := shared.GetAnalyticsQueue(r)
 
 	var slug string
 	if !cfg.IsSubdomains() || subdomain == "" {
@@ -427,21 +405,6 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 
 		if parsedText.ImageCard != "" {
 			ogImageCard = parsedText.ImageCard
-		}
-
-		// track visit
-		view, err := shared.AnalyticsVisitFromRequest(r, dbpool, user.ID)
-		if err == nil {
-			view.PostID = post.ID
-			select {
-			case ch <- view:
-			default:
-				logger.Error("could not send analytics view to channel", "view", view)
-			}
-		} else {
-			if !errors.Is(err, shared.ErrAnalyticsDisabled) {
-				logger.Error("could not record analytics view", "err", err, "view", view)
-			}
 		}
 
 		unlisted := false
@@ -953,13 +916,10 @@ func StartApiServer() {
 	mainRoutes := createMainRoutes(staticRoutes)
 	subdomainRoutes := createSubdomainRoutes(staticRoutes)
 
-	ch := make(chan *db.AnalyticsVisits, 100)
-	go shared.AnalyticsCollect(ch, dbpool, logger)
 	apiConfig := &shared.ApiConfig{
-		Cfg:            cfg,
-		Dbpool:         dbpool,
-		Storage:        st,
-		AnalyticsQueue: ch,
+		Cfg:     cfg,
+		Dbpool:  dbpool,
+		Storage: st,
 	}
 	handler := shared.CreateServe(mainRoutes, subdomainRoutes, apiConfig)
 	router := http.HandlerFunc(handler)

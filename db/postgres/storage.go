@@ -986,7 +986,7 @@ func newNullString(s string) sql.NullString {
 
 func (me *PsqlDB) InsertVisit(visit *db.AnalyticsVisits) error {
 	_, err := me.Db.Exec(
-		`INSERT INTO analytics_visits (user_id, project_id, post_id, namespace, host, path, ip_address, user_agent, referer, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);`,
+		`INSERT INTO analytics_visits (user_id, project_id, post_id, namespace, host, path, ip_address, user_agent, referer, status, content_type) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11);`,
 		visit.UserID,
 		newNullString(visit.ProjectID),
 		newNullString(visit.PostID),
@@ -997,6 +997,7 @@ func (me *PsqlDB) InsertVisit(visit *db.AnalyticsVisits) error {
 		visit.UserAgent,
 		visit.Referer,
 		visit.Status,
+		visit.ContentType,
 	)
 	return err
 }

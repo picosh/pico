@@ -8,7 +8,6 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/stub"
@@ -219,8 +218,7 @@ func TestApiBasic(t *testing.T) {
 			responseRecorder := httptest.NewRecorder()
 
 			st, _ := storage.NewStorageMemory(tc.storage)
-			ch := make(chan *db.AnalyticsVisits, 100)
-			router := NewWebRouter(cfg, cfg.Logger, tc.dbpool, st, ch)
+			router := NewWebRouter(cfg, cfg.Logger, tc.dbpool, st)
 			router.ServeHTTP(responseRecorder, request)
 
 			if responseRecorder.Code != tc.status {
@@ -237,43 +235,6 @@ func TestApiBasic(t *testing.T) {
 				t.Errorf("Want '%s', got '%s'", tc.want, body)
 			}
 		})
-	}
-}
-
-func TestAnalytics(t *testing.T) {
-	bucketName := shared.GetAssetBucketName(testUserID)
-	cfg := NewConfigSite()
-	cfg.Domain = "pgs.test"
-	expectedPath := "/app"
-	request := httptest.NewRequest("GET", mkpath(expectedPath), strings.NewReader(""))
-	responseRecorder := httptest.NewRecorder()
-
-	sto := map[string]map[string]string{
-		bucketName: {
-			"test/app.html": "hello world!",
-		},
-	}
-	st, _ := storage.NewStorageMemory(sto)
-	ch := make(chan *db.AnalyticsVisits, 100)
-	dbpool := NewPgsAnalticsDb(cfg.Logger)
-	router := NewWebRouter(cfg, cfg.Logger, dbpool, st, ch)
-
-	go func() {
-		for analytics := range ch {
-			if analytics.Path != expectedPath {
-				t.Errorf("Want path '%s', got '%s'", expectedPath, analytics.Path)
-			}
-			close(ch)
-		}
-	}()
-
-	router.ServeHTTP(responseRecorder, request)
-
-	select {
-	case <-ch:
-		return
-	case <-time.After(time.Second * 1):
-		t.Error("didnt receive analytics event within time limit")
 	}
 }
 
@@ -337,8 +298,7 @@ func TestImageManipulation(t *testing.T) {
 					Ratio: &storage.Ratio{},
 				},
 			}
-			ch := make(chan *db.AnalyticsVisits, 100)
-			router := NewWebRouter(cfg, cfg.Logger, tc.dbpool, st, ch)
+			router := NewWebRouter(cfg, cfg.Logger, tc.dbpool, st)
 			router.ServeHTTP(responseRecorder, request)
 
 			if responseRecorder.Code != tc.status {

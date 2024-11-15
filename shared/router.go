@@ -69,10 +69,9 @@ func CreatePProfRoutesMux(mux *http.ServeMux) {
 }
 
 type ApiConfig struct {
-	Cfg            *ConfigSite
-	Dbpool         db.DB
-	Storage        storage.StorageServe
-	AnalyticsQueue chan *db.AnalyticsVisits
+	Cfg     *ConfigSite
+	Dbpool  db.DB
+	Storage storage.StorageServe
 }
 
 func (hc *ApiConfig) HasPrivilegedAccess(apiToken string) bool {
@@ -93,7 +92,6 @@ func (hc *ApiConfig) CreateCtx(prevCtx context.Context, subdomain string) contex
 	ctx = context.WithValue(ctx, ctxDBKey{}, hc.Dbpool)
 	ctx = context.WithValue(ctx, ctxStorageKey{}, hc.Storage)
 	ctx = context.WithValue(ctx, ctxCfg{}, hc.Cfg)
-	ctx = context.WithValue(ctx, ctxAnalyticsQueue{}, hc.AnalyticsQueue)
 	return ctx
 }
 
@@ -172,7 +170,6 @@ type ctxDBKey struct{}
 type ctxStorageKey struct{}
 type ctxLoggerKey struct{}
 type ctxCfg struct{}
-type ctxAnalyticsQueue struct{}
 
 type CtxSubdomainKey struct{}
 type ctxKey struct{}
@@ -226,10 +223,6 @@ func GetCustomDomain(host string, space string) string {
 	}
 
 	return ""
-}
-
-func GetAnalyticsQueue(r *http.Request) chan *db.AnalyticsVisits {
-	return r.Context().Value(ctxAnalyticsQueue{}).(chan *db.AnalyticsVisits)
 }
 
 func GetApiToken(r *http.Request) string {

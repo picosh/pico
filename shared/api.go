@@ -13,6 +13,23 @@ import (
 	"github.com/picosh/utils"
 )
 
+type SubdomainProps struct {
+	ProjectName string
+	Username    string
+}
+
+func GetProjectFromSubdomain(subdomain string) (*SubdomainProps, error) {
+	props := &SubdomainProps{}
+	strs := strings.SplitN(subdomain, "-", 2)
+	props.Username = strs[0]
+	if len(strs) == 2 {
+		props.ProjectName = strs[1]
+	} else {
+		props.ProjectName = props.Username
+	}
+	return props, nil
+}
+
 func CorsHeaders(headers http.Header) {
 	headers.Add("Access-Control-Allow-Origin", "*")
 	headers.Add("Vary", "Origin")

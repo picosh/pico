@@ -51,7 +51,7 @@ func createHttpHandler(apiConfig *shared.ApiConfig) CtxHttpBridge {
 			"pubkey", pubkeyStr,
 		)
 
-		props, err := getProjectFromSubdomain(subdomain)
+		props, err := shared.GetProjectFromSubdomain(subdomain)
 		if err != nil {
 			log.Error(err.Error())
 			return http.HandlerFunc(shared.UnauthorizedHandler)
@@ -121,7 +121,6 @@ func createHttpHandler(apiConfig *shared.ApiConfig) CtxHttpBridge {
 			logger,
 			apiConfig.Dbpool,
 			apiConfig.Storage,
-			apiConfig.AnalyticsQueue,
 		)
 		tunnelRouter := TunnelWebRouter{routes}
 		router := http.NewServeMux()

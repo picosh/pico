@@ -177,7 +177,6 @@ func ImgRequest(w http.ResponseWriter, r *http.Request) {
 	dbpool := shared.GetDB(r)
 	logger := shared.GetLogger(r)
 	username := shared.GetUsernameFromRequest(r)
-	analytics := shared.GetAnalyticsQueue(r)
 
 	user, err := dbpool.FindUserForName(username)
 	if err != nil {
@@ -241,7 +240,6 @@ func ImgRequest(w http.ResponseWriter, r *http.Request) {
 		logger,
 		dbpool,
 		st,
-		analytics,
 	)
 	router.ServeAsset(fname, opts, true, anyPerm, w, r)
 }
