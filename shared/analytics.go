@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
@@ -167,7 +168,7 @@ func AnalyticsVisitFromRequest(r *http.Request, dbpool db.DB, userID string) (*d
 
 func AnalyticsCollect(ch chan *db.AnalyticsVisits, dbpool db.DB, logger *slog.Logger) {
 	info := NewPicoPipeClient()
-	metricDrain, err := pipe.NewClient(logger, info)
+	metricDrain, err := pipe.NewClient(context.Background(), logger, info)
 	if err != nil {
 		logger.Error("could not create metric-drain client", "err", err)
 		return

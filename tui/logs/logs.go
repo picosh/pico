@@ -172,7 +172,7 @@ func (m Model) waitForActivity(sub chan map[string]any) tea.Cmd {
 func (m Model) connectLogs(sub chan map[string]any) tea.Cmd {
 	return func() tea.Msg {
 		conn := shared.NewPicoPipeClient()
-		stdoutPipe, err := pipeLogger.ReadLogs(m.ctx, conn)
+		stdoutPipe, err := pipeLogger.ReadLogs(m.ctx, m.shared.Logger, conn)
 		if err != nil {
 			return errMsg(err)
 		}

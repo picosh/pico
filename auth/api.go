@@ -258,7 +258,7 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 
 	space := r.URL.Query().Get("space")
 	if space == "" {
-		spaceErr := fmt.Errorf("Must provide `space` query parameter")
+		spaceErr := fmt.Errorf("must provide `space` query parameter")
 		client.Logger.Error(spaceErr.Error())
 		http.Error(w, spaceErr.Error(), http.StatusUnprocessableEntity)
 	}
@@ -644,7 +644,7 @@ func handler(routes []shared.Route, client *Client) http.HandlerFunc {
 
 func metricDrainSub(ctx context.Context, dbpool db.DB, logger *slog.Logger, secret string) {
 	conn := shared.NewPicoPipeClient()
-	stdoutPipe, err := pipe.Sub("sub metric-drain -k", ctx, conn)
+	stdoutPipe, err := pipe.Sub(ctx, logger, conn, "sub metric-drain -k")
 
 	if err != nil {
 		logger.Error("could not sub to metric-drain", "err", err)

@@ -71,7 +71,7 @@ func (c *Cmd) notifications() error {
 
 func (c *Cmd) logs(ctx context.Context) error {
 	conn := shared.NewPicoPipeClient()
-	stdoutPipe, err := pipeLogger.ReadLogs(ctx, conn)
+	stdoutPipe, err := pipeLogger.ReadLogs(ctx, c.Log, conn)
 
 	if err != nil {
 		return err
