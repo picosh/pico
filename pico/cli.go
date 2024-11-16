@@ -17,7 +17,7 @@ import (
 	"github.com/picosh/pico/tui/plus"
 	"github.com/picosh/utils"
 
-	pipeLogger "github.com/picosh/pubsub/log"
+	pipeLogger "github.com/picosh/utils/pipe/log"
 )
 
 func getUser(s ssh.Session, dbpool db.DB) (*db.User, error) {
@@ -71,7 +71,7 @@ func (c *Cmd) notifications() error {
 
 func (c *Cmd) logs(ctx context.Context) error {
 	conn := shared.NewPicoPipeClient()
-	stdoutPipe, err := pipeLogger.ConnectToLogs(ctx, conn)
+	stdoutPipe, err := pipeLogger.ReadLogs(ctx, conn)
 
 	if err != nil {
 		return err

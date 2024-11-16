@@ -13,7 +13,7 @@ import (
 	"net/url"
 
 	"github.com/picosh/pico/db"
-	"github.com/picosh/pubsub"
+	"github.com/picosh/utils/pipe"
 	"github.com/simplesurance/go-ip-anonymizer/ipanonymizer"
 	"github.com/x-way/crawlerdetect"
 )
@@ -167,8 +167,17 @@ func AnalyticsVisitFromRequest(r *http.Request, dbpool db.DB, userID string) (*d
 
 func AnalyticsCollect(ch chan *db.AnalyticsVisits, dbpool db.DB, logger *slog.Logger) {
 	info := NewPicoPipeClient()
-	metricDrain := pubsub.NewRemoteClientWriter(info, logger, 0)
-	go metricDrain.KeepAlive("pub metric-drain -b=false")
+	metricDrain, err := pipe.NewClient(logger, info)
+	if err != nil {
+		logger.Error("could not create metric-drain client", "err", err)
+		return
+	}
+
+	s, err := metricDrain.AddSession("metric-drain", "pub metric-drain -b=false", -1, -1)
+	if err != nil {
+		logger.Error("could not add session for metric-drain", "err", err)
+		return
+	}
 
 	for visit := range ch {
 		data, err := json.Marshal(visit)
@@ -176,7 +185,7 @@ func AnalyticsCollect(ch chan *db.AnalyticsVisits, dbpool db.DB, logger *slog.Lo
 			logger.Error("could not json marshall visit record", "err", err)
 		}
 		data = append(data, '\n')
-		_, err = metricDrain.Write(data)
+		_, err = s.Write(data)
 		if err != nil {
 			logger.Error("could not write to metric-drain", "err", err)
 		}

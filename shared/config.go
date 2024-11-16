@@ -9,11 +9,12 @@ import (
 	"os"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/picosh/pico/db"
 	"github.com/picosh/utils"
 
-	pipeLogger "github.com/picosh/pubsub/log"
+	pipeLogger "github.com/picosh/utils/pipe/log"
 )
 
 var DefaultEmail = "hello@pico.sh"
@@ -279,7 +280,7 @@ func CreateLogger(space string) *slog.Logger {
 
 	if strings.ToLower(utils.GetEnv("PICO_PIPE_ENABLED", "true")) == "true" {
 		conn := NewPicoPipeClient()
-		newLog, err := pipeLogger.SendLogRegister(log, conn, 100)
+		newLog, err := pipeLogger.RegisterLogger(log, conn, 100, 10*time.Millisecond)
 
 		if err == nil {
 			newLogger = newLog

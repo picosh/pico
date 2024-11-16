@@ -11,7 +11,10 @@
       "mode": "auto",
       "program": "${workspaceFolder}/cmd/${input:service}/${input:type}/main.go",
       "envFile": "${workspaceFolder}/.env",
-      "cwd": "${workspaceFolder}"
+      "cwd": "${workspaceFolder}",
+      "buildFlags": [
+        "-race"
+      ]
     }
   ],
   "inputs": [

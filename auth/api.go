@@ -20,8 +20,8 @@ import (
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
-	"github.com/picosh/pubsub"
 	"github.com/picosh/utils"
+	"github.com/picosh/utils/pipe"
 )
 
 type Client struct {
@@ -644,7 +644,7 @@ func handler(routes []shared.Route, client *Client) http.HandlerFunc {
 
 func metricDrainSub(ctx context.Context, dbpool db.DB, logger *slog.Logger, secret string) {
 	conn := shared.NewPicoPipeClient()
-	stdoutPipe, err := pubsub.RemoteSub("sub metric-drain -k", ctx, conn)
+	stdoutPipe, err := pipe.Sub("sub metric-drain -k", ctx, conn)
 
 	if err != nil {
 		logger.Error("could not sub to metric-drain", "err", err)

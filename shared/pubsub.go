@@ -1,12 +1,12 @@
 package shared
 
 import (
-	"github.com/picosh/pubsub"
 	"github.com/picosh/utils"
+	"github.com/picosh/utils/pipe"
 )
 
-func NewPicoPipeClient() *pubsub.RemoteClientInfo {
-	return &pubsub.RemoteClientInfo{
+func NewPicoPipeClient() *pipe.SSHClientInfo {
+	return &pipe.SSHClientInfo{
 		RemoteHost:     utils.GetEnv("PICO_PIPE_ENDPOINT", "pipe.pico.sh:22"),
 		KeyLocation:    utils.GetEnv("PICO_PIPE_KEY", "ssh_data/term_info_ed25519"),
 		KeyPassphrase:  utils.GetEnv("PICO_PIPE_PASSPHRASE", ""),

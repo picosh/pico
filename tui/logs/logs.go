@@ -16,7 +16,7 @@ import (
 	"github.com/picosh/pico/tui/pages"
 	"github.com/picosh/utils"
 
-	pipeLogger "github.com/picosh/pubsub/log"
+	pipeLogger "github.com/picosh/utils/pipe/log"
 )
 
 type state int
@@ -172,7 +172,7 @@ func (m Model) waitForActivity(sub chan map[string]any) tea.Cmd {
 func (m Model) connectLogs(sub chan map[string]any) tea.Cmd {
 	return func() tea.Msg {
 		conn := shared.NewPicoPipeClient()
-		stdoutPipe, err := pipeLogger.ConnectToLogs(m.ctx, conn)
+		stdoutPipe, err := pipeLogger.ReadLogs(m.ctx, conn)
 		if err != nil {
 			return errMsg(err)
 		}
