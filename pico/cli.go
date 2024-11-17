@@ -89,7 +89,8 @@ func (c *Cmd) logs(ctx context.Context) error {
 		}
 
 		user := utils.AnyToStr(parsedData, "user")
-		if user == c.User.Name {
+		userId := utils.AnyToStr(parsedData, "userId")
+		if user == c.User.Name || userId == c.User.ID {
 			wish.Println(c.SshSession, line)
 		}
 	}

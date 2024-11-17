@@ -593,7 +593,7 @@ func (me *PsqlDB) FindUserForKey(username string, key string) (*db.User, error) 
 	me.Logger.Info("attempting to find user with only public key", "key", key)
 	pk, err := me.FindPublicKeyForKey(key)
 	if err == nil {
-		me.Logger.Info("found pubkey, looking for user", "key", key, "userID", pk.UserID)
+		me.Logger.Info("found pubkey, looking for user", "key", key, "userId", pk.UserID)
 		user, err := me.FindUser(pk.UserID)
 		if err != nil {
 			return nil, err

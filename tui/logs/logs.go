@@ -189,7 +189,8 @@ func (m Model) connectLogs(sub chan map[string]any) tea.Cmd {
 			}
 
 			user := utils.AnyToStr(parsedData, "user")
-			if user == m.shared.User.Name {
+			userId := utils.AnyToStr(parsedData, "userId")
+			if user == m.shared.User.Name || userId == m.shared.User.ID {
 				sub <- parsedData
 			}
 		}
