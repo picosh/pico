@@ -41,7 +41,7 @@ require (
 	github.com/picosh/pubsub v0.0.0-20241114191831-ec8f16c0eb88
 	github.com/picosh/send v0.0.0-20241107150437-0febb0049b4f
 	github.com/picosh/tunkit v0.0.0-20240905223921-532404cef9d9
-	github.com/picosh/utils v0.0.0-20241116191332-39c204dc4605
+	github.com/picosh/utils v0.0.0-20241117170405-a9640fad84c8
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06
 	github.com/sendgrid/sendgrid-go v3.16.0+incompatible
 	github.com/simplesurance/go-ip-anonymizer v0.0.0-20200429124537-35a880f8e87d

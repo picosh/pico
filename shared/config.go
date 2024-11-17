@@ -280,7 +280,7 @@ func CreateLogger(space string) *slog.Logger {
 
 	if strings.ToLower(utils.GetEnv("PICO_PIPE_ENABLED", "true")) == "true" {
 		conn := NewPicoPipeClient()
-		newLog, err := pipeLogger.RegisterLogger(log, conn, 100, 10*time.Millisecond)
+		newLog, err := pipeLogger.RegisterReconnectLogger(log, conn, 100, 10*time.Millisecond)
 
 		if err == nil {
 			newLogger = newLog
