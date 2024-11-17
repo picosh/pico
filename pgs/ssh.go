@@ -81,7 +81,7 @@ func StartSshServer() {
 		st,
 	)
 
-	ch := make(chan *db.AnalyticsVisits)
+	ch := make(chan *db.AnalyticsVisits, 100)
 	go shared.AnalyticsCollect(ch, dbpool, logger)
 	apiConfig := &shared.ApiConfig{
 		Cfg:            cfg,

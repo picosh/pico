@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/picosh/pico/db"
 	"github.com/picosh/utils/pipe"
@@ -174,7 +175,7 @@ func AnalyticsCollect(ch chan *db.AnalyticsVisits, dbpool db.DB, logger *slog.Lo
 		return
 	}
 
-	s, err := metricDrain.AddSession("metric-drain", "pub metric-drain -b=false", -1, -1)
+	s, err := metricDrain.AddSession("metric-drain", "pub metric-drain -b=false", 100, 10*time.Millisecond)
 	if err != nil {
 		logger.Error("could not add session for metric-drain", "err", err)
 		return

@@ -161,10 +161,14 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if err == nil {
 			view.ProjectID = h.ProjectID
 			view.Status = http.StatusNotFound
-			ch <- view
+			select {
+			case ch <- view:
+			default:
+				logger.Error("could not send analytics view to channel", "view", view)
+			}
 		} else {
 			if !errors.Is(err, shared.ErrAnalyticsDisabled) {
-				logger.Error("could not record analytics view", "err", err)
+				logger.Error("could not record analytics view", "err", err, "view", view)
 			}
 		}
 		http.Error(w, "404 not found", http.StatusNotFound)
@@ -239,10 +243,14 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		view, err := shared.AnalyticsVisitFromRequest(r, h.Dbpool, h.UserID)
 		if err == nil {
 			view.ProjectID = h.ProjectID
-			ch <- view
+			select {
+			case ch <- view:
+			default:
+				logger.Error("could not send analytics view to channel", "view", view)
+			}
 		} else {
 			if !errors.Is(err, shared.ErrAnalyticsDisabled) {
-				logger.Error("could not record analytics view", "err", err)
+				logger.Error("could not record analytics view", "err", err, "view", view)
 			}
 		}
 	}
