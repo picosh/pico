@@ -185,8 +185,11 @@ func AnalyticsCollect(ch chan *db.AnalyticsVisits, dbpool db.DB, logger *slog.Lo
 		data, err := json.Marshal(visit)
 		if err != nil {
 			logger.Error("could not json marshall visit record", "err", err)
+			continue
 		}
+
 		data = append(data, '\n')
+
 		_, err = s.Write(data)
 		if err != nil {
 			logger.Error("could not write to metric-drain", "err", err)
