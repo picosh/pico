@@ -21,7 +21,7 @@ import (
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/utils"
-	"github.com/picosh/utils/pipe"
+	"github.com/picosh/utils/pipe/metrics"
 )
 
 type Client struct {
@@ -643,15 +643,15 @@ func handler(routes []shared.Route, client *Client) http.HandlerFunc {
 }
 
 func metricDrainSub(ctx context.Context, dbpool db.DB, logger *slog.Logger, secret string) {
-	conn := shared.NewPicoPipeClient()
-	stdoutPipe, err := pipe.Sub(ctx, logger, conn, "sub metric-drain -k")
+	drain := metrics.ReconnectReadMetrics(
+		ctx,
+		logger,
+		shared.NewPicoPipeClient(),
+		100,
+		10*time.Millisecond,
+	)
 
-	if err != nil {
-		logger.Error("could not sub to metric-drain", "err", err)
-		return
-	}
-
-	scanner := bufio.NewScanner(stdoutPipe)
+	scanner := bufio.NewScanner(drain)
 	for scanner.Scan() {
 		line := scanner.Text()
 		visit := db.AnalyticsVisits{}

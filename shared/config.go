@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"context"
 	"fmt"
 	"html/template"
 	"log/slog"
@@ -280,13 +281,7 @@ func CreateLogger(space string) *slog.Logger {
 
 	if strings.ToLower(utils.GetEnv("PICO_PIPE_ENABLED", "true")) == "true" {
 		conn := NewPicoPipeClient()
-		newLog, err := pipeLogger.RegisterReconnectLogger(log, conn, 100, 10*time.Millisecond)
-
-		if err == nil {
-			newLogger = newLog
-		} else {
-			slog.Error("unable to start send logger", "error", err)
-		}
+		newLogger = pipeLogger.RegisterReconnectLogger(context.Background(), log, conn, 100, 10*time.Millisecond)
 	}
 
 	return newLogger.With("service", space)

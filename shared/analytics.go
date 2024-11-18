@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/picosh/pico/db"
-	"github.com/picosh/utils/pipe"
+	"github.com/picosh/utils/pipe/metrics"
 	"github.com/simplesurance/go-ip-anonymizer/ipanonymizer"
 	"github.com/x-way/crawlerdetect"
 )
@@ -168,18 +168,13 @@ func AnalyticsVisitFromRequest(r *http.Request, dbpool db.DB, userID string) (*d
 }
 
 func AnalyticsCollect(ch chan *db.AnalyticsVisits, dbpool db.DB, logger *slog.Logger) {
-	info := NewPicoPipeClient()
-	metricDrain, err := pipe.NewClient(context.Background(), logger, info)
-	if err != nil {
-		logger.Error("could not create metric-drain client", "err", err)
-		return
-	}
-
-	s, err := metricDrain.AddSession("metric-drain", "pub metric-drain -b=false", 100, 0, 10*time.Millisecond)
-	if err != nil {
-		logger.Error("could not add session for metric-drain", "err", err)
-		return
-	}
+	drain := metrics.RegisterReconnectMetricRecorder(
+		context.Background(),
+		logger,
+		NewPicoPipeClient(),
+		100,
+		10*time.Millisecond,
+	)
 
 	for visit := range ch {
 		data, err := json.Marshal(visit)
@@ -190,7 +185,7 @@ func AnalyticsCollect(ch chan *db.AnalyticsVisits, dbpool db.DB, logger *slog.Lo
 
 		data = append(data, '\n')
 
-		_, err = s.Write(data)
+		_, err = drain.Write(data)
 		if err != nil {
 			logger.Error("could not write to metric-drain", "err", err)
 		}
