@@ -668,6 +668,7 @@ func metricDrainSub(ctx context.Context, dbpool db.DB, logger *slog.Logger, secr
 			if err != nil {
 				if !errors.Is(err, shared.ErrAnalyticsDisabled) {
 					logger.Info("could not record analytics visit", "reason", err, "visit", visit, user)
+					continue
 				}
 			}
 
