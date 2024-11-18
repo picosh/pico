@@ -277,8 +277,12 @@ github.com/picosh/senpai v0.0.0-20240503200611-af89e73973b0 h1:pBRIbiCj7K6rGELij
 github.com/picosh/senpai v0.0.0-20240503200611-af89e73973b0/go.mod h1:QaBDtybFC5gz7EG/9c3bgzuyW7W5W2rYLFZxWNuWk3Q=
 github.com/picosh/tunkit v0.0.0-20240905223921-532404cef9d9 h1:g5oZmnDFr11HarA8IAXcc4o9PBlolSM59QIATCSoato=
 github.com/picosh/tunkit v0.0.0-20240905223921-532404cef9d9/go.mod h1:UrDH/VCIc1wg/L6iY2zSYt4TiGw+25GsKSnkVkU40Dw=
+github.com/picosh/utils v0.0.0-20241116191332-39c204dc4605 h1:A9yRvOupUH9gxGJ/r+4x2RL2uZVEf2Am2AfiLrAfaTg=
+github.com/picosh/utils v0.0.0-20241116191332-39c204dc4605/go.mod h1:HogYEyJ43IGXrOa3D/kjM1pkzNAyh+pejRyv8Eo//pk=
 github.com/picosh/utils v0.0.0-20241118005757-bec2696bc760 h1:NDSSzGV96Rs76/Be+xGdKPm9YGC8ayvCL3CgbFIA4iE=
 github.com/picosh/utils v0.0.0-20241118005757-bec2696bc760/go.mod h1:HogYEyJ43IGXrOa3D/kjM1pkzNAyh+pejRyv8Eo//pk=
+github.com/picosh/utils v0.0.0-20241118014950-9515a3e4c5f9 h1:utr7lmPRDBubE52IzLkzzjQFmOu8gIKD+JTLRpxqgnI=
+github.com/picosh/utils v0.0.0-20241118014950-9515a3e4c5f9/go.mod h1:HogYEyJ43IGXrOa3D/kjM1pkzNAyh+pejRyv8Eo//pk=
 github.com/pkg/sftp v1.13.7 h1:uv+I3nNJvlKZIQGSr8JVQLNHFU9YhhNpvC14Y6KgmSM=
 github.com/pkg/sftp v1.13.7/go.mod h1:KMKI0t3T6hfA+lTR/ssZdunHo+uwq7ghoN09/FSu3DY=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
