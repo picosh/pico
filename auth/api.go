@@ -651,27 +651,33 @@ func metricDrainSub(ctx context.Context, dbpool db.DB, logger *slog.Logger, secr
 		10*time.Millisecond,
 	)
 
-	scanner := bufio.NewScanner(drain)
-	for scanner.Scan() {
-		line := scanner.Text()
-		visit := db.AnalyticsVisits{}
-		err := json.Unmarshal([]byte(line), &visit)
-		if err != nil {
-			logger.Error("json unmarshal", "err", err)
-			continue
-		}
+	for {
+		scanner := bufio.NewScanner(drain)
+		for scanner.Scan() {
+			line := scanner.Text()
+			visit := db.AnalyticsVisits{}
+			err := json.Unmarshal([]byte(line), &visit)
+			if err != nil {
+				logger.Error("json unmarshal", "err", err)
+				continue
+			}
 
-		err = shared.AnalyticsVisitFromVisit(&visit, dbpool, secret)
-		if err != nil {
-			if !errors.Is(err, shared.ErrAnalyticsDisabled) {
-				logger.Info("could not record analytics visit", "reason", err)
+			err = shared.AnalyticsVisitFromVisit(&visit, dbpool, secret)
+			if err != nil {
+				if !errors.Is(err, shared.ErrAnalyticsDisabled) {
+					logger.Info("could not record analytics visit", "reason", err)
+				}
+			}
+
+			logger.Info("inserting visit", "visit", visit)
+			err = dbpool.InsertVisit(&visit)
+			if err != nil {
+				logger.Error("could not insert visit record", "err", err)
 			}
 		}
 
-		logger.Info("inserting visit", "visit", visit)
-		err = dbpool.InsertVisit(&visit)
-		if err != nil {
-			logger.Error("could not insert visit record", "err", err)
+		if scanner.Err() != nil {
+			logger.Error("scanner error", "err", scanner.Err())
 		}
 	}
 }
