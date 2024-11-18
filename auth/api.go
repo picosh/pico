@@ -284,11 +284,6 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	space := r.URL.Query().Get("space")
-	if space == "" {
-		spaceErr := fmt.Errorf("must provide `space` query parameter")
-		client.Logger.Error(spaceErr.Error())
-		http.Error(w, spaceErr.Error(), http.StatusUnprocessableEntity)
-	}
 
 	client.Logger.Info(
 		"handle key",
@@ -301,7 +296,7 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 	user, err := client.Dbpool.FindUserForKey(data.Username, data.PublicKey)
 	if err != nil {
 		client.Logger.Error(err.Error())
-		http.Error(w, err.Error(), http.StatusUnauthorized)
+		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
