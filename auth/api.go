@@ -648,7 +648,7 @@ func metricDrainSub(ctx context.Context, dbpool db.DB, logger *slog.Logger, secr
 		logger,
 		shared.NewPicoPipeClient(),
 		100,
-		10*time.Millisecond,
+		-1,
 	)
 
 	for {
