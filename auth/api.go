@@ -662,17 +662,19 @@ func metricDrainSub(ctx context.Context, dbpool db.DB, logger *slog.Logger, secr
 				continue
 			}
 
+			user := slog.Any("userId", visit.UserID)
+
 			err = shared.AnalyticsVisitFromVisit(&visit, dbpool, secret)
 			if err != nil {
 				if !errors.Is(err, shared.ErrAnalyticsDisabled) {
-					logger.Info("could not record analytics visit", "reason", err)
+					logger.Info("could not record analytics visit", "reason", err, "visit", visit, user)
 				}
 			}
 
-			logger.Info("inserting visit", "visit", visit)
+			logger.Info("inserting visit", "visit", visit, user)
 			err = dbpool.InsertVisit(&visit)
 			if err != nil {
-				logger.Error("could not insert visit record", "err", err)
+				logger.Error("could not insert visit record", "err", err, "visit", visit, user)
 			}
 		}
 
