@@ -70,26 +70,45 @@ type oauth2Server struct {
 	ResponseTypesSupported                    []string `json:"response_types_supported"`
 }
 
-func generateURL(cfg *AuthCfg, path string) string {
-	return fmt.Sprintf("%s/%s", cfg.Domain, path)
+func generateURL(cfg *AuthCfg, path string, space string) string {
+	query := ""
+
+	if space != "" {
+		query = fmt.Sprintf("?space=%s", space)
+	}
+
+	return fmt.Sprintf("%s/%s%s", cfg.Domain, path, query)
+}
+
+func hasPlusOrSpace(client *Client, user *db.User, space string) bool {
+	return client.Dbpool.HasFeatureForUser(user.ID, "plus") || client.Dbpool.HasFeatureForUser(user.ID, space)
 }
 
 func wellKnownHandler(w http.ResponseWriter, r *http.Request) {
 	client := getClient(r)
 
+	space, err := url.PathUnescape(getField(r, 0))
+	if err != nil {
+		client.Logger.Error(err.Error())
+	}
+
+	if space == "" {
+		space = r.URL.Query().Get("space")
+	}
+
 	p := oauth2Server{
 		Issuer:                client.Cfg.Issuer,
-		IntrospectionEndpoint: generateURL(client.Cfg, "introspect"),
+		IntrospectionEndpoint: generateURL(client.Cfg, "introspect", space),
 		IntrospectionEndpointAuthMethodsSupported: []string{
 			"none",
 		},
-		AuthorizationEndpoint:  generateURL(client.Cfg, "authorize"),
-		TokenEndpoint:          generateURL(client.Cfg, "token"),
+		AuthorizationEndpoint:  generateURL(client.Cfg, "authorize", ""),
+		TokenEndpoint:          generateURL(client.Cfg, "token", ""),
 		ResponseTypesSupported: []string{"code"},
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	err := json.NewEncoder(w).Encode(p)
+	err = json.NewEncoder(w).Encode(p)
 	if err != nil {
 		client.Logger.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -117,6 +136,14 @@ func introspectHandler(w http.ResponseWriter, r *http.Request) {
 		Active:   true,
 		Username: user.Name,
 	}
+
+	space := r.URL.Query().Get("space")
+	if space != "" {
+		if !hasPlusOrSpace(client, user, space) {
+			p.Active = false
+		}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	err = json.NewEncoder(w).Encode(p)
@@ -278,12 +305,7 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if space == "tuns" {
-		if !client.Dbpool.HasFeatureForUser(user.ID, "plus") {
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-	} else if !client.Dbpool.HasFeatureForUser(user.ID, space) {
+	if !hasPlusOrSpace(client, user, space) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
@@ -595,7 +617,7 @@ func createMainRoutes() []shared.Route {
 
 	routes := []shared.Route{
 		shared.NewRoute("GET", "/checkout/(.+)", checkoutHandler),
-		shared.NewRoute("GET", "/.well-known/oauth-authorization-server", wellKnownHandler),
+		shared.NewRoute("GET", "/.well-known/oauth-authorization-server/?(.+)?", wellKnownHandler),
 		shared.NewRoute("POST", "/introspect", introspectHandler),
 		shared.NewRoute("GET", "/authorize", authorizeHandler),
 		shared.NewRoute("POST", "/token", tokenHandler),
