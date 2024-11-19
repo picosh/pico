@@ -434,7 +434,11 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 							if !*clean {
 								wish.Fatalln(sesh, "timeout reached, exiting ...")
 							} else {
-								sesh.Exit(1)
+								err = sesh.Exit(1)
+								if err != nil {
+									logger.Error("error exiting session", "err", err)
+								}
+
 								sesh.Close()
 							}
 						}

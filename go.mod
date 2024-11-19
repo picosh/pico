@@ -10,7 +10,7 @@ go 1.23.1
 
 // replace github.com/picosh/pubsub => ../pubsub
 
-replace github.com/picosh/utils => ../utils
+// replace github.com/picosh/utils => ../utils
 
 replace git.sr.ht/~delthas/senpai => github.com/picosh/senpai v0.0.0-20240503200611-af89e73973b0
 
