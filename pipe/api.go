@@ -48,10 +48,6 @@ func createStaticRoutes() []shared.Route {
 		shared.NewRoute("GET", "/favicon.ico", serveFile("favicon.ico", "image/x-icon")),
 		shared.NewRoute("GET", "/robots.txt", serveFile("robots.txt", "text/plain")),
 		shared.NewRoute("GET", "/anim.js", serveFile("anim.js", "text/javascript")),
-		shared.NewRoute("GET", "/topic/(.+)", handleSub(false)),
-		shared.NewRoute("POST", "/topic/(.+)", handlePub(false)),
-		shared.NewRoute("GET", "/pubsub/(.+)", handleSub(true)),
-		shared.NewRoute("POST", "/pubsub/(.+)", handlePub(true)),
 	}
 }
 
@@ -216,6 +212,18 @@ func createMainRoutes(staticRoutes []shared.Route) []shared.Route {
 	routes := []shared.Route{
 		shared.NewRoute("GET", "/", shared.CreatePageHandler("html/marketing.page.tmpl")),
 		shared.NewRoute("GET", "/check", shared.CheckHandler),
+	}
+
+	pipeRoutes := []shared.Route{
+		shared.NewRoute("GET", "/topic/(.+)", handleSub(false)),
+		shared.NewRoute("POST", "/topic/(.+)", handlePub(false)),
+		shared.NewRoute("GET", "/pubsub/(.+)", handleSub(true)),
+		shared.NewRoute("POST", "/pubsub/(.+)", handlePub(true)),
+	}
+
+	for _, route := range pipeRoutes {
+		route.CorsEnabled = true
+		routes = append(routes, route)
 	}
 
 	routes = append(
