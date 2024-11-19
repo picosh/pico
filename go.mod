@@ -10,7 +10,7 @@ go 1.23.1
 
 // replace github.com/picosh/pubsub => ../pubsub
 
-// replace github.com/picosh/utils => ../utils
+replace github.com/picosh/utils => ../utils
 
 replace git.sr.ht/~delthas/senpai => github.com/picosh/senpai v0.0.0-20240503200611-af89e73973b0
 
@@ -41,7 +41,7 @@ require (
 	github.com/picosh/pubsub v0.0.0-20241114191831-ec8f16c0eb88
 	github.com/picosh/send v0.0.0-20241107150437-0febb0049b4f
 	github.com/picosh/tunkit v0.0.0-20240905223921-532404cef9d9
-	github.com/picosh/utils v0.0.0-20241118014950-9515a3e4c5f9
+	github.com/picosh/utils v0.0.0-20241119183946-4b7dcdc032f2
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06
 	github.com/sendgrid/sendgrid-go v3.16.0+incompatible
 	github.com/simplesurance/go-ip-anonymizer v0.0.0-20200429124537-35a880f8e87d

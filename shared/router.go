@@ -62,6 +62,18 @@ type ApiConfig struct {
 	AnalyticsQueue chan *db.AnalyticsVisits
 }
 
+func (hc *ApiConfig) HasPrivilegedAccess(apiToken string) bool {
+	user, err := hc.Dbpool.FindUserForToken(apiToken)
+	if err != nil {
+		return false
+	}
+	return hc.Dbpool.HasFeatureForUser(user.ID, "auth")
+}
+
+func (hc *ApiConfig) HasPlusOrSpace(user *db.User, space string) bool {
+	return hc.Dbpool.HasFeatureForUser(user.ID, "plus") || hc.Dbpool.HasFeatureForUser(user.ID, space)
+}
+
 func (hc *ApiConfig) CreateCtx(prevCtx context.Context, subdomain string) context.Context {
 	ctx := context.WithValue(prevCtx, ctxLoggerKey{}, hc.Cfg.Logger)
 	ctx = context.WithValue(ctx, CtxSubdomainKey{}, subdomain)
@@ -123,6 +135,10 @@ func GetSubdomainFromRequest(r *http.Request, domain, space string) string {
 }
 
 func findRouteConfig(r *http.Request, routes []Route, subdomainRoutes []Route, cfg *ConfigSite) ([]Route, string) {
+	if len(subdomainRoutes) == 0 {
+		return routes, ""
+	}
+
 	subdomain := GetSubdomainFromRequest(r, cfg.Domain, cfg.Space)
 	if subdomain == "" {
 		return routes, subdomain
@@ -201,4 +217,12 @@ func GetCustomDomain(host string, space string) string {
 
 func GetAnalyticsQueue(r *http.Request) chan *db.AnalyticsVisits {
 	return r.Context().Value(ctxAnalyticsQueue{}).(chan *db.AnalyticsVisits)
+}
+
+func GetApiToken(r *http.Request) string {
+	authHeader := r.Header.Get("authorization")
+	if authHeader == "" {
+		return ""
+	}
+	return strings.TrimPrefix(authHeader, "Bearer ")
 }

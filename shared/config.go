@@ -42,6 +42,9 @@ type ConfigSite struct {
 	MinioUser          string
 	MinioPass          string
 	Space              string
+	Issuer             string
+	Secret             string
+	SecretWebhook      string
 	AllowedExt         []string
 	HiddenPosts        []string
 	MaxSize            uint64

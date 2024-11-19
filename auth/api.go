@@ -12,8 +12,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"os"
-	"strings"
 	"time"
 
 	"github.com/gorilla/feeds"
@@ -24,43 +22,6 @@ import (
 	"github.com/picosh/utils/pipe/metrics"
 )
 
-type Client struct {
-	Cfg    *AuthCfg
-	Dbpool db.DB
-	Logger *slog.Logger
-}
-
-func (client *Client) hasPrivilegedAccess(apiToken string) bool {
-	user, err := client.Dbpool.FindUserForToken(apiToken)
-	if err != nil {
-		return false
-	}
-	return client.Dbpool.HasFeatureForUser(user.ID, "auth")
-}
-
-type ctxClient struct{}
-type ctxKey struct{}
-
-func getClient(r *http.Request) *Client {
-	return r.Context().Value(ctxClient{}).(*Client)
-}
-
-func getField(r *http.Request, index int) string {
-	fields := r.Context().Value(ctxKey{}).([]string)
-	if index >= len(fields) {
-		return ""
-	}
-	return fields[index]
-}
-
-func getApiToken(r *http.Request) string {
-	authHeader := r.Header.Get("authorization")
-	if authHeader == "" {
-		return ""
-	}
-	return strings.TrimPrefix(authHeader, "Bearer ")
-}
-
 type oauth2Server struct {
 	Issuer                                    string   `json:"issuer"`
 	IntrospectionEndpoint                     string   `json:"introspection_endpoint"`
@@ -70,7 +31,7 @@ type oauth2Server struct {
 	ResponseTypesSupported                    []string `json:"response_types_supported"`
 }
 
-func generateURL(cfg *AuthCfg, path string, space string) string {
+func generateURL(cfg *shared.ConfigSite, path string, space string) string {
 	query := ""
 
 	if space != "" {
@@ -80,38 +41,34 @@ func generateURL(cfg *AuthCfg, path string, space string) string {
 	return fmt.Sprintf("%s/%s%s", cfg.Domain, path, query)
 }
 
-func hasPlusOrSpace(client *Client, user *db.User, space string) bool {
-	return client.Dbpool.HasFeatureForUser(user.ID, "plus") || client.Dbpool.HasFeatureForUser(user.ID, space)
-}
+func wellKnownHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		space, err := url.PathUnescape(shared.GetField(r, 0))
+		if err != nil {
+			apiConfig.Cfg.Logger.Error(err.Error())
+		}
 
-func wellKnownHandler(w http.ResponseWriter, r *http.Request) {
-	client := getClient(r)
+		if space == "" {
+			space = r.URL.Query().Get("space")
+		}
 
-	space, err := url.PathUnescape(getField(r, 0))
-	if err != nil {
-		client.Logger.Error(err.Error())
-	}
-
-	if space == "" {
-		space = r.URL.Query().Get("space")
-	}
-
-	p := oauth2Server{
-		Issuer:                client.Cfg.Issuer,
-		IntrospectionEndpoint: generateURL(client.Cfg, "introspect", space),
-		IntrospectionEndpointAuthMethodsSupported: []string{
-			"none",
-		},
-		AuthorizationEndpoint:  generateURL(client.Cfg, "authorize", ""),
-		TokenEndpoint:          generateURL(client.Cfg, "token", ""),
-		ResponseTypesSupported: []string{"code"},
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	err = json.NewEncoder(w).Encode(p)
-	if err != nil {
-		client.Logger.Error(err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		p := oauth2Server{
+			Issuer:                apiConfig.Cfg.Issuer,
+			IntrospectionEndpoint: generateURL(apiConfig.Cfg, "introspect", space),
+			IntrospectionEndpointAuthMethodsSupported: []string{
+				"none",
+			},
+			AuthorizationEndpoint:  generateURL(apiConfig.Cfg, "authorize", ""),
+			TokenEndpoint:          generateURL(apiConfig.Cfg, "token", ""),
+			ResponseTypesSupported: []string{"code"},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		err = json.NewEncoder(w).Encode(p)
+		if err != nil {
+			apiConfig.Cfg.Logger.Error(err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 	}
 }
 
@@ -120,148 +77,149 @@ type oauth2Introspection struct {
 	Username string `json:"username"`
 }
 
-func introspectHandler(w http.ResponseWriter, r *http.Request) {
-	client := getClient(r)
-	token := r.FormValue("token")
-	client.Logger.Info("introspect token", "token", token)
+func introspectHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		token := r.FormValue("token")
+		apiConfig.Cfg.Logger.Info("introspect token", "token", token)
 
-	user, err := client.Dbpool.FindUserForToken(token)
-	if err != nil {
-		client.Logger.Error(err.Error())
-		http.Error(w, err.Error(), http.StatusUnauthorized)
-		return
-	}
+		user, err := apiConfig.Dbpool.FindUserForToken(token)
+		if err != nil {
+			apiConfig.Cfg.Logger.Error(err.Error())
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+			return
+		}
 
-	p := oauth2Introspection{
-		Active:   true,
-		Username: user.Name,
-	}
+		p := oauth2Introspection{
+			Active:   true,
+			Username: user.Name,
+		}
 
-	space := r.URL.Query().Get("space")
-	if space != "" {
-		if !hasPlusOrSpace(client, user, space) {
-			p.Active = false
+		space := r.URL.Query().Get("space")
+		if space != "" {
+			if !apiConfig.HasPlusOrSpace(user, space) {
+				p.Active = false
+			}
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		err = json.NewEncoder(w).Encode(p)
+		if err != nil {
+			apiConfig.Cfg.Logger.Error(err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	}
+}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	err = json.NewEncoder(w).Encode(p)
-	if err != nil {
-		client.Logger.Error(err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+func authorizeHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		responseType := r.URL.Query().Get("response_type")
+		clientID := r.URL.Query().Get("client_id")
+		redirectURI := r.URL.Query().Get("redirect_uri")
+		scope := r.URL.Query().Get("scope")
+
+		apiConfig.Cfg.Logger.Info(
+			"authorize handler",
+			"responseType", responseType,
+			"clientID", clientID,
+			"redirectURI", redirectURI,
+			"scope", scope,
+		)
+
+		ts, err := template.ParseFiles(
+			"auth/html/redirect.page.tmpl",
+			"auth/html/footer.partial.tmpl",
+			"auth/html/marketing-footer.partial.tmpl",
+			"auth/html/base.layout.tmpl",
+		)
+
+		if err != nil {
+			apiConfig.Cfg.Logger.Error(err.Error())
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+			return
+		}
+
+		err = ts.Execute(w, map[string]any{
+			"response_type": responseType,
+			"client_id":     clientID,
+			"redirect_uri":  redirectURI,
+			"scope":         scope,
+		})
+
+		if err != nil {
+			apiConfig.Cfg.Logger.Error(err.Error())
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+			return
+		}
 	}
 }
 
-func authorizeHandler(w http.ResponseWriter, r *http.Request) {
-	client := getClient(r)
+func redirectHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		token := r.FormValue("token")
+		redirectURI := r.FormValue("redirect_uri")
+		responseType := r.FormValue("response_type")
 
-	responseType := r.URL.Query().Get("response_type")
-	clientID := r.URL.Query().Get("client_id")
-	redirectURI := r.URL.Query().Get("redirect_uri")
-	scope := r.URL.Query().Get("scope")
+		apiConfig.Cfg.Logger.Info("redirect handler",
+			"token", token,
+			"redirectURI", redirectURI,
+			"responseType", responseType,
+		)
 
-	client.Logger.Info(
-		"authorize handler",
-		"responseType", responseType,
-		"clientID", clientID,
-		"redirectURI", redirectURI,
-		"scope", scope,
-	)
+		if token == "" || redirectURI == "" || responseType != "code" {
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
 
-	ts, err := template.ParseFiles(
-		"auth/html/redirect.page.tmpl",
-		"auth/html/footer.partial.tmpl",
-		"auth/html/marketing-footer.partial.tmpl",
-		"auth/html/base.layout.tmpl",
-	)
+		url, err := url.Parse(redirectURI)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 
-	if err != nil {
-		client.Logger.Error(err.Error())
-		http.Error(w, err.Error(), http.StatusUnauthorized)
-		return
+		urlQuery := url.Query()
+		urlQuery.Add("code", token)
+
+		url.RawQuery = urlQuery.Encode()
+
+		http.Redirect(w, r, url.String(), http.StatusFound)
 	}
-
-	err = ts.Execute(w, map[string]any{
-		"response_type": responseType,
-		"client_id":     clientID,
-		"redirect_uri":  redirectURI,
-		"scope":         scope,
-	})
-
-	if err != nil {
-		client.Logger.Error(err.Error())
-		http.Error(w, err.Error(), http.StatusUnauthorized)
-		return
-	}
-}
-
-func redirectHandler(w http.ResponseWriter, r *http.Request) {
-	client := getClient(r)
-
-	token := r.FormValue("token")
-	redirectURI := r.FormValue("redirect_uri")
-	responseType := r.FormValue("response_type")
-
-	client.Logger.Info("redirect handler",
-		"token", token,
-		"redirectURI", redirectURI,
-		"responseType", responseType,
-	)
-
-	if token == "" || redirectURI == "" || responseType != "code" {
-		http.Error(w, "bad request", http.StatusBadRequest)
-		return
-	}
-
-	url, err := url.Parse(redirectURI)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	urlQuery := url.Query()
-	urlQuery.Add("code", token)
-
-	url.RawQuery = urlQuery.Encode()
-
-	http.Redirect(w, r, url.String(), http.StatusFound)
 }
 
 type oauth2Token struct {
 	AccessToken string `json:"access_token"`
 }
 
-func tokenHandler(w http.ResponseWriter, r *http.Request) {
-	client := getClient(r)
+func tokenHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		token := r.FormValue("code")
+		redirectURI := r.FormValue("redirect_uri")
+		grantType := r.FormValue("grant_type")
 
-	token := r.FormValue("code")
-	redirectURI := r.FormValue("redirect_uri")
-	grantType := r.FormValue("grant_type")
+		apiConfig.Cfg.Logger.Info(
+			"handle token",
+			"token", token,
+			"redirectURI", redirectURI,
+			"grantType", grantType,
+		)
 
-	client.Logger.Info(
-		"handle token",
-		"token", token,
-		"redirectURI", redirectURI,
-		"grantType", grantType,
-	)
+		_, err := apiConfig.Dbpool.FindUserForToken(token)
+		if err != nil {
+			apiConfig.Cfg.Logger.Error(err.Error())
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+			return
+		}
 
-	_, err := client.Dbpool.FindUserForToken(token)
-	if err != nil {
-		client.Logger.Error(err.Error())
-		http.Error(w, err.Error(), http.StatusUnauthorized)
-		return
-	}
-
-	p := oauth2Token{
-		AccessToken: token,
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	err = json.NewEncoder(w).Encode(p)
-	if err != nil {
-		client.Logger.Error(err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		p := oauth2Token{
+			AccessToken: token,
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		err = json.NewEncoder(w).Encode(p)
+		if err != nil {
+			apiConfig.Cfg.Logger.Error(err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 	}
 }
 
@@ -271,98 +229,98 @@ type sishData struct {
 	RemoteAddress string `json:"remote_addr"`
 }
 
-func keyHandler(w http.ResponseWriter, r *http.Request) {
-	client := getClient(r)
+func keyHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var data sishData
 
-	var data sishData
+		err := json.NewDecoder(r.Body).Decode(&data)
+		if err != nil {
+			apiConfig.Cfg.Logger.Error(err.Error())
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 
-	err := json.NewDecoder(r.Body).Decode(&data)
-	if err != nil {
-		client.Logger.Error(err.Error())
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
+		space := r.URL.Query().Get("space")
 
-	space := r.URL.Query().Get("space")
+		apiConfig.Cfg.Logger.Info(
+			"handle key",
+			"remoteAddress", data.RemoteAddress,
+			"user", data.Username,
+			"space", space,
+			"publicKey", data.PublicKey,
+		)
 
-	client.Logger.Info(
-		"handle key",
-		"remoteAddress", data.RemoteAddress,
-		"user", data.Username,
-		"space", space,
-		"publicKey", data.PublicKey,
-	)
+		user, err := apiConfig.Dbpool.FindUserForKey(data.Username, data.PublicKey)
+		if err != nil {
+			apiConfig.Cfg.Logger.Error(err.Error())
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
 
-	user, err := client.Dbpool.FindUserForKey(data.Username, data.PublicKey)
-	if err != nil {
-		client.Logger.Error(err.Error())
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
+		if !apiConfig.HasPlusOrSpace(user, space) {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
 
-	if !hasPlusOrSpace(client, user, space) {
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
+		if !apiConfig.HasPrivilegedAccess(shared.GetApiToken(r)) {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
 
-	if !client.hasPrivilegedAccess(getApiToken(r)) {
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	err = json.NewEncoder(w).Encode(user)
-	if err != nil {
-		client.Logger.Error(err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		err = json.NewEncoder(w).Encode(user)
+		if err != nil {
+			apiConfig.Cfg.Logger.Error(err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 	}
 }
 
-func userHandler(w http.ResponseWriter, r *http.Request) {
-	client := getClient(r)
+func userHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !apiConfig.HasPrivilegedAccess(shared.GetApiToken(r)) {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
 
-	if !client.hasPrivilegedAccess(getApiToken(r)) {
-		w.WriteHeader(http.StatusForbidden)
-		return
-	}
+		var data sishData
 
-	var data sishData
+		err := json.NewDecoder(r.Body).Decode(&data)
+		if err != nil {
+			apiConfig.Cfg.Logger.Error(err.Error())
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 
-	err := json.NewDecoder(r.Body).Decode(&data)
-	if err != nil {
-		client.Logger.Error(err.Error())
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
+		apiConfig.Cfg.Logger.Info(
+			"handle key",
+			"remoteAddress", data.RemoteAddress,
+			"user", data.Username,
+			"publicKey", data.PublicKey,
+		)
 
-	client.Logger.Info(
-		"handle key",
-		"remoteAddress", data.RemoteAddress,
-		"user", data.Username,
-		"publicKey", data.PublicKey,
-	)
+		user, err := apiConfig.Dbpool.FindUserForName(data.Username)
+		if err != nil {
+			apiConfig.Cfg.Logger.Error(err.Error())
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
 
-	user, err := client.Dbpool.FindUserForName(data.Username)
-	if err != nil {
-		client.Logger.Error(err.Error())
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
+		keys, err := apiConfig.Dbpool.FindKeysForUser(user)
+		if err != nil {
+			apiConfig.Cfg.Logger.Error(err.Error())
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
 
-	keys, err := client.Dbpool.FindKeysForUser(user)
-	if err != nil {
-		client.Logger.Error(err.Error())
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	err = json.NewEncoder(w).Encode(keys)
-	if err != nil {
-		client.Logger.Error(err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		err = json.NewEncoder(w).Encode(keys)
+		if err != nil {
+			apiConfig.Cfg.Logger.Error(err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 	}
 }
 
@@ -387,84 +345,85 @@ func genFeedItem(now time.Time, expiresAt time.Time, warning time.Time, txt stri
 	return nil
 }
 
-func rssHandler(w http.ResponseWriter, r *http.Request) {
-	client := getClient(r)
-	apiToken, err := url.PathUnescape(getField(r, 0))
-	if err != nil {
-		client.Logger.Error(err.Error())
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-	user, err := client.Dbpool.FindUserForToken(apiToken)
-	if err != nil {
-		client.Logger.Error(err.Error())
-		http.Error(w, "invalid token", http.StatusNotFound)
-		return
-	}
+func rssHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		apiToken, err := url.PathUnescape(shared.GetField(r, 0))
+		if err != nil {
+			apiConfig.Cfg.Logger.Error(err.Error())
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		user, err := apiConfig.Dbpool.FindUserForToken(apiToken)
+		if err != nil {
+			apiConfig.Cfg.Logger.Error(err.Error())
+			http.Error(w, "invalid token", http.StatusNotFound)
+			return
+		}
 
-	href := fmt.Sprintf("https://auth.pico.sh/rss/%s", apiToken)
+		href := fmt.Sprintf("https://auth.pico.sh/rss/%s", apiToken)
 
-	feed := &feeds.Feed{
-		Title:       "pico+",
-		Link:        &feeds.Link{Href: href},
-		Description: "get notified of important membership updates",
-		Author:      &feeds.Author{Name: "team pico"},
-		Created:     time.Now(),
-	}
-	var feedItems []*feeds.Item
-
-	now := time.Now()
-	ff, err := client.Dbpool.FindFeatureForUser(user.ID, "plus")
-	if err != nil {
-		// still want to send an empty feed
-	} else {
-		createdAt := ff.CreatedAt
-		createdAtStr := createdAt.Format("2006-01-02 15:04:05")
-		id := fmt.Sprintf("pico-plus-activated-%d", createdAt.Unix())
-		content := `Thanks for joining pico+! You now have access to all our premium services for exactly one year.  We will send you pico+ expiration notifications through this RSS feed.  Go to <a href="https://pico.sh/getting-started#next-steps">pico.sh/getting-started#next-steps</a> to start using our services.`
-		plus := &feeds.Item{
-			Id:          id,
-			Title:       fmt.Sprintf("pico+ membership activated on %s", createdAtStr),
-			Link:        &feeds.Link{Href: "https://pico.sh"},
-			Content:     content,
-			Created:     *createdAt,
-			Updated:     *createdAt,
-			Description: content,
+		feed := &feeds.Feed{
+			Title:       "pico+",
+			Link:        &feeds.Link{Href: href},
+			Description: "get notified of important membership updates",
 			Author:      &feeds.Author{Name: "team pico"},
+			Created:     time.Now(),
 		}
-		feedItems = append(feedItems, plus)
+		var feedItems []*feeds.Item
 
-		oneMonthWarning := ff.ExpiresAt.AddDate(0, -1, 0)
-		mo := genFeedItem(now, *ff.ExpiresAt, oneMonthWarning, "1-month")
-		if mo != nil {
-			feedItems = append(feedItems, mo)
+		now := time.Now()
+		ff, err := apiConfig.Dbpool.FindFeatureForUser(user.ID, "plus")
+		if err != nil {
+			// still want to send an empty feed
+		} else {
+			createdAt := ff.CreatedAt
+			createdAtStr := createdAt.Format("2006-01-02 15:04:05")
+			id := fmt.Sprintf("pico-plus-activated-%d", createdAt.Unix())
+			content := `Thanks for joining pico+! You now have access to all our premium services for exactly one year.  We will send you pico+ expiration notifications through this RSS feed.  Go to <a href="https://pico.sh/getting-started#next-steps">pico.sh/getting-started#next-steps</a> to start using our services.`
+			plus := &feeds.Item{
+				Id:          id,
+				Title:       fmt.Sprintf("pico+ membership activated on %s", createdAtStr),
+				Link:        &feeds.Link{Href: "https://pico.sh"},
+				Content:     content,
+				Created:     *createdAt,
+				Updated:     *createdAt,
+				Description: content,
+				Author:      &feeds.Author{Name: "team pico"},
+			}
+			feedItems = append(feedItems, plus)
+
+			oneMonthWarning := ff.ExpiresAt.AddDate(0, -1, 0)
+			mo := genFeedItem(now, *ff.ExpiresAt, oneMonthWarning, "1-month")
+			if mo != nil {
+				feedItems = append(feedItems, mo)
+			}
+
+			oneWeekWarning := ff.ExpiresAt.AddDate(0, 0, -7)
+			wk := genFeedItem(now, *ff.ExpiresAt, oneWeekWarning, "1-week")
+			if wk != nil {
+				feedItems = append(feedItems, wk)
+			}
+
+			oneDayWarning := ff.ExpiresAt.AddDate(0, 0, -1)
+			day := genFeedItem(now, *ff.ExpiresAt, oneDayWarning, "1-day")
+			if day != nil {
+				feedItems = append(feedItems, day)
+			}
 		}
 
-		oneWeekWarning := ff.ExpiresAt.AddDate(0, 0, -7)
-		wk := genFeedItem(now, *ff.ExpiresAt, oneWeekWarning, "1-week")
-		if wk != nil {
-			feedItems = append(feedItems, wk)
+		feed.Items = feedItems
+
+		rss, err := feed.ToAtom()
+		if err != nil {
+			apiConfig.Cfg.Logger.Error(err.Error())
+			http.Error(w, "Could not generate atom rss feed", http.StatusInternalServerError)
 		}
 
-		oneDayWarning := ff.ExpiresAt.AddDate(0, 0, -1)
-		day := genFeedItem(now, *ff.ExpiresAt, oneDayWarning, "1-day")
-		if day != nil {
-			feedItems = append(feedItems, day)
+		w.Header().Add("Content-Type", "application/atom+xml")
+		_, err = w.Write([]byte(rss))
+		if err != nil {
+			apiConfig.Cfg.Logger.Error(err.Error())
 		}
-	}
-
-	feed.Items = feedItems
-
-	rss, err := feed.ToAtom()
-	if err != nil {
-		client.Logger.Error(err.Error())
-		http.Error(w, "Could not generate atom rss feed", http.StatusInternalServerError)
-	}
-
-	w.Header().Add("Content-Type", "application/atom+xml")
-	_, err = w.Write([]byte(rss))
-	if err != nil {
-		client.Logger.Error(err.Error())
 	}
 }
 
@@ -491,11 +450,10 @@ type OrderEvent struct {
 
 // Status code must be 200 or else lemonsqueezy will keep retrying
 // https://docs.lemonsqueezy.com/help/webhooks
-func paymentWebhookHandler(secret string) func(http.ResponseWriter, *http.Request) {
+func paymentWebhookHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		client := getClient(r)
-		dbpool := client.Dbpool
-		logger := client.Logger
+		dbpool := apiConfig.Dbpool
+		logger := apiConfig.Cfg.Logger
 		const MaxBodyBytes = int64(65536)
 		r.Body = http.MaxBytesReader(w, r.Body, MaxBodyBytes)
 		payload, err := io.ReadAll(r.Body)
@@ -513,7 +471,7 @@ func paymentWebhookHandler(secret string) func(http.ResponseWriter, *http.Reques
 			return
 		}
 
-		hash := shared.HmacString(secret, string(payload))
+		hash := shared.HmacString(apiConfig.Cfg.SecretWebhook, string(payload))
 		sig := r.Header.Get("X-Signature")
 		if !hmac.Equal([]byte(hash), []byte(sig)) {
 			logger.Error("invalid signature X-Signature")
@@ -588,39 +546,38 @@ func paymentWebhookHandler(secret string) func(http.ResponseWriter, *http.Reques
 }
 
 // URL shortener for out pico+ URL.
-func checkoutHandler(w http.ResponseWriter, r *http.Request) {
-	username, err := url.PathUnescape(getField(r, 0))
-	if err != nil {
-		w.WriteHeader(http.StatusUnprocessableEntity)
-		return
+func checkoutHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		username, err := url.PathUnescape(shared.GetField(r, 0))
+		if err != nil {
+			apiConfig.Cfg.Logger.Error(err.Error())
+			w.WriteHeader(http.StatusUnprocessableEntity)
+			return
+		}
+		link := "https://checkout.pico.sh/buy/73c26cf9-3fac-44c3-b744-298b3032a96b"
+		url := fmt.Sprintf(
+			"%s?discount=0&checkout[custom][username]=%s",
+			link,
+			username,
+		)
+		http.Redirect(w, r, url, http.StatusMovedPermanently)
 	}
-	link := "https://checkout.pico.sh/buy/73c26cf9-3fac-44c3-b744-298b3032a96b"
-	url := fmt.Sprintf(
-		"%s?discount=0&checkout[custom][username]=%s",
-		link,
-		username,
-	)
-	http.Redirect(w, r, url, http.StatusMovedPermanently)
 }
 
-func createMainRoutes() []shared.Route {
+func createMainRoutes(apiConfig *shared.ApiConfig) []shared.Route {
 	fileServer := http.FileServer(http.Dir("auth/public"))
-	secret := os.Getenv("PICO_SECRET_WEBHOOK")
-	if secret == "" {
-		panic("must provide PICO_SECRET_WEBHOOK environment variable")
-	}
 
 	routes := []shared.Route{
-		shared.NewRoute("GET", "/checkout/(.+)", checkoutHandler),
-		shared.NewRoute("GET", "/.well-known/oauth-authorization-server/?(.+)?", wellKnownHandler),
-		shared.NewRoute("POST", "/introspect", introspectHandler),
-		shared.NewRoute("GET", "/authorize", authorizeHandler),
-		shared.NewRoute("POST", "/token", tokenHandler),
-		shared.NewRoute("POST", "/key", keyHandler),
-		shared.NewRoute("POST", "/user", userHandler),
-		shared.NewRoute("GET", "/rss/(.+)", rssHandler),
-		shared.NewRoute("POST", "/redirect", redirectHandler),
-		shared.NewRoute("POST", "/webhook", paymentWebhookHandler(secret)),
+		shared.NewRoute("GET", "/checkout/(.+)", checkoutHandler(apiConfig)),
+		shared.NewRoute("GET", "/.well-known/oauth-authorization-server/?(.+)?", wellKnownHandler(apiConfig)),
+		shared.NewRoute("POST", "/introspect", introspectHandler(apiConfig)),
+		shared.NewRoute("GET", "/authorize", authorizeHandler(apiConfig)),
+		shared.NewRoute("POST", "/token", tokenHandler(apiConfig)),
+		shared.NewRoute("POST", "/key", keyHandler(apiConfig)),
+		shared.NewRoute("POST", "/user", userHandler(apiConfig)),
+		shared.NewRoute("GET", "/rss/(.+)", rssHandler(apiConfig)),
+		shared.NewRoute("POST", "/redirect", redirectHandler(apiConfig)),
+		shared.NewRoute("POST", "/webhook", paymentWebhookHandler(apiConfig)),
 		shared.NewRoute("GET", "/main.css", fileServer.ServeHTTP),
 		shared.NewRoute("GET", "/card.png", fileServer.ServeHTTP),
 		shared.NewRoute("GET", "/favicon-16x16.png", fileServer.ServeHTTP),
@@ -631,32 +588,6 @@ func createMainRoutes() []shared.Route {
 	}
 
 	return routes
-}
-
-func handler(routes []shared.Route, client *Client) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		var allow []string
-
-		for _, route := range routes {
-			matches := route.Regex.FindStringSubmatch(r.URL.Path)
-			if len(matches) > 0 {
-				if r.Method != route.Method {
-					allow = append(allow, route.Method)
-					continue
-				}
-				clientCtx := context.WithValue(r.Context(), ctxClient{}, client)
-				ctx := context.WithValue(clientCtx, ctxKey{}, matches[1:])
-				route.Handler(w, r.WithContext(ctx))
-				return
-			}
-		}
-		if len(allow) > 0 {
-			w.Header().Set("Allow", strings.Join(allow, ", "))
-			http.Error(w, "405 method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-		http.NotFound(w, r)
-	}
 }
 
 func metricDrainSub(ctx context.Context, dbpool db.DB, logger *slog.Logger, secret string) {
@@ -702,56 +633,59 @@ func metricDrainSub(ctx context.Context, dbpool db.DB, logger *slog.Logger, secr
 	}
 }
 
-type AuthCfg struct {
-	Debug  bool
-	Port   string
-	DbURL  string
-	Domain string
-	Issuer string
-	Secret string
-}
-
 func StartApiServer() {
 	debug := utils.GetEnv("AUTH_DEBUG", "0")
-	cfg := &AuthCfg{
-		DbURL:  utils.GetEnv("DATABASE_URL", ""),
-		Debug:  debug == "1",
-		Issuer: utils.GetEnv("AUTH_ISSUER", "pico.sh"),
-		Domain: utils.GetEnv("AUTH_DOMAIN", "http://0.0.0.0:3000"),
-		Port:   utils.GetEnv("AUTH_WEB_PORT", "3000"),
-		Secret: utils.GetEnv("PICO_SECRET", ""),
+
+	cfg := &shared.ConfigSite{
+		DbURL:         utils.GetEnv("DATABASE_URL", ""),
+		Debug:         debug == "1",
+		Issuer:        utils.GetEnv("AUTH_ISSUER", "pico.sh"),
+		Domain:        utils.GetEnv("AUTH_DOMAIN", "http://0.0.0.0:3000"),
+		Port:          utils.GetEnv("AUTH_WEB_PORT", "3000"),
+		Secret:        utils.GetEnv("PICO_SECRET", ""),
+		SecretWebhook: utils.GetEnv("PICO_SECRET_WEBHOOK", ""),
 	}
+
+	if cfg.SecretWebhook == "" {
+		panic("must provide PICO_SECRET_WEBHOOK environment variable")
+	}
+
 	if cfg.Secret == "" {
 		panic("must provide PICO_SECRET environment variable")
 	}
 
 	logger := shared.CreateLogger("auth")
+
+	cfg.Logger = logger
+
 	db := postgres.NewDB(cfg.DbURL, logger)
 	defer db.Close()
 
-	client := &Client{
-		Cfg:    cfg,
-		Dbpool: db,
-		Logger: logger,
-	}
-
 	ctx := context.Background()
+
 	// gather metrics in the auth service
 	go metricDrainSub(ctx, db, logger, cfg.Secret)
 	defer ctx.Done()
 
-	routes := createMainRoutes()
+	apiConfig := &shared.ApiConfig{
+		Cfg:    cfg,
+		Dbpool: db,
+	}
+
+	routes := createMainRoutes(apiConfig)
 
 	if cfg.Debug {
 		routes = shared.CreatePProfRoutes(routes)
 	}
 
-	router := http.HandlerFunc(handler(routes, client))
+	handler := shared.CreateServe(routes, nil, apiConfig)
+	router := http.HandlerFunc(handler)
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)
-	client.Logger.Info("starting server on port", "port", cfg.Port)
+	logger.Info("starting server on port", "port", cfg.Port)
+
 	err := http.ListenAndServe(portStr, router)
 	if err != nil {
-		client.Logger.Info("http-serve", "err", err.Error())
+		logger.Info("http-serve", "err", err.Error())
 	}
 }

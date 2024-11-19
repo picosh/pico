@@ -1,12 +1,19 @@
 package pipe
 
 import (
+	"bufio"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"net/url"
 	"os"
+	"sync"
+	"time"
 
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
+	"github.com/picosh/utils/pipe"
 )
 
 func serveFile(file string, contentType string) http.HandlerFunc {
@@ -41,6 +48,167 @@ func createStaticRoutes() []shared.Route {
 		shared.NewRoute("GET", "/favicon.ico", serveFile("favicon.ico", "image/x-icon")),
 		shared.NewRoute("GET", "/robots.txt", serveFile("robots.txt", "text/plain")),
 		shared.NewRoute("GET", "/anim.js", serveFile("anim.js", "text/javascript")),
+		shared.NewRoute("GET", "/topic/(.+)", handleSub(false)),
+		shared.NewRoute("POST", "/topic/(.+)", handlePub(false)),
+		shared.NewRoute("GET", "/pubsub/(.+)", handleSub(true)),
+		shared.NewRoute("POST", "/pubsub/(.+)", handlePub(true)),
+	}
+}
+
+type writeFlusher struct {
+	responseWriter http.ResponseWriter
+	controller     *http.ResponseController
+}
+
+func (w writeFlusher) Write(p []byte) (n int, err error) {
+	n, err = w.responseWriter.Write(p)
+	if err == nil {
+		err = w.controller.Flush()
+	}
+	return
+}
+
+var _ io.Writer = writeFlusher{}
+
+func handleSub(pubsub bool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		logger := shared.GetLogger(r)
+
+		clientInfo := shared.NewPicoPipeClient()
+		topic, _ := url.PathUnescape(shared.GetField(r, 0))
+
+		logger.Info("sub", "topic", topic, "info", clientInfo, "pubsub", pubsub)
+
+		params := "-p"
+		if r.URL.Query().Get("persist") == "true" {
+			params += " -k"
+		}
+
+		p, err := pipe.Sub(
+			r.Context(),
+			logger.With("topic", topic, "info", clientInfo, "pubsub", pubsub),
+			clientInfo,
+			fmt.Sprintf("sub %s %s", params, topic),
+		)
+
+		if err != nil {
+			logger.Error("sub error", "topic", topic, "info", clientInfo, "err", err.Error())
+			http.Error(w, "server error", 500)
+			return
+		}
+
+		if mime := r.URL.Query().Get("mime"); mime != "" {
+			w.Header().Add("Content-Type", r.URL.Query().Get("mime"))
+		}
+
+		w.WriteHeader(http.StatusOK)
+
+		_, err = io.Copy(writeFlusher{w, http.NewResponseController(w)}, p)
+		if err != nil {
+			logger.Error("sub copy error", "topic", topic, "info", clientInfo, "err", err.Error())
+			return
+		}
+	}
+}
+
+func handlePub(pubsub bool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		logger := shared.GetLogger(r)
+
+		clientInfo := shared.NewPicoPipeClient()
+		topic, _ := url.PathUnescape(shared.GetField(r, 0))
+
+		logger.Info("pub", "topic", topic, "info", clientInfo)
+
+		params := "-p"
+		if pubsub {
+			params += " -b=false"
+		}
+
+		var wg sync.WaitGroup
+
+		reader := bufio.NewReaderSize(r.Body, 1)
+
+		first := make([]byte, 1)
+
+		nFirst, err := reader.Read(first)
+		if err != nil && !errors.Is(err, io.EOF) {
+			logger.Error("pub peek error", "topic", topic, "info", clientInfo, "err", err.Error())
+			http.Error(w, "server error", 500)
+			return
+		}
+
+		if nFirst == 0 {
+			params += " -e"
+		}
+
+		p, err := pipe.Pub(
+			r.Context(),
+			logger.With("topic", topic, "info", clientInfo, "pubsub", pubsub),
+			clientInfo,
+			fmt.Sprintf("pub %s %s", params, topic),
+		)
+
+		if err != nil {
+			logger.Error("pub error", "topic", topic, "info", clientInfo, "err", err.Error())
+			http.Error(w, "server error", 500)
+			return
+		}
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			if rwc, ok := p.(io.ReadWriteCloser); ok {
+				s := bufio.NewScanner(rwc)
+
+				for s.Scan() {
+					if s.Text() == "sending msg ..." {
+						time.Sleep(10 * time.Millisecond)
+						break
+					}
+				}
+
+				if err := s.Err(); err != nil {
+					logger.Error("pub scan error", "topic", topic, "info", clientInfo, "err", err.Error())
+					return
+				}
+			}
+		}()
+
+		wg.Wait()
+
+	outer:
+		for {
+			select {
+			case <-r.Context().Done():
+				break outer
+			default:
+				n, err := p.Write(first)
+				if err != nil {
+					logger.Error("pub write error", "topic", topic, "info", clientInfo, "err", err.Error())
+					http.Error(w, "server error", 500)
+					return
+				}
+
+				if n > 0 {
+					break outer
+				}
+
+				time.Sleep(10 * time.Millisecond)
+			}
+		}
+
+		_, err = io.Copy(p, reader)
+		if err != nil {
+			logger.Error("pub copy error", "topic", topic, "info", clientInfo, "err", err.Error())
+			http.Error(w, "server error", 500)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+
+		time.Sleep(10 * time.Millisecond)
 	}
 }
 
