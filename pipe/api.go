@@ -133,6 +133,8 @@ func handlePub(pubsub bool) http.HandlerFunc {
 			cleanList := cleanRegex.ReplaceAllString(accessList, "")
 			params += fmt.Sprintf(" -a=%s", cleanList)
 			params = params[3:]
+
+			topic = fmt.Sprintf("web-%s", topic)
 		}
 
 		var wg sync.WaitGroup
