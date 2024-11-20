@@ -177,24 +177,18 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 			go func() {
 				defer cancel()
 
-				var lastRes int64 = -1
-
 				for {
 					select {
 					case <-pipeCtx.Done():
 						return
 					default:
-						n, err := io.Copy(io.Discard, sesh.Stderr())
+						_, err := sesh.SendRequest("ping@pico.sh", false, nil)
 						if err != nil {
-							logger.Error("error copying stderr to discard", "err", err, "n", n)
+							logger.Error("error sending ping", "err", err)
 							return
 						}
 
-						if lastRes == 0 && n == 0 {
-							return
-						}
-
-						lastRes = n
+						time.Sleep(5 * time.Second)
 					}
 				}
 			}()
