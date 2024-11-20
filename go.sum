@@ -279,6 +279,8 @@ github.com/picosh/tunkit v0.0.0-20240905223921-532404cef9d9 h1:g5oZmnDFr11HarA8I
 github.com/picosh/tunkit v0.0.0-20240905223921-532404cef9d9/go.mod h1:UrDH/VCIc1wg/L6iY2zSYt4TiGw+25GsKSnkVkU40Dw=
 github.com/picosh/utils v0.0.0-20241119183946-4b7dcdc032f2 h1:fZMsfZWm5P2SpT1GOUbun0juIu94rjsZWOZ+WYLBqBk=
 github.com/picosh/utils v0.0.0-20241119183946-4b7dcdc032f2/go.mod h1:HogYEyJ43IGXrOa3D/kjM1pkzNAyh+pejRyv8Eo//pk=
+github.com/picosh/utils v0.0.0-20241120010252-4429484464d4 h1:udlsJx9YIoxnPXX5hR6ReCOBnROXplEb8Fa63WXTvNI=
+github.com/picosh/utils v0.0.0-20241120010252-4429484464d4/go.mod h1:HogYEyJ43IGXrOa3D/kjM1pkzNAyh+pejRyv8Eo//pk=
 github.com/pkg/sftp v1.13.7 h1:uv+I3nNJvlKZIQGSr8JVQLNHFU9YhhNpvC14Y6KgmSM=
 github.com/pkg/sftp v1.13.7/go.mod h1:KMKI0t3T6hfA+lTR/ssZdunHo+uwq7ghoN09/FSu3DY=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=

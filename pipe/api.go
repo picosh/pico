@@ -2,6 +2,7 @@ package pipe
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -12,12 +13,16 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/utils/pipe"
 )
 
-var cleanRegex = regexp.MustCompile(`[^0-9a-zA-Z,]`)
+var (
+	cleanRegex = regexp.MustCompile(`[^0-9a-zA-Z,]`)
+	sshClient  *pipe.Client
+)
 
 func serveFile(file string, contentType string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -85,18 +90,19 @@ func handleSub(pubsub bool) http.HandlerFunc {
 			params += " -k"
 		}
 
-		p, err := pipe.Sub(
-			r.Context(),
-			logger.With("topic", topic, "info", clientInfo, "pubsub", pubsub),
-			clientInfo,
-			fmt.Sprintf("sub %s %s", params, topic),
-		)
+		id := uuid.New().String()
 
+		p, err := sshClient.AddSession(id, fmt.Sprintf("sub %s %s", params, topic), 0, -1, -1)
 		if err != nil {
 			logger.Error("sub error", "topic", topic, "info", clientInfo, "err", err.Error())
 			http.Error(w, "server error", 500)
 			return
 		}
+
+		go func() {
+			<-r.Context().Done()
+			sshClient.RemoveSession(id)
+		}()
 
 		if mime := r.URL.Query().Get("mime"); mime != "" {
 			w.Header().Add("Content-Type", r.URL.Query().Get("mime"))
@@ -154,37 +160,36 @@ func handlePub(pubsub bool) http.HandlerFunc {
 			params += " -e"
 		}
 
-		p, err := pipe.Pub(
-			r.Context(),
-			logger.With("topic", topic, "info", clientInfo, "pubsub", pubsub),
-			clientInfo,
-			fmt.Sprintf("pub %s %s", params, topic),
-		)
+		id := uuid.New().String()
 
+		p, err := sshClient.AddSession(id, fmt.Sprintf("pub %s %s", params, topic), 0, -1, -1)
 		if err != nil {
 			logger.Error("pub error", "topic", topic, "info", clientInfo, "err", err.Error())
 			http.Error(w, "server error", 500)
 			return
 		}
 
+		go func() {
+			<-r.Context().Done()
+			sshClient.RemoveSession(id)
+		}()
+
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 
-			if rwc, ok := p.(io.ReadWriteCloser); ok {
-				s := bufio.NewScanner(rwc)
+			s := bufio.NewScanner(p)
 
-				for s.Scan() {
-					if s.Text() == "sending msg ..." {
-						time.Sleep(10 * time.Millisecond)
-						break
-					}
+			for s.Scan() {
+				if s.Text() == "sending msg ..." {
+					time.Sleep(10 * time.Millisecond)
+					break
 				}
+			}
 
-				if err := s.Err(); err != nil {
-					logger.Error("pub scan error", "topic", topic, "info", clientInfo, "err", err.Error())
-					return
-				}
+			if err := s.Err(); err != nil {
+				logger.Error("pub scan error", "topic", topic, "info", clientInfo, "err", err.Error())
+				return
 			}
 		}()
 
@@ -264,6 +269,15 @@ func StartApiServer() {
 
 	mainRoutes := createMainRoutes(staticRoutes)
 	subdomainRoutes := staticRoutes
+
+	info := shared.NewPicoPipeClient()
+
+	client, err := pipe.NewClient(context.Background(), logger.With("info", info), info)
+	if err != nil {
+		panic(err)
+	}
+
+	sshClient = client
 
 	apiConfig := &shared.ApiConfig{
 		Cfg:    cfg,
