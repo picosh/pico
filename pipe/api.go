@@ -101,7 +101,10 @@ func handleSub(pubsub bool) http.HandlerFunc {
 
 		go func() {
 			<-r.Context().Done()
-			sshClient.RemoveSession(id)
+			err := sshClient.RemoveSession(id)
+			if err != nil {
+				logger.Error("sub remove error", "topic", topic, "info", clientInfo, "err", err.Error())
+			}
 		}()
 
 		if mime := r.URL.Query().Get("mime"); mime != "" {
@@ -171,7 +174,10 @@ func handlePub(pubsub bool) http.HandlerFunc {
 
 		go func() {
 			<-r.Context().Done()
-			sshClient.RemoveSession(id)
+			err := sshClient.RemoveSession(id)
+			if err != nil {
+				logger.Error("pub remove error", "topic", topic, "info", clientInfo, "err", err.Error())
+			}
 		}()
 
 		wg.Add(1)
