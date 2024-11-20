@@ -74,6 +74,8 @@ services:
       - .env.example
     ports:
       - "3002:3000"
+    volumes:
+      - ./data/prose-web/data:/app/ssh_data
   prose-ssh:
     build:
       args:

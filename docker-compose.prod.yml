@@ -164,6 +164,11 @@ services:
       - .env.prod
     volumes:
       - ./data/prose-ssh/data:/app/ssh_data
+    labels:
+      pipemgr: true
+    depends_on:
+      pipemgr:
+        condition: service_healthy
   prose-ssh:
     networks:
       prose:
@@ -256,6 +261,11 @@ services:
     volumes:
       - ./data/storage/data:/app/.storage
       - ./data/pgs-ssh/data:/app/ssh_data
+    labels:
+      pipemgr: true
+    depends_on:
+      pipemgr:
+        condition: service_healthy
   pgs-ssh:
     networks:
       pgs:
