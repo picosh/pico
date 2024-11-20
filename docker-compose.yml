@@ -29,6 +29,20 @@ services:
     profiles:
       - db
       - all
+  pipemgr:
+    image: ghcr.io/picosh/pipemgr:latest
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 2s
+      timeout: 5s
+      retries: 5
+      start_period: 1s
+    profiles:
+      - all
+      - log
   pastes-web:
     image: ghcr.io/picosh/pico/pastes-web:latest
     restart: always

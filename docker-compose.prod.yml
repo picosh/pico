@@ -31,6 +31,11 @@ services:
       - .env.prod
     volumes:
       - ./data/minio-data:/data
+  pipemgr:
+    env_file:
+      - .env.prod
+    volumes:
+      - ./data/pipemgr/data/term_info_ed25519:/key:ro
   registry:
     env_file:
       - .env.prod
@@ -146,6 +151,11 @@ services:
       - ${PROSE_CADDYFILE}:/etc/caddy/Caddyfile
       - ./data/prose-caddy/data:/data
       - ./data/prose-caddy/config:/config
+    labels:
+      pipemgr.enable: true
+    depends_on:
+      pipemgr:
+        condition: service_healthy
     ports:
       - "${PROSE_HTTPS_V4:-443}:443"
       - "${PROSE_HTTP_V4:-80}:80"
@@ -242,6 +252,11 @@ services:
       - "${PGS_HTTP_V4:-80}:80"
       - "${PGS_HTTPS_V6:-[::1]:443}:443"
       - "${PGS_HTTP_V6:-[::1]:80}:80"
+    labels:
+      pipemgr.enable: true
+    depends_on:
+      pipemgr:
+        condition: service_healthy
     profiles:
       - pgs
       - caddy
