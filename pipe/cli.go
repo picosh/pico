@@ -172,6 +172,33 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				}
 			}
 
+			pipeCtx, cancel := context.WithCancel(ctx)
+
+			go func() {
+				defer cancel()
+
+				var lastRes int64 = -1
+
+				for {
+					select {
+					case <-pipeCtx.Done():
+						return
+					default:
+						n, err := io.Copy(io.Discard, sesh.Stderr())
+						if err != nil {
+							logger.Error("error copying stderr to discard", "err", err, "n", n)
+							return
+						}
+
+						if lastRes == 0 && n == 0 {
+							return
+						}
+
+						lastRes = n
+					}
+				}
+			}()
+
 			cmd := strings.TrimSpace(args[0])
 			if cmd == "help" {
 				wish.Println(sesh, helpStr(toSshCmd(handler.Cfg)))
@@ -364,7 +391,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					}
 				}
 
-				var pubCtx context.Context = ctx
+				var pubCtx context.Context = pipeCtx
 
 				if *block {
 					count := 0
@@ -528,7 +555,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				}
 
 				err = pubsub.Sub(
-					ctx,
+					pipeCtx,
 					clientID,
 					sesh,
 					[]*psub.Channel{
@@ -618,7 +645,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				}
 
 				readErr, writeErr := pubsub.Pipe(
-					ctx,
+					pipeCtx,
 					clientID,
 					sesh,
 					[]*psub.Channel{

@@ -285,6 +285,22 @@ func StartApiServer() {
 
 	sshClient = client
 
+	pingSession, err := sshClient.AddSession("ping", "pub -b=false -c ping", 0, -1, -1)
+	if err != nil {
+		panic(err)
+	}
+
+	go func() {
+		for {
+			_, err := pingSession.Write([]byte(fmt.Sprintf("%s: pipe-web ping\n", time.Now().UTC().Format(time.RFC3339))))
+			if err != nil {
+				logger.Error("pipe ping error", "err", err.Error())
+			}
+
+			time.Sleep(5 * time.Second)
+		}
+	}()
+
 	apiConfig := &shared.ApiConfig{
 		Cfg:    cfg,
 		Dbpool: db,
