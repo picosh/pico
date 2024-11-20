@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -39,7 +40,7 @@ func serveFile(file string, contentType string) http.HandlerFunc {
 		_, err = w.Write(contents)
 		if err != nil {
 			logger.Error("could not write static file", "err", err.Error())
-			http.Error(w, "server error", 500)
+			http.Error(w, "server error", http.StatusInternalServerError)
 		}
 	}
 }
@@ -90,12 +91,18 @@ func handleSub(pubsub bool) http.HandlerFunc {
 			params += " -k"
 		}
 
+		if accessList := r.URL.Query().Get("access"); accessList != "" {
+			logger.Info("adding access list", "topic", topic, "info", clientInfo, "access", accessList)
+			cleanList := cleanRegex.ReplaceAllString(accessList, "")
+			params += fmt.Sprintf(" -a=%s", cleanList)
+		}
+
 		id := uuid.NewString()
 
 		p, err := sshClient.AddSession(id, fmt.Sprintf("sub %s %s", params, topic), 0, -1, -1)
 		if err != nil {
 			logger.Error("sub error", "topic", topic, "info", clientInfo, "err", err.Error())
-			http.Error(w, "server error", 500)
+			http.Error(w, "server error", http.StatusInternalServerError)
 			return
 		}
 
@@ -152,7 +159,7 @@ func handlePub(pubsub bool) http.HandlerFunc {
 		nFirst, err := reader.Read(first)
 		if err != nil && !errors.Is(err, io.EOF) {
 			logger.Error("pub peek error", "topic", topic, "info", clientInfo, "err", err.Error())
-			http.Error(w, "server error", 500)
+			http.Error(w, "server error", http.StatusInternalServerError)
 			return
 		}
 
@@ -165,7 +172,7 @@ func handlePub(pubsub bool) http.HandlerFunc {
 		p, err := sshClient.AddSession(id, fmt.Sprintf("pub %s %s", params, topic), 0, -1, -1)
 		if err != nil {
 			logger.Error("pub error", "topic", topic, "info", clientInfo, "err", err.Error())
-			http.Error(w, "server error", 500)
+			http.Error(w, "server error", http.StatusInternalServerError)
 			return
 		}
 
@@ -177,7 +184,11 @@ func handlePub(pubsub bool) http.HandlerFunc {
 			}
 		}()
 
+		var scanErr error
+		scanStatus := http.StatusInternalServerError
+
 		wg.Add(1)
+
 		go func() {
 			defer wg.Done()
 
@@ -188,15 +199,36 @@ func handlePub(pubsub bool) http.HandlerFunc {
 					time.Sleep(10 * time.Millisecond)
 					break
 				}
+
+				if strings.HasPrefix(s.Text(), "  ssh ") {
+					f := strings.Fields(s.Text())
+					if len(f) > 1 && f[len(f)-1] != topic {
+						scanErr = fmt.Errorf("pub is not same as used, expected `%s` and received `%s`", topic, f[len(f)-1])
+						scanStatus = http.StatusUnauthorized
+						return
+					}
+				}
 			}
 
 			if err := s.Err(); err != nil {
-				logger.Error("pub scan error", "topic", topic, "info", clientInfo, "err", err.Error())
+				scanErr = err
 				return
 			}
 		}()
 
 		wg.Wait()
+
+		if scanErr != nil {
+			logger.Error("pub scan error", "topic", topic, "info", clientInfo, "err", scanErr.Error())
+
+			msg := "server error"
+			if scanStatus == http.StatusUnauthorized {
+				msg = "access denied"
+			}
+
+			http.Error(w, msg, scanStatus)
+			return
+		}
 
 	outer:
 		for {
@@ -207,7 +239,7 @@ func handlePub(pubsub bool) http.HandlerFunc {
 				n, err := p.Write(first)
 				if err != nil {
 					logger.Error("pub write error", "topic", topic, "info", clientInfo, "err", err.Error())
-					http.Error(w, "server error", 500)
+					http.Error(w, "server error", http.StatusInternalServerError)
 					return
 				}
 
@@ -222,7 +254,7 @@ func handlePub(pubsub bool) http.HandlerFunc {
 		_, err = io.Copy(p, reader)
 		if err != nil {
 			logger.Error("pub copy error", "topic", topic, "info", clientInfo, "err", err.Error())
-			http.Error(w, "server error", 500)
+			http.Error(w, "server error", http.StatusInternalServerError)
 			return
 		}
 

@@ -242,7 +242,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 						for _, channel := range channels {
 							extraData := ""
 
-							if accessList, ok := handler.Access.Load(channel.Topic); ok {
+							if accessList, ok := handler.Access.Load(channel.Topic); ok && len(accessList) > 0 {
 								extraData += fmt.Sprintf(" (Access List: %s)", strings.Join(accessList, ", "))
 							}
 
@@ -270,7 +270,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 						for waitingChannel, channelPubs := range waitingChannels {
 							extraData := ""
 
-							if accessList, ok := handler.Access.Load(waitingChannel); ok {
+							if accessList, ok := handler.Access.Load(waitingChannel); ok && len(accessList) > 0 {
 								extraData += fmt.Sprintf(" (Access List: %s)", strings.Join(accessList, ", "))
 							}
 
@@ -370,17 +370,19 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					}
 				}
 
-				if len(accessList) > 0 {
-					_, loaded := handler.Access.LoadOrStore(name, accessList)
-					if !loaded {
-						defer func() {
-							handler.Access.Delete(name)
-						}()
-					}
+				var accessListCreator bool
+
+				_, loaded := handler.Access.LoadOrStore(name, accessList)
+				if !loaded {
+					defer func() {
+						handler.Access.Delete(name)
+					}()
+
+					accessListCreator = true
 				}
 
-				if accessList, ok := handler.Access.Load(withoutUser); !isAdmin && ok {
-					if checkAccess(accessList, userName, sesh) {
+				if accessList, ok := handler.Access.Load(withoutUser); ok && len(accessList) > 0 && !isAdmin {
+					if checkAccess(accessList, userName, sesh) || accessListCreator {
 						name = withoutUser
 					} else if !*public {
 						name = toTopic(userName, withoutUser)
@@ -399,8 +401,6 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 						topic,
 					)
 				}
-
-				var pubCtx context.Context = pipeCtx
 
 				if *block {
 					count := 0
@@ -429,16 +429,13 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 							wish.Println(sesh, termMsg)
 						}
 
-						downCtx, cancelFunc := context.WithCancel(ctx)
-						pubCtx = downCtx
-
 						ready := make(chan struct{})
 
 						go func() {
 							for {
 								select {
-								case <-ctx.Done():
-									cancelFunc()
+								case <-pipeCtx.Done():
+									cancel()
 									return
 								case <-time.After(1 * time.Millisecond):
 									count := 0
@@ -463,9 +460,9 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 
 						select {
 						case <-ready:
-						case <-ctx.Done():
+						case <-pipeCtx.Done():
 						case <-time.After(tt):
-							cancelFunc()
+							cancel()
 
 							if !*clean {
 								wish.Fatalln(sesh, "timeout reached, exiting ...")
@@ -504,7 +501,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				}
 
 				err = pubsub.Pub(
-					pubCtx,
+					pipeCtx,
 					clientID,
 					rw,
 					[]*psub.Channel{
@@ -522,6 +519,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				}
 			} else if cmd == "sub" {
 				subCmd := flagSet("sub", sesh)
+				access := subCmd.String("a", "", "Comma separated list of pico usernames or ssh-key fingerprints to allow access to a topic")
 				public := subCmd.Bool("p", false, "Subscribe to a public topic")
 				keepAlive := subCmd.Bool("k", false, "Keep the subscription alive even after the publisher has died")
 				clean := subCmd.Bool("c", false, "Don't send status messages")
@@ -541,7 +539,14 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					"keepAlive", *keepAlive,
 					"topic", topic,
 					"clean", *clean,
+					"access", *access,
 				)
+
+				var accessList []string
+
+				if *access != "" {
+					accessList = parseArgList(*access)
+				}
 
 				var withoutUser string
 				var name string
@@ -558,8 +563,19 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					}
 				}
 
-				if accessList, ok := handler.Access.Load(withoutUser); !isAdmin && ok {
-					if checkAccess(accessList, userName, sesh) {
+				var accessListCreator bool
+
+				_, loaded := handler.Access.LoadOrStore(name, accessList)
+				if !loaded {
+					defer func() {
+						handler.Access.Delete(name)
+					}()
+
+					accessListCreator = true
+				}
+
+				if accessList, ok := handler.Access.Load(withoutUser); ok && len(accessList) > 0 && !isAdmin {
+					if checkAccess(accessList, userName, sesh) || accessListCreator {
 						name = withoutUser
 					} else if !*public {
 						name = toTopic(userName, withoutUser)
@@ -635,17 +651,19 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					}
 				}
 
-				if len(accessList) > 0 {
-					_, loaded := handler.Access.LoadOrStore(name, accessList)
-					if !loaded {
-						defer func() {
-							handler.Access.Delete(name)
-						}()
-					}
+				var accessListCreator bool
+
+				_, loaded := handler.Access.LoadOrStore(name, accessList)
+				if !loaded {
+					defer func() {
+						handler.Access.Delete(name)
+					}()
+
+					accessListCreator = true
 				}
 
-				if accessList, ok := handler.Access.Load(withoutUser); !isAdmin && ok {
-					if checkAccess(accessList, userName, sesh) {
+				if accessList, ok := handler.Access.Load(withoutUser); ok && len(accessList) > 0 && !isAdmin {
+					if checkAccess(accessList, userName, sesh) || accessListCreator {
 						name = withoutUser
 					} else if !*public {
 						name = toTopic(userName, withoutUser)
