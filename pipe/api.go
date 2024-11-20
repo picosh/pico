@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 	"sync"
 	"time"
 
@@ -15,6 +16,8 @@ import (
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/utils/pipe"
 )
+
+var cleanRegex = regexp.MustCompile(`[^0-9a-zA-Z,]`)
 
 func serveFile(file string, contentType string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -73,6 +76,8 @@ func handleSub(pubsub bool) http.HandlerFunc {
 		clientInfo := shared.NewPicoPipeClient()
 		topic, _ := url.PathUnescape(shared.GetField(r, 0))
 
+		topic = cleanRegex.ReplaceAllString(topic, "")
+
 		logger.Info("sub", "topic", topic, "info", clientInfo, "pubsub", pubsub)
 
 		params := "-p"
@@ -114,11 +119,20 @@ func handlePub(pubsub bool) http.HandlerFunc {
 		clientInfo := shared.NewPicoPipeClient()
 		topic, _ := url.PathUnescape(shared.GetField(r, 0))
 
+		topic = cleanRegex.ReplaceAllString(topic, "")
+
 		logger.Info("pub", "topic", topic, "info", clientInfo)
 
 		params := "-p"
 		if pubsub {
 			params += " -b=false"
+		}
+
+		if accessList := r.URL.Query().Get("access"); accessList != "" {
+			logger.Info("adding access list", "topic", topic, "info", clientInfo, "access", accessList)
+			cleanList := cleanRegex.ReplaceAllString(accessList, "")
+			params += fmt.Sprintf(" -a=%s", cleanList)
+			params = params[3:]
 		}
 
 		var wg sync.WaitGroup
