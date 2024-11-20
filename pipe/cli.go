@@ -364,17 +364,29 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					if *public {
 						name = toPublicTopic(topic)
 						msgFlag = "-p "
+						withoutUser = name
 					} else {
 						withoutUser = topic
 					}
 				}
 
-				if len(accessList) > 0 && !*public {
+				if len(accessList) > 0 {
 					_, loaded := handler.Access.LoadOrStore(name, accessList)
 					if !loaded {
 						defer func() {
 							handler.Access.Delete(name)
 						}()
+					}
+				}
+
+				if accessList, ok := handler.Access.Load(withoutUser); !isAdmin && ok {
+					if checkAccess(accessList, userName, sesh) {
+						name = withoutUser
+					} else if !*public {
+						name = toTopic(userName, withoutUser)
+					} else {
+						topic = uuid.NewString()
+						name = toPublicTopic(topic)
 					}
 				}
 
@@ -386,12 +398,6 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 						msgFlag,
 						topic,
 					)
-				}
-
-				if accessList, ok := handler.Access.Load(withoutUser); !isAdmin && !*public && ok {
-					if checkAccess(accessList, userName, sesh) {
-						name = withoutUser
-					}
 				}
 
 				var pubCtx context.Context = pipeCtx
@@ -546,14 +552,20 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					name = toTopic(userName, topic)
 					if *public {
 						name = toPublicTopic(topic)
+						withoutUser = name
 					} else {
 						withoutUser = topic
 					}
 				}
 
-				if accessList, ok := handler.Access.Load(withoutUser); !isAdmin && !*public && ok {
+				if accessList, ok := handler.Access.Load(withoutUser); !isAdmin && ok {
 					if checkAccess(accessList, userName, sesh) {
 						name = withoutUser
+					} else if !*public {
+						name = toTopic(userName, withoutUser)
+					} else {
+						wish.Errorln(sesh, "access denied")
+						return
 					}
 				}
 
@@ -617,17 +629,29 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					if *public {
 						name = toPublicTopic(topic)
 						flagMsg = "-p "
+						withoutUser = name
 					} else {
 						withoutUser = topic
 					}
 				}
 
-				if len(accessList) > 0 && !*public {
+				if len(accessList) > 0 {
 					_, loaded := handler.Access.LoadOrStore(name, accessList)
 					if !loaded {
 						defer func() {
 							handler.Access.Delete(name)
 						}()
+					}
+				}
+
+				if accessList, ok := handler.Access.Load(withoutUser); !isAdmin && ok {
+					if checkAccess(accessList, userName, sesh) {
+						name = withoutUser
+					} else if !*public {
+						name = toTopic(userName, withoutUser)
+					} else {
+						topic = uuid.NewString()
+						name = toPublicTopic(topic)
 					}
 				}
 
@@ -639,12 +663,6 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 						flagMsg,
 						topic,
 					)
-				}
-
-				if accessList, ok := handler.Access.Load(withoutUser); !isAdmin && !*public && ok {
-					if checkAccess(accessList, userName, sesh) {
-						name = withoutUser
-					}
 				}
 
 				readErr, writeErr := pubsub.Pipe(

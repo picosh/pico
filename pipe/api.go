@@ -20,7 +20,7 @@ import (
 )
 
 var (
-	cleanRegex = regexp.MustCompile(`[^0-9a-zA-Z,]`)
+	cleanRegex = regexp.MustCompile(`[^0-9a-zA-Z,/]`)
 	sshClient  *pipe.Client
 )
 
@@ -90,7 +90,7 @@ func handleSub(pubsub bool) http.HandlerFunc {
 			params += " -k"
 		}
 
-		id := uuid.New().String()
+		id := uuid.NewString()
 
 		p, err := sshClient.AddSession(id, fmt.Sprintf("sub %s %s", params, topic), 0, -1, -1)
 		if err != nil {
@@ -141,9 +141,6 @@ func handlePub(pubsub bool) http.HandlerFunc {
 			logger.Info("adding access list", "topic", topic, "info", clientInfo, "access", accessList)
 			cleanList := cleanRegex.ReplaceAllString(accessList, "")
 			params += fmt.Sprintf(" -a=%s", cleanList)
-			params = params[3:]
-
-			topic = fmt.Sprintf("web-%s", topic)
 		}
 
 		var wg sync.WaitGroup
@@ -163,7 +160,7 @@ func handlePub(pubsub bool) http.HandlerFunc {
 			params += " -e"
 		}
 
-		id := uuid.New().String()
+		id := uuid.NewString()
 
 		p, err := sshClient.AddSession(id, fmt.Sprintf("pub %s %s", params, topic), 0, -1, -1)
 		if err != nil {
