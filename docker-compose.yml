@@ -30,8 +30,6 @@ services:
       - db
       - all
   pipemgr:
-    build:
-      context: .
     image: ghcr.io/picosh/pipemgr:latest
     restart: always
     volumes:
