@@ -213,6 +213,9 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				topicFilter := fmt.Sprintf("%s/", userName)
 				if isAdmin {
 					topicFilter = ""
+					if len(args) > 1 {
+						topicFilter = args[1]
+					}
 				}
 
 				var channels []*psub.Channel
