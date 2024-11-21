@@ -76,6 +76,11 @@ services:
       - "3002:3000"
     volumes:
       - ./data/prose-web/data:/app/ssh_data
+    labels:
+      pipemgr.enable: true
+    depends_on:
+      pipemgr:
+        condition: service_healthy
   prose-ssh:
     build:
       args:
@@ -121,6 +126,11 @@ services:
       - ./data/storage/data:/app/.storage
     ports:
       - "3004:3000"
+    labels:
+      pipemgr.enable: true
+    depends_on:
+      pipemgr:
+        condition: service_healthy
   pgs-ssh:
     build:
       args:

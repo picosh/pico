@@ -165,7 +165,7 @@ services:
     volumes:
       - ./data/prose-ssh/data:/app/ssh_data
     labels:
-      pipemgr: true
+      pipemgr.enable: true
     depends_on:
       pipemgr:
         condition: service_healthy
@@ -262,7 +262,7 @@ services:
       - ./data/storage/data:/app/.storage
       - ./data/pgs-ssh/data:/app/ssh_data
     labels:
-      pipemgr: true
+      pipemgr.enable: true
     depends_on:
       pipemgr:
         condition: service_healthy
