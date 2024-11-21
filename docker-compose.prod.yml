@@ -35,7 +35,7 @@ services:
     env_file:
       - .env.prod
     volumes:
-      - ./data/pipemgr/data/term_info_id25519:/key:ro
+      - ./data/pipemgr/data/term_info_ed25519:/key:ro
   registry:
     env_file:
       - .env.prod
