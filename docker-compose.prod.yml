@@ -151,6 +151,11 @@ services:
       - ${PROSE_CADDYFILE}:/etc/caddy/Caddyfile
       - ./data/prose-caddy/data:/data
       - ./data/prose-caddy/config:/config
+    labels:
+      pipemgr.enable: true
+    depends_on:
+      pipemgr:
+        condition: service_healthy
     ports:
       - "${PROSE_HTTPS_V4:-443}:443"
       - "${PROSE_HTTP_V4:-80}:80"
@@ -169,11 +174,6 @@ services:
       - .env.prod
     volumes:
       - ./data/prose-ssh/data:/app/ssh_data
-    labels:
-      pipemgr.enable: true
-    depends_on:
-      pipemgr:
-        condition: service_healthy
   prose-ssh:
     networks:
       prose:
