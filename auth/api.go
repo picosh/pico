@@ -4,11 +4,13 @@ import (
 	"bufio"
 	"context"
 	"crypto/hmac"
+	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"html/template"
 	"io"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -21,6 +23,9 @@ import (
 	"github.com/picosh/utils"
 	"github.com/picosh/utils/pipe/metrics"
 )
+
+//go:embed html/* public/*
+var embedFS embed.FS
 
 type oauth2Server struct {
 	Issuer                                    string   `json:"issuer"`
@@ -126,11 +131,12 @@ func authorizeHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 			"scope", scope,
 		)
 
-		ts, err := template.ParseFiles(
-			"auth/html/redirect.page.tmpl",
-			"auth/html/footer.partial.tmpl",
-			"auth/html/marketing-footer.partial.tmpl",
-			"auth/html/base.layout.tmpl",
+		ts, err := template.ParseFS(
+			embedFS,
+			"html/redirect.page.tmpl",
+			"html/footer.partial.tmpl",
+			"html/marketing-footer.partial.tmpl",
+			"html/base.layout.tmpl",
 		)
 
 		if err != nil {
@@ -367,7 +373,6 @@ func rssHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 			Link:        &feeds.Link{Href: href},
 			Description: "get notified of important membership updates",
 			Author:      &feeds.Author{Name: "team pico"},
-			Created:     time.Now(),
 		}
 		var feedItems []*feeds.Item
 
@@ -404,7 +409,7 @@ func rssHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 				feedItems = append(feedItems, wk)
 			}
 
-			oneDayWarning := ff.ExpiresAt.AddDate(0, 0, -1)
+			oneDayWarning := ff.ExpiresAt.AddDate(0, 0, -2)
 			day := genFeedItem(now, *ff.ExpiresAt, oneDayWarning, "1-day")
 			if day != nil {
 				feedItems = append(feedItems, day)
@@ -427,25 +432,33 @@ func rssHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 	}
 }
 
+type CustomDataMeta struct {
+	PicoUsername string `json:"username"`
+}
+
+type OrderEventMeta struct {
+	EventName  string          `json:"event_name"`
+	CustomData *CustomDataMeta `json:"custom_data"`
+}
+
+type OrderEventData struct {
+	Type string              `json:"type"`
+	ID   string              `json:"id"`
+	Attr *OrderEventDataAttr `json:"attributes"`
+}
+
+type OrderEventDataAttr struct {
+	OrderNumber int       `json:"order_number"`
+	Identifier  string    `json:"identifier"`
+	UserName    string    `json:"user_name"`
+	UserEmail   string    `json:"user_email"`
+	CreatedAt   time.Time `json:"created_at"`
+	Status      string    `json:"status"` // `paid`, `refund`
+}
+
 type OrderEvent struct {
-	Meta *struct {
-		EventName  string `json:"event_name"`
-		CustomData *struct {
-			PicoUsername string `json:"username"`
-		} `json:"custom_data"`
-	} `json:"meta"`
-	Data *struct {
-		Type string `json:"type"`
-		ID   string `json:"id"`
-		Attr *struct {
-			OrderNumber int       `json:"order_number"`
-			Identifier  string    `json:"identifier"`
-			UserName    string    `json:"user_name"`
-			UserEmail   string    `json:"user_email"`
-			CreatedAt   time.Time `json:"created_at"`
-			Status      string    `json:"status"` // `paid`, `refund`
-		} `json:"attributes"`
-	} `json:"data"`
+	Meta *OrderEventMeta `json:"meta"`
+	Data *OrderEventData `json:"data"`
 }
 
 // Status code must be 200 or else lemonsqueezy will keep retrying
@@ -457,9 +470,13 @@ func paymentWebhookHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 		const MaxBodyBytes = int64(65536)
 		r.Body = http.MaxBytesReader(w, r.Body, MaxBodyBytes)
 		payload, err := io.ReadAll(r.Body)
+
+		w.Header().Add("content-type", "text/plain")
+
 		if err != nil {
 			logger.Error("error reading request body", "err", err.Error())
 			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(fmt.Sprintf("error reading request body %s", err.Error())))
 			return
 		}
 
@@ -468,6 +485,7 @@ func paymentWebhookHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 		if err := json.Unmarshal(payload, &event); err != nil {
 			logger.Error("failed to parse webhook body JSON", "err", err.Error())
 			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(fmt.Sprintf("failed to parse webhook body JSON %s", err.Error())))
 			return
 		}
 
@@ -476,24 +494,28 @@ func paymentWebhookHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 		if !hmac.Equal([]byte(hash), []byte(sig)) {
 			logger.Error("invalid signature X-Signature")
 			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("invalid signature x-signature"))
 			return
 		}
 
 		if event.Meta == nil {
 			logger.Error("no meta field found")
 			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("no meta field found"))
 			return
 		}
 
 		if event.Meta.EventName != "order_created" {
 			logger.Error("event not order_created", "event", event.Meta.EventName)
 			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("event not order_created"))
 			return
 		}
 
 		if event.Meta.CustomData == nil {
 			logger.Error("no custom data found")
 			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("no custom data found"))
 			return
 		}
 
@@ -502,6 +524,7 @@ func paymentWebhookHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 		if event.Data == nil || event.Data.Attr == nil {
 			logger.Error("no data or data.attributes fields found")
 			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("no data or data.attributes fields found"))
 			return
 		}
 
@@ -525,23 +548,28 @@ func paymentWebhookHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 		if username == "" {
 			log.Error("no `?checkout[custom][username]=xxx` found in URL, cannot add pico+ membership")
 			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("no `?checkout[custom][username]=xxx` found in URL, cannot add pico+ membership"))
 			return
 		}
 
 		if status != "paid" {
 			log.Error("status not paid")
 			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("status not paid"))
 			return
 		}
 
 		err = dbpool.AddPicoPlusUser(username, "lemonsqueezy", txID)
 		if err != nil {
 			log.Error("failed to add pico+ user", "err", err)
-		} else {
-			log.Info("successfully added pico+ user")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("status not paid"))
+			return
 		}
 
+		log.Info("successfully added pico+ user")
 		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("successfully added pico+ user"))
 	}
 }
 
@@ -565,7 +593,11 @@ func checkoutHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 }
 
 func createMainRoutes(apiConfig *shared.ApiConfig) []shared.Route {
-	fileServer := http.FileServer(http.Dir("auth/public"))
+	serverRoot, err := fs.Sub(embedFS, "public")
+	if err != nil {
+		panic(err)
+	}
+	fileServer := http.FileServerFS(serverRoot)
 
 	routes := []shared.Route{
 		shared.NewRoute("GET", "/checkout/(.+)", checkoutHandler(apiConfig)),

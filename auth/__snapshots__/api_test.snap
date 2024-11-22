@@ -1,0 +1,169 @@
+
+[TestPaymentWebhook - 1]
+successfully added pico+ user
+---
+
+[TestAuthApi/authorize - 1]
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset='utf-8'>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>auth redirect</title>
+
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+
+    <meta name="keywords" content="static, site, hosting" />
+
+    <link rel="stylesheet" href="/main.css" />
+
+    
+  </head>
+  <body >
+<header>
+    <h1 class="text-2xl">Auth Redirect</h1>
+    <hr />
+</header>
+<main>
+    <section>
+        <h2 class="text-xl">You are being redirected to </h2>
+        <p>
+            Here is their auth request data:
+        </p>
+
+        <article>
+            <h2 class="text-lg">Client ID</h2>
+            <div></div>
+        </article>
+
+        <br />
+
+        <article>
+            <h2 class="text-lg">Redirect URI</h2>
+            <div></div>
+        </article>
+
+        <br />
+
+        <article>
+            <h2 class="text-lg">Scope</h2>
+            <div></div>
+        </article>
+
+        <br />
+
+        <article>
+            <h2 class="text-lg">Response Type</h2>
+            <div></div>
+        </article>
+
+        <br />
+
+        <article>
+            <h2 class="text-lg">If you would like to continue authenticating with this service, ssh into a pico service and generate a token. Then input it here and click submit.</h2>
+            <br />
+            <form action="/redirect" method="POST">
+                <label for="token">Auth Token:</label><br>
+                <input type="text" id="token" name="token"><br>
+                <br />
+                <input type="hidden" id="redirect_uri" name="redirect_uri" value="">
+                <input type="hidden" id="response_type" name="response_type" value="">
+                <input type="submit" value="Submit">
+            </form>
+        </article>
+    </section>
+</main>
+
+<footer>
+  <hr />
+  <p class="font-italic">Built and maintained by <a href="https://pico.sh">pico.sh</a>.</p>
+  <div>
+    <a href="https://github.com/picosh/pico">source</a>
+  </div>
+</footer>
+
+</body>
+</html>
+---
+
+[TestUser - 1]
+[{"id":"1","user_id":"user-1","name":"my-key","key":"nice-pubkey","created_at":"0001-01-01T00:00:00Z"}]
+---
+
+[TestAuthApi/rss - 1]
+<?xml version="1.0" encoding="UTF-8"?><feed xmlns="http://www.w3.org/2005/Atom">
+  <title>pico+</title>
+  <id>https://auth.pico.sh/rss/123</id>
+  <updated></updated>
+  <subtitle>get notified of important membership updates</subtitle>
+  <link href="https://auth.pico.sh/rss/123"></link>
+  <author>
+    <name>team pico</name>
+  </author>
+  <entry>
+    <title>pico+ membership activated on 2021-08-15 14:30:45</title>
+    <updated>2021-08-15T14:30:45Z</updated>
+    <id>pico-plus-activated-1629037845</id>
+    <content type="html">Thanks for joining pico+! You now have access to all our premium services for exactly one year.  We will send you pico+ expiration notifications through this RSS feed.  Go to &lt;a href=&#34;https://pico.sh/getting-started#next-steps&#34;&gt;pico.sh/getting-started#next-steps&lt;/a&gt; to start using our services.</content>
+    <link href="https://pico.sh" rel="alternate"></link>
+    <summary type="html">Thanks for joining pico+! You now have access to all our premium services for exactly one year.  We will send you pico+ expiration notifications through this RSS feed.  Go to &lt;a href=&#34;https://pico.sh/getting-started#next-steps&#34;&gt;pico.sh/getting-started#next-steps&lt;/a&gt; to start using our services.</summary>
+    <author>
+      <name>team pico</name>
+    </author>
+  </entry>
+  <entry>
+    <title>pico+ 1-month expiration notice</title>
+    <updated>2021-07-16T14:30:45Z</updated>
+    <id>1626445845</id>
+    <content type="html">Your pico+ membership is going to expire on 2021-08-16 14:30:45</content>
+    <link href="https://pico.sh" rel="alternate"></link>
+    <summary type="html">Your pico+ membership is going to expire on 2021-08-16 14:30:45</summary>
+    <author>
+      <name>team pico</name>
+    </author>
+  </entry>
+  <entry>
+    <title>pico+ 1-week expiration notice</title>
+    <updated>2021-08-09T14:30:45Z</updated>
+    <id>1628519445</id>
+    <content type="html">Your pico+ membership is going to expire on 2021-08-16 14:30:45</content>
+    <link href="https://pico.sh" rel="alternate"></link>
+    <summary type="html">Your pico+ membership is going to expire on 2021-08-16 14:30:45</summary>
+    <author>
+      <name>team pico</name>
+    </author>
+  </entry>
+  <entry>
+    <title>pico+ 1-day expiration notice</title>
+    <updated>2021-08-14T14:30:45Z</updated>
+    <id>1628951445</id>
+    <content type="html">Your pico+ membership is going to expire on 2021-08-16 14:30:45</content>
+    <link href="https://pico.sh" rel="alternate"></link>
+    <summary type="html">Your pico+ membership is going to expire on 2021-08-16 14:30:45</summary>
+    <author>
+      <name>team pico</name>
+    </author>
+  </entry>
+</feed>
+---
+
+[TestKey - 1]
+{"id":"user-1","name":"user-a","created_at":null}
+---
+
+[TestAuthApi/fileserver - 1]
+User-agent: *
+Allow: /
+---
+
+[TestAuthApi/well-known - 1]
+{"issuer":"auth.pico.test","introspection_endpoint":"http://0.0.0.0:3000/introspect","introspection_endpoint_auth_methods_supported":["none"],"authorization_endpoint":"http://0.0.0.0:3000/authorize","token_endpoint":"http://0.0.0.0:3000/token","response_types_supported":["code"]}
+---
+
+[TestIntrospect - 1]
+{"active":true,"username":"user-a"}
+---
+
+[TestToken - 1]
+{"access_token":"123"}
+---
