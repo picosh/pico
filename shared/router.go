@@ -55,6 +55,19 @@ func CreatePProfRoutes(routes []Route) []Route {
 	)
 }
 
+func CreatePProfRoutesMux(mux *http.ServeMux) {
+	http.HandleFunc("GET /debug/pprof/cmdline", pprof.Cmdline)
+	http.HandleFunc("GET /debug/pprof/profile", pprof.Profile)
+	http.HandleFunc("GET /debug/pprof/symbol", pprof.Symbol)
+	http.HandleFunc("GET /debug/pprof/trace", pprof.Trace)
+	http.HandleFunc("GET /debug/pprof/(.*)", pprof.Index)
+	http.HandleFunc("POST /debug/pprof/cmdline", pprof.Cmdline)
+	http.HandleFunc("POST /debug/pprof/profile", pprof.Profile)
+	http.HandleFunc("POST /debug/pprof/symbol", pprof.Symbol)
+	http.HandleFunc("POST /debug/pprof/trace", pprof.Trace)
+	http.HandleFunc("POST /debug/pprof/(.*)", pprof.Index)
+}
+
 type ApiConfig struct {
 	Cfg            *ConfigSite
 	Dbpool         db.DB

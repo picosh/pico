@@ -592,36 +592,6 @@ func checkoutHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 	}
 }
 
-func createMainRoutes(apiConfig *shared.ApiConfig) []shared.Route {
-	serverRoot, err := fs.Sub(embedFS, "public")
-	if err != nil {
-		panic(err)
-	}
-	fileServer := http.FileServerFS(serverRoot)
-
-	routes := []shared.Route{
-		shared.NewRoute("GET", "/checkout/(.+)", checkoutHandler(apiConfig)),
-		shared.NewRoute("GET", "/.well-known/oauth-authorization-server/?(.+)?", wellKnownHandler(apiConfig)),
-		shared.NewRoute("POST", "/introspect", introspectHandler(apiConfig)),
-		shared.NewRoute("GET", "/authorize", authorizeHandler(apiConfig)),
-		shared.NewRoute("POST", "/token", tokenHandler(apiConfig)),
-		shared.NewRoute("POST", "/key", keyHandler(apiConfig)),
-		shared.NewRoute("POST", "/user", userHandler(apiConfig)),
-		shared.NewRoute("GET", "/rss/(.+)", rssHandler(apiConfig)),
-		shared.NewRoute("POST", "/redirect", redirectHandler(apiConfig)),
-		shared.NewRoute("POST", "/webhook", paymentWebhookHandler(apiConfig)),
-		shared.NewRoute("GET", "/main.css", fileServer.ServeHTTP),
-		shared.NewRoute("GET", "/card.png", fileServer.ServeHTTP),
-		shared.NewRoute("GET", "/favicon-16x16.png", fileServer.ServeHTTP),
-		shared.NewRoute("GET", "/favicon-32x32.png", fileServer.ServeHTTP),
-		shared.NewRoute("GET", "/apple-touch-icon.png", fileServer.ServeHTTP),
-		shared.NewRoute("GET", "/favicon.ico", fileServer.ServeHTTP),
-		shared.NewRoute("GET", "/robots.txt", fileServer.ServeHTTP),
-	}
-
-	return routes
-}
-
 func metricDrainSub(ctx context.Context, dbpool db.DB, logger *slog.Logger, secret string) {
 	drain := metrics.ReconnectReadMetrics(
 		ctx,
@@ -665,6 +635,41 @@ func metricDrainSub(ctx context.Context, dbpool db.DB, logger *slog.Logger, secr
 	}
 }
 
+func authMux(apiConfig *shared.ApiConfig) *http.ServeMux {
+	serverRoot, err := fs.Sub(embedFS, "public")
+	if err != nil {
+		panic(err)
+	}
+	fileServer := http.FileServerFS(serverRoot)
+
+	mux := http.NewServeMux()
+	// ensure legacy router is disabled
+	// GODEBUG=httpmuxgo121=0
+	mux.Handle("GET /checkout/{username}", checkoutHandler(apiConfig))
+	mux.Handle("GET /.well-known/oauth-authorization-server/?(.+)?", wellKnownHandler(apiConfig))
+	mux.Handle("POST /introspect", introspectHandler(apiConfig))
+	mux.Handle("GET /authorize", authorizeHandler(apiConfig))
+	mux.Handle("POST /token", tokenHandler(apiConfig))
+	mux.Handle("POST /key", keyHandler(apiConfig))
+	mux.Handle("POST /user", userHandler(apiConfig))
+	mux.Handle("GET /rss/{token}", rssHandler(apiConfig))
+	mux.Handle("POST /redirect", redirectHandler(apiConfig))
+	mux.Handle("POST /webhook", paymentWebhookHandler(apiConfig))
+	mux.HandleFunc("GET /main.css", fileServer.ServeHTTP)
+	mux.HandleFunc("GET /card.png", fileServer.ServeHTTP)
+	mux.HandleFunc("GET /favicon-16x16.png", fileServer.ServeHTTP)
+	mux.HandleFunc("GET /favicon-32x32.png", fileServer.ServeHTTP)
+	mux.HandleFunc("GET /apple-touch-icon.png", fileServer.ServeHTTP)
+	mux.HandleFunc("GET /favicon.ico", fileServer.ServeHTTP)
+	mux.HandleFunc("GET /robots.txt", fileServer.ServeHTTP)
+
+	if apiConfig.Cfg.Debug {
+		shared.CreatePProfRoutesMux(mux)
+	}
+
+	return mux
+}
+
 func StartApiServer() {
 	debug := utils.GetEnv("AUTH_DEBUG", "0")
 
@@ -704,19 +709,12 @@ func StartApiServer() {
 		Dbpool: db,
 	}
 
-	routes := createMainRoutes(apiConfig)
-
-	if cfg.Debug {
-		routes = shared.CreatePProfRoutes(routes)
-	}
-
-	handler := shared.CreateServe(routes, nil, apiConfig)
-	router := http.HandlerFunc(handler)
+	mux := authMux(apiConfig)
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)
 	logger.Info("starting server on port", "port", cfg.Port)
 
-	err := http.ListenAndServe(portStr, router)
+	err := http.ListenAndServe(portStr, mux)
 	if err != nil {
 		logger.Info("http-serve", "err", err.Error())
 	}

@@ -48,10 +48,8 @@ func TestPaymentWebhook(t *testing.T) {
 	request.Header.Add("X-signature", hash)
 	responseRecorder := httptest.NewRecorder()
 
-	routes := createMainRoutes(apiConfig)
-	handler := shared.CreateServe(routes, nil, apiConfig)
-	router := http.HandlerFunc(handler)
-	router.ServeHTTP(responseRecorder, request)
+	mux := authMux(apiConfig)
+	mux.ServeHTTP(responseRecorder, request)
 
 	testResponse(t, responseRecorder, 200, "text/plain")
 }
@@ -70,10 +68,8 @@ func TestUser(t *testing.T) {
 	request.Header.Add("Authorization", "Bearer 123")
 	responseRecorder := httptest.NewRecorder()
 
-	routes := createMainRoutes(apiConfig)
-	handler := shared.CreateServe(routes, nil, apiConfig)
-	router := http.HandlerFunc(handler)
-	router.ServeHTTP(responseRecorder, request)
+	mux := authMux(apiConfig)
+	mux.ServeHTTP(responseRecorder, request)
 
 	testResponse(t, responseRecorder, 200, "application/json")
 }
@@ -93,10 +89,8 @@ func TestKey(t *testing.T) {
 	request.Header.Add("Authorization", "Bearer 123")
 	responseRecorder := httptest.NewRecorder()
 
-	routes := createMainRoutes(apiConfig)
-	handler := shared.CreateServe(routes, nil, apiConfig)
-	router := http.HandlerFunc(handler)
-	router.ServeHTTP(responseRecorder, request)
+	mux := authMux(apiConfig)
+	mux.ServeHTTP(responseRecorder, request)
 
 	testResponse(t, responseRecorder, 200, "application/json")
 }
@@ -108,10 +102,8 @@ func TestCheckout(t *testing.T) {
 	request.Header.Add("Authorization", "Bearer 123")
 	responseRecorder := httptest.NewRecorder()
 
-	routes := createMainRoutes(apiConfig)
-	handler := shared.CreateServe(routes, nil, apiConfig)
-	router := http.HandlerFunc(handler)
-	router.ServeHTTP(responseRecorder, request)
+	mux := authMux(apiConfig)
+	mux.ServeHTTP(responseRecorder, request)
 
 	loc := responseRecorder.Header().Get("Location")
 	if loc != "https://checkout.pico.sh/buy/73c26cf9-3fac-44c3-b744-298b3032a96b?discount=0&checkout[custom][username]=user-a" {
@@ -129,10 +121,8 @@ func TestIntrospect(t *testing.T) {
 	request := httptest.NewRequest("POST", mkpath("/introspect?token=123"), strings.NewReader(""))
 	responseRecorder := httptest.NewRecorder()
 
-	routes := createMainRoutes(apiConfig)
-	handler := shared.CreateServe(routes, nil, apiConfig)
-	router := http.HandlerFunc(handler)
-	router.ServeHTTP(responseRecorder, request)
+	mux := authMux(apiConfig)
+	mux.ServeHTTP(responseRecorder, request)
 
 	testResponse(t, responseRecorder, 200, "application/json")
 }
@@ -143,10 +133,8 @@ func TestToken(t *testing.T) {
 	request := httptest.NewRequest("POST", mkpath("/token?code=123"), strings.NewReader(""))
 	responseRecorder := httptest.NewRecorder()
 
-	routes := createMainRoutes(apiConfig)
-	handler := shared.CreateServe(routes, nil, apiConfig)
-	router := http.HandlerFunc(handler)
-	router.ServeHTTP(responseRecorder, request)
+	mux := authMux(apiConfig)
+	mux.ServeHTTP(responseRecorder, request)
 
 	testResponse(t, responseRecorder, 200, "application/json")
 }
@@ -189,10 +177,8 @@ func TestAuthApi(t *testing.T) {
 			request := httptest.NewRequest("GET", mkpath(tc.path), strings.NewReader(""))
 			responseRecorder := httptest.NewRecorder()
 
-			routes := createMainRoutes(apiConfig)
-			handler := shared.CreateServe(routes, nil, apiConfig)
-			router := http.HandlerFunc(handler)
-			router.ServeHTTP(responseRecorder, request)
+			mux := authMux(apiConfig)
+			mux.ServeHTTP(responseRecorder, request)
 
 			testResponse(t, responseRecorder, tc.status, tc.contentType)
 		})

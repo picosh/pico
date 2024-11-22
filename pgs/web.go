@@ -83,6 +83,9 @@ func NewWebRouter(cfg *shared.ConfigSite, logger *slog.Logger, dbpool db.DB, st 
 }
 
 func (web *WebRouter) initRouters() {
+	// ensure legacy router is disabled
+	// GODEBUG=httpmuxgo121=0
+
 	// root domain
 	rootRouter := http.NewServeMux()
 	rootRouter.HandleFunc("GET /check", web.checkHandler)
