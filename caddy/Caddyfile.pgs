@@ -95,6 +95,7 @@ monitoring.{$MONITORING_APP_DOMAIN}, prometheus.{$MONITORING_APP_DOMAIN}, grafan
 
 :443 {
 	reverse_proxy web:3000
+	log
 	tls {$APP_EMAIL} {
 		on_demand
 	}
