@@ -26,35 +26,35 @@ successfully added pico+ user
 </header>
 <main>
     <section>
-        <h2 class="text-xl">You are being redirected to </h2>
+        <h2 class="text-xl">You are being redirected to pico.test</h2>
         <p>
             Here is their auth request data:
         </p>
 
         <article>
             <h2 class="text-lg">Client ID</h2>
-            <div></div>
+            <div>333</div>
         </article>
 
         <br />
 
         <article>
             <h2 class="text-lg">Redirect URI</h2>
-            <div></div>
+            <div>pico.test</div>
         </article>
 
         <br />
 
         <article>
             <h2 class="text-lg">Scope</h2>
-            <div></div>
+            <div>admin</div>
         </article>
 
         <br />
 
         <article>
             <h2 class="text-lg">Response Type</h2>
-            <div></div>
+            <div>json</div>
         </article>
 
         <br />
@@ -66,8 +66,8 @@ successfully added pico+ user
                 <label for="token">Auth Token:</label><br>
                 <input type="text" id="token" name="token"><br>
                 <br />
-                <input type="hidden" id="redirect_uri" name="redirect_uri" value="">
-                <input type="hidden" id="response_type" name="response_type" value="">
+                <input type="hidden" id="redirect_uri" name="redirect_uri" value="pico.test">
+                <input type="hidden" id="response_type" name="response_type" value="json">
                 <input type="submit" value="Submit">
             </form>
         </article>

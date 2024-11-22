@@ -156,7 +156,7 @@ func TestAuthApi(t *testing.T) {
 	tt := []*ApiExample{
 		{
 			name:        "authorize",
-			path:        "/authorize",
+			path:        "/authorize?response_type=json&client_id=333&redirect_uri=pico.test&scope=admin",
 			status:      http.StatusOK,
 			contentType: "text/html; charset=utf-8",
 			dbpool:      apiConfig.Dbpool,
