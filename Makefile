@@ -28,6 +28,10 @@ test:
 	go test ./...
 .PHONY: test
 
+snaps:
+	UPDATE_SNAPS=true go test ./...
+.PHONY: snaps
+
 bp-setup:
 	$(DOCKER_CMD) buildx ls | grep pico || $(DOCKER_CMD) buildx create --name pico
 	$(DOCKER_CMD) buildx use pico

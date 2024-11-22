@@ -55,11 +55,36 @@ func CreatePProfRoutes(routes []Route) []Route {
 	)
 }
 
+func CreatePProfRoutesMux(mux *http.ServeMux) {
+	mux.HandleFunc("GET /debug/pprof/cmdline", pprof.Cmdline)
+	mux.HandleFunc("GET /debug/pprof/profile", pprof.Profile)
+	mux.HandleFunc("GET /debug/pprof/symbol", pprof.Symbol)
+	mux.HandleFunc("GET /debug/pprof/trace", pprof.Trace)
+	mux.HandleFunc("GET /debug/pprof/(.*)", pprof.Index)
+	mux.HandleFunc("POST /debug/pprof/cmdline", pprof.Cmdline)
+	mux.HandleFunc("POST /debug/pprof/profile", pprof.Profile)
+	mux.HandleFunc("POST /debug/pprof/symbol", pprof.Symbol)
+	mux.HandleFunc("POST /debug/pprof/trace", pprof.Trace)
+	mux.HandleFunc("POST /debug/pprof/(.*)", pprof.Index)
+}
+
 type ApiConfig struct {
 	Cfg            *ConfigSite
 	Dbpool         db.DB
 	Storage        storage.StorageServe
 	AnalyticsQueue chan *db.AnalyticsVisits
+}
+
+func (hc *ApiConfig) HasPrivilegedAccess(apiToken string) bool {
+	user, err := hc.Dbpool.FindUserForToken(apiToken)
+	if err != nil {
+		return false
+	}
+	return hc.Dbpool.HasFeatureForUser(user.ID, "auth")
+}
+
+func (hc *ApiConfig) HasPlusOrSpace(user *db.User, space string) bool {
+	return hc.Dbpool.HasFeatureForUser(user.ID, "plus") || hc.Dbpool.HasFeatureForUser(user.ID, space)
 }
 
 func (hc *ApiConfig) CreateCtx(prevCtx context.Context, subdomain string) context.Context {
@@ -123,6 +148,10 @@ func GetSubdomainFromRequest(r *http.Request, domain, space string) string {
 }
 
 func findRouteConfig(r *http.Request, routes []Route, subdomainRoutes []Route, cfg *ConfigSite) ([]Route, string) {
+	if len(subdomainRoutes) == 0 {
+		return routes, ""
+	}
+
 	subdomain := GetSubdomainFromRequest(r, cfg.Domain, cfg.Space)
 	if subdomain == "" {
 		return routes, subdomain
@@ -201,4 +230,12 @@ func GetCustomDomain(host string, space string) string {
 
 func GetAnalyticsQueue(r *http.Request) chan *db.AnalyticsVisits {
 	return r.Context().Value(ctxAnalyticsQueue{}).(chan *db.AnalyticsVisits)
+}
+
+func GetApiToken(r *http.Request) string {
+	authHeader := r.Header.Get("authorization")
+	if authHeader == "" {
+		return ""
+	}
+	return strings.TrimPrefix(authHeader, "Bearer ")
 }

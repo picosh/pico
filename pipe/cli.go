@@ -172,6 +172,27 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				}
 			}
 
+			pipeCtx, cancel := context.WithCancel(ctx)
+
+			go func() {
+				defer cancel()
+
+				for {
+					select {
+					case <-pipeCtx.Done():
+						return
+					default:
+						_, err := sesh.SendRequest("ping@pico.sh", false, nil)
+						if err != nil {
+							logger.Error("error sending ping", "err", err)
+							return
+						}
+
+						time.Sleep(5 * time.Second)
+					}
+				}
+			}()
+
 			cmd := strings.TrimSpace(args[0])
 			if cmd == "help" {
 				wish.Println(sesh, helpStr(toSshCmd(handler.Cfg)))
@@ -186,6 +207,9 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				topicFilter := fmt.Sprintf("%s/", userName)
 				if isAdmin {
 					topicFilter = ""
+					if len(args) > 1 {
+						topicFilter = args[1]
+					}
 				}
 
 				var channels []*psub.Channel
@@ -212,7 +236,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 						for _, channel := range channels {
 							extraData := ""
 
-							if accessList, ok := handler.Access.Load(channel.Topic); ok {
+							if accessList, ok := handler.Access.Load(channel.Topic); ok && len(accessList) > 0 {
 								extraData += fmt.Sprintf(" (Access List: %s)", strings.Join(accessList, ", "))
 							}
 
@@ -240,7 +264,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 						for waitingChannel, channelPubs := range waitingChannels {
 							extraData := ""
 
-							if accessList, ok := handler.Access.Load(waitingChannel); ok {
+							if accessList, ok := handler.Access.Load(waitingChannel); ok && len(accessList) > 0 {
 								extraData += fmt.Sprintf(" (Access List: %s)", strings.Join(accessList, ", "))
 							}
 
@@ -284,6 +308,8 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				public := pubCmd.Bool("p", false, "Publish message to public topic")
 				block := pubCmd.Bool("b", true, "Block writes until a subscriber is available")
 				timeout := pubCmd.Duration("t", 30*24*time.Hour, "Timeout as a Go duration to block for a subscriber to be available. Valid time units are 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h'. Default is 30 days.")
+				clean := pubCmd.Bool("c", false, "Don't send status messages")
+
 				if !flagCheck(pubCmd, topic, cmdArgs) {
 					return
 				}
@@ -301,6 +327,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					"timeout", *timeout,
 					"topic", topic,
 					"access", *access,
+					"clean", *clean,
 				)
 
 				var accessList []string
@@ -331,35 +358,43 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					if *public {
 						name = toPublicTopic(topic)
 						msgFlag = "-p "
+						withoutUser = name
 					} else {
 						withoutUser = topic
 					}
 				}
 
-				if len(accessList) > 0 && !*public {
-					_, loaded := handler.Access.LoadOrStore(name, accessList)
-					if !loaded {
-						defer func() {
-							handler.Access.Delete(name)
-						}()
-					}
+				var accessListCreator bool
+
+				_, loaded := handler.Access.LoadOrStore(name, accessList)
+				if !loaded {
+					defer func() {
+						handler.Access.Delete(name)
+					}()
+
+					accessListCreator = true
 				}
 
-				wish.Printf(
-					sesh,
-					"subscribe to this channel:\n  ssh %s sub %s%s\n",
-					toSshCmd(handler.Cfg),
-					msgFlag,
-					topic,
-				)
-
-				if accessList, ok := handler.Access.Load(withoutUser); !isAdmin && !*public && ok {
-					if checkAccess(accessList, userName, sesh) {
+				if accessList, ok := handler.Access.Load(withoutUser); ok && len(accessList) > 0 && !isAdmin {
+					if checkAccess(accessList, userName, sesh) || accessListCreator {
 						name = withoutUser
+					} else if !*public {
+						name = toTopic(userName, withoutUser)
+					} else {
+						topic = uuid.NewString()
+						name = toPublicTopic(topic)
 					}
 				}
 
-				var pubCtx context.Context = ctx
+				if !*clean {
+					wish.Printf(
+						sesh,
+						"subscribe to this channel:\n  ssh %s sub %s%s\n",
+						toSshCmd(handler.Cfg),
+						msgFlag,
+						topic,
+					)
+				}
 
 				if *block {
 					count := 0
@@ -383,18 +418,18 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 						if tt > 0 {
 							termMsg += " " + tt.String()
 						}
-						wish.Println(sesh, termMsg)
 
-						downCtx, cancelFunc := context.WithCancel(ctx)
-						pubCtx = downCtx
+						if !*clean {
+							wish.Println(sesh, termMsg)
+						}
 
 						ready := make(chan struct{})
 
 						go func() {
 							for {
 								select {
-								case <-ctx.Done():
-									cancelFunc()
+								case <-pipeCtx.Done():
+									cancel()
 									return
 								case <-time.After(1 * time.Millisecond):
 									count := 0
@@ -419,10 +454,20 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 
 						select {
 						case <-ready:
-						case <-ctx.Done():
+						case <-pipeCtx.Done():
 						case <-time.After(tt):
-							cancelFunc()
-							wish.Fatalln(sesh, "timeout reached, exiting ...")
+							cancel()
+
+							if !*clean {
+								wish.Fatalln(sesh, "timeout reached, exiting ...")
+							} else {
+								err = sesh.Exit(1)
+								if err != nil {
+									logger.Error("error exiting session", "err", err)
+								}
+
+								sesh.Close()
+							}
 						}
 
 						newWaiters, _ := handler.Waiters.LoadOrStore(name, nil)
@@ -445,10 +490,12 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					}
 				}
 
-				wish.Println(sesh, "sending msg ...")
+				if !*clean {
+					wish.Println(sesh, "sending msg ...")
+				}
 
 				err = pubsub.Pub(
-					pubCtx,
+					pipeCtx,
 					clientID,
 					rw,
 					[]*psub.Channel{
@@ -457,14 +504,20 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					*block,
 				)
 
-				wish.Println(sesh, "msg sent!")
-				if err != nil {
+				if !*clean {
+					wish.Println(sesh, "msg sent!")
+				}
+
+				if err != nil && !*clean {
 					wish.Errorln(sesh, err)
 				}
 			} else if cmd == "sub" {
 				subCmd := flagSet("sub", sesh)
+				access := subCmd.String("a", "", "Comma separated list of pico usernames or ssh-key fingerprints to allow access to a topic")
 				public := subCmd.Bool("p", false, "Subscribe to a public topic")
 				keepAlive := subCmd.Bool("k", false, "Keep the subscription alive even after the publisher has died")
+				clean := subCmd.Bool("c", false, "Don't send status messages")
+
 				if !flagCheck(subCmd, topic, cmdArgs) {
 					return
 				}
@@ -479,7 +532,15 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					"public", *public,
 					"keepAlive", *keepAlive,
 					"topic", topic,
+					"clean", *clean,
+					"access", *access,
 				)
+
+				var accessList []string
+
+				if *access != "" {
+					accessList = parseArgList(*access)
+				}
 
 				var withoutUser string
 				var name string
@@ -490,19 +551,36 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					name = toTopic(userName, topic)
 					if *public {
 						name = toPublicTopic(topic)
+						withoutUser = name
 					} else {
 						withoutUser = topic
 					}
 				}
 
-				if accessList, ok := handler.Access.Load(withoutUser); !isAdmin && !*public && ok {
-					if checkAccess(accessList, userName, sesh) {
+				var accessListCreator bool
+
+				_, loaded := handler.Access.LoadOrStore(name, accessList)
+				if !loaded {
+					defer func() {
+						handler.Access.Delete(name)
+					}()
+
+					accessListCreator = true
+				}
+
+				if accessList, ok := handler.Access.Load(withoutUser); ok && len(accessList) > 0 && !isAdmin {
+					if checkAccess(accessList, userName, sesh) || accessListCreator {
 						name = withoutUser
+					} else if !*public {
+						name = toTopic(userName, withoutUser)
+					} else {
+						wish.Errorln(sesh, "access denied")
+						return
 					}
 				}
 
 				err = pubsub.Sub(
-					ctx,
+					pipeCtx,
 					clientID,
 					sesh,
 					[]*psub.Channel{
@@ -511,7 +589,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					*keepAlive,
 				)
 
-				if err != nil {
+				if err != nil && !*clean {
 					wish.Errorln(sesh, err)
 				}
 			} else if cmd == "pipe" {
@@ -519,6 +597,8 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				access := pipeCmd.String("a", "", "Comma separated list of pico usernames or ssh-key fingerprints to allow access to a topic")
 				public := pipeCmd.Bool("p", false, "Pipe to a public topic")
 				replay := pipeCmd.Bool("r", false, "Replay messages to the client that sent it")
+				clean := pipeCmd.Bool("c", false, "Don't send status messages")
+
 				if !flagCheck(pipeCmd, topic, cmdArgs) {
 					return
 				}
@@ -534,6 +614,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					"replay", *replay,
 					"topic", topic,
 					"access", *access,
+					"clean", *clean,
 				)
 
 				var accessList []string
@@ -558,21 +639,35 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					if *public {
 						name = toPublicTopic(topic)
 						flagMsg = "-p "
+						withoutUser = name
 					} else {
 						withoutUser = topic
 					}
 				}
 
-				if len(accessList) > 0 && !*public {
-					_, loaded := handler.Access.LoadOrStore(name, accessList)
-					if !loaded {
-						defer func() {
-							handler.Access.Delete(name)
-						}()
+				var accessListCreator bool
+
+				_, loaded := handler.Access.LoadOrStore(name, accessList)
+				if !loaded {
+					defer func() {
+						handler.Access.Delete(name)
+					}()
+
+					accessListCreator = true
+				}
+
+				if accessList, ok := handler.Access.Load(withoutUser); ok && len(accessList) > 0 && !isAdmin {
+					if checkAccess(accessList, userName, sesh) || accessListCreator {
+						name = withoutUser
+					} else if !*public {
+						name = toTopic(userName, withoutUser)
+					} else {
+						topic = uuid.NewString()
+						name = toPublicTopic(topic)
 					}
 				}
 
-				if isCreator {
+				if isCreator && !*clean {
 					wish.Printf(
 						sesh,
 						"subscribe to this topic:\n  ssh %s sub %s%s\n",
@@ -582,14 +677,8 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					)
 				}
 
-				if accessList, ok := handler.Access.Load(withoutUser); !isAdmin && !*public && ok {
-					if checkAccess(accessList, userName, sesh) {
-						name = withoutUser
-					}
-				}
-
 				readErr, writeErr := pubsub.Pipe(
-					ctx,
+					pipeCtx,
 					clientID,
 					sesh,
 					[]*psub.Channel{
@@ -598,11 +687,11 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					*replay,
 				)
 
-				if readErr != nil {
+				if readErr != nil && !*clean {
 					wish.Errorln(sesh, "error reading from pipe", readErr)
 				}
 
-				if writeErr != nil {
+				if writeErr != nil && !*clean {
 					wish.Errorln(sesh, "error writing to pipe", writeErr)
 				}
 			}
