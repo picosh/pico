@@ -48,11 +48,7 @@ func generateURL(cfg *shared.ConfigSite, path string, space string) string {
 
 func wellKnownHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		space, err := url.PathUnescape(shared.GetField(r, 0))
-		if err != nil {
-			apiConfig.Cfg.Logger.Error(err.Error())
-		}
-
+		space := r.PathValue("space")
 		if space == "" {
 			space = r.URL.Query().Get("space")
 		}
@@ -69,7 +65,7 @@ func wellKnownHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		err = json.NewEncoder(w).Encode(p)
+		err := json.NewEncoder(w).Encode(p)
 		if err != nil {
 			apiConfig.Cfg.Logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -353,12 +349,7 @@ func genFeedItem(now time.Time, expiresAt time.Time, warning time.Time, txt stri
 
 func rssHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		apiToken, err := url.PathUnescape(shared.GetField(r, 0))
-		if err != nil {
-			apiConfig.Cfg.Logger.Error(err.Error())
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
+		apiToken := r.PathValue("token")
 		user, err := apiConfig.Dbpool.FindUserForToken(apiToken)
 		if err != nil {
 			apiConfig.Cfg.Logger.Error(err.Error())
@@ -574,14 +565,9 @@ func paymentWebhookHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 }
 
 // URL shortener for out pico+ URL.
-func checkoutHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
+func checkoutHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		username, err := url.PathUnescape(shared.GetField(r, 0))
-		if err != nil {
-			apiConfig.Cfg.Logger.Error(err.Error())
-			w.WriteHeader(http.StatusUnprocessableEntity)
-			return
-		}
+		username := r.PathValue("username")
 		link := "https://checkout.pico.sh/buy/73c26cf9-3fac-44c3-b744-298b3032a96b"
 		url := fmt.Sprintf(
 			"%s?discount=0&checkout[custom][username]=%s",
@@ -645,8 +631,9 @@ func authMux(apiConfig *shared.ApiConfig) *http.ServeMux {
 	mux := http.NewServeMux()
 	// ensure legacy router is disabled
 	// GODEBUG=httpmuxgo121=0
-	mux.Handle("GET /checkout/{username}", checkoutHandler(apiConfig))
-	mux.Handle("GET /.well-known/oauth-authorization-server/?(.+)?", wellKnownHandler(apiConfig))
+	mux.Handle("GET /checkout/{username}", checkoutHandler())
+	mux.Handle("GET /.well-known/oauth-authorization-server", wellKnownHandler(apiConfig))
+	mux.Handle("GET /.well-known/oauth-authorization-server/{space}", wellKnownHandler(apiConfig))
 	mux.Handle("POST /introspect", introspectHandler(apiConfig))
 	mux.Handle("GET /authorize", authorizeHandler(apiConfig))
 	mux.Handle("POST /token", tokenHandler(apiConfig))
