@@ -26,12 +26,10 @@ func PlusView(username string, w int) string {
 - prose
   - increased storage limits
   - blog analytics
-- docker registry
-  - full access
 - 10GB total storage
 
 There are a few ways to purchase a membership. We try our best to
-provide immediate access to <code>pico+</code> regardless of payment
+provide immediate access to pico+ regardless of payment
 method.
 
 ## Online Payment (credit card, paypal)
