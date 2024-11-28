@@ -607,10 +607,11 @@ type CaddyAccessLog struct {
 	Request     AccessLogReq `json:"request"`
 	Status      int          `json:"status"`
 	RespHeaders RespHeaders  `json:"resp_headers"`
+	ServiceID   string       `json:"server_id"`
 }
 
 func deserializeCaddyAccessLog(dbpool db.DB, access *CaddyAccessLog) (*db.AnalyticsVisits, error) {
-	spaceRaw := strings.SplitN(access.Request.Tls.ServerName, ".", 2)
+	spaceRaw := strings.SplitN(access.ServiceID, ".", 2)
 	space := spaceRaw[0]
 	host := access.Request.Host
 	path := access.Request.Uri
@@ -845,10 +846,10 @@ func StartApiServer() {
 
 	ctx := context.Background()
 
-	// gather metrics in the auth service
-	go metricDrainSub(ctx, db, logger, cfg.Secret)
 	// convert container logs to access logs
 	go containerDrainSub(ctx, db, logger)
+	// gather metrics in the auth service
+	go metricDrainSub(ctx, db, logger, cfg.Secret)
 
 	defer ctx.Done()
 
