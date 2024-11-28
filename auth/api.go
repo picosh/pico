@@ -6,7 +6,6 @@ import (
 	"crypto/hmac"
 	"embed"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"html/template"
 	"io"
@@ -354,7 +353,11 @@ func rssHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 		apiToken := r.PathValue("token")
 		user, err := apiConfig.Dbpool.FindUserForToken(apiToken)
 		if err != nil {
-			apiConfig.Cfg.Logger.Error(err.Error())
+			apiConfig.Cfg.Logger.Error(
+				"could not find user for token",
+				"err", err.Error(),
+				"token", apiToken,
+			)
 			http.Error(w, "invalid token", http.StatusNotFound)
 			return
 		}
@@ -629,6 +632,7 @@ func deserializeCaddyAccessLog(dbpool db.DB, access *CaddyAccessLog) (*db.Analyt
 	if err != nil {
 		return nil, err
 	}
+
 	// get user ID
 	user, err := dbpool.FindUserForName(props.Username)
 	if err != nil {
@@ -645,8 +649,10 @@ func deserializeCaddyAccessLog(dbpool db.DB, access *CaddyAccessLog) (*db.Analyt
 		projectID = project.ID
 	} else if space == "prose" { // figure out post ID
 		if path == "" || path == "/" {
+			// ignore
 		} else {
-			post, err := dbpool.FindPostWithSlug(path, user.ID, space)
+			cleanPath := strings.TrimPrefix(path, "/")
+			post, err := dbpool.FindPostWithSlug(cleanPath, user.ID, space)
 			if err != nil {
 				return nil, err
 			}
@@ -713,7 +719,11 @@ func containerDrainSub(ctx context.Context, dbpool db.DB, logger *slog.Logger) {
 					logger.Error("could not marshal json of a visit", "err", err)
 					continue
 				}
-				_, _ = send.Write(jso)
+				jso = append(jso, []byte("\n")...)
+				_, err = send.Write(jso)
+				if err != nil {
+					logger.Error("could not write to metric-drain", "err", err)
+				}
 			}
 		}
 	}
@@ -748,14 +758,15 @@ func metricDrainSub(ctx context.Context, dbpool db.DB, logger *slog.Logger, secr
 				logger.Info("could not unmarshal json", "err", err, "line", line)
 				continue
 			}
+			logger.Info("received visit", "visit", visit)
 			err = shared.AnalyticsVisitFromVisit(&visit, dbpool, secret)
 			if err != nil {
-				if !errors.Is(err, shared.ErrAnalyticsDisabled) {
-					logger.Info("could not record analytics visit", "reason", err)
-				}
+				logger.Info("could not record analytics visit", "err", err)
+				continue
 			}
 
 			if visit.ContentType != "" && !strings.HasPrefix(visit.ContentType, "text/html") {
+				logger.Info("invalid content type", "contentType", visit.ContentType)
 				continue
 			}
 
