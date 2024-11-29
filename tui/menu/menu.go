@@ -20,6 +20,7 @@ const (
 	PlusChoice
 	SettingsChoice
 	LogsChoice
+	AnalyticsChoice
 	ChatChoice
 	ExitChoice
 	UnsetChoice // set when no choice has been made
@@ -33,18 +34,19 @@ var menuChoices = map[menuChoice]string{
 	PlusChoice:          "Pico+",
 	SettingsChoice:      "Settings",
 	LogsChoice:          "Logs",
+	AnalyticsChoice:     "Analytics",
 	ChatChoice:          "Chat",
 	ExitChoice:          "Exit",
 }
 
 type Model struct {
-	shared     common.SharedModel
+	shared     *common.SharedModel
 	err        error
 	menuIndex  int
 	menuChoice menuChoice
 }
 
-func NewModel(shared common.SharedModel) Model {
+func NewModel(shared *common.SharedModel) Model {
 	return Model{
 		shared:     shared,
 		menuChoice: UnsetChoice,

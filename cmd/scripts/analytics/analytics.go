@@ -15,16 +15,12 @@ func main() {
 	dbpool := postgres.NewDB(DbURL, logger)
 
 	args := os.Args
-	fkID := args[1]
+	host := args[1]
 
 	stats, err := dbpool.VisitSummary(
 		&db.SummaryOpts{
-			FkID: fkID,
-			// By:   "post_id",
-			By:       "user_id",
-			Interval: "day",
-			Origin:   utils.StartOfMonth(),
-			// Where:    "AND (post_id IS NOT NULL OR (post_id IS NULL AND project_id IS NULL))",
+			Origin: utils.StartOfMonth(),
+			Host:   host,
 		},
 	)
 	if err != nil {
@@ -36,8 +32,6 @@ func main() {
 			"interval",
 			"interval", s.Interval,
 			"visitors", s.Visitors,
-			"postID", s.PostID,
-			"projectID", s.ProjectID,
 		)
 	}
 
@@ -46,8 +40,6 @@ func main() {
 			"url",
 			"url", url.Url,
 			"count", url.Count,
-			"postID", url.PostID,
-			"projectID", url.ProjectID,
 		)
 	}
 
@@ -56,8 +48,6 @@ func main() {
 			"referer",
 			"url", url.Url,
 			"count", url.Count,
-			"postID", url.PostID,
-			"projectID", url.ProjectID,
 		)
 	}
 }

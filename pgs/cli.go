@@ -1,12 +1,10 @@
 package pgs
 
 import (
-	"cmp"
 	"errors"
 	"fmt"
 	"log/slog"
 	"path/filepath"
-	"slices"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -67,10 +65,6 @@ func getHelpText(styles common.Styles, userName string, width int) string {
 		{
 			"stats",
 			"usage statistics",
-		},
-		{
-			fmt.Sprintf("stats %s", projectName),
-			fmt.Sprintf("site analytics for `%s`", projectName),
 		},
 		{
 			"ls",
@@ -200,102 +194,13 @@ func (c *Cmd) help() {
 	c.output(getHelpText(c.Styles, c.User.Name, c.Width))
 }
 
-func (c *Cmd) statsByProject(projectName string) error {
-	project, err := c.Dbpool.FindProjectByName(c.User.ID, projectName)
-	if err != nil {
-		return errors.Join(err, fmt.Errorf("project (%s) does not exit", projectName))
-	}
-
-	opts := &db.SummaryOpts{
-		FkID:     project.ID,
-		By:       "project_id",
-		Interval: "day",
-		Origin:   utils.StartOfMonth(),
-	}
-
-	summary, err := c.Dbpool.VisitSummary(opts)
-	if err != nil {
-		return err
-	}
-
-	c.output("Top URLs")
-	topUrlsTbl := common.VisitUrlsTbl(summary.TopUrls)
-	c.output(topUrlsTbl.Width(c.Width).String())
-
-	c.output("Top Referers")
-	topRefsTbl := common.VisitUrlsTbl(summary.TopReferers)
-	c.output(topRefsTbl.Width(c.Width).String())
-
-	uniqueTbl := common.UniqueVisitorsTbl(summary.Intervals)
-	c.output("Unique Visitors this Month")
-	c.output(uniqueTbl.Width(c.Width).String())
-
-	return nil
-}
-
-func (c *Cmd) statsSites() error {
-	opts := &db.SummaryOpts{
-		FkID:     c.User.ID,
-		By:       "user_id",
-		Interval: "day",
-		Origin:   utils.StartOfMonth(),
-	}
-
-	summary, err := c.Dbpool.VisitSummary(opts)
-	if err != nil {
-		return err
-	}
-
-	projects, err := c.Dbpool.FindProjectsByUser(c.User.ID)
-	if err != nil {
-		return err
-	}
-
-	c.output("\nVisitor Analytics this Month\n")
-
-	c.output("Top URLs")
-	topUrlsTbl := common.VisitUrlsWithProjectTbl(projects, summary.TopUrls)
-
-	c.output(topUrlsTbl.Width(c.Width).String())
-
-	c.output("Top Referers")
-	topRefsTbl := common.VisitUrlsTbl(summary.TopReferers)
-	c.output(topRefsTbl.Width(c.Width).String())
-
-	mapper := map[string]*db.VisitInterval{}
-	result := []*db.VisitUrl{}
-	// combine visitors by project_id
-	for _, interval := range summary.Intervals {
-		if interval.ProjectID == "" {
-			continue
-		}
-		if _, ok := mapper[interval.ProjectID]; !ok {
-			mapper[interval.ProjectID] = interval
-		}
-		mapper[interval.ProjectID].Visitors += interval.Visitors
-	}
-
-	for _, val := range mapper {
-		projectName := ""
-		for _, project := range projects {
-			if project.ID == val.ProjectID {
-				projectName = project.Name
-			}
-		}
-		result = append(result, &db.VisitUrl{
-			Url:   projectName,
-			Count: val.Visitors,
-		})
-	}
-
-	slices.SortFunc(result, func(a, b *db.VisitUrl) int {
-		return cmp.Compare(b.Count, a.Count)
-	})
-
-	uniqueTbl := common.VisitUrlsTbl(result)
-	c.output("Unique Visitors by Site")
-	c.output(uniqueTbl.Width(c.Width).String())
-
+func (c *Cmd) statsByProject(_ string) error {
+	msg := fmt.Sprintf(
+		"%s\n\nRun %s to access pico's analytics TUI",
+		c.Styles.Logo.Render("DEPRECATED"),
+		c.Styles.Code.Render("ssh pico.sh"),
+	)
+	c.output(c.Styles.RoundedBorder.Render(msg))
 	return nil
 }
 
@@ -339,7 +244,10 @@ func (c *Cmd) stats(cfgMaxSize uint64) error {
 		Rows(data)
 	c.output(t.String())
 
-	return c.statsSites()
+	c.output("Site usage analytics:")
+	_ = c.statsByProject("")
+
+	return nil
 }
 
 func (c *Cmd) ls() error {

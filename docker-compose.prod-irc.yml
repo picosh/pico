@@ -1,4 +1,3 @@
-version: "3.8"
 services:
   auth-caddy:
     image: ghcr.io/picosh/pico/caddy:latest

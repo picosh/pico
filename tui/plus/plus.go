@@ -40,7 +40,7 @@ method.
 
 Send cash (USD) or check to:
 - pico.sh LLC
-- 206 E Huron St STE 103
+- 206 E Huron St
 - Ann Arbor MI 48104
 
 ## Notes
@@ -64,11 +64,11 @@ we plan on continuing to include more services as we build them.`, url)
 
 // Model holds the state of the username UI.
 type Model struct {
-	shared   common.SharedModel
+	shared   *common.SharedModel
 	viewport viewport.Model
 }
 
-func headerHeight(shrd common.SharedModel) int {
+func headerHeight(shrd *common.SharedModel) int {
 	return shrd.HeaderHeight
 }
 
@@ -77,7 +77,7 @@ func headerWidth(w int) int {
 }
 
 // NewModel returns a new username model in its initial state.
-func NewModel(shared common.SharedModel) Model {
+func NewModel(shared *common.SharedModel) Model {
 	hh := headerHeight(shared)
 	ww := headerWidth(shared.Width)
 	viewport := viewport.New(ww, shared.Height-hh)

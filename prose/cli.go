@@ -1,7 +1,6 @@
 package prose
 
 import (
-	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -9,6 +8,7 @@ import (
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
 	bm "github.com/charmbracelet/wish/bubbletea"
+	"github.com/muesli/termenv"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/tui/common"
 	"github.com/picosh/utils"
@@ -52,66 +52,18 @@ func (c *Cmd) help() {
 	c.output(helpStr)
 }
 
-func (c *Cmd) statsByPost(postSlug string) error {
-	post, err := c.Dbpool.FindPostWithSlug(postSlug, c.User.ID, "prose")
-	if err != nil {
-		return errors.Join(err, fmt.Errorf("post (%s) does not exit", postSlug))
-	}
-
-	opts := &db.SummaryOpts{
-		FkID:     post.ID,
-		By:       "post_id",
-		Interval: "day",
-		Origin:   utils.StartOfMonth(),
-	}
-
-	summary, err := c.Dbpool.VisitSummary(opts)
-	if err != nil {
-		return err
-	}
-
-	c.output("Top URLs")
-	topUrlsTbl := common.VisitUrlsTbl(summary.TopUrls)
-	c.output(topUrlsTbl.Width(c.Width).String())
-
-	c.output("Top Referers")
-	topRefsTbl := common.VisitUrlsTbl(summary.TopReferers)
-	c.output(topRefsTbl.Width(c.Width).String())
-
-	uniqueTbl := common.UniqueVisitorsTbl(summary.Intervals)
-	c.output("Unique Visitors this Month")
-	c.output(uniqueTbl.Width(c.Width).String())
-
+func (c *Cmd) statsByPost(_ string) error {
+	msg := fmt.Sprintf(
+		"%s\n\nRun %s to access pico's analytics TUI",
+		c.Styles.Logo.Render("DEPRECATED"),
+		c.Styles.Code.Render("ssh pico.sh"),
+	)
+	c.output(c.Styles.RoundedBorder.Render(msg))
 	return nil
 }
 
 func (c *Cmd) stats() error {
-	opts := &db.SummaryOpts{
-		FkID:     c.User.ID,
-		By:       "user_id",
-		Interval: "day",
-		Origin:   utils.StartOfMonth(),
-		Where:    "AND (post_id IS NOT NULL OR (post_id IS NULL AND project_id IS NULL))",
-	}
-
-	summary, err := c.Dbpool.VisitSummary(opts)
-	if err != nil {
-		return err
-	}
-
-	c.output("Top URLs")
-	topUrlsTbl := common.VisitUrlsTbl(summary.TopUrls)
-	c.output(topUrlsTbl.Width(c.Width).String())
-
-	c.output("Top Referers")
-	topRefsTbl := common.VisitUrlsTbl(summary.TopReferers)
-	c.output(topRefsTbl.Width(c.Width).String())
-
-	uniqueTbl := common.UniqueVisitorsTbl(summary.Intervals)
-	c.output("Unique Visitors this Month")
-	c.output(uniqueTbl.Width(c.Width).String())
-
-	return nil
+	return c.statsByPost("")
 }
 
 type CliHandler struct {
@@ -147,6 +99,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 			}
 
 			renderer := bm.MakeRenderer(sesh)
+			renderer.SetColorProfile(termenv.TrueColor)
 			styles := common.DefaultStyles(renderer)
 
 			opts := Cmd{

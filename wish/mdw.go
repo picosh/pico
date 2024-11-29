@@ -16,7 +16,6 @@ func SessionMessage(sesh ssh.Session, msg string) {
 func DeprecatedNotice() wish.Middleware {
 	return func(next ssh.Handler) ssh.Handler {
 		return func(sesh ssh.Session) {
-
 			renderer := bm.MakeRenderer(sesh)
 			styles := common.DefaultStyles(renderer)
 

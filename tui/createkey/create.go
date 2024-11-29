@@ -40,7 +40,7 @@ type errMsg struct {
 func (e errMsg) Error() string { return e.err.Error() }
 
 type Model struct {
-	shared common.SharedModel
+	shared *common.SharedModel
 
 	state  state
 	newKey string
@@ -82,7 +82,7 @@ func (m *Model) indexBackward() {
 }
 
 // NewModel returns a new username model in its initial state.
-func NewModel(shared common.SharedModel) Model {
+func NewModel(shared *common.SharedModel) Model {
 	im := input.New()
 	im.PlaceholderStyle = shared.Styles.InputPlaceholder
 	im.Cursor.Style = shared.Styles.Cursor

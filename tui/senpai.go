@@ -9,7 +9,7 @@ import (
 )
 
 type SenpaiCmd struct {
-	shared common.SharedModel
+	shared *common.SharedModel
 }
 
 func (m *SenpaiCmd) Run() error {
@@ -30,7 +30,7 @@ func (m *SenpaiCmd) SetStdin(io.Reader)  {}
 func (m *SenpaiCmd) SetStdout(io.Writer) {}
 func (m *SenpaiCmd) SetStderr(io.Writer) {}
 
-func LoadChat(shrd common.SharedModel) tea.Cmd {
+func LoadChat(shrd *common.SharedModel) tea.Cmd {
 	sp := &SenpaiCmd{
 		shared: shrd,
 	}

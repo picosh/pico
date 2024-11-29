@@ -53,7 +53,7 @@ Create a feeds file (e.g. pico.txt):`, url)
 
 // Model holds the state of the username UI.
 type Model struct {
-	shared common.SharedModel
+	shared *common.SharedModel
 
 	Done bool // true when it's time to exit this view
 	Quit bool // true when the user wants to quit the whole program
@@ -61,7 +61,7 @@ type Model struct {
 	viewport viewport.Model
 }
 
-func headerHeight(shrd common.SharedModel) int {
+func headerHeight(shrd *common.SharedModel) int {
 	return shrd.HeaderHeight
 }
 
@@ -69,7 +69,7 @@ func headerWidth(w int) int {
 	return w - 2
 }
 
-func NewModel(shared common.SharedModel) Model {
+func NewModel(shared *common.SharedModel) Model {
 	hh := headerHeight(shared)
 	ww := headerWidth(shared.Width)
 	viewport := viewport.New(ww, shared.Height-hh)

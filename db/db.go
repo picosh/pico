@@ -145,12 +145,28 @@ type Analytics struct {
 	UsersWithPost  int
 }
 
+type VisitInterval struct {
+	Interval *time.Time `json:"interval"`
+	Visitors int        `json:"visitors"`
+}
+
+type VisitUrl struct {
+	Url   string `json:"url"`
+	Count int    `json:"count"`
+}
+
 type SummaryOpts struct {
-	FkID     string
-	By       string
 	Interval string
 	Origin   time.Time
-	Where    string
+	Host     string
+	Path     string
+	UserID   string
+}
+
+type SummaryVisits struct {
+	Intervals   []*VisitInterval `json:"intervals"`
+	TopUrls     []*VisitUrl      `json:"top_urls"`
+	TopReferers []*VisitUrl      `json:"top_referers"`
 }
 
 type PostAnalytics struct {
@@ -173,26 +189,6 @@ type AnalyticsVisits struct {
 	Referer     string `json:"referer"`
 	Status      int    `json:"status"`
 	ContentType string `json:"content_type"`
-}
-
-type VisitInterval struct {
-	PostID    string     `json:"post_id"`
-	ProjectID string     `json:"project_id"`
-	Interval  *time.Time `json:"interval"`
-	Visitors  int        `json:"visitors"`
-}
-
-type VisitUrl struct {
-	PostID    string `json:"post_id"`
-	ProjectID string `json:"project_id"`
-	Url       string `json:"url"`
-	Count     int    `json:"count"`
-}
-
-type SummaryVisits struct {
-	Intervals   []*VisitInterval `json:"intervals"`
-	TopUrls     []*VisitUrl      `json:"top_urls"`
-	TopReferers []*VisitUrl      `json:"top_referers"`
 }
 
 type Pager struct {
@@ -382,7 +378,7 @@ type DB interface {
 
 	InsertVisit(view *AnalyticsVisits) error
 	VisitSummary(opts *SummaryOpts) (*SummaryVisits, error)
-	FindVisitSiteList(userID string) ([]string, error)
+	FindVisitSiteList(opts *SummaryOpts) ([]*VisitUrl, error)
 
 	AddPicoPlusUser(username string, paymentType, txId string) error
 	FindFeatureForUser(userID string, feature string) (*FeatureFlag, error)

@@ -15,6 +15,7 @@ const (
 	PlusPage
 	SettingsPage
 	LogsPage
+	AnalyticsPage
 )
 
 type NavigateMsg struct{ Page }
@@ -47,6 +48,8 @@ func ToTitle(page Page) string {
 		return "settings"
 	case LogsPage:
 		return "logs"
+	case AnalyticsPage:
+		return "analytics"
 	}
 
 	return ""

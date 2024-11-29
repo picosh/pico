@@ -23,7 +23,7 @@ func CmsMiddleware(cfg *shared.ConfigSite) bm.Handler {
 		renderer := bm.MakeRenderer(sesh)
 		styles := common.DefaultStyles(renderer)
 
-		shrd := common.SharedModel{
+		shrd := &common.SharedModel{
 			Session: sesh,
 			Cfg:     cfg,
 			Dbpool:  dbpool,

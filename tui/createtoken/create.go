@@ -37,7 +37,7 @@ type errMsg struct {
 func (e errMsg) Error() string { return e.err.Error() }
 
 type Model struct {
-	shared common.SharedModel
+	shared *common.SharedModel
 
 	state     state
 	tokenName string
@@ -48,7 +48,7 @@ type Model struct {
 }
 
 // NewModel returns a new username model in its initial state.
-func NewModel(shared common.SharedModel) Model {
+func NewModel(shared *common.SharedModel) Model {
 	im := input.New()
 	im.Cursor.Style = shared.Styles.Cursor
 	im.Placeholder = "A name used for your reference"

@@ -45,7 +45,7 @@ var helpMsg = fmt.Sprintf("Names can only contain plain letters and numbers and 
 
 // Model holds the state of the username UI.
 type Model struct {
-	shared common.SharedModel
+	shared *common.SharedModel
 
 	state   state
 	newName string
@@ -55,7 +55,7 @@ type Model struct {
 }
 
 // NewModel returns a new username model in its initial state.
-func NewModel(shared common.SharedModel) Model {
+func NewModel(shared *common.SharedModel) Model {
 	im := input.New()
 	im.Cursor.Style = shared.Styles.Cursor
 	im.Placeholder = "enter username"

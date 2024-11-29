@@ -127,13 +127,6 @@ func createHttpHandler(apiConfig *shared.ApiConfig) CtxHttpBridge {
 		router.HandleFunc("GET /{fname}/{options}...", tunnelRouter.ImageRequest)
 		router.HandleFunc("GET /{fname}", tunnelRouter.AssetRequest)
 		router.HandleFunc("GET /{$}", tunnelRouter.AssetRequest)
-
-		/* subdomainRoutes := createSubdomainRoutes(allowPerm)
-		routes = append(routes, subdomainRoutes...)
-		finctx := apiConfig.CreateCtx(context.Background(), subdomain)
-		finctx = context.WithValue(finctx, shared.CtxSshKey{}, ctx)
-		httpHandler := shared.CreateServeBasic(routes, finctx)
-		httpRouter := http.HandlerFunc(httpHandler) */
 		return router
 	}
 }

@@ -32,13 +32,13 @@ const (
 type featuresLoadedMsg []*db.FeatureFlag
 
 type Model struct {
-	shared   common.SharedModel
+	shared   *common.SharedModel
 	features []*db.FeatureFlag
 	state    state
 	focus    focus
 }
 
-func NewModel(shrd common.SharedModel) Model {
+func NewModel(shrd *common.SharedModel) Model {
 	return Model{
 		shared: shrd,
 		state:  stateLoading,

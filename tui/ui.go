@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/wish"
 	"github.com/muesli/reflow/wordwrap"
 	"github.com/muesli/reflow/wrap"
+	"github.com/picosh/pico/tui/analytics"
 	"github.com/picosh/pico/tui/common"
 	"github.com/picosh/pico/tui/createaccount"
 	"github.com/picosh/pico/tui/createkey"
@@ -31,18 +32,18 @@ const (
 
 // Just a generic tea.Model to demo terminal information of ssh.
 type UI struct {
-	shared common.SharedModel
+	shared *common.SharedModel
 
 	state      state
 	activePage pages.Page
 	pages      []tea.Model
 }
 
-func NewUI(shared common.SharedModel) *UI {
+func NewUI(shared *common.SharedModel) *UI {
 	m := &UI{
 		shared: shared,
 		state:  initState,
-		pages:  make([]tea.Model, 10),
+		pages:  make([]tea.Model, 11),
 	}
 	return m
 }
@@ -78,6 +79,7 @@ func (m *UI) Init() tea.Cmd {
 	m.pages[pages.PlusPage] = plus.NewModel(m.shared)
 	m.pages[pages.SettingsPage] = settings.NewModel(m.shared)
 	m.pages[pages.LogsPage] = logs.NewModel(m.shared)
+	m.pages[pages.AnalyticsPage] = analytics.NewModel(m.shared)
 	if m.shared.User == nil {
 		m.activePage = pages.CreateAccountPage
 	} else {
@@ -141,6 +143,8 @@ func (m *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.activePage = pages.SettingsPage
 		case menu.LogsChoice:
 			m.activePage = pages.LogsPage
+		case menu.AnalyticsChoice:
+			m.activePage = pages.AnalyticsPage
 		case menu.ChatChoice:
 			return m, LoadChat(m.shared)
 		case menu.ExitChoice:

@@ -1002,69 +1002,44 @@ func (me *PsqlDB) InsertVisit(visit *db.AnalyticsVisits) error {
 	return err
 }
 
-func (me *PsqlDB) visitUniqueBlog(opts *db.SummaryOpts) ([]*db.VisitInterval, error) {
-	uniqueVisitors := fmt.Sprintf(`SELECT
-		date_trunc('%s', created_at) as interval_start,
-        count(DISTINCT ip_address) as unique_visitors
-	FROM analytics_visits
-	WHERE %s=$1 AND created_at >= $2 AND status <> 404 %s
-	GROUP BY interval_start`, opts.Interval, opts.By, opts.Where)
-
-	intervals := []*db.VisitInterval{}
-	rs, err := me.Db.Query(uniqueVisitors, opts.FkID, opts.Origin)
-	if err != nil {
-		return nil, err
+func visitFilterBy(opts *db.SummaryOpts) (string, string) {
+	where := ""
+	val := ""
+	if opts.Host != "" {
+		where = "host"
+		val = opts.Host
+	} else if opts.Path != "" {
+		where = "path"
+		val = opts.Path
 	}
 
-	for rs.Next() {
-		interval := &db.VisitInterval{}
-		err := rs.Scan(
-			&interval.Interval,
-			&interval.Visitors,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		intervals = append(intervals, interval)
-	}
-	if rs.Err() != nil {
-		return nil, rs.Err()
-	}
-	return intervals, nil
+	return where, val
 }
 
 func (me *PsqlDB) visitUnique(opts *db.SummaryOpts) ([]*db.VisitInterval, error) {
+	where, with := visitFilterBy(opts)
 	uniqueVisitors := fmt.Sprintf(`SELECT
-		post_id,
-		project_id,
 		date_trunc('%s', created_at) as interval_start,
         count(DISTINCT ip_address) as unique_visitors
 	FROM analytics_visits
-	WHERE %s=$1 AND created_at >= $2 AND status <> 404 %s
-	GROUP BY post_id, project_id, interval_start`, opts.Interval, opts.By, opts.Where)
+	WHERE created_at >= $1 AND %s = $2 AND user_id = $3 AND status <> 404
+	GROUP BY interval_start`, opts.Interval, where)
 
 	intervals := []*db.VisitInterval{}
-	rs, err := me.Db.Query(uniqueVisitors, opts.FkID, opts.Origin)
+	rs, err := me.Db.Query(uniqueVisitors, opts.Origin, with, opts.UserID)
 	if err != nil {
 		return nil, err
 	}
 
 	for rs.Next() {
 		interval := &db.VisitInterval{}
-		var postID sql.NullString
-		var projectID sql.NullString
 		err := rs.Scan(
-			&postID,
-			&projectID,
 			&interval.Interval,
 			&interval.Visitors,
 		)
 		if err != nil {
 			return nil, err
 		}
-		interval.PostID = postID.String
-		interval.ProjectID = projectID.String
 
 		intervals = append(intervals, interval)
 	}
@@ -1075,17 +1050,18 @@ func (me *PsqlDB) visitUnique(opts *db.SummaryOpts) ([]*db.VisitInterval, error)
 }
 
 func (me *PsqlDB) visitReferer(opts *db.SummaryOpts) ([]*db.VisitUrl, error) {
+	where, with := visitFilterBy(opts)
 	topUrls := fmt.Sprintf(`SELECT
 		referer,
 		count(DISTINCT ip_address) as referer_count
 	FROM analytics_visits
-	WHERE %s=$1 AND created_at >= $2 AND referer <> '' AND status <> 404 %s
+	WHERE created_at >= $1 AND %s = $2 AND user_id = $3 AND referer <> '' AND status <> 404
 	GROUP BY referer
 	ORDER BY referer_count DESC
-	LIMIT 10`, opts.By, opts.Where)
+	LIMIT 10`, where)
 
 	intervals := []*db.VisitUrl{}
-	rs, err := me.Db.Query(topUrls, opts.FkID, opts.Origin)
+	rs, err := me.Db.Query(topUrls, opts.Origin, with, opts.UserID)
 	if err != nil {
 		return nil, err
 	}
@@ -1109,38 +1085,65 @@ func (me *PsqlDB) visitReferer(opts *db.SummaryOpts) ([]*db.VisitUrl, error) {
 }
 
 func (me *PsqlDB) visitUrl(opts *db.SummaryOpts) ([]*db.VisitUrl, error) {
+	where, with := visitFilterBy(opts)
 	topUrls := fmt.Sprintf(`SELECT
 		path,
-		count(DISTINCT ip_address) as path_count,
-		post_id,
-		project_id
+		count(DISTINCT ip_address) as path_count
 	FROM analytics_visits
-	WHERE %s=$1 AND created_at >= $2 AND path <> '' AND status <> 404 %s
-	GROUP BY path, post_id, project_id
+	WHERE created_at >= $1 AND %s = $2 AND user_id = $3 AND path <> '' AND status <> 404
+	GROUP BY path
 	ORDER BY path_count DESC
-	LIMIT 10`, opts.By, opts.Where)
+	LIMIT 10`, where)
 
 	intervals := []*db.VisitUrl{}
-	rs, err := me.Db.Query(topUrls, opts.FkID, opts.Origin)
+	rs, err := me.Db.Query(topUrls, opts.Origin, with, opts.UserID)
 	if err != nil {
 		return nil, err
 	}
 
 	for rs.Next() {
 		interval := &db.VisitUrl{}
-		var postID sql.NullString
-		var projectID sql.NullString
 		err := rs.Scan(
 			&interval.Url,
 			&interval.Count,
-			&postID,
-			&projectID,
 		)
 		if err != nil {
 			return nil, err
 		}
-		interval.PostID = postID.String
-		interval.ProjectID = projectID.String
+
+		intervals = append(intervals, interval)
+	}
+	if rs.Err() != nil {
+		return nil, rs.Err()
+	}
+	return intervals, nil
+}
+
+func (me *PsqlDB) visitHost(opts *db.SummaryOpts) ([]*db.VisitUrl, error) {
+	topUrls := `SELECT
+		host,
+		count(DISTINCT ip_address) as host_count
+	FROM analytics_visits
+	WHERE created_at >= $1 AND user_id = $2 AND path <> '' AND status <> 404
+	GROUP BY host
+	ORDER BY host_count DESC
+	LIMIT 10`
+
+	intervals := []*db.VisitUrl{}
+	rs, err := me.Db.Query(topUrls, opts.Origin, opts.UserID)
+	if err != nil {
+		return nil, err
+	}
+
+	for rs.Next() {
+		interval := &db.VisitUrl{}
+		err := rs.Scan(
+			&interval.Url,
+			&interval.Count,
+		)
+		if err != nil {
+			return nil, err
+		}
 
 		intervals = append(intervals, interval)
 	}
@@ -1151,28 +1154,21 @@ func (me *PsqlDB) visitUrl(opts *db.SummaryOpts) ([]*db.VisitUrl, error) {
 }
 
 func (me *PsqlDB) VisitSummary(opts *db.SummaryOpts) (*db.SummaryVisits, error) {
-	var visitors []*db.VisitInterval
-	var err error
-	if opts.Where == "" {
-		visitors, err = me.visitUnique(opts)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		visitors, err = me.visitUniqueBlog(opts)
-		if err != nil {
-			return nil, err
-		}
+	visitors, err := me.visitUnique(opts)
+	if err != nil {
+		return nil, err
 	}
 
 	urls, err := me.visitUrl(opts)
 	if err != nil {
 		return nil, err
 	}
+
 	refs, err := me.visitReferer(opts)
 	if err != nil {
 		return nil, err
 	}
+
 	return &db.SummaryVisits{
 		Intervals:   visitors,
 		TopUrls:     urls,
@@ -1180,29 +1176,8 @@ func (me *PsqlDB) VisitSummary(opts *db.SummaryOpts) (*db.SummaryVisits, error) 
 	}, nil
 }
 
-func (me *PsqlDB) FindVisitSiteList(userID string) ([]string, error) {
-	siteList := []string{}
-
-	rs, err := me.Db.Query("SELECT DISTINCT(host) FROM analytics_visits WHERE user_id=$1", userID)
-	if err != nil {
-		return nil, err
-	}
-
-	for rs.Next() {
-		var host string
-		err := rs.Scan(
-			&host,
-		)
-		if err != nil {
-			return nil, err
-		}
-		siteList = append(siteList, host)
-	}
-	if rs.Err() != nil {
-		return nil, rs.Err()
-	}
-
-	return siteList, nil
+func (me *PsqlDB) FindVisitSiteList(opts *db.SummaryOpts) ([]*db.VisitUrl, error) {
+	return me.visitHost(opts)
 }
 
 func (me *PsqlDB) FindUsers() ([]*db.User, error) {

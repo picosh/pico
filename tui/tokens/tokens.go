@@ -39,7 +39,7 @@ type (
 
 // Model is the Tea state model for this user interface.
 type Model struct {
-	shared common.SharedModel
+	shared *common.SharedModel
 
 	state          state
 	err            error
@@ -69,7 +69,7 @@ func (m *Model) UpdatePaging(msg tea.Msg) {
 }
 
 // NewModel creates a new model with defaults.
-func NewModel(shared common.SharedModel) Model {
+func NewModel(shared *common.SharedModel) Model {
 	p := pager.New()
 	p.PerPage = keysPerPage
 	p.Type = pager.Dots
@@ -265,7 +265,7 @@ func (m *Model) promptView(prompt string) string {
 		m.shared.Styles.Delete.Render("(y/N)")
 }
 
-func FetchTokens(shrd common.SharedModel) tea.Cmd {
+func FetchTokens(shrd *common.SharedModel) tea.Cmd {
 	return func() tea.Msg {
 		ak, err := shrd.Dbpool.FindTokensForUser(shrd.User.ID)
 		if err != nil {

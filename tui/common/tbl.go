@@ -9,62 +9,51 @@ import (
 	"github.com/picosh/pico/db"
 )
 
-func UniqueVisitorsTbl(intervals []*db.VisitInterval) *table.Table {
+func UniqueVisitorsTbl(intervals []*db.VisitInterval, renderer *lipgloss.Renderer, maxWidth int) *table.Table {
 	headers := []string{"Date", "Unique Visitors"}
 	data := [][]string{}
+	sum := 0
 	for _, d := range intervals {
 		data = append(data, []string{
-			d.Interval.Format(time.RFC3339Nano),
+			d.Interval.Format(time.DateOnly),
 			fmt.Sprintf("%d", d.Visitors),
 		})
+		sum += d.Visitors
 	}
 
+	data = append(data, []string{
+		"Total",
+		fmt.Sprintf("%d", sum),
+	})
+
 	t := table.New().
-		Border(lipgloss.RoundedBorder()).
+		BorderStyle(renderer.NewStyle().BorderForeground(Indigo)).
+		Width(maxWidth).
 		Headers(headers...).
 		Rows(data...)
 	return t
 }
 
-func VisitUrlsTbl(urls []*db.VisitUrl) *table.Table {
+func VisitUrlsTbl(urls []*db.VisitUrl, renderer *lipgloss.Renderer, maxWidth int) *table.Table {
 	headers := []string{"URL", "Count"}
 	data := [][]string{}
+	sum := 0
 	for _, d := range urls {
 		data = append(data, []string{
 			d.Url,
 			fmt.Sprintf("%d", d.Count),
 		})
+		sum += d.Count
 	}
 
-	t := table.New().
-		Border(lipgloss.RoundedBorder()).
-		Headers(headers...).
-		Rows(data...)
-	return t
-}
-
-func VisitUrlsWithProjectTbl(projects []*db.Project, urls []*db.VisitUrl) *table.Table {
-	headers := []string{"Project", "URL", "Count"}
-	data := [][]string{}
-	for _, d := range urls {
-		if d.ProjectID == "" {
-			continue
-		}
-		projectName := ""
-		for _, project := range projects {
-			if project.ID == d.ProjectID {
-				projectName = project.Name
-			}
-		}
-		data = append(data, []string{
-			projectName,
-			d.Url,
-			fmt.Sprintf("%d", d.Count),
-		})
-	}
+	data = append(data, []string{
+		"Total",
+		fmt.Sprintf("%d", sum),
+	})
 
 	t := table.New().
-		Border(lipgloss.RoundedBorder()).
+		BorderStyle(renderer.NewStyle().BorderForeground(Indigo)).
+		Width(maxWidth).
 		Headers(headers...).
 		Rows(data...)
 	return t
