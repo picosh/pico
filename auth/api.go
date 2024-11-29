@@ -766,7 +766,7 @@ func metricDrainSub(ctx context.Context, dbpool db.DB, logger *slog.Logger, secr
 				continue
 			}
 
-			if visit.ContentType != "" && !strings.HasPrefix(visit.ContentType, "text/html") {
+			if !strings.HasPrefix(visit.ContentType, "text/html") {
 				logger.Info("invalid content type", "contentType", visit.ContentType)
 				continue
 			}
