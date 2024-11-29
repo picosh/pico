@@ -382,6 +382,7 @@ type DB interface {
 
 	InsertVisit(view *AnalyticsVisits) error
 	VisitSummary(opts *SummaryOpts) (*SummaryVisits, error)
+	FindVisitSiteList(userID string) ([]string, error)
 
 	AddPicoPlusUser(username string, paymentType, txId string) error
 	FindFeatureForUser(userID string, feature string) (*FeatureFlag, error)

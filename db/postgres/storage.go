@@ -1180,6 +1180,31 @@ func (me *PsqlDB) VisitSummary(opts *db.SummaryOpts) (*db.SummaryVisits, error) 
 	}, nil
 }
 
+func (me *PsqlDB) FindVisitSiteList(userID string) ([]string, error) {
+	siteList := []string{}
+
+	rs, err := me.Db.Query("SELECT DISTINCT(host) FROM analytics_visits WHERE user_id=$1", userID)
+	if err != nil {
+		return nil, err
+	}
+
+	for rs.Next() {
+		var host string
+		err := rs.Scan(
+			&host,
+		)
+		if err != nil {
+			return nil, err
+		}
+		siteList = append(siteList, host)
+	}
+	if rs.Err() != nil {
+		return nil, rs.Err()
+	}
+
+	return siteList, nil
+}
+
 func (me *PsqlDB) FindUsers() ([]*db.User, error) {
 	var users []*db.User
 	rs, err := me.Db.Query(sqlSelectUsers)

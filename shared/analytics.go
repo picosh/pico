@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/picosh/pico/db"
@@ -32,7 +33,7 @@ func trackableUserAgent(agent string) error {
 	if crawlerdetect.IsCrawler(agent) {
 		return fmt.Errorf(
 			"request is likely from a bot (User-Agent: %s)",
-			cleanUserAgent(agent),
+			CleanUserAgent(agent),
 		)
 	}
 	return nil
@@ -78,22 +79,66 @@ func cleanUrlFromRequest(r *http.Request) (string, string) {
 	return host, r.URL.Path
 }
 
-func cleanUserAgent(ua string) string {
+func CleanUserAgent(ua string) string {
 	// truncate user-agent because http headers have no text limit
 	if len(ua) > 1000 {
 		return ua[:1000]
 	}
-	return ua
+	return strings.TrimSpace(ua)
 }
 
-func cleanReferer(ref string) (string, error) {
+func filterIp(host string) (string, error) {
+	if host == "" {
+		return "", nil
+	}
+	addr := net.ParseIP(host)
+	if addr != nil {
+		return "", fmt.Errorf("host is an ip")
+	}
+	return host, nil
+}
+
+func CleanReferer(raw string) (string, error) {
+	ref := raw
+	if ref == "" {
+		return "", nil
+	}
+	// referer sometimes dont include scheme but we need it
+	if !strings.HasPrefix(ref, "http") {
+		ref = "https://" + ref
+	}
 	// we only want to store host for security reasons
 	// https://developer.mozilla.org/en-US/docs/Web/Security/Referer_header:_privacy_and_security_concerns
 	u, err := url.Parse(ref)
 	if err != nil {
 		return "", err
 	}
-	return u.Host, nil
+	hostname := u.Hostname()
+	hostname, _ = filterIp(hostname)
+	hostname = strings.TrimSpace(strings.ToLower(hostname))
+	return hostname, err
+}
+
+func CleanHost(raw string) (string, error) {
+	prep := strings.TrimSpace(strings.ToLower(raw))
+	if prep == "" {
+		return "", fmt.Errorf("host is blank")
+	}
+	// hosts dont usually include scheme but we need it
+	if !strings.HasPrefix(prep, "http") {
+		prep = "https://" + prep
+	}
+	// no clue why but our prod data contains periods
+	prep = strings.Trim(prep, ".")
+	// we only want to store host for security reasons
+	// https://developer.mozilla.org/en-US/docs/Web/Security/Referer_header:_privacy_and_security_concerns
+	u, err := url.Parse(prep)
+	if err != nil {
+		return raw, err
+	}
+	host := u.Hostname()
+	host, err = filterIp(host)
+	return host, err
 }
 
 var ErrAnalyticsDisabled = errors.New("owner does not have site analytics enabled")
@@ -116,12 +161,18 @@ func AnalyticsVisitFromVisit(visit *db.AnalyticsVisits, dbpool db.DB, secret str
 	_, path := cleanUrl(visit.Path)
 	visit.Path = path
 
-	referer, err := cleanReferer(visit.Referer)
+	referer, err := CleanReferer(visit.Referer)
 	if err != nil {
 		return err
 	}
 	visit.Referer = referer
-	visit.UserAgent = cleanUserAgent(visit.UserAgent)
+
+	hostname, err := CleanHost(visit.Host)
+	if err != nil {
+		return err
+	}
+	visit.Host = hostname
+	visit.UserAgent = CleanUserAgent(visit.UserAgent)
 
 	return nil
 }

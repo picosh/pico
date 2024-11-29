@@ -157,6 +157,10 @@ func (me *StubDB) VisitSummary(opts *db.SummaryOpts) (*db.SummaryVisits, error) 
 	return &db.SummaryVisits{}, notImpl
 }
 
+func (me *StubDB) FindVisitSiteList(userID string) ([]string, error) {
+	return []string{}, notImpl
+}
+
 func (me *StubDB) FindUsers() ([]*db.User, error) {
 	return []*db.User{}, notImpl
 }
