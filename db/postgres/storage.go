@@ -1159,7 +1159,7 @@ func (me *PsqlDB) visitHost(opts *db.SummaryOpts) ([]*db.VisitUrl, error) {
 		host,
 		count(DISTINCT ip_address) as host_count
 	FROM analytics_visits
-	WHERE user_id = $1 AND host <> ''
+	WHERE user_id = $1 AND host <> '' AND status >= 200 AND status < 300
 	GROUP BY host
 	ORDER BY host_count DESC`
 
