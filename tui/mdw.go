@@ -36,6 +36,10 @@ func CmsMiddleware(cfg *shared.ConfigSite) bm.Handler {
 		}
 
 		m := NewUI(shrd)
+		err := m.setupUser()
+		if err != nil {
+			return nil, nil
+		}
 
 		opts := bm.MakeOptions(sesh)
 		opts = append(opts, tea.WithAltScreen())

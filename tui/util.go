@@ -3,6 +3,7 @@ package tui
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/tui/common"
@@ -29,6 +30,21 @@ func findUser(shrd *common.SharedModel) (*db.User, error) {
 		}
 		// no user and not error indicates we need to create an account
 		return nil, nil
+	}
+
+	// impersonation
+	adminPrefix := "admin__"
+	if strings.HasPrefix(usr, adminPrefix) {
+		hasFeature := shrd.Dbpool.HasFeatureForUser(user.ID, "admin")
+		if !hasFeature {
+			return nil, fmt.Errorf("only admins can impersonate a user")
+		}
+		impersonate := strings.Replace(usr, adminPrefix, "", 1)
+		user, err = shrd.Dbpool.FindUserForName(impersonate)
+		if err != nil {
+			return nil, err
+		}
+		shrd.Impersonated = true
 	}
 
 	return user, nil

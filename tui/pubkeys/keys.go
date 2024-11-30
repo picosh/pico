@@ -161,7 +161,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.index = 0
 		m.keys = msg
 		for i, key := range m.keys {
-			if key.Key == m.shared.User.PublicKey.Key {
+			if m.shared.User.PublicKey != nil && key.Key == m.shared.User.PublicKey.Key {
 				m.activeKeyIndex = i
 			}
 		}

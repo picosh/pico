@@ -19,4 +19,5 @@ type SharedModel struct {
 	Height          int
 	HeaderHeight    int
 	Styles          Styles
+	Impersonated    bool
 }

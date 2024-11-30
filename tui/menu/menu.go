@@ -130,6 +130,10 @@ func (m Model) bioView() string {
 		vals = append(vals, "Pico+ Expires", expires)
 	}
 
+	if m.shared.Impersonated {
+		vals = append(vals, "Impersonated", "YES")
+	}
+
 	return common.KeyValueView(m.shared.Styles, vals...)
 }
 

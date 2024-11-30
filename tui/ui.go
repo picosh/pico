@@ -54,19 +54,25 @@ func (m *UI) updateActivePage(msg tea.Msg) tea.Cmd {
 	return cmd
 }
 
+func (m *UI) setupUser() error {
+	user, err := findUser(m.shared)
+	if err != nil {
+		m.shared.Logger.Error("cannot find user", "err", err)
+		wish.Errorf(m.shared.Session, "\nERROR: %s\n\n", err)
+		return err
+	}
+
+	m.shared.User = user
+	ff, _ := findPlusFeatureFlag(m.shared)
+	m.shared.PlusFeatureFlag = ff
+
+	return nil
+}
+
 func (m *UI) Init() tea.Cmd {
 	// header height is required to calculate viewport for
 	// some pages
 	m.shared.HeaderHeight = lipgloss.Height(m.header()) + 1
-	user, err := findUser(m.shared)
-	if err != nil {
-		wish.Errorln(m.shared.Session, err)
-		return tea.Quit
-	}
-	m.shared.User = user
-
-	ff, _ := findPlusFeatureFlag(m.shared)
-	m.shared.PlusFeatureFlag = ff
 
 	m.pages[pages.MenuPage] = menu.NewModel(m.shared)
 	m.pages[pages.CreateAccountPage] = createaccount.NewModel(m.shared)
@@ -126,6 +132,7 @@ func (m *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// user created account
 	case createaccount.CreateAccountMsg:
+		_ = m.setupUser()
 		// reset model and pages
 		return m, m.Init()
 
