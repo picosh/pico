@@ -4,6 +4,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/ssh"
 	bm "github.com/charmbracelet/wish/bubbletea"
+	"github.com/muesli/termenv"
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/tui/common"
@@ -21,6 +22,7 @@ func CmsMiddleware(cfg *shared.ConfigSite) bm.Handler {
 
 		dbpool := postgres.NewDB(cfg.DbURL, cfg.Logger)
 		renderer := bm.MakeRenderer(sesh)
+		renderer.SetColorProfile(termenv.TrueColor)
 		styles := common.DefaultStyles(renderer)
 
 		shrd := &common.SharedModel{

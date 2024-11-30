@@ -1119,15 +1119,49 @@ func (me *PsqlDB) visitUrl(opts *db.SummaryOpts) ([]*db.VisitUrl, error) {
 	return intervals, nil
 }
 
+func (me *PsqlDB) visitUrlNotFound(opts *db.SummaryOpts) ([]*db.VisitUrl, error) {
+	where, with := visitFilterBy(opts)
+	topUrls := fmt.Sprintf(`SELECT
+		path,
+		count(DISTINCT ip_address) as path_count
+	FROM analytics_visits
+	WHERE created_at >= $1 AND %s = $2 AND user_id = $3 AND path <> '' AND status = 404
+	GROUP BY path
+	ORDER BY path_count DESC
+	LIMIT 10`, where)
+
+	intervals := []*db.VisitUrl{}
+	rs, err := me.Db.Query(topUrls, opts.Origin, with, opts.UserID)
+	if err != nil {
+		return nil, err
+	}
+
+	for rs.Next() {
+		interval := &db.VisitUrl{}
+		err := rs.Scan(
+			&interval.Url,
+			&interval.Count,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		intervals = append(intervals, interval)
+	}
+	if rs.Err() != nil {
+		return nil, rs.Err()
+	}
+	return intervals, nil
+}
+
 func (me *PsqlDB) visitHost(opts *db.SummaryOpts) ([]*db.VisitUrl, error) {
 	topUrls := `SELECT
 		host,
 		count(DISTINCT ip_address) as host_count
 	FROM analytics_visits
-	WHERE user_id = $1 AND path <> '' AND status <> 404
+	WHERE user_id = $1 AND host <> ''
 	GROUP BY host
-	ORDER BY host_count DESC
-	LIMIT 10`
+	ORDER BY host_count DESC`
 
 	intervals := []*db.VisitUrl{}
 	rs, err := me.Db.Query(topUrls, opts.UserID)
@@ -1164,15 +1198,21 @@ func (me *PsqlDB) VisitSummary(opts *db.SummaryOpts) (*db.SummaryVisits, error) 
 		return nil, err
 	}
 
+	notFound, err := me.visitUrlNotFound(opts)
+	if err != nil {
+		return nil, err
+	}
+
 	refs, err := me.visitReferer(opts)
 	if err != nil {
 		return nil, err
 	}
 
 	return &db.SummaryVisits{
-		Intervals:   visitors,
-		TopUrls:     urls,
-		TopReferers: refs,
+		Intervals:    visitors,
+		TopUrls:      urls,
+		TopReferers:  refs,
+		NotFoundUrls: notFound,
 	}, nil
 }
 

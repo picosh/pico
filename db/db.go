@@ -164,9 +164,10 @@ type SummaryOpts struct {
 }
 
 type SummaryVisits struct {
-	Intervals   []*VisitInterval `json:"intervals"`
-	TopUrls     []*VisitUrl      `json:"top_urls"`
-	TopReferers []*VisitUrl      `json:"top_referers"`
+	Intervals    []*VisitInterval `json:"intervals"`
+	TopUrls      []*VisitUrl      `json:"top_urls"`
+	NotFoundUrls []*VisitUrl      `json:"not_found_urls"`
+	TopReferers  []*VisitUrl      `json:"top_referers"`
 }
 
 type PostAnalytics struct {

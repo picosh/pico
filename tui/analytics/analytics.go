@@ -275,9 +275,13 @@ func (m Model) renderSiteStats(summary *db.SummaryVisits) string {
 	str := m.shared.Styles.Label.SetString(fmt.Sprintf("%s by %s\n", name, by)).String()
 
 	if !strings.HasPrefix(m.repl, "post") {
-		str += "Top URLs\n"
+		str += "\nTop URLs\n"
 		topUrlsTbl := common.VisitUrlsTbl(summary.TopUrls, m.shared.Styles.Renderer, m.viewport.Width)
 		str += topUrlsTbl.String()
+
+		str += "\nTop Not Found URLs\n"
+		notFoundUrlsTbl := common.VisitUrlsTbl(summary.NotFoundUrls, m.shared.Styles.Renderer, m.viewport.Width)
+		str += notFoundUrlsTbl.String()
 	}
 
 	str += "\nTop Referers\n"
@@ -349,7 +353,7 @@ func (m Model) fetchPostStats(raw string, interval string) tea.Cmd {
 
 func (m Model) renderSiteList() string {
 	tbl := common.VisitUrlsTbl(m.siteList, m.shared.Styles.Renderer, m.viewport.Width)
-	str := "Sites: Unique Visitors this Month\n"
+	str := "Sites: Total Unique Visitors\n"
 	str += tbl.String()
 	return str
 }
