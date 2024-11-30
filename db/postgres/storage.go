@@ -1124,13 +1124,13 @@ func (me *PsqlDB) visitHost(opts *db.SummaryOpts) ([]*db.VisitUrl, error) {
 		host,
 		count(DISTINCT ip_address) as host_count
 	FROM analytics_visits
-	WHERE created_at >= $1 AND user_id = $2 AND path <> '' AND status <> 404
+	WHERE user_id = $1 AND path <> '' AND status <> 404
 	GROUP BY host
 	ORDER BY host_count DESC
 	LIMIT 10`
 
 	intervals := []*db.VisitUrl{}
-	rs, err := me.Db.Query(topUrls, opts.Origin, opts.UserID)
+	rs, err := me.Db.Query(topUrls, opts.UserID)
 	if err != nil {
 		return nil, err
 	}
