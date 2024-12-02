@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	input "github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -205,7 +206,7 @@ func matched(str, match string) bool {
 }
 
 func logToStr(styles common.Styles, data map[string]any, match string) string {
-	time := utils.AnyToStr(data, "time")
+	rawtime := utils.AnyToStr(data, "time")
 	service := utils.AnyToStr(data, "service")
 	level := utils.AnyToStr(data, "level")
 	msg := utils.AnyToStr(data, "msg")
@@ -225,9 +226,15 @@ func logToStr(styles common.Styles, data map[string]any, match string) string {
 		}
 	}
 
+	date, err := time.Parse(time.RFC3339Nano, rawtime)
+	dateStr := rawtime
+	if err == nil {
+		dateStr = date.Format(time.RFC3339)
+	}
+
 	acc := fmt.Sprintf(
 		"%s %s %s %s %s %s %s",
-		time,
+		dateStr,
 		service,
 		levelView(styles, level),
 		msg,
