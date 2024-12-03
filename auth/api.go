@@ -555,7 +555,7 @@ func paymentWebhookHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 			return
 		}
 
-		err = dbpool.AddPicoPlusUser(username, "lemonsqueezy", txID)
+		err = dbpool.AddPicoPlusUser(username, email, "lemonsqueezy", txID)
 		if err != nil {
 			log.Error("failed to add pico+ user", "err", err)
 			w.WriteHeader(http.StatusOK)

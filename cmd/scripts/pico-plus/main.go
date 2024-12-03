@@ -30,7 +30,7 @@ func main() {
 		"txId", txId,
 	)
 
-	err := dbpool.AddPicoPlusUser(username, paymentType, txId)
+	err := dbpool.AddPicoPlusUser(username, "test@pico.sh", paymentType, txId)
 	if err != nil {
 		logger.Error("Failed to add pico+ user", "err", err)
 		os.Exit(1)

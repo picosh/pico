@@ -197,7 +197,7 @@ type AuthDb struct {
 	*stub.StubDB
 }
 
-func (a *AuthDb) AddPicoPlusUser(username, from, txid string) error {
+func (a *AuthDb) AddPicoPlusUser(username, email, from, txid string) error {
 	return nil
 }
 

@@ -381,7 +381,7 @@ type DB interface {
 	VisitSummary(opts *SummaryOpts) (*SummaryVisits, error)
 	FindVisitSiteList(opts *SummaryOpts) ([]*VisitUrl, error)
 
-	AddPicoPlusUser(username string, paymentType, txId string) error
+	AddPicoPlusUser(username, email, paymentType, txId string) error
 	FindFeatureForUser(userID string, feature string) (*FeatureFlag, error)
 	FindFeaturesForUser(userID string) ([]*FeatureFlag, error)
 	HasFeatureForUser(userID string, feature string) bool

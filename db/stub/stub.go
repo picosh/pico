@@ -281,6 +281,6 @@ func (me *StubDB) RemoveFeature(userID string, name string) error {
 	return notImpl
 }
 
-func (me *StubDB) AddPicoPlusUser(username, paymentType, txId string) error {
+func (me *StubDB) AddPicoPlusUser(username, email, paymentType, txId string) error {
 	return notImpl
 }
