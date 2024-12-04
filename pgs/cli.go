@@ -52,7 +52,7 @@ func projectTable(styles common.Styles, projects []*db.Project, width int) *tabl
 }
 
 func getHelpText(styles common.Styles, userName string, width int) string {
-	helpStr := "Commands: [help, stats, ls, rm, link, unlink, prune, retain, depends, acl]\n"
+	helpStr := "Commands: [help, stats, ls, rm, link, unlink, prune, retain, depends, acl, cache]\n"
 	helpStr += styles.Note.Render("NOTICE:") + " *must* append with `--write` for the changes to persist.\n"
 
 	projectName := "projA"
@@ -98,6 +98,10 @@ func getHelpText(styles common.Styles, userName string, width int) string {
 			fmt.Sprintf("acl %s", projectName),
 			fmt.Sprintf("access control for `%s`", projectName),
 		},
+		{
+			fmt.Sprintf("cache %s", projectName),
+			fmt.Sprintf("clear http cache for `%s`", projectName),
+		},
 	}
 
 	t := table.New().
@@ -120,6 +124,7 @@ type Cmd struct {
 	Styles  common.Styles
 	Width   int
 	Height  int
+	Cfg     *shared.ConfigSite
 }
 
 func (c *Cmd) output(out string) {
@@ -481,6 +486,37 @@ func (c *Cmd) acl(projectName, aclType string, acls []string) error {
 	}
 	if c.Write {
 		return c.Dbpool.UpdateProjectAcl(c.User.ID, projectName, acl)
+	}
+	return nil
+}
+
+func (c *Cmd) cache(projectName string) error {
+	c.Log.Info(
+		"user running `cache` command",
+		"user", c.User.Name,
+		"project", projectName,
+	)
+	c.output(fmt.Sprintf("clearing http cache for %s", projectName))
+	if c.Write {
+		surrogate := getSurrogateKey(c.User.Name, projectName)
+		return purgeCache(c.Cfg, surrogate)
+	}
+	return nil
+}
+
+func (c *Cmd) cacheAll() error {
+	isAdmin := c.Dbpool.HasFeatureForUser(c.User.ID, "admin")
+	if !isAdmin {
+		return fmt.Errorf("must be admin to use this command")
+	}
+
+	c.Log.Info(
+		"admin running `cache-all` command",
+		"user", c.User.Name,
+	)
+	c.output("clearing http cache for all sites")
+	if c.Write {
+		return purgeAllCache(c.Cfg)
 	}
 	return nil
 }

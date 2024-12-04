@@ -6,7 +6,6 @@ import (
 	"io"
 	"io/fs"
 	"log/slog"
-	"net/http"
 	"os"
 	"path"
 	"path/filepath"
@@ -412,7 +411,9 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (s
 		utils.BytesToGB(maxSize),
 		(float32(nextStorageSize)/float32(maxSize))*100,
 	)
-	h.CacheClearingQueue <- fmt.Sprintf("%s-%s", user.Name, projectName)
+
+	surrogate := getSurrogateKey(user.Name, projectName)
+	h.CacheClearingQueue <- surrogate
 
 	return str, nil
 }
@@ -480,7 +481,10 @@ func (h *UploadAssetHandler) Delete(s ssh.Session, entry *sendutils.FileEntry) e
 		}
 	}
 	err = h.Storage.DeleteObject(bucket, assetFilepath)
-	h.CacheClearingQueue <- fmt.Sprintf("%s-%s", user.Name, projectName)
+
+	surrogate := getSurrogateKey(user.Name, projectName)
+	h.CacheClearingQueue <- surrogate
+
 	return err
 }
 
@@ -533,7 +537,6 @@ func (h *UploadAssetHandler) writeAsset(reader io.Reader, data *FileData) (int64
 // Repeated messages for the same site are grouped so that we only flush once
 // per site per 5 seconds.
 func runCacheQueue(ch chan string, cfg *shared.ConfigSite) {
-	cacheApiUrl := fmt.Sprintf("https://%s/souin-api/souin/", cfg.Domain)
 	var pendingFlushes sync.Map
 	tick := time.Tick(5 * time.Second)
 	for {
@@ -544,7 +547,7 @@ func runCacheQueue(ch chan string, cfg *shared.ConfigSite) {
 			go func() {
 				pendingFlushes.Range(func(key, value any) bool {
 					pendingFlushes.Delete(key)
-					err := purgeCache(key.(string), cacheApiUrl, cfg.CacheUser, cfg.CachePassword)
+					err := purgeCache(cfg, key.(string))
 					if err != nil {
 						cfg.Logger.Error("failed to clear cache", "err", err.Error())
 					}
@@ -553,30 +556,4 @@ func runCacheQueue(ch chan string, cfg *shared.ConfigSite) {
 			}()
 		}
 	}
-}
-
-// purgeCache send an HTTP request to the pgs Caddy instance which purges
-// cached entries for a given subdomain (like "fakeuser-www-proj"). We set a
-// "surrogate-key: <subdomain>" header on every pgs response which ensures all
-// cached assets for a given subdomain are grouped under a single key (which is
-// separate from the "GET-https-example.com-/path" key used for serving files
-// from the cache).
-func purgeCache(subdomain string, cacheApiUrl string, username string, password string) error {
-	client := &http.Client{
-		Timeout: time.Second * 5,
-	}
-	req, err := http.NewRequest("PURGE", cacheApiUrl, nil)
-	if err != nil {
-		return err
-	}
-	req.Header.Add("Surrogate-Key", subdomain)
-	req.SetBasicAuth(username, password)
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	if resp.StatusCode != 204 {
-		return fmt.Errorf("received unexpected response code %d", resp.StatusCode)
-	}
-	return nil
 }

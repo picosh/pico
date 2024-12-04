@@ -106,6 +106,7 @@ func WishMiddleware(handler *UploadAssetHandler) wish.Middleware {
 				Styles:  styles,
 				Width:   width,
 				Height:  height,
+				Cfg:     handler.Cfg,
 			}
 
 			cmd := strings.TrimSpace(args[0])
@@ -119,6 +120,12 @@ func WishMiddleware(handler *UploadAssetHandler) wish.Middleware {
 					return
 				} else if cmd == "ls" {
 					err := opts.ls()
+					opts.bail(err)
+					return
+				} else if cmd == "cache-all" {
+					opts.Write = true
+					err := opts.cacheAll()
+					opts.notice()
 					opts.bail(err)
 					return
 				} else {
@@ -209,6 +216,17 @@ func WishMiddleware(handler *UploadAssetHandler) wish.Middleware {
 				opts.Write = *write
 
 				err := opts.rm(projectName)
+				opts.notice()
+				opts.bail(err)
+				return
+			} else if cmd == "cache" {
+				cacheCmd, write := flagSet("cache", sesh)
+				if !flagCheck(cacheCmd, projectName, cmdArgs) {
+					return
+				}
+				opts.Write = *write
+
+				err := opts.cache(projectName)
 				opts.notice()
 				opts.bail(err)
 				return
