@@ -538,11 +538,13 @@ func runCacheQueue(ch chan string, cfg *shared.ConfigSite) {
 	tick := time.Tick(5 * time.Second)
 	for {
 		select {
-		case host := <-ch:
-			pendingFlushes.Store(host, host)
+		case subdomain := <-ch:
+			cfg.Logger.Info("storing cache key", "subdomain", subdomain)
+			pendingFlushes.Store(subdomain, subdomain)
 		case <-tick:
 			go func() {
 				pendingFlushes.Range(func(key, value any) bool {
+					cfg.Logger.Info("purging cache key", "key", key)
 					pendingFlushes.Delete(key)
 					err := purgeCache(key.(string), cacheApiUrl, cfg.CacheUser, cfg.CachePassword)
 					if err != nil {
