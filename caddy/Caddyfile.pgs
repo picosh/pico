@@ -32,7 +32,7 @@
 	route {
 		@souinApi path /souin-api/*
 		basic_auth @souinApi {
-			testuser $2a$14$i1G0lil5qti7qahb4.Kte.wP/3O8uaStduzhBBtuDUZhMJeSjxbqm
+			cacheuser $2a$14$NuCZqIy/NGKEmK89bNSKseBidpwPK4HiD4rqgnLftUHpWVAfV4xGO
 		}
 		cache {
 			regex {
