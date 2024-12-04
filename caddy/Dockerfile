@@ -8,7 +8,9 @@ ARG TARGETARCH
 ENV GOOS=${TARGETOS} GOARCH=${TARGETARCH}
 
 RUN xcaddy build \
-    --with github.com/caddy-dns/cloudflare
+    --with github.com/caddy-dns/cloudflare \
+    --with github.com/darkweak/souin/plugins/caddy@v1.7.5 \
+    --with github.com/darkweak/storages/otter/caddy
 
 FROM caddy:alpine
 

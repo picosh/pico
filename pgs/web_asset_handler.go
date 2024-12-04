@@ -121,6 +121,11 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				r.Host = destUrl.Host
 				r.URL = destUrl
 			}
+			// Disable caching
+			proxy.ModifyResponse = func(r *http.Response) error {
+				r.Header.Set("cache-control", "no-cache")
+				return nil
+			}
 			proxy.ServeHTTP(w, r)
 			return
 		}
@@ -215,6 +220,9 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if w.Header().Get("content-type") == "" {
 		w.Header().Set("content-type", contentType)
 	}
+
+	// Allows us to invalidate the cache when files are modified
+	w.Header().Set("surrogate-key", h.Subdomain)
 
 	finContentType := w.Header().Get("content-type")
 

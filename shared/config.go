@@ -38,6 +38,8 @@ type ConfigSite struct {
 	Protocol           string
 	DbURL              string
 	StorageDir         string
+	CacheUser          string
+	CachePassword      string
 	MinioURL           string
 	MinioUser          string
 	MinioPass          string
