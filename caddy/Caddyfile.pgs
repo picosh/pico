@@ -18,6 +18,34 @@
 	}
 }
 
+:443 {
+	reverse_proxy web:3000
+	log {
+		format append {
+			server_id {$APP_DOMAIN}
+		}
+	}
+
+	#tls internal {
+	#	on_demand
+	#}
+	tls {$APP_EMAIL} {
+		on_demand
+	}
+
+	encode zstd gzip
+	route {
+		cache {
+			regex {
+				exclude /check
+			}
+			key {
+				template {http.request.method}-{http.request.path}
+			}
+		}
+	}
+}
+
 *.{$APP_DOMAIN}, {$APP_DOMAIN} {
 	reverse_proxy web:3000
 	log {
@@ -25,10 +53,13 @@
 			server_id {$APP_DOMAIN}
 		}
 	}
+
+	#tls internal
 	tls {$APP_EMAIL} {
 		dns cloudflare {$CF_API_TOKEN}
 		resolvers 1.1.1.1
 	}
+
 	route {
 		@souinApi path /souin-api/*
 		basic_auth @souinApi {
@@ -38,8 +69,10 @@
 			regex {
 				exclude /check
 			}
+			key {
+				template {http.request.method}-{http.request.path}
+			}
 		}
-		reverse_proxy web:3000
 	}
 
 	encode zstd gzip
@@ -116,17 +149,4 @@ monitoring.{$MONITORING_APP_DOMAIN}, prometheus.{$MONITORING_APP_DOMAIN}, grafan
 	metrics @caddymetrics {
 		disable_openmetrics
 	}
-}
-
-:443 {
-	reverse_proxy web:3000
-	log {
-		format append {
-			server_id {$APP_DOMAIN}
-		}
-	}
-	tls {$APP_EMAIL} {
-		on_demand
-	}
-	encode zstd gzip
 }
