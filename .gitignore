@@ -13,3 +13,4 @@ ssh_data
 __debug_bin
 .bin
 /public/
+caddy/caddy
