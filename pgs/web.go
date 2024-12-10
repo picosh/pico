@@ -12,13 +12,30 @@ import (
 
 	_ "net/http/pprof"
 
+	"github.com/darkweak/souin/configurationtypes"
+	"github.com/darkweak/souin/pkg/middleware"
+	"github.com/darkweak/souin/plugins/souin/storages"
+	"github.com/darkweak/storages/core"
 	"github.com/gorilla/feeds"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
 	sst "github.com/picosh/pobj/storage"
+	"google.golang.org/protobuf/proto"
 )
+
+type CachedHttp struct {
+	handler *middleware.SouinBaseHandler
+	routes  *WebRouter
+}
+
+func (c *CachedHttp) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
+	c.handler.ServeHTTP(writer, req, func(w http.ResponseWriter, r *http.Request) error {
+		c.routes.ServeHTTP(w, r)
+		return nil
+	})
+}
 
 func StartApiServer() {
 	cfg := NewConfigSite()
@@ -40,7 +57,53 @@ func StartApiServer() {
 		return
 	}
 
+	stale := configurationtypes.Duration{Duration: 1000 * time.Second}
+	c := &middleware.BaseConfiguration{
+		API: configurationtypes.API{
+			Prometheus: configurationtypes.APIEndpoint{
+				Enable: true,
+			},
+		},
+		DefaultCache: &configurationtypes.DefaultCache{
+			TTL:   configurationtypes.Duration{Duration: 300 * time.Second},
+			Stale: stale,
+			Otter: configurationtypes.CacheProvider{
+				Uuid:          fmt.Sprintf("OTTER-%s", stale),
+				Configuration: map[string]interface{}{},
+			},
+		},
+		LogLevel: "debug",
+	}
+	c.SetLogger(&CompatLogger{logger})
+	storages.InitFromConfiguration(c)
+	httpCache := middleware.NewHTTPCacheHandler(c)
 	routes := NewWebRouter(cfg, logger, dbpool, st)
+	cacher := &CachedHttp{
+		handler: httpCache,
+		routes:  routes,
+	}
+
+	storer := httpCache.Storers[0]
+
+	go func() {
+		time.Sleep(5 * time.Second)
+		var header http.Header = map[string][]string{}
+		header.Add("Surrogate-Key", "erock-test")
+		ck, _ := httpCache.SurrogateKeyStorer.Purge(header)
+		for _, key := range ck {
+			key, _ = strings.CutPrefix(key, core.MappingKeyPrefix)
+			if b := storer.Get(core.MappingKeyPrefix + key); len(b) > 0 {
+				var mapping core.StorageMapper
+				if e := proto.Unmarshal(b, &mapping); e == nil {
+					for k := range mapping.GetMapping() {
+						storer.Delete(k)
+					}
+				}
+			}
+
+			storer.Delete(core.MappingKeyPrefix + key)
+		}
+	}()
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)
 	logger.Info(
@@ -48,7 +111,7 @@ func StartApiServer() {
 		"port", cfg.Port,
 		"domain", cfg.Domain,
 	)
-	err = http.ListenAndServe(portStr, routes)
+	err = http.ListenAndServe(portStr, cacher)
 	logger.Error(
 		"listen and serve",
 		"err", err.Error(),
@@ -444,4 +507,61 @@ func (web *WebRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	ctx = context.WithValue(ctx, shared.CtxSubdomainKey{}, subdomain)
 	router.ServeHTTP(w, r.WithContext(ctx))
+}
+
+type CompatLogger struct {
+	logger *slog.Logger
+}
+
+func (cl *CompatLogger) marshall(int ...interface{}) string {
+	res := ""
+	for _, val := range int {
+		switch r := val.(type) {
+		case string:
+			res += " " + r
+		}
+	}
+	return res
+}
+func (cl *CompatLogger) DPanic(int ...interface{}) {
+	cl.logger.Error("panic", "output", cl.marshall(int))
+}
+func (cl *CompatLogger) DPanicf(st string, int ...interface{}) {
+	cl.logger.Error(fmt.Sprintf(st, int...))
+}
+func (cl *CompatLogger) Debug(int ...interface{}) {
+	cl.logger.Debug("debug", "output", cl.marshall(int))
+}
+func (cl *CompatLogger) Debugf(st string, int ...interface{}) {
+	cl.logger.Debug(fmt.Sprintf(st, int...))
+}
+func (cl *CompatLogger) Error(int ...interface{}) {
+	cl.logger.Error("error", "output", cl.marshall(int))
+}
+func (cl *CompatLogger) Errorf(st string, int ...interface{}) {
+	cl.logger.Error(fmt.Sprintf(st, int...))
+}
+func (cl *CompatLogger) Fatal(int ...interface{}) {
+	cl.logger.Error("fatal", "outpu", cl.marshall(int))
+}
+func (cl *CompatLogger) Fatalf(st string, int ...interface{}) {
+	cl.logger.Error(fmt.Sprintf(st, int...))
+}
+func (cl *CompatLogger) Info(int ...interface{}) {
+	cl.logger.Info("info", "output", cl.marshall(int))
+}
+func (cl *CompatLogger) Infof(st string, int ...interface{}) {
+	cl.logger.Info(fmt.Sprintf(st, int...))
+}
+func (cl *CompatLogger) Panic(int ...interface{}) {
+	cl.logger.Error("panic", "output", cl.marshall(int))
+}
+func (cl *CompatLogger) Panicf(st string, int ...interface{}) {
+	cl.logger.Error(fmt.Sprintf(st, int...))
+}
+func (cl *CompatLogger) Warn(int ...interface{}) {
+	cl.logger.Warn("warn", "output", cl.marshall(int))
+}
+func (cl *CompatLogger) Warnf(st string, int ...interface{}) {
+	cl.logger.Warn(fmt.Sprintf(st, int...))
 }

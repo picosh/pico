@@ -8,16 +8,23 @@
 		metrics
 		trusted_proxies static 0.0.0.0/0
 	}
-	cache {
-		ttl 300s
-		max_cacheable_body_bytes 1000000
-		otter
-		api {
-			souin
-		}
-	}
 }
 
+# custom domains
+:443 {
+	reverse_proxy web:3000
+	log {
+		format append {
+			server_id {$APP_DOMAIN}
+		}
+	}
+	tls {$APP_EMAIL} {
+		on_demand
+	}
+	encode zstd gzip
+}
+
+# subdomains and root pgs domain
 *.{$APP_DOMAIN}, {$APP_DOMAIN} {
 	reverse_proxy web:3000
 	log {
@@ -28,18 +35,6 @@
 	tls {$APP_EMAIL} {
 		dns cloudflare {$CF_API_TOKEN}
 		resolvers 1.1.1.1
-	}
-	route {
-		@souinApi path /souin-api/*
-		basic_auth @souinApi {
-			cacheuser $2a$14$NuCZqIy/NGKEmK89bNSKseBidpwPK4HiD4rqgnLftUHpWVAfV4xGO
-		}
-		cache {
-			regex {
-				exclude /check
-			}
-		}
-		reverse_proxy web:3000
 	}
 
 	encode zstd gzip
@@ -116,17 +111,4 @@ monitoring.{$MONITORING_APP_DOMAIN}, prometheus.{$MONITORING_APP_DOMAIN}, grafan
 	metrics @caddymetrics {
 		disable_openmetrics
 	}
-}
-
-:443 {
-	reverse_proxy web:3000
-	log {
-		format append {
-			server_id {$APP_DOMAIN}
-		}
-	}
-	tls {$APP_EMAIL} {
-		on_demand
-	}
-	encode zstd gzip
 }
