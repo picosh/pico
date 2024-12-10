@@ -1,6 +1,7 @@
 package pgs
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"log/slog"
@@ -12,15 +13,36 @@ import (
 
 	_ "net/http/pprof"
 
+	"github.com/darkweak/souin/configurationtypes"
+	"github.com/darkweak/souin/pkg/middleware"
+	"github.com/darkweak/souin/plugins/souin/storages"
+	"github.com/darkweak/storages/core"
 	"github.com/gorilla/feeds"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
 	sst "github.com/picosh/pobj/storage"
+	"google.golang.org/protobuf/proto"
 )
 
+type CachedHttp struct {
+	handler *middleware.SouinBaseHandler
+	routes  *WebRouter
+}
+
+func (c *CachedHttp) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
+	err := c.handler.ServeHTTP(writer, req, func(w http.ResponseWriter, r *http.Request) error {
+		c.routes.ServeHTTP(w, r)
+		return nil
+	})
+	if err != nil {
+		c.routes.Logger.Error("serve http", "err", err)
+	}
+}
+
 func StartApiServer() {
+	ctx := context.Background()
 	cfg := NewConfigSite()
 	logger := cfg.Logger
 
@@ -40,7 +62,33 @@ func StartApiServer() {
 		return
 	}
 
+	stale := configurationtypes.Duration{Duration: 1000 * time.Second}
+	c := &middleware.BaseConfiguration{
+		API: configurationtypes.API{
+			Prometheus: configurationtypes.APIEndpoint{
+				Enable: true,
+			},
+		},
+		DefaultCache: &configurationtypes.DefaultCache{
+			TTL:   configurationtypes.Duration{Duration: 300 * time.Second},
+			Stale: stale,
+			Otter: configurationtypes.CacheProvider{
+				Uuid:          fmt.Sprintf("OTTER-%s", stale),
+				Configuration: map[string]interface{}{},
+			},
+		},
+		LogLevel: "debug",
+	}
+	c.SetLogger(&CompatLogger{logger})
+	storages.InitFromConfiguration(c)
+	httpCache := middleware.NewHTTPCacheHandler(c)
 	routes := NewWebRouter(cfg, logger, dbpool, st)
+	cacher := &CachedHttp{
+		handler: httpCache,
+		routes:  routes,
+	}
+
+	go routes.cacheMgmt(ctx, httpCache)
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)
 	logger.Info(
@@ -48,7 +96,7 @@ func StartApiServer() {
 		"port", cfg.Port,
 		"domain", cfg.Domain,
 	)
-	err = http.ListenAndServe(portStr, routes)
+	err = http.ListenAndServe(portStr, cacher)
 	logger.Error(
 		"listen and serve",
 		"err", err.Error(),
@@ -214,6 +262,48 @@ func (web *WebRouter) checkHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNotFound)
+}
+
+func (web *WebRouter) cacheMgmt(ctx context.Context, httpCache *middleware.SouinBaseHandler) {
+	storer := httpCache.Storers[0]
+	drain := createSubCacheDrain(ctx, web.Logger)
+
+	for {
+		scanner := bufio.NewScanner(drain)
+		for scanner.Scan() {
+			surrogateKey := strings.TrimSpace(scanner.Text())
+			web.Logger.Info("received cache-drain item", "surrogateKey", surrogateKey)
+
+			if surrogateKey == "*" {
+				storer.DeleteMany(".+")
+				err := httpCache.SurrogateKeyStorer.Destruct()
+				if err != nil {
+					web.Logger.Error("could not clear cache and surrogate key store", "err", err)
+				} else {
+					web.Logger.Info("successfully cleared cache and surrogate keys store")
+				}
+				continue
+			}
+
+			var header http.Header = map[string][]string{}
+			header.Add("Surrogate-Key", surrogateKey)
+
+			ck, _ := httpCache.SurrogateKeyStorer.Purge(header)
+			for _, key := range ck {
+				key, _ = strings.CutPrefix(key, core.MappingKeyPrefix)
+				if b := storer.Get(core.MappingKeyPrefix + key); len(b) > 0 {
+					var mapping core.StorageMapper
+					if e := proto.Unmarshal(b, &mapping); e == nil {
+						for k := range mapping.GetMapping() {
+							storer.Delete(k)
+						}
+					}
+				}
+
+				storer.Delete(core.MappingKeyPrefix + key)
+			}
+		}
+	}
 }
 
 func (web *WebRouter) createRssHandler(by string) http.HandlerFunc {
@@ -444,4 +534,61 @@ func (web *WebRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	ctx = context.WithValue(ctx, shared.CtxSubdomainKey{}, subdomain)
 	router.ServeHTTP(w, r.WithContext(ctx))
+}
+
+type CompatLogger struct {
+	logger *slog.Logger
+}
+
+func (cl *CompatLogger) marshall(int ...interface{}) string {
+	res := ""
+	for _, val := range int {
+		switch r := val.(type) {
+		case string:
+			res += " " + r
+		}
+	}
+	return res
+}
+func (cl *CompatLogger) DPanic(int ...interface{}) {
+	cl.logger.Error("panic", "output", cl.marshall(int))
+}
+func (cl *CompatLogger) DPanicf(st string, int ...interface{}) {
+	cl.logger.Error(fmt.Sprintf(st, int...))
+}
+func (cl *CompatLogger) Debug(int ...interface{}) {
+	cl.logger.Debug("debug", "output", cl.marshall(int))
+}
+func (cl *CompatLogger) Debugf(st string, int ...interface{}) {
+	cl.logger.Debug(fmt.Sprintf(st, int...))
+}
+func (cl *CompatLogger) Error(int ...interface{}) {
+	cl.logger.Error("error", "output", cl.marshall(int))
+}
+func (cl *CompatLogger) Errorf(st string, int ...interface{}) {
+	cl.logger.Error(fmt.Sprintf(st, int...))
+}
+func (cl *CompatLogger) Fatal(int ...interface{}) {
+	cl.logger.Error("fatal", "outpu", cl.marshall(int))
+}
+func (cl *CompatLogger) Fatalf(st string, int ...interface{}) {
+	cl.logger.Error(fmt.Sprintf(st, int...))
+}
+func (cl *CompatLogger) Info(int ...interface{}) {
+	cl.logger.Info("info", "output", cl.marshall(int))
+}
+func (cl *CompatLogger) Infof(st string, int ...interface{}) {
+	cl.logger.Info(fmt.Sprintf(st, int...))
+}
+func (cl *CompatLogger) Panic(int ...interface{}) {
+	cl.logger.Error("panic", "output", cl.marshall(int))
+}
+func (cl *CompatLogger) Panicf(st string, int ...interface{}) {
+	cl.logger.Error(fmt.Sprintf(st, int...))
+}
+func (cl *CompatLogger) Warn(int ...interface{}) {
+	cl.logger.Warn("warn", "output", cl.marshall(int))
+}
+func (cl *CompatLogger) Warnf(st string, int ...interface{}) {
+	cl.logger.Warn(fmt.Sprintf(st, int...))
 }

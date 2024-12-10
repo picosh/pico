@@ -2,6 +2,7 @@ package pgs
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"io/fs"
@@ -104,10 +105,10 @@ type UploadAssetHandler struct {
 	CacheClearingQueue chan string
 }
 
-func NewUploadAssetHandler(dbpool db.DB, cfg *shared.ConfigSite, storage sst.ObjectStorage) *UploadAssetHandler {
+func NewUploadAssetHandler(dbpool db.DB, cfg *shared.ConfigSite, storage sst.ObjectStorage, ctx context.Context) *UploadAssetHandler {
 	// Enable buffering so we don't slow down uploads.
 	ch := make(chan string, 100)
-	go runCacheQueue(ch, cfg)
+	go runCacheQueue(cfg, ctx, ch)
 	return &UploadAssetHandler{
 		DBPool:             dbpool,
 		Cfg:                cfg,
@@ -532,7 +533,8 @@ func (h *UploadAssetHandler) writeAsset(reader io.Reader, data *FileData) (int64
 // One message arrives per file that is written/deleted during uploads.
 // Repeated messages for the same site are grouped so that we only flush once
 // per site per 5 seconds.
-func runCacheQueue(ch chan string, cfg *shared.ConfigSite) {
+func runCacheQueue(cfg *shared.ConfigSite, ctx context.Context, ch chan string) {
+	send := createPubCacheDrain(ctx, cfg.Logger)
 	var pendingFlushes sync.Map
 	tick := time.Tick(5 * time.Second)
 	for {
@@ -543,7 +545,7 @@ func runCacheQueue(ch chan string, cfg *shared.ConfigSite) {
 			go func() {
 				pendingFlushes.Range(func(key, value any) bool {
 					pendingFlushes.Delete(key)
-					err := purgeCache(cfg, key.(string))
+					err := purgeCache(cfg, send, key.(string))
 					if err != nil {
 						cfg.Logger.Error("failed to clear cache", "err", err.Error())
 					}
