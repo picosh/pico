@@ -12,6 +12,11 @@ import (
 
 	_ "net/http/pprof"
 
+	"github.com/darkweak/souin/configurationtypes"
+	"github.com/darkweak/souin/pkg/middleware"
+	"github.com/darkweak/souin/plugins/souin/configuration"
+	"github.com/darkweak/storages/core"
+	"github.com/darkweak/storages/otter"
 	"github.com/gorilla/feeds"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
@@ -19,6 +24,72 @@ import (
 	"github.com/picosh/pico/shared/storage"
 	sst "github.com/picosh/pobj/storage"
 )
+
+type CompatLogger struct {
+	logger *slog.Logger
+}
+
+func (cl *CompatLogger) DPanic(int ...interface{}) {
+	fmt.Println(int...)
+}
+func (cl *CompatLogger) DPanicf(st string, int ...interface{}) {
+	fmt.Printf(st, int...)
+	fmt.Println("")
+}
+func (cl *CompatLogger) Debug(int ...interface{}) {
+	fmt.Println(int...)
+}
+func (cl *CompatLogger) Debugf(st string, int ...interface{}) {
+	fmt.Printf(st, int...)
+	fmt.Println("")
+}
+func (cl *CompatLogger) Error(int ...interface{}) {
+	fmt.Println(int...)
+}
+func (cl *CompatLogger) Errorf(st string, int ...interface{}) {
+	fmt.Printf(st, int...)
+	fmt.Println("")
+}
+func (cl *CompatLogger) Fatal(int ...interface{}) {
+	fmt.Println(int...)
+}
+func (cl *CompatLogger) Fatalf(st string, int ...interface{}) {
+	fmt.Printf(st, int...)
+	fmt.Println("")
+}
+func (cl *CompatLogger) Info(int ...interface{}) {
+	fmt.Println(int...)
+}
+func (cl *CompatLogger) Infof(st string, int ...interface{}) {
+	fmt.Printf(st, int...)
+	fmt.Println("")
+}
+func (cl *CompatLogger) Panic(int ...interface{}) {
+	fmt.Println(int...)
+}
+func (cl *CompatLogger) Panicf(st string, int ...interface{}) {
+	fmt.Printf(st, int...)
+	fmt.Println("")
+}
+func (cl *CompatLogger) Warn(int ...interface{}) {
+	fmt.Println(int...)
+}
+func (cl *CompatLogger) Warnf(st string, int ...interface{}) {
+	fmt.Printf(st, int...)
+	fmt.Println("")
+}
+
+type CachedHttp struct {
+	handler *middleware.SouinBaseHandler
+	routes  *WebRouter
+}
+
+func (c *CachedHttp) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
+	c.handler.ServeHTTP(writer, req, func(w http.ResponseWriter, r *http.Request) error {
+		c.routes.ServeHTTP(w, r)
+		return nil
+	})
+}
 
 func StartApiServer() {
 	cfg := NewConfigSite()
@@ -40,7 +111,35 @@ func StartApiServer() {
 		return
 	}
 
+	c := &configuration.Configuration{
+		DefaultCache: &configurationtypes.DefaultCache{
+			TTL:   configurationtypes.Duration{Duration: 300 * time.Second},
+			Stale: configurationtypes.Duration{Duration: 1000 * time.Second},
+			Otter: configurationtypes.CacheProvider{},
+		},
+		LogLevel: "debug",
+	}
+	lg := &CompatLogger{logger}
+	c.SetLogger(lg)
+	stale := c.GetDefaultCache().GetStale()
+	cp := core.CacheProvider{
+		Configuration: nil,
+		Path:          "",
+		URL:           "",
+	}
+	storer, err := otter.Factory(cp, lg, stale)
+	if err != nil {
+		panic(err)
+	}
+	core.RegisterStorage(storer)
+	uuid := fmt.Sprintf("%s-%s", storer.Name(), storer.Uuid())
+	c.DefaultCache.Otter.Uuid = uuid
+	httpCache := middleware.NewHTTPCacheHandler(c)
 	routes := NewWebRouter(cfg, logger, dbpool, st)
+	cacher := &CachedHttp{
+		handler: httpCache,
+		routes:  routes,
+	}
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)
 	logger.Info(
@@ -48,7 +147,7 @@ func StartApiServer() {
 		"port", cfg.Port,
 		"domain", cfg.Domain,
 	)
-	err = http.ListenAndServe(portStr, routes)
+	err = http.ListenAndServe(portStr, cacher)
 	logger.Error(
 		"listen and serve",
 		"err", err.Error(),
