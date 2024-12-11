@@ -14,15 +14,15 @@ import (
 
 	"github.com/darkweak/souin/configurationtypes"
 	"github.com/darkweak/souin/pkg/middleware"
-	"github.com/darkweak/souin/plugins/souin/configuration"
+	"github.com/darkweak/souin/plugins/souin/storages"
 	"github.com/darkweak/storages/core"
-	"github.com/darkweak/storages/otter"
 	"github.com/gorilla/feeds"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
 	sst "github.com/picosh/pobj/storage"
+	"google.golang.org/protobuf/proto"
 )
 
 type CompatLogger struct {
@@ -111,35 +111,47 @@ func StartApiServer() {
 		return
 	}
 
-	c := &configuration.Configuration{
+	stale := configurationtypes.Duration{Duration: 1000 * time.Second}
+	c := &middleware.BaseConfiguration{
 		DefaultCache: &configurationtypes.DefaultCache{
 			TTL:   configurationtypes.Duration{Duration: 300 * time.Second},
-			Stale: configurationtypes.Duration{Duration: 1000 * time.Second},
-			Otter: configurationtypes.CacheProvider{},
+			Stale: stale,
+			Otter: configurationtypes.CacheProvider{
+				Uuid:          fmt.Sprintf("OTTER-%s", stale),
+				Configuration: map[string]interface{}{},
+			},
 		},
 		LogLevel: "debug",
 	}
-	lg := &CompatLogger{logger}
-	c.SetLogger(lg)
-	stale := c.GetDefaultCache().GetStale()
-	cp := core.CacheProvider{
-		Configuration: nil,
-		Path:          "",
-		URL:           "",
-	}
-	storer, err := otter.Factory(cp, lg, stale)
-	if err != nil {
-		panic(err)
-	}
-	core.RegisterStorage(storer)
-	uuid := fmt.Sprintf("%s-%s", storer.Name(), storer.Uuid())
-	c.DefaultCache.Otter.Uuid = uuid
+	storages.InitFromConfiguration(c)
 	httpCache := middleware.NewHTTPCacheHandler(c)
 	routes := NewWebRouter(cfg, logger, dbpool, st)
 	cacher := &CachedHttp{
 		handler: httpCache,
 		routes:  routes,
 	}
+
+	storer := httpCache.Storers[0]
+
+	go func() {
+		time.Sleep(5 * time.Second)
+		var header http.Header = map[string][]string{}
+		header.Add("Surrogate-Key", "erock-test")
+		ck, _ := httpCache.SurrogateKeyStorer.Purge(header)
+		for _, key := range ck {
+			key, _ = strings.CutPrefix(key, core.MappingKeyPrefix)
+			if b := storer.Get(core.MappingKeyPrefix + key); len(b) > 0 {
+				var mapping core.StorageMapper
+				if e := proto.Unmarshal(b, &mapping); e == nil {
+					for k := range mapping.GetMapping() {
+						storer.Delete(k)
+					}
+				}
+			}
+
+			storer.Delete(core.MappingKeyPrefix + key)
+		}
+	}()
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)
 	logger.Info(
