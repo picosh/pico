@@ -7,7 +7,6 @@ import (
 	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared"
-	"github.com/picosh/utils"
 )
 
 type TunnelWebRouter struct {
@@ -39,16 +38,14 @@ func createHttpHandler(apiConfig *shared.ApiConfig) CtxHttpBridge {
 			"impersonating", asUser,
 		)
 
-		pubkey, err := shared.GetPublicKey(ctx)
-		if err != nil {
-			log.Error(err.Error(), "subdomain", subdomain)
+		pubkey := ctx.Permissions().Extensions["pubkey"]
+		if pubkey == "" {
+			log.Error("pubkey not found in extensions", "subdomain", subdomain)
 			return http.HandlerFunc(shared.UnauthorizedHandler)
 		}
 
-		pubkeyStr := utils.KeyForKeyText(pubkey)
-
 		log = log.With(
-			"pubkey", pubkeyStr,
+			"pubkey", pubkey,
 		)
 
 		props, err := shared.GetProjectFromSubdomain(subdomain)
@@ -72,7 +69,7 @@ func createHttpHandler(apiConfig *shared.ApiConfig) CtxHttpBridge {
 			return http.HandlerFunc(shared.UnauthorizedHandler)
 		}
 
-		requester, _ := dbh.FindUserForKey("", pubkeyStr)
+		requester, _ := dbh.FindUserForKey("", pubkey)
 		if requester != nil {
 			log = log.With(
 				"requester", requester.Name,
@@ -89,32 +86,17 @@ func createHttpHandler(apiConfig *shared.ApiConfig) CtxHttpBridge {
 			requester, _ = dbh.FindUserForName(asUser)
 		}
 
-		shared.SetUser(ctx, requester)
-
-		if !HasProjectAccess(project, owner, requester, pubkey) {
+		ctx.Permissions().Extensions["user_id"] = requester.ID
+		publicKey, err := ssh.ParsePublicKey([]byte(pubkey))
+		if err != nil {
+			return http.HandlerFunc(shared.UnauthorizedHandler)
+		}
+		if !HasProjectAccess(project, owner, requester, publicKey) {
 			log.Error("no access")
 			return http.HandlerFunc(shared.UnauthorizedHandler)
 		}
 
 		log.Info("user has access to site")
-
-		/* routes := []shared.Route{
-			// special API endpoint for tunnel users accessing site
-			shared.NewCorsRoute("GET", "/api/current_user", func(w http.ResponseWriter, r *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				user, err := shared.GetUser(ctx)
-				if err != nil {
-					logger.Error("could not find user", "err", err.Error())
-					shared.JSONError(w, err.Error(), http.StatusNotFound)
-					return
-				}
-				pico := shared.NewUserApi(user, pubkey)
-				err = json.NewEncoder(w).Encode(pico)
-				if err != nil {
-					log.Error(err.Error())
-				}
-			}),
-		} */
 
 		routes := NewWebRouter(
 			apiConfig.Cfg,

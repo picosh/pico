@@ -141,7 +141,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 			logger := handler.Logger
 			ctx := sesh.Context()
 
-			user, err := shared.GetUser(ctx)
+			user, err := handler.DBPool.FindUser(sesh.Permissions().Extensions["user_id"])
 			if err != nil {
 				logger.Info("user not found", "err", err)
 			}

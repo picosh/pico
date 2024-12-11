@@ -82,7 +82,7 @@ func (r *FileHandlerRouter) Read(s ssh.Session, entry *utils.FileEntry) (os.File
 
 func BaseList(s ssh.Session, fpath string, isDir bool, recursive bool, spaces []string, dbpool db.DB) ([]os.FileInfo, error) {
 	var fileList []os.FileInfo
-	user, err := shared.GetUser(s.Context())
+	user, err := dbpool.FindUser(s.Permissions().Extensions["user_id"])
 	if err != nil {
 		return fileList, err
 	}
@@ -153,7 +153,7 @@ func (r *FileHandlerRouter) GetLogger() *slog.Logger {
 }
 
 func (r *FileHandlerRouter) Validate(s ssh.Session) error {
-	user, err := shared.GetUser(s.Context())
+	user, err := r.DBPool.FindUser(s.Permissions().Extensions["user_id"])
 	if err != nil {
 		return err
 	}

@@ -53,7 +53,7 @@ require (
 	go.abhg.dev/goldmark/anchor v0.1.1
 	go.abhg.dev/goldmark/hashtag v0.3.1
 	go.abhg.dev/goldmark/toc v0.10.0
-	golang.org/x/crypto v0.29.0
+	golang.org/x/crypto v0.31.0
 	gopkg.in/yaml.v2 v2.4.0
 )
 
@@ -179,10 +179,10 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	golang.org/x/exp v0.0.0-20241108190413-2d47ceb2692f // indirect
 	golang.org/x/net v0.31.0 // indirect
-	golang.org/x/sync v0.9.0 // indirect
-	golang.org/x/sys v0.27.0 // indirect
-	golang.org/x/term v0.26.0 // indirect
-	golang.org/x/text v0.20.0 // indirect
+	golang.org/x/sync v0.10.0 // indirect
+	golang.org/x/sys v0.28.0 // indirect
+	golang.org/x/term v0.27.0 // indirect
+	golang.org/x/text v0.21.0 // indirect
 	golang.org/x/time v0.8.0 // indirect
 	google.golang.org/protobuf v1.35.2 // indirect
 	mvdan.cc/xurls/v2 v2.5.0 // indirect

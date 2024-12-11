@@ -121,7 +121,7 @@ func (h *UploadAssetHandler) GetLogger() *slog.Logger {
 }
 
 func (h *UploadAssetHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os.FileInfo, sendutils.ReaderAtCloser, error) {
-	user, err := shared.GetUser(s.Context())
+	user, err := h.DBPool.FindUser(s.Permissions().Extensions["user_id"])
 	if err != nil {
 		return nil, nil, err
 	}
@@ -155,7 +155,7 @@ func (h *UploadAssetHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os
 func (h *UploadAssetHandler) List(s ssh.Session, fpath string, isDir bool, recursive bool) ([]os.FileInfo, error) {
 	var fileList []os.FileInfo
 
-	user, err := shared.GetUser(s.Context())
+	user, err := h.DBPool.FindUser(s.Permissions().Extensions["user_id"])
 	if err != nil {
 		return fileList, err
 	}
@@ -197,7 +197,7 @@ func (h *UploadAssetHandler) List(s ssh.Session, fpath string, isDir bool, recur
 }
 
 func (h *UploadAssetHandler) Validate(s ssh.Session) error {
-	user, err := shared.GetUser(s.Context())
+	user, err := h.DBPool.FindUser(s.Permissions().Extensions["user_id"])
 	if err != nil {
 		return err
 	}
@@ -248,7 +248,7 @@ func (h *UploadAssetHandler) findDenylist(bucket sst.Bucket, project *db.Project
 }
 
 func (h *UploadAssetHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (string, error) {
-	user, err := shared.GetUser(s.Context())
+	user, err := h.DBPool.FindUser(s.Permissions().Extensions["user_id"])
 	if user == nil || err != nil {
 		h.Cfg.Logger.Error("user not found in ctx", "err", err.Error())
 		return "", err
@@ -314,11 +314,7 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (s
 		return "", err
 	}
 
-	featureFlag, err := shared.GetFeatureFlag(s.Context())
-	if err != nil {
-		return "", err
-	}
-
+	featureFlag := shared.FindPlusFF(h.DBPool, h.Cfg, user.ID)
 	// calculate the filsize difference between the same file already
 	// stored and the updated file being uploaded
 	assetFilename := shared.GetAssetFileName(entry)
@@ -424,7 +420,7 @@ func isSpecialFile(entry *sendutils.FileEntry) bool {
 }
 
 func (h *UploadAssetHandler) Delete(s ssh.Session, entry *sendutils.FileEntry) error {
-	user, err := shared.GetUser(s.Context())
+	user, err := h.DBPool.FindUser(s.Permissions().Extensions["user_id"])
 	if err != nil {
 		h.Cfg.Logger.Error("user not found in ctx", "err", err.Error())
 		return err

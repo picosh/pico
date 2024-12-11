@@ -48,7 +48,7 @@ func NewUploadImgHandler(dbpool db.DB, cfg *shared.ConfigSite, storage storage.S
 }
 
 func (h *UploadImgHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os.FileInfo, sendutils.ReaderAtCloser, error) {
-	user, err := shared.GetUser(s.Context())
+	user, err := h.DBPool.FindUser(s.Permissions().Extensions["user_id"])
 	if err != nil {
 		return nil, nil, err
 	}
@@ -88,7 +88,7 @@ func (h *UploadImgHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os.F
 
 func (h *UploadImgHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (string, error) {
 	logger := h.Cfg.Logger
-	user, err := shared.GetUser(s.Context())
+	user, err := h.DBPool.FindUser(s.Permissions().Extensions["user_id"])
 	if err != nil {
 		logger.Error("could not get user from ctx", "err", err.Error())
 		return "", err
@@ -145,10 +145,7 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (str
 		logger.Info("unable to find image, continuing", "filename", nextPost.Filename, "err", err.Error())
 	}
 
-	featureFlag, err := shared.GetFeatureFlag(s.Context())
-	if err != nil {
-		return "", err
-	}
+	featureFlag := shared.FindPlusFF(h.DBPool, h.Cfg, user.ID)
 	metadata := PostMetaData{
 		OrigText:    text,
 		Post:        &nextPost,
@@ -192,7 +189,7 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (str
 }
 
 func (h *UploadImgHandler) Delete(s ssh.Session, entry *sendutils.FileEntry) error {
-	user, err := shared.GetUser(s.Context())
+	user, err := h.DBPool.FindUser(s.Permissions().Extensions["user_id"])
 	if err != nil {
 		return err
 	}

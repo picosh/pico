@@ -28,7 +28,6 @@ import (
 )
 
 func authHandler(ctx ssh.Context, key ssh.PublicKey) bool {
-	shared.SetPublicKey(ctx, key)
 	return true
 }
 
