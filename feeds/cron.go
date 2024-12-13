@@ -175,17 +175,6 @@ func (f *Fetcher) RunPost(logger *slog.Logger, user *db.User, post *db.Post) err
 		urls = append(urls, url)
 	}
 
-	msgBody, err := f.FetchAll(logger, urls, parsed.InlineContent, user.Name, post)
-	if err != nil {
-		return err
-	}
-
-	subject := fmt.Sprintf("%s feed digest", post.Title)
-	err = f.SendEmail(logger, user.Name, parsed.Email, subject, msgBody)
-	if err != nil {
-		return err
-	}
-
 	now := time.Now().UTC()
 	if post.ExpiresAt == nil {
 		expiresAt := time.Now().AddDate(0, 6, 0)
@@ -193,7 +182,70 @@ func (f *Fetcher) RunPost(logger *slog.Logger, user *db.User, post *db.Post) err
 	}
 	post.Data.LastDigest = &now
 	_, err = f.db.UpdatePost(post)
-	return err
+	if err != nil {
+		return err
+	}
+
+	subject := fmt.Sprintf("%s feed digest", post.Title)
+
+	msgBody, err := f.FetchAll(logger, urls, parsed.InlineContent, user.Name, post)
+	if err != nil {
+		errForUser := err
+
+		// we don't want to increment in this case
+		if errors.Is(errForUser, ErrNoRecentArticles) {
+			return nil
+		}
+
+		post.Data.Attempts += 1
+		logger.Error("could not fetch urls", "err", err, "attempts", post.Data.Attempts)
+
+		errBody := fmt.Sprintf(`There was an error attempting to fetch your feeds (%d) times.  After (3) attempts we remove the file from our system.  Please check all the URLs and re-upload.
+Also, we have centralized logs in our pico.sh TUI that will display realtime feed errors so you can debug.
+
+
+%s
+
+
+%s`, post.Data.Attempts, errForUser.Error(), post.Text)
+		err = f.SendEmail(
+			logger, user.Name,
+			parsed.Email,
+			subject,
+			&MsgBody{Html: strings.ReplaceAll(errBody, "\n", "<br />"), Text: errBody},
+		)
+		if err != nil {
+			return err
+		}
+
+		if post.Data.Attempts >= 3 {
+			err = f.db.RemovePosts([]string{post.ID})
+			if err != nil {
+				return err
+			}
+		} else {
+			_, err = f.db.UpdatePost(post)
+			if err != nil {
+				return err
+			}
+		}
+		return errForUser
+	} else {
+		post.Data.Attempts = 0
+		_, err := f.db.UpdatePost(post)
+		if err != nil {
+			return err
+		}
+	}
+
+	if msgBody != nil {
+		err = f.SendEmail(logger, user.Name, parsed.Email, subject, msgBody)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (f *Fetcher) RunUser(user *db.User) error {
@@ -353,12 +405,14 @@ func (f *Fetcher) FetchAll(logger *slog.Logger, urls []string, inlineContent boo
 		return nil, err
 	}
 
+	var allErrors error
 	for _, url := range urls {
 		feedTmpl, err := f.Fetch(logger, fp, url, username, feedItems)
 		if err != nil {
 			if errors.Is(err, ErrNoRecentArticles) {
 				logger.Info("no recent articles", "err", err)
 			} else {
+				allErrors = errors.Join(allErrors, fmt.Errorf("%s: %w", url, err))
 				logger.Error("fetch error", "err", err)
 			}
 			continue
@@ -367,7 +421,10 @@ func (f *Fetcher) FetchAll(logger *slog.Logger, urls []string, inlineContent boo
 	}
 
 	if len(feeds.Feeds) == 0 {
-		return nil, fmt.Errorf("(%s) %w, skipping email", username, ErrNoRecentArticles)
+		if allErrors != nil {
+			return nil, allErrors
+		}
+		return nil, fmt.Errorf("%w, skipping email", ErrNoRecentArticles)
 	}
 
 	fdi := []*db.FeedItem{}
@@ -399,6 +456,11 @@ func (f *Fetcher) FetchAll(logger *slog.Logger, urls []string, inlineContent boo
 	html, err := f.PrintHtml(feeds)
 	if err != nil {
 		return nil, err
+	}
+
+	if allErrors != nil {
+		text = fmt.Sprintf("> %s\n\n%s", allErrors, text)
+		html = fmt.Sprintf("<blockquote>%s</blockquote><br /><br/>%s", allErrors, html)
 	}
 
 	return &MsgBody{

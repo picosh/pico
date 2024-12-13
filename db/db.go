@@ -32,6 +32,7 @@ type User struct {
 type PostData struct {
 	ImgPath    string     `json:"img_path"`
 	LastDigest *time.Time `json:"last_digest"`
+	Attempts   int        `json:"attempts"`
 }
 
 // Make the Attrs struct implement the driver.Valuer interface. This method
