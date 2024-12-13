@@ -1,6 +1,7 @@
 package pgs
 
 import (
+	"context"
 	"net/http"
 	"strings"
 
@@ -11,10 +12,24 @@ import (
 
 type TunnelWebRouter struct {
 	*WebRouter
+	subdomain string
+}
+
+func (web *TunnelWebRouter) InitRouter() {
+	router := http.NewServeMux()
+	router.HandleFunc("GET /{fname...}", web.AssetRequest)
+	router.HandleFunc("GET /{$}", web.AssetRequest)
+	web.UserRouter = router
 }
 
 func (web *TunnelWebRouter) Perm(proj *db.Project) bool {
 	return true
+}
+
+func (web *TunnelWebRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	ctx = context.WithValue(ctx, shared.CtxSubdomainKey{}, web.subdomain)
+	web.UserRouter.ServeHTTP(w, r.WithContext(ctx))
 }
 
 type CtxHttpBridge = func(ssh.Context) http.Handler
@@ -50,13 +65,17 @@ func createHttpHandler(apiConfig *shared.ApiConfig) CtxHttpBridge {
 
 		props, err := shared.GetProjectFromSubdomain(subdomain)
 		if err != nil {
-			log.Error(err.Error())
+			log.Error("could not get project from subdomain", "err", err.Error())
 			return http.HandlerFunc(shared.UnauthorizedHandler)
 		}
 
 		owner, err := dbh.FindUserForName(props.Username)
 		if err != nil {
-			log.Error(err.Error())
+			log.Error(
+				"could not find user from name",
+				"name", props.Username,
+				"err", err.Error(),
+			)
 			return http.HandlerFunc(shared.UnauthorizedHandler)
 		}
 		log = log.With(
@@ -65,7 +84,7 @@ func createHttpHandler(apiConfig *shared.ApiConfig) CtxHttpBridge {
 
 		project, err := dbh.FindProjectByName(owner.ID, props.ProjectName)
 		if err != nil {
-			log.Error(err.Error())
+			log.Error("could not get project by name", "project", props.ProjectName, "err", err.Error())
 			return http.HandlerFunc(shared.UnauthorizedHandler)
 		}
 
@@ -87,8 +106,9 @@ func createHttpHandler(apiConfig *shared.ApiConfig) CtxHttpBridge {
 		}
 
 		ctx.Permissions().Extensions["user_id"] = requester.ID
-		publicKey, err := ssh.ParsePublicKey([]byte(pubkey))
+		publicKey, _, _, _, err := ssh.ParseAuthorizedKey([]byte(pubkey))
 		if err != nil {
+			log.Error("could not parse public key", "pubkey", pubkey, "err", err)
 			return http.HandlerFunc(shared.UnauthorizedHandler)
 		}
 		if !HasProjectAccess(project, owner, requester, publicKey) {
@@ -104,11 +124,8 @@ func createHttpHandler(apiConfig *shared.ApiConfig) CtxHttpBridge {
 			apiConfig.Dbpool,
 			apiConfig.Storage,
 		)
-		tunnelRouter := TunnelWebRouter{routes}
-		router := http.NewServeMux()
-		router.HandleFunc("GET /{fname}/{options}...", tunnelRouter.ImageRequest)
-		router.HandleFunc("GET /{fname}", tunnelRouter.AssetRequest)
-		router.HandleFunc("GET /{$}", tunnelRouter.AssetRequest)
-		return router
+		tunnelRouter := TunnelWebRouter{routes, subdomain}
+		tunnelRouter.initRouters()
+		return &tunnelRouter
 	}
 }
