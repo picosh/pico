@@ -180,7 +180,6 @@ func (f *Fetcher) RunPost(logger *slog.Logger, user *db.User, post *db.Post) err
 		expiresAt := time.Now().AddDate(0, 6, 0)
 		post.ExpiresAt = &expiresAt
 	}
-	post.Data.LastDigest = &now
 	_, err = f.db.UpdatePost(post)
 	if err != nil {
 		return err
@@ -243,6 +242,12 @@ Also, we have centralized logs in our pico.sh TUI that will display realtime fee
 		if err != nil {
 			return err
 		}
+	}
+
+	post.Data.LastDigest = &now
+	_, err = f.db.UpdatePost(post)
+	if err != nil {
+		return err
 	}
 
 	return nil
