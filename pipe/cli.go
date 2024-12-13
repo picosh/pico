@@ -19,6 +19,7 @@ import (
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared"
 	psub "github.com/picosh/pubsub"
+	"github.com/picosh/utils"
 	gossh "golang.org/x/crypto/ssh"
 )
 
@@ -141,7 +142,8 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 			logger := handler.Logger
 			ctx := sesh.Context()
 
-			user, err := handler.DBPool.FindUser(sesh.Permissions().Extensions["user_id"])
+			pubkey := utils.KeyForKeyText(sesh.PublicKey())
+			user, err := handler.DBPool.FindUserForKey(sesh.User(), pubkey)
 			if err != nil {
 				logger.Info("user not found", "err", err)
 			}
