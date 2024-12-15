@@ -80,7 +80,7 @@ func (m Model) View() string {
 	if m.state == stateLoading {
 		return "Loading ..."
 	}
-	return m.featuresView() + "\n" + m.analyticsView()
+	return m.servicesView() + "\n" + m.featuresView() + "\n" + m.analyticsView()
 }
 
 func (m Model) findAnalyticsFeature() *db.FeatureFlag {
@@ -114,6 +114,46 @@ We will only store usage statistics for 1 year from when the event was created.`
 	}
 
 	return m.shared.Styles.RoundedBorder.Width(maxWidth).SetString(str).String()
+}
+
+func (m Model) servicesView() string {
+	headers := []string{
+		"Name",
+		"Status",
+	}
+
+	hasPlus := m.shared.PlusFeatureFlag != nil
+
+	data := [][]string{
+		{"prose", "active"},
+		{"pipe", "active"},
+		{"pastes", "active"},
+		{"rss-to-email", "active"},
+	}
+
+	if hasPlus {
+		data = append(
+			data,
+			[]string{"pages", "active"},
+			[]string{"tuns", "active"},
+			[]string{"irc bouncer", "active"},
+		)
+	} else {
+		data = append(
+			data,
+			[]string{"pages", "free tier"},
+			[]string{"tuns", "requires pico+"},
+			[]string{"IRC bouncer", "requires pico+"},
+		)
+	}
+
+	t := table.New().
+		Border(lipgloss.RoundedBorder()).
+		BorderStyle(m.shared.Styles.Renderer.NewStyle().BorderForeground(common.Indigo)).
+		Width(maxWidth).
+		Headers(headers...).
+		Rows(data...)
+	return "Services\n" + t.String()
 }
 
 func (m Model) featuresView() string {

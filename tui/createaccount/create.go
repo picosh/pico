@@ -201,6 +201,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) View() string {
 	s := common.LogoView() + "\n\n"
 	pubkey := fmt.Sprintf("pubkey: %s", utils.KeyForSha256(m.shared.Session.PublicKey()))
+	s += "\nWelcome to pico.sh's management TUI.  By creating an account you get access to our pico services.  We have free and paid services.  After you create an account, you can go to the Settings page to see which services you can access.\n\n"
 	s += m.shared.Styles.Label.SetString(pubkey).String()
 	s += "\n\n" + m.input.View() + "\n\n"
 
