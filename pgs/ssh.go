@@ -74,10 +74,13 @@ func StartSshServer() {
 		return
 	}
 
+	ctx := context.Background()
+	defer ctx.Done()
 	handler := NewUploadAssetHandler(
 		dbpool,
 		cfg,
 		st,
+		ctx,
 	)
 
 	apiConfig := &shared.ApiConfig{

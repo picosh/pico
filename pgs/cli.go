@@ -1,6 +1,7 @@
 package pgs
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -497,9 +498,12 @@ func (c *Cmd) cache(projectName string) error {
 		"project", projectName,
 	)
 	c.output(fmt.Sprintf("clearing http cache for %s", projectName))
+	ctx := context.Background()
+	defer ctx.Done()
+	send := createPubCacheDrain(ctx, c.Log)
 	if c.Write {
 		surrogate := getSurrogateKey(c.User.Name, projectName)
-		return purgeCache(c.Cfg, surrogate)
+		return purgeCache(c.Cfg, send, surrogate)
 	}
 	return nil
 }
@@ -516,7 +520,10 @@ func (c *Cmd) cacheAll() error {
 	)
 	c.output("clearing http cache for all sites")
 	if c.Write {
-		return purgeAllCache(c.Cfg)
+		ctx := context.Background()
+		defer ctx.Done()
+		send := createPubCacheDrain(ctx, c.Log)
+		return purgeAllCache(c.Cfg, send)
 	}
 	return nil
 }
