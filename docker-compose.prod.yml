@@ -152,6 +152,7 @@ services:
       - ./data/prose-caddy/config:/config
     labels:
       pipemgr.enable: true
+      pipemgr.filter: "http.log.access"
     depends_on:
       pipemgr:
         condition: service_healthy
@@ -253,6 +254,7 @@ services:
       - "${PGS_HTTP_V6:-[::1]:80}:80"
     labels:
       pipemgr.enable: true
+      pipemgr.filter: "http.log.access"
     depends_on:
       pipemgr:
         condition: service_healthy
