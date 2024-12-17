@@ -61,8 +61,8 @@ func StartApiServer() {
 		logger.Error("could not connect to object storage", "err", err.Error())
 		return
 	}
-
-	stale := configurationtypes.Duration{Duration: 1000 * time.Second}
+	ttl := configurationtypes.Duration{Duration: cfg.CacheTTL}
+	stale := configurationtypes.Duration{Duration: cfg.CacheTTL * 2}
 	c := &middleware.BaseConfiguration{
 		API: configurationtypes.API{
 			Prometheus: configurationtypes.APIEndpoint{
@@ -70,12 +70,17 @@ func StartApiServer() {
 			},
 		},
 		DefaultCache: &configurationtypes.DefaultCache{
-			TTL:   configurationtypes.Duration{Duration: 300 * time.Second},
+			TTL:   ttl,
 			Stale: stale,
 			Otter: configurationtypes.CacheProvider{
 				Uuid:          fmt.Sprintf("OTTER-%s", stale),
 				Configuration: map[string]interface{}{},
 			},
+			Regex: configurationtypes.Regex{
+				Exclude: "/check",
+			},
+			MaxBodyBytes:        uint64(cfg.MaxAssetSize),
+			DefaultCacheControl: cfg.CacheControl,
 		},
 		LogLevel: "debug",
 	}
