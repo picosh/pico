@@ -126,12 +126,12 @@ small {
 
 details {
   border: 2px solid var(--grey-light);
-  padding: calc(var(--line-height) - 2px) 1ch;
-  margin-bottom: var(--line-height);
+  padding: calc(var(--grid-height) - 2px) 1ch;
+  margin-bottom: var(--grid-height);
 }
 
 details[open] summary {
-  margin-bottom: var(--line-height);
+  margin-bottom: var(--grid-height);
 }
 
 summary {
@@ -214,8 +214,7 @@ blockquote code {
   border: 1px solid var(--blockquote);
 }
 
-ul,
-ol {
+ul {
   padding: 0 0 0 var(--line-height);
   list-style-position: inside;
   list-style-type: square;
@@ -223,6 +222,17 @@ ol {
 }
 
 ul[style*="list-style-type: none;"] {
+  padding: 0;
+}
+
+ol {
+  padding: 0 0 0 var(--line-height);
+  list-style-position: inside;
+  list-style-type: decimal;
+  margin: var(--line-height) 0;
+}
+
+ol[style*="list-style-type: none;"] {
   padding: 0;
 }
 
@@ -238,10 +248,6 @@ li {
 
 li::marker {
   line-height: 0;
-}
-
-li > pre {
-  padding: 0;
 }
 
 footer {
@@ -263,6 +269,10 @@ dd:not(:last-child) {
 
 figure {
   margin: 0;
+}
+
+sup {
+  line-height: 0;
 }
 
 #toc {
@@ -409,6 +419,10 @@ figure {
   flex-direction: column;
 }
 
+.flex-wrap {
+  flex-wrap: wrap;
+}
+
 .items-center {
   align-items: center;
 }
@@ -498,6 +512,11 @@ figure {
   padding: 0;
 }
 
+.px {
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+}
+
 .px-2 {
   padding-left: 1rem;
   padding-right: 1rem;
@@ -583,6 +602,10 @@ figure {
 
 .align-right {
   text-align: right;
+}
+
+.text-transform-none {
+  text-transform: none;
 }
 
 /* ==== MARKDOWN ==== */
