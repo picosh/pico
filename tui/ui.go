@@ -9,6 +9,7 @@ import (
 	"github.com/muesli/reflow/wordwrap"
 	"github.com/muesli/reflow/wrap"
 	"github.com/picosh/pico/tui/analytics"
+	"github.com/picosh/pico/tui/chat"
 	"github.com/picosh/pico/tui/common"
 	"github.com/picosh/pico/tui/createaccount"
 	"github.com/picosh/pico/tui/createkey"
@@ -43,7 +44,7 @@ func NewUI(shared *common.SharedModel) *UI {
 	m := &UI{
 		shared: shared,
 		state:  initState,
-		pages:  make([]tea.Model, 11),
+		pages:  make([]tea.Model, 12),
 	}
 	return m
 }
@@ -86,6 +87,7 @@ func (m *UI) Init() tea.Cmd {
 	m.pages[pages.SettingsPage] = settings.NewModel(m.shared)
 	m.pages[pages.LogsPage] = logs.NewModel(m.shared)
 	m.pages[pages.AnalyticsPage] = analytics.NewModel(m.shared)
+	m.pages[pages.ChatPage] = chat.NewModel(m.shared)
 	if m.shared.User == nil {
 		m.activePage = pages.CreateAccountPage
 	} else {
@@ -153,7 +155,7 @@ func (m *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case menu.AnalyticsChoice:
 			m.activePage = pages.AnalyticsPage
 		case menu.ChatChoice:
-			return m, LoadChat(m.shared)
+			m.activePage = pages.ChatPage
 		case menu.ExitChoice:
 			m.shared.Dbpool.Close()
 			return m, tea.Quit

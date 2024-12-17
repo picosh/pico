@@ -270,6 +270,10 @@ services:
     volumes:
       - ./data/storage/data:/app/.storage
       - ./data/pgs-ssh/data:/app/ssh_data
+    deploy:
+      resources:
+        limits:
+          memory: 3g
   pgs-ssh:
     networks:
       pgs:
