@@ -21,7 +21,6 @@ import (
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/utils"
-	"github.com/picosh/utils/pipe"
 	"github.com/picosh/utils/pipe/metrics"
 )
 
@@ -583,35 +582,32 @@ func checkoutHandler() http.HandlerFunc {
 	}
 }
 
-type AccessLogReq struct {
-	RemoteIP   string `json:"remote_ip"`
-	RemotePort string `json:"remote_port"`
-	ClientIP   string `json:"client_ip"`
-	Method     string `json:"method"`
-	Host       string `json:"host"`
-	Uri        string `json:"uri"`
-	Headers    struct {
-		UserAgent []string `json:"User-Agent"`
-		Referer   []string `json:"Referer"`
-	} `json:"headers"`
-	Tls struct {
-		ServerName string `json:"server_name"`
-	} `json:"tls"`
+type AccessLog struct {
+	Status      int               `json:"status"`
+	ServerID    string            `json:"server_id"`
+	Request     AccessLogReq      `json:"request"`
+	RespHeaders AccessRespHeaders `json:"resp_headers"`
 }
 
-type RespHeaders struct {
+type AccessLogReqHeaders struct {
+	UserAgent []string `json:"User-Agent"`
+	Referer   []string `json:"Referer"`
+}
+
+type AccessLogReq struct {
+	ClientIP string              `json:"client_ip"`
+	Method   string              `json:"method"`
+	Host     string              `json:"host"`
+	Uri      string              `json:"uri"`
+	Headers  AccessLogReqHeaders `json:"headers"`
+}
+
+type AccessRespHeaders struct {
 	ContentType []string `json:"Content-Type"`
 }
 
-type CaddyAccessLog struct {
-	Request     AccessLogReq `json:"request"`
-	Status      int          `json:"status"`
-	RespHeaders RespHeaders  `json:"resp_headers"`
-	ServiceID   string       `json:"server_id"`
-}
-
-func deserializeCaddyAccessLog(dbpool db.DB, access *CaddyAccessLog) (*db.AnalyticsVisits, error) {
-	spaceRaw := strings.SplitN(access.ServiceID, ".", 2)
+func deserializeCaddyAccessLog(dbpool db.DB, access *AccessLog) (*db.AnalyticsVisits, error) {
+	spaceRaw := strings.SplitN(access.ServerID, ".", 2)
 	space := spaceRaw[0]
 	host := access.Request.Host
 	path := access.Request.Uri
@@ -676,62 +672,8 @@ func deserializeCaddyAccessLog(dbpool db.DB, access *CaddyAccessLog) (*db.Analyt
 	}, nil
 }
 
-// this feels really stupid because i'm taking containter-drain,
-// filtering it, and then sending it to metric-drain.  The
-// metricDrainSub function listens on the metric-drain and saves it.
-// So why not just call the necessary functions to save the visit?
-// We want to be able to use pipe as a debugging tool which means we
-// can manually sub to `metric-drain` and have a nice clean output to view.
-func containerDrainSub(ctx context.Context, dbpool db.DB, logger *slog.Logger) {
-	info := shared.NewPicoPipeClient()
-	drain := pipe.NewReconnectReadWriteCloser(
-		ctx,
-		logger,
-		info,
-		"container drain",
-		"sub container-drain -k",
-		100,
-		-1,
-	)
-
-	send := pipe.NewReconnectReadWriteCloser(
-		ctx,
-		logger,
-		info,
-		"from container drain to metric drain",
-		"pub metric-drain -b=false",
-		100,
-		-1,
-	)
-
-	for {
-		scanner := bufio.NewScanner(drain)
-		for scanner.Scan() {
-			line := scanner.Text()
-			if strings.Contains(line, "http.log.access") {
-				clean := strings.TrimSpace(line)
-				visit, err := accessLogToVisit(dbpool, clean)
-				if err != nil {
-					logger.Debug("could not convert access log to a visit", "err", err)
-					continue
-				}
-				jso, err := json.Marshal(visit)
-				if err != nil {
-					logger.Error("could not marshal json of a visit", "err", err)
-					continue
-				}
-				jso = append(jso, []byte("\n")...)
-				_, err = send.Write(jso)
-				if err != nil {
-					logger.Error("could not write to metric-drain", "err", err)
-				}
-			}
-		}
-	}
-}
-
 func accessLogToVisit(dbpool db.DB, line string) (*db.AnalyticsVisits, error) {
-	accessLog := CaddyAccessLog{}
+	accessLog := AccessLog{}
 	err := json.Unmarshal([]byte(line), &accessLog)
 	if err != nil {
 		return nil, err
@@ -753,14 +695,16 @@ func metricDrainSub(ctx context.Context, dbpool db.DB, logger *slog.Logger, secr
 		scanner := bufio.NewScanner(drain)
 		for scanner.Scan() {
 			line := scanner.Text()
-			visit := db.AnalyticsVisits{}
-			err := json.Unmarshal([]byte(line), &visit)
+			clean := strings.TrimSpace(line)
+
+			visit, err := accessLogToVisit(dbpool, clean)
 			if err != nil {
-				logger.Info("could not unmarshal json", "err", err, "line", line)
+				logger.Error("could not convert access log to a visit", "err", err)
 				continue
 			}
+
 			logger.Info("received visit", "visit", visit)
-			err = shared.AnalyticsVisitFromVisit(&visit, dbpool, secret)
+			err = shared.AnalyticsVisitFromVisit(visit, dbpool, secret)
 			if err != nil {
 				logger.Info("could not record analytics visit", "err", err)
 				continue
@@ -772,7 +716,7 @@ func metricDrainSub(ctx context.Context, dbpool db.DB, logger *slog.Logger, secr
 			}
 
 			logger.Info("inserting visit", "visit", visit)
-			err = dbpool.InsertVisit(&visit)
+			err = dbpool.InsertVisit(visit)
 			if err != nil {
 				logger.Error("could not insert visit record", "err", err)
 			}
@@ -846,8 +790,6 @@ func StartApiServer() {
 
 	ctx := context.Background()
 
-	// convert container logs to access logs
-	go containerDrainSub(ctx, db, logger)
 	// gather metrics in the auth service
 	go metricDrainSub(ctx, db, logger, cfg.Secret)
 

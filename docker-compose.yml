@@ -30,6 +30,7 @@ services:
       - all
   pipemgr:
     image: ghcr.io/picosh/pipemgr:latest
+    command: /pipemgr -command "pub metric-drain -b=false"
     restart: always
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
