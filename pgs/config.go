@@ -1,6 +1,9 @@
 package pgs
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/utils"
 )
@@ -16,8 +19,13 @@ func NewConfigSite() *shared.ConfigSite {
 	port := utils.GetEnv("PGS_WEB_PORT", "3000")
 	protocol := utils.GetEnv("PGS_PROTOCOL", "https")
 	storageDir := utils.GetEnv("PGS_STORAGE_DIR", ".storage")
-	pgsCacheUser := utils.GetEnv("PGS_CACHE_USER", "")
-	pgsCachePass := utils.GetEnv("PGS_CACHE_PASSWORD", "")
+	cacheTTL, err := time.ParseDuration(utils.GetEnv("PGS_CACHE_TTL", ""))
+	if err != nil {
+		cacheTTL = 600 * time.Second
+	}
+	cacheControl := utils.GetEnv(
+		"PGS_CACHE_CONTROL",
+		fmt.Sprintf("max-age=%d", int(cacheTTL.Seconds())))
 	minioURL := utils.GetEnv("MINIO_URL", "")
 	minioUser := utils.GetEnv("MINIO_ROOT_USER", "")
 	minioPass := utils.GetEnv("MINIO_ROOT_PASSWORD", "")
@@ -29,8 +37,8 @@ func NewConfigSite() *shared.ConfigSite {
 		Protocol:           protocol,
 		DbURL:              dbURL,
 		StorageDir:         storageDir,
-		CacheUser:          pgsCacheUser,
-		CachePassword:      pgsCachePass,
+		CacheTTL:           cacheTTL,
+		CacheControl:       cacheControl,
 		MinioURL:           minioURL,
 		MinioUser:          minioUser,
 		MinioPass:          minioPass,
