@@ -14,17 +14,16 @@ import (
 func PlusView(username string, w int) string {
 	paymentLink := "https://auth.pico.sh/checkout"
 	url := fmt.Sprintf("%s/%s", paymentLink, url.QueryEscape(username))
-	md := fmt.Sprintf(`Signup to get premium access
+	md := fmt.Sprintf(`Signup for pico+
 
 ## $2/month (billed annually)
 
 - tuns
-  - full access
+  - per-site analytics
 - pages
-  - full access
   - per-site analytics
 - prose
-  - increased storage limits
+  - no inherent storage limits
   - blog analytics
 - 10GB total storage
 
@@ -44,6 +43,8 @@ Send cash (USD) or check to:
 - Ann Arbor MI 48104
 
 ## Notes
+
+You can keep purchasing pico+ to add additional years to your subscription.
 
 Have any questions not covered here? [Email](mailto:hello@pico.sh)
 us or join [IRC](https://pico.sh/irc), we will promptly respond.

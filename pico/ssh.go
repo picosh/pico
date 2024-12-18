@@ -39,7 +39,7 @@ func createRouter(cfg *shared.ConfigSite, handler *UploadHandler, cliHandler *Cl
 			scp.Middleware(handler),
 			wishrsync.Middleware(handler),
 			auth.Middleware(handler),
-			wsh.PtyMdw(bm.MiddlewareWithColorProfile(tui.CmsMiddleware(cfg), termenv.ANSI256)),
+			wsh.PtyMdw(bm.MiddlewareWithColorProfile(tui.CmsMiddleware(cfg), termenv.TrueColor)),
 			WishMiddleware(cliHandler),
 			wsh.LogMiddleware(handler.GetLogger()),
 		}
