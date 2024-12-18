@@ -300,11 +300,21 @@ func (web *WebRouter) cacheMgmt(ctx context.Context, httpCache *middleware.Souin
 					var mapping core.StorageMapper
 					if e := proto.Unmarshal(b, &mapping); e == nil {
 						for k := range mapping.GetMapping() {
+							web.Logger.Info(
+								"deleting key from cache",
+								"surrogateKey", surrogateKey,
+								"key", k,
+							)
 							storer.Delete(k)
 						}
 					}
 				}
 
+				web.Logger.Info(
+					"deleting from cache",
+					"surrogateKey", surrogateKey,
+					"key", core.MappingKeyPrefix+key,
+				)
 				storer.Delete(core.MappingKeyPrefix + key)
 			}
 		}

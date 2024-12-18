@@ -28,7 +28,7 @@ require (
 	github.com/charmbracelet/promwish v0.7.0
 	github.com/charmbracelet/ssh v0.0.0-20240725163421-eb71b85b27aa
 	github.com/charmbracelet/wish v1.4.3
-	github.com/darkweak/souin v1.7.6-0.20241208130618-0e1579f1adc7
+	github.com/darkweak/souin v1.7.5
 	github.com/darkweak/souin/plugins/souin/storages v1.7.5
 	github.com/darkweak/storages/core v0.0.11
 	github.com/gkampitakis/go-snaps v0.5.7
