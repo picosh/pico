@@ -627,13 +627,13 @@ func deserializeCaddyAccessLog(dbpool db.DB, access *AccessLog) (*db.AnalyticsVi
 	// get user and namespace details from subdomain
 	props, err := shared.GetProjectFromSubdomain(subdomain)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not get project from subdomain %s: %w", subdomain, err)
 	}
 
 	// get user ID
 	user, err := dbpool.FindUserForName(props.Username)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not find user for name %s: %w", props.Username, err)
 	}
 
 	projectID := ""
@@ -641,7 +641,12 @@ func deserializeCaddyAccessLog(dbpool db.DB, access *AccessLog) (*db.AnalyticsVi
 	if space == "pgs" { // figure out project ID
 		project, err := dbpool.FindProjectByName(user.ID, props.ProjectName)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf(
+				"could not find project by name, (user:%s, project:%s): %w",
+				user.ID,
+				props.ProjectName,
+				err,
+			)
 		}
 		projectID = project.ID
 	} else if space == "prose" { // figure out post ID
@@ -651,7 +656,13 @@ func deserializeCaddyAccessLog(dbpool db.DB, access *AccessLog) (*db.AnalyticsVi
 			cleanPath := strings.TrimPrefix(path, "/")
 			post, err := dbpool.FindPostWithSlug(cleanPath, user.ID, space)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf(
+					"could not find post with slug (path:%s, userId:%s, space:%s): %w",
+					cleanPath,
+					user.ID,
+					space,
+					err,
+				)
 			}
 			postID = post.ID
 		}
@@ -676,7 +687,7 @@ func accessLogToVisit(dbpool db.DB, line string) (*db.AnalyticsVisits, error) {
 	accessLog := AccessLog{}
 	err := json.Unmarshal([]byte(line), &accessLog)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not unmarshal line: %w", err)
 	}
 
 	return deserializeCaddyAccessLog(dbpool, &accessLog)
