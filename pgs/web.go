@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"regexp"
 	"strings"
@@ -300,22 +301,24 @@ func (web *WebRouter) cacheMgmt(ctx context.Context, httpCache *middleware.Souin
 					var mapping core.StorageMapper
 					if e := proto.Unmarshal(b, &mapping); e == nil {
 						for k := range mapping.GetMapping() {
+							qkey, _ := url.QueryUnescape(k)
 							web.Logger.Info(
-								"deleting key from cache",
+								"deleting key from surrogate cache",
 								"surrogateKey", surrogateKey,
-								"key", k,
+								"key", qkey,
 							)
-							storer.Delete(k)
+							storer.Delete(qkey)
 						}
 					}
 				}
 
+				qkey, _ := url.QueryUnescape(key)
 				web.Logger.Info(
 					"deleting from cache",
 					"surrogateKey", surrogateKey,
-					"key", core.MappingKeyPrefix+key,
+					"key", core.MappingKeyPrefix+qkey,
 				)
-				storer.Delete(core.MappingKeyPrefix + key)
+				storer.Delete(core.MappingKeyPrefix + qkey)
 			}
 		}
 	}

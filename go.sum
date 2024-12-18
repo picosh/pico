@@ -714,8 +714,8 @@ github.com/picosh/pobj v0.0.0-20241016194248-c39198b2ff23 h1:NEJ5a4UXeF0/X7xmYNz
 github.com/picosh/pobj v0.0.0-20241016194248-c39198b2ff23/go.mod h1:cF+eAl4G1vU+WOD8cYCKaxokHo6MWmbR8J4/SJnvESg=
 github.com/picosh/pubsub v0.0.0-20241114191831-ec8f16c0eb88 h1:hdxE6rquHHw1/eeqS1b+ojLaxGtN8zOiTUclPwaVbPg=
 github.com/picosh/pubsub v0.0.0-20241114191831-ec8f16c0eb88/go.mod h1:+9hDKIDHQCvGFigCVlIl589BwpT9R4boKhUVc/OgRU4=
-github.com/picosh/send v0.0.0-20241107150437-0febb0049b4f h1:pdEh1Z7zH5Og9nS7jRuqwup3bcPsC6faDNQ6mgrV9ws=
-github.com/picosh/send v0.0.0-20241107150437-0febb0049b4f/go.mod h1:RAgLDK3LrDK6pNeXtU9tjo28obl5DxShcTUk2nm/KCM=
+github.com/picosh/send v0.0.0-20241218031305-056b1fe8ff80 h1:m0x9UOipmz0HCMNuhpzOgxRgOHefgNebmpcTwu0CwxU=
+github.com/picosh/send v0.0.0-20241218031305-056b1fe8ff80/go.mod h1:RAgLDK3LrDK6pNeXtU9tjo28obl5DxShcTUk2nm/KCM=
 github.com/picosh/senpai v0.0.0-20240503200611-af89e73973b0 h1:pBRIbiCj7K6rGELijb//dYhyCo8A3fvxW5dijrJVtjs=
 github.com/picosh/senpai v0.0.0-20240503200611-af89e73973b0/go.mod h1:QaBDtybFC5gz7EG/9c3bgzuyW7W5W2rYLFZxWNuWk3Q=
 github.com/picosh/tunkit v0.0.0-20240905223921-532404cef9d9 h1:g5oZmnDFr11HarA8IAXcc4o9PBlolSM59QIATCSoato=
