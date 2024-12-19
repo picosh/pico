@@ -16,12 +16,12 @@ rsync, scp, or sftp. Hopefully you see the trend.
 - [tuns](https://pico.sh/tuns): https/wss/tcp tunnels to localhost using only
 - [pages](https://pico.sh/pgs): A static site hosting platform using SSH for
   site deployments. SSH.
-- [pipes](https://pipe.pico.sh): Authenticated `*nix` pipes over SSH
+- [pipe](https://pipe.pico.sh): Authenticated `*nix` pipes over SSH
 - [prose](https://pico.sh/prose): A blog platform using SSH for content
   management.
+- [rss-to-email](https://pico.sh/feeds): An RSS email notification service using SSH.
 - [pastes](https://pico.sh/pastes): Upload code snippets using rsync, scp, and
   sftp.
-- [rss-to-email](https://pico.sh/feeds): An RSS email notification service using SSH.
 
 ## Deploy a site with a single command
 
