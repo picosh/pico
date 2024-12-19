@@ -21,7 +21,7 @@ rsync, scp, or sftp. Hopefully you see the trend.
   management.
 - [pastes](https://pico.sh/pastes): Upload code snippets using rsync, scp, and
   sftp.
-- [feeds](https://pico.sh/feeds): An RSS email notification service using SSH.
+- [rss-to-email](https://pico.sh/feeds): An RSS email notification service using SSH.
 
 ## Deploy a site with a single command
 
