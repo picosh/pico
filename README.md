@@ -13,9 +13,9 @@ Want to publish a blog post? Use rsync, scp, or sftp. Want to publish a website?
 Use rsync, scp, or sftp. Want to share a code snippet with a colleague? Use
 rsync, scp, or sftp. Hopefully you see the trend.
 
-- [tuns](https://pico.sh/tuns): https/wss/tcp tunnels to localhost using only
 - [pages](https://pico.sh/pgs): A static site hosting platform using SSH for
   site deployments. SSH.
+- [tuns](https://pico.sh/tuns): https/wss/tcp tunnels to localhost using only
 - [pipe](https://pipe.pico.sh): Authenticated `*nix` pipes over SSH
 - [prose](https://pico.sh/prose): A blog platform using SSH for content
   management.
