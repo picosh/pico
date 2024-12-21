@@ -203,7 +203,7 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if !info.LastModified.IsZero() {
-			w.Header().Add("last-modified", info.LastModified.Format(http.TimeFormat))
+			w.Header().Add("last-modified", info.LastModified.UTC().Format(http.TimeFormat))
 		}
 	}
 
@@ -225,7 +225,11 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		"status", status,
 		"contentType", finContentType,
 	)
-
+	done, _ := checkPreconditions(w, r, info.LastModified.UTC())
+	if done {
+		// A conditional request was detected, status and headers are set, no body required (either 412 or 304)
+		return
+	}
 	w.WriteHeader(status)
 	_, err = io.Copy(w, contents)
 
