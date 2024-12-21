@@ -18,7 +18,9 @@ func NewStorageMemory(sto map[string]map[string]string) (*StorageMemory, error) 
 	return &StorageMemory{st}, nil
 }
 
-func (s *StorageMemory) ServeObject(bucket sst.Bucket, fpath string, opts *ImgProcessOpts) (io.ReadCloser, string, error) {
-	obj, _, err := s.GetObject(bucket, fpath)
-	return obj, GetMimeType(fpath), err
+func (s *StorageMemory) ServeObject(bucket sst.Bucket, fpath string, opts *ImgProcessOpts) (io.ReadCloser, *sst.ObjectInfo, error) {
+	obj, info, err := s.GetObject(bucket, fpath)
+	mimeType := GetMimeType(fpath)
+	info.Metadata.Set("content-type", mimeType)
+	return obj, info, err
 }

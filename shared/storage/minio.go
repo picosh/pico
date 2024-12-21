@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	sst "github.com/picosh/pobj/storage"
 )
@@ -21,14 +22,22 @@ func NewStorageMinio(address, user, pass string) (*StorageMinio, error) {
 	return &StorageMinio{st}, nil
 }
 
-func (s *StorageMinio) ServeObject(bucket sst.Bucket, fpath string, opts *ImgProcessOpts) (io.ReadCloser, string, error) {
-	if opts == nil || os.Getenv("IMGPROXY_URL") == "" {
-		contentType := GetMimeType(fpath)
-		rc, _, err := s.GetObject(bucket, fpath)
-		return rc, contentType, err
+func (s *StorageMinio) ServeObject(bucket sst.Bucket, fpath string, opts *ImgProcessOpts) (io.ReadCloser, *sst.ObjectInfo, error) {
+	var rc io.ReadCloser
+	var info *sst.ObjectInfo
+	var err error
+	mimeType := GetMimeType(fpath)
+	if !strings.HasPrefix(mimeType, "image/") || opts == nil || os.Getenv("IMGPROXY_URL") == "" {
+		rc, info, err = s.GetObject(bucket, fpath)
+		// Minio always returns application/octet-stream which needs to be overridden.
+		info.Metadata.Set("content-type", mimeType)
+	} else {
+		filePath := filepath.Join(bucket.Name, fpath)
+		dataURL := fmt.Sprintf("s3://%s", filePath)
+		rc, info, err = HandleProxy(dataURL, opts)
 	}
-
-	filePath := filepath.Join(bucket.Name, fpath)
-	dataURL := fmt.Sprintf("s3://%s", filePath)
-	return HandleProxy(dataURL, opts)
+	if err != nil {
+		return nil, nil, err
+	}
+	return rc, info, err
 }
