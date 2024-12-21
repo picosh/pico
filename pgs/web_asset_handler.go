@@ -131,19 +131,14 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		attempts = append(attempts, fp.Filepath)
-		mimeType := storage.GetMimeType(fp.Filepath)
 		logger = logger.With("filename", fp.Filepath)
 		var c io.ReadCloser
 		var err error
-		if strings.HasPrefix(mimeType, "image/") {
-			c, contentType, err = h.Storage.ServeObject(
-				h.Bucket,
-				fp.Filepath,
-				h.ImgProcessOpts,
-			)
-		} else {
-			c, info, err = h.Storage.GetObject(h.Bucket, fp.Filepath)
-		}
+		c, info, err = h.Storage.ServeObject(
+			h.Bucket,
+			fp.Filepath,
+			h.ImgProcessOpts,
+		)
 		if err == nil {
 			contents = c
 			assetFilepath = fp.Filepath
@@ -163,9 +158,7 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	defer contents.Close()
 
-	if contentType == "" {
-		contentType = storage.GetMimeType(assetFilepath)
-	}
+	contentType = info.Metadata.Get("content-type")
 
 	var headers []*HeaderRule
 	headersFp, headersInfo, err := h.Storage.GetObject(h.Bucket, filepath.Join(h.ProjectDir, "_headers"))

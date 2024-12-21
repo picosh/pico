@@ -12,6 +12,9 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/picosh/pobj/storage"
 )
 
 func GetMimeType(fpath string) string {
@@ -199,7 +202,7 @@ func (img *ImgProcessOpts) String() string {
 	return processOpts
 }
 
-func HandleProxy(dataURL string, opts *ImgProcessOpts) (io.ReadCloser, string, error) {
+func HandleProxy(dataURL string, opts *ImgProcessOpts) (io.ReadCloser, *storage.ObjectInfo, error) {
 	imgProxyURL := os.Getenv("IMGPROXY_URL")
 	imgProxySalt := os.Getenv("IMGPROXY_SALT")
 	imgProxyKey := os.Getenv("IMGPROXY_KEY")
@@ -213,12 +216,12 @@ func HandleProxy(dataURL string, opts *ImgProcessOpts) (io.ReadCloser, string, e
 	if imgProxySalt != "" && imgProxyKey != "" {
 		keyBin, err := hex.DecodeString(imgProxyKey)
 		if err != nil {
-			return nil, "", err
+			return nil, nil, err
 		}
 
 		saltBin, err := hex.DecodeString(imgProxySalt)
 		if err != nil {
-			return nil, "", err
+			return nil, nil, err
 		}
 
 		mac := hmac.New(sha256.New, keyBin)
@@ -226,17 +229,33 @@ func HandleProxy(dataURL string, opts *ImgProcessOpts) (io.ReadCloser, string, e
 		mac.Write([]byte(processPath))
 		signature = base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 	}
-
 	proxyAddress := fmt.Sprintf("%s/%s%s", imgProxyURL, signature, processPath)
 
 	res, err := http.Get(proxyAddress)
 	if err != nil {
-		return nil, "", err
+		return nil, nil, err
 	}
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return nil, "", fmt.Errorf("%s", res.Status)
+		return nil, nil, fmt.Errorf("imgproxy returned %s", res.Status)
+	}
+	lastModified := res.Header.Get("Last-Modified")
+	parsedTime, err := time.Parse(time.RFC1123, lastModified)
+	if err != nil {
+		return nil, nil, fmt.Errorf("decoding last-modified: %w", err)
+	}
+	info := &storage.ObjectInfo{
+		Size:         res.ContentLength,
+		LastModified: parsedTime,
+		ETag:         trimEtag(res.Header.Get("etag")),
+		Metadata:     res.Header,
 	}
 
-	return res.Body, res.Header.Get("Content-Type"), nil
+	return res.Body, info, nil
+}
+
+// trimEtag removes quotes from the etag header, which matches the behavior of the minio-go SDK
+func trimEtag(etag string) string {
+	etag = strings.TrimPrefix(etag, "\"")
+	return strings.TrimSuffix(etag, "\"")
 }
