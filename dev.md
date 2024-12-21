@@ -7,6 +7,8 @@
 cp ./.env.example .env
 ```
 
+If you are running apps outside of docker, remember to change the postgres, minio, and imgproxy hostnames to "localhost" in `.env`.
+
 Initialize local env variables using direnv
 
 ```bash
@@ -30,6 +32,28 @@ make migrate
 go run ./cmd/pgs/ssh
 # in a separate terminal
 go run ./cmd/pgs/web
+```
+
+## sign up and upload files
+
+The initial database has no users, you need to sign up via pico/ssh:
+
+```bash
+go run ./cmd/pico/ssh
+# in a separate terminal, complete the signup flow, set your username to "picouser"
+ssh localhost -p 2222
+```
+
+Stop the pico SSH server, then you can upload files:
+
+```bash
+go run ./cmd/pgs/ssh
+# in a separate terminal
+go run ./cmd/pgs/web
+# in a third terminal
+echo 'Hello, World!' > file.txt
+scp -P 2222 file.txt localhost:/test/file.txt
+curl -iH "Host: picouser-test.pgs.dev.pico.sh" localhost:3000/file.txt
 ```
 
 ## deployment
