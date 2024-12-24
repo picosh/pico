@@ -11,3 +11,10 @@ select
 from projects
 group by month
 order by month DESC;
+
+select
+  count(id) as users,
+  date_trunc('month', created_at) as month
+from app_users
+group by month
+order by month DESC;
