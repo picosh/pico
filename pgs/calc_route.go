@@ -97,6 +97,9 @@ func correlatePlaceholder(orig, pattern string) (string, string) {
 		_type = "match"
 	} else if strings.Contains(pattern, "*") {
 		_type = "wildcard"
+		if pattern == "/*" {
+			nextList = append(nextList, ".*")
+		}
 	} else if strings.Contains(pattern, ":") {
 		_type = "variable"
 	}
@@ -148,7 +151,7 @@ func genRedirectRoute(actual string, fromStr string, to string) string {
 			ls := actualList[idx:]
 			// if the * is part of other text in the segment (e.g. `/files*`)
 			// then we don't want to include "files" in the destination
-			if len(item) > 1 {
+			if len(item) > 1 && len(actualList) > idx+1 {
 				ls = actualList[idx+1:]
 			}
 			// standalone splat
@@ -164,11 +167,8 @@ func genRedirectRoute(actual string, fromStr string, to string) string {
 
 	fin := []string{"/"}
 
-	fmt.Println(toList)
 	for _, item := range toList {
-		fmt.Println(item)
 		if strings.HasSuffix(item, ":splat") {
-			fmt.Println(mapper[item])
 			fin = append(fin, mapper[item])
 		} else if mapper[item] != "" {
 			fin = append(fin, mapper[item])
@@ -221,7 +221,7 @@ func calcRoutes(projectName, fp string, userRedirects []*RedirectRule) []*HttpRe
 			break
 		}
 
-		if len(match) > 0 {
+		if len(match) > 0 && match[0] != "" {
 			isRedirect := checkIsRedirect(redirect.Status)
 			if !isRedirect && !hasProtocol(redirect.To) {
 				route := genRedirectRoute(fp, from, redirect.To)

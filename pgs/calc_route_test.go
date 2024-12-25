@@ -550,6 +550,24 @@ func TestCalcRoutes(t *testing.T) {
 				{Filepath: "https://some.dev/.well-known/webfinger?query=nice", Status: 301},
 			},
 		},
+		{
+			Name: "well-known-splat-suffix-error",
+			Actual: calcRoutes(
+				"public",
+				"/software/",
+				[]*RedirectRule{
+					{
+						From:   "/.well-known/nodeinfo*",
+						To:     "https://some.dev/.well-known/nodeinfo:splat",
+						Status: 301,
+					},
+				},
+			),
+			Expected: []*HttpReply{
+				{Filepath: "public/software/index.html", Status: 200},
+				{Filepath: "public/404.html", Status: 404},
+			},
+		},
 	}
 
 	for _, fixture := range fixtures {
