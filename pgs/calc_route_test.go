@@ -512,6 +512,44 @@ func TestCalcRoutes(t *testing.T) {
 				{Filepath: "https://super.fly.sh/super/ficial.html", Status: 302},
 			},
 		},
+		{
+			Name: "well-known-splat-suffix",
+			Actual: calcRoutes(
+				"public",
+				"/.well-known/nodeinfo",
+				[]*RedirectRule{
+					{
+						From:   "/.well-known/nodeinfo*",
+						To:     "https://some.dev/.well-known/nodeinfo:splat",
+						Status: 301,
+					},
+				},
+			),
+			Expected: []*HttpReply{
+				{Filepath: "public/.well-known/nodeinfo", Status: 200},
+				{Filepath: "public/.well-known/nodeinfo.html", Status: 200},
+				{Filepath: "https://some.dev/.well-known/nodeinfo", Status: 301},
+			},
+		},
+		{
+			Name: "wildcard-query-param",
+			Actual: calcRoutes(
+				"public",
+				"/.well-known/webfinger?query=nice",
+				[]*RedirectRule{
+					{
+						From:   "/.well-known/webfinger*",
+						To:     "https://some.dev/.well-known/webfinger:splat",
+						Status: 301,
+					},
+				},
+			),
+			Expected: []*HttpReply{
+				{Filepath: "public/.well-known/webfinger?query=nice", Status: 200},
+				{Filepath: "public/.well-known/webfinger?query=nice.html", Status: 200},
+				{Filepath: "https://some.dev/.well-known/webfinger?query=nice", Status: 301},
+			},
+		},
 	}
 
 	for _, fixture := range fixtures {

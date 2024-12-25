@@ -86,7 +86,7 @@ func correlatePlaceholder(orig, pattern string) (string, string) {
 		if strings.HasPrefix(item, ":") {
 			nextList = append(nextList, origList[idx])
 		} else if strings.Contains(item, "*") {
-			nextList = append(nextList, strings.ReplaceAll(item, "*", "(.+)"))
+			nextList = append(nextList, strings.ReplaceAll(item, "*", "(.*)"))
 		} else if item == origList[idx] {
 			nextList = append(nextList, origList[idx])
 		}
@@ -151,16 +151,24 @@ func genRedirectRoute(actual string, fromStr string, to string) string {
 			if len(item) > 1 {
 				ls = actualList[idx+1:]
 			}
+			// standalone splat
 			splat := strings.Join(ls, "/")
 			mapper[":splat"] = splat
+
+			// splat as a suffix to a string
+			place := strings.ReplaceAll(item, "*", ":splat")
+			mapper[place] = strings.Join(actualList[idx:], "/")
 			break
 		}
 	}
 
 	fin := []string{"/"}
 
+	fmt.Println(toList)
 	for _, item := range toList {
-		if item == ":splat" {
+		fmt.Println(item)
+		if strings.HasSuffix(item, ":splat") {
+			fmt.Println(mapper[item])
 			fin = append(fin, mapper[item])
 		} else if mapper[item] != "" {
 			fin = append(fin, mapper[item])
