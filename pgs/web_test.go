@@ -23,6 +23,7 @@ type ApiExample struct {
 	name        string
 	path        string
 	want        string
+	wantUrl     string
 	status      int
 	contentType string
 
@@ -210,6 +211,22 @@ func TestApiBasic(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:        "redirects-query-param",
+			path:        "/anything?query=param",
+			want:        `<a href="/about.html?query=param">Moved Permanently</a>.`,
+			wantUrl:     "/about.html?query=param",
+			status:      http.StatusMovedPermanently,
+			contentType: "text/html; charset=utf-8",
+
+			dbpool: NewPgsDb(cfg.Logger),
+			storage: map[string]map[string]string{
+				bucketName: {
+					"test/_redirects": "/anything /about.html 301",
+					"test/about.html": "hello world!",
+				},
+			},
+		},
 	}
 
 	for _, tc := range tt {
@@ -233,6 +250,16 @@ func TestApiBasic(t *testing.T) {
 			body := strings.TrimSpace(responseRecorder.Body.String())
 			if body != tc.want {
 				t.Errorf("Want '%s', got '%s'", tc.want, body)
+			}
+
+			if tc.wantUrl != "" {
+				location, err := responseRecorder.Result().Location()
+				if err != nil {
+					t.Errorf("err: %s", err.Error())
+				}
+				if tc.wantUrl != location.String() {
+					t.Errorf("Want '%s', got '%s'", tc.wantUrl, location.String())
+				}
 			}
 		})
 	}

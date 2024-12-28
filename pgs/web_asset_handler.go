@@ -74,6 +74,13 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	status := http.StatusOK
 	attempts := []string{}
 	for _, fp := range routes {
+		destUrl, err := url.Parse(fp.Filepath)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		destUrl.RawQuery = r.URL.RawQuery
+
 		if checkIsRedirect(fp.Status) {
 			// hack: check to see if there's an index file in the requested directory
 			// before redirecting, this saves a hop that will just end up a 404
@@ -86,17 +93,17 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 			logger.Info(
 				"redirecting request",
-				"destination", fp.Filepath,
+				"destination", destUrl.String(),
 				"status", fp.Status,
 			)
-			http.Redirect(w, r, fp.Filepath, fp.Status)
+			http.Redirect(w, r, destUrl.String(), fp.Status)
 			return
 		} else if hasProtocol(fp.Filepath) {
 			if !h.HasPicoPlus {
 				msg := "must be pico+ user to fetch content from external source"
 				logger.Error(
 					msg,
-					"destination", fp.Filepath,
+					"destination", destUrl.String(),
 					"status", fp.Status,
 				)
 				http.Error(w, msg, http.StatusUnauthorized)
@@ -105,15 +112,10 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 			logger.Info(
 				"fetching content from external service",
-				"destination", fp.Filepath,
+				"destination", destUrl.String(),
 				"status", fp.Status,
 			)
 
-			destUrl, err := url.Parse(fp.Filepath)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
 			proxy := httputil.NewSingleHostReverseProxy(destUrl)
 			oldDirector := proxy.Director
 			proxy.Director = func(r *http.Request) {
@@ -134,7 +136,6 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		mimeType := storage.GetMimeType(fp.Filepath)
 		logger = logger.With("filename", fp.Filepath)
 		var c io.ReadCloser
-		var err error
 		if strings.HasPrefix(mimeType, "image/") {
 			c, contentType, err = h.Storage.ServeObject(
 				h.Bucket,
