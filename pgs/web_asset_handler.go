@@ -68,9 +68,8 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	routes := calcRoutes(h.ProjectDir, h.Filepath, redirects)
 
 	var contents io.ReadCloser
-	contentType := ""
 	assetFilepath := ""
-	info := &sst.ObjectInfo{}
+	var info *sst.ObjectInfo
 	status := http.StatusOK
 	attempts := []string{}
 	for _, fp := range routes {
@@ -135,7 +134,7 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		attempts = append(attempts, fp.Filepath)
 		logger = logger.With("filename", fp.Filepath)
 		var c io.ReadCloser
-		c, _, err = h.Storage.ServeObject(
+		c, info, err = h.Storage.ServeObject(
 			h.Bucket,
 			fp.Filepath,
 			h.ImgProcessOpts,
@@ -158,8 +157,6 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer contents.Close()
-
-	contentType = info.Metadata.Get("content-type")
 
 	var headers []*HeaderRule
 	headersFp, headersInfo, err := h.Storage.GetObject(h.Bucket, filepath.Join(h.ProjectDir, "_headers"))
@@ -195,7 +192,9 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	contentType := ""
 	if info != nil {
+		contentType = info.Metadata.Get("content-type")
 		if info.Size != 0 {
 			w.Header().Add("content-length", strconv.Itoa(int(info.Size)))
 		}

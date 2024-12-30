@@ -2,6 +2,7 @@ package storage
 
 import (
 	"io"
+	"net/http"
 
 	sst "github.com/picosh/pobj/storage"
 )
@@ -20,6 +21,9 @@ func NewStorageMemory(sto map[string]map[string]string) (*StorageMemory, error) 
 
 func (s *StorageMemory) ServeObject(bucket sst.Bucket, fpath string, opts *ImgProcessOpts) (io.ReadCloser, *sst.ObjectInfo, error) {
 	obj, info, err := s.GetObject(bucket, fpath)
+	if info.Metadata == nil {
+		info.Metadata = make(http.Header)
+	}
 	mimeType := GetMimeType(fpath)
 	info.Metadata.Set("content-type", mimeType)
 	return obj, info, err

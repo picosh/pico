@@ -3,6 +3,7 @@ package storage
 import (
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -24,7 +25,10 @@ func NewStorageFS(dir string) (*StorageFS, error) {
 
 func (s *StorageFS) ServeObject(bucket sst.Bucket, fpath string, opts *ImgProcessOpts) (io.ReadCloser, *sst.ObjectInfo, error) {
 	var rc io.ReadCloser
-	var info *sst.ObjectInfo
+	info := &sst.ObjectInfo{
+		Metadata:     make(http.Header),
+		UserMetadata: map[string]string{},
+	}
 	var err error
 	mimeType := GetMimeType(fpath)
 	if !strings.HasPrefix(mimeType, "image/") || opts == nil || os.Getenv("IMGPROXY_URL") == "" {

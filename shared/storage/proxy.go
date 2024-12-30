@@ -254,7 +254,7 @@ func HandleProxy(dataURL string, opts *ImgProcessOpts) (io.ReadCloser, *storage.
 	return res.Body, info, nil
 }
 
-// trimEtag removes quotes from the etag header, which matches the behavior of the minio-go SDK
+// trimEtag removes quotes from the etag header, which matches the behavior of the minio-go SDK.
 func trimEtag(etag string) string {
 	etag = strings.TrimPrefix(etag, "\"")
 	return strings.TrimSuffix(etag, "\"")

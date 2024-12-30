@@ -271,10 +271,14 @@ type ImageStorageMemory struct {
 	Fpath string
 }
 
-func (s *ImageStorageMemory) ServeObject(bucket sst.Bucket, fpath string, opts *storage.ImgProcessOpts) (io.ReadCloser, string, error) {
+func (s *ImageStorageMemory) ServeObject(bucket sst.Bucket, fpath string, opts *storage.ImgProcessOpts) (io.ReadCloser, *sst.ObjectInfo, error) {
 	s.Opts = opts
 	s.Fpath = fpath
-	return io.NopCloser(strings.NewReader("hello world!")), "image/jpeg", nil
+	info := sst.ObjectInfo{
+		Metadata: make(http.Header),
+	}
+	info.Metadata.Set("content-type", "image/jpeg")
+	return io.NopCloser(strings.NewReader("hello world!")), &info, nil
 }
 
 func TestImageManipulation(t *testing.T) {
@@ -334,7 +338,7 @@ func TestImageManipulation(t *testing.T) {
 
 			ct := responseRecorder.Header().Get("content-type")
 			if ct != tc.contentType {
-				t.Errorf("Want status '%s', got '%s'", tc.contentType, ct)
+				t.Errorf("Want content type '%s', got '%s'", tc.contentType, ct)
 			}
 
 			body := strings.TrimSpace(responseRecorder.Body.String())
