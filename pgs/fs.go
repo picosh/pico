@@ -230,12 +230,6 @@ func isZeroTime(t time.Time) bool {
 	return t.IsZero() || t.Equal(unixEpochTime)
 }
 
-func setLastModified(w http.ResponseWriter, modtime time.Time) {
-	if !isZeroTime(modtime) {
-		w.Header().Set("Last-Modified", modtime.UTC().Format(http.TimeFormat))
-	}
-}
-
 func writeNotModified(w http.ResponseWriter) {
 	// RFC 7232 section 4.1:
 	// a sender SHOULD NOT generate representation metadata other than the
