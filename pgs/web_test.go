@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/stub"
@@ -22,6 +23,7 @@ var testUsername = "user"
 type ApiExample struct {
 	name        string
 	path        string
+	reqHeaders  map[string]string
 	want        string
 	wantUrl     string
 	status      int
@@ -227,11 +229,101 @@ func TestApiBasic(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "conditional-if-modified-since-future",
+			path: "/test.html",
+			reqHeaders: map[string]string{
+				"If-Modified-Since": time.Now().UTC().Add(time.Hour).Format(http.TimeFormat),
+			},
+			want:        "",
+			status:      http.StatusNotModified,
+			contentType: "",
+
+			dbpool: NewPgsDb(cfg.Logger),
+			storage: map[string]map[string]string{
+				bucketName: {
+					"test/test.html": "hello world!",
+				},
+			},
+		},
+		{
+			name: "conditional-if-modified-since-past",
+			path: "/test.html",
+			reqHeaders: map[string]string{
+				"If-Modified-Since": time.Now().UTC().Add(-time.Hour).Format(http.TimeFormat),
+			},
+			want:        "hello world!",
+			status:      http.StatusOK,
+			contentType: "text/html",
+
+			dbpool: NewPgsDb(cfg.Logger),
+			storage: map[string]map[string]string{
+				bucketName: {
+					"test/test.html": "hello world!",
+				},
+			},
+		},
+		{
+			name: "conditional-if-none-match-pass",
+			path: "/test.html",
+			reqHeaders: map[string]string{
+				"If-None-Match": "\"static-etag-for-testing-purposes\"",
+			},
+			want:        "",
+			status:      http.StatusNotModified,
+			contentType: "",
+
+			dbpool: NewPgsDb(cfg.Logger),
+			storage: map[string]map[string]string{
+				bucketName: {
+					"test/test.html": "hello world!",
+				},
+			},
+		},
+		{
+			name: "conditional-if-none-match-fail",
+			path: "/test.html",
+			reqHeaders: map[string]string{
+				"If-None-Match": "\"non-matching-etag\"",
+			},
+			want:        "hello world!",
+			status:      http.StatusOK,
+			contentType: "text/html",
+
+			dbpool: NewPgsDb(cfg.Logger),
+			storage: map[string]map[string]string{
+				bucketName: {
+					"test/test.html": "hello world!",
+				},
+			},
+		},
+		{
+			name: "conditional-if-none-match-and-if-modified-since",
+			path: "/test.html",
+			reqHeaders: map[string]string{
+				// The matching etag should take precedence over the past mod time
+				"If-None-Match":     "\"static-etag-for-testing-purposes\"",
+				"If-Modified-Since": time.Now().UTC().Add(-time.Hour).Format(http.TimeFormat),
+			},
+			want:        "",
+			status:      http.StatusNotModified,
+			contentType: "",
+
+			dbpool: NewPgsDb(cfg.Logger),
+			storage: map[string]map[string]string{
+				bucketName: {
+					"test/test.html": "hello world!",
+				},
+			},
+		},
 	}
 
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
 			request := httptest.NewRequest("GET", mkpath(tc.path), strings.NewReader(""))
+			for key, val := range tc.reqHeaders {
+				request.Header.Set(key, val)
+			}
 			responseRecorder := httptest.NewRecorder()
 
 			st, _ := storage.NewStorageMemory(tc.storage)
