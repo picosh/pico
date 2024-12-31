@@ -3,6 +3,7 @@ package storage
 import (
 	"io"
 	"net/http"
+	"time"
 
 	sst "github.com/picosh/pobj/storage"
 )
@@ -23,6 +24,13 @@ func (s *StorageMemory) ServeObject(bucket sst.Bucket, fpath string, opts *ImgPr
 	obj, info, err := s.GetObject(bucket, fpath)
 	if info.Metadata == nil {
 		info.Metadata = make(http.Header)
+	}
+	// Make tests work by supplying non-null Last-Modified and Etag values
+	if info.LastModified.IsZero() {
+		info.LastModified = time.Now().UTC()
+	}
+	if info.ETag == "" {
+		info.ETag = "static-etag-for-testing-purposes"
 	}
 	mimeType := GetMimeType(fpath)
 	info.Metadata.Set("content-type", mimeType)

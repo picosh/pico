@@ -199,11 +199,12 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			w.Header().Add("content-length", strconv.Itoa(int(info.Size)))
 		}
 		if info.ETag != "" {
-			w.Header().Add("etag", info.ETag)
+			// Minio SDK trims off the mandatory quotes (RFC 7232 § 2.3)
+			w.Header().Add("etag", fmt.Sprintf("\"%s\"", info.ETag))
 		}
 
 		if !info.LastModified.IsZero() {
-			w.Header().Add("last-modified", info.LastModified.Format(http.TimeFormat))
+			w.Header().Add("last-modified", info.LastModified.UTC().Format(http.TimeFormat))
 		}
 	}
 
@@ -225,7 +226,11 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		"status", status,
 		"contentType", finContentType,
 	)
-
+	done, _ := checkPreconditions(w, r, info.LastModified.UTC())
+	if done {
+		// A conditional request was detected, status and headers are set, no body required (either 412 or 304)
+		return
+	}
 	w.WriteHeader(status)
 	_, err = io.Copy(w, contents)
 
