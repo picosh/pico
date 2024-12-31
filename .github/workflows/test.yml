@@ -1,0 +1,15 @@
+name: Test PRs
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
+    - name: Run tests and lint
+      uses: ./.github/actions/test
