@@ -213,6 +213,42 @@ func TestCalcRoutes(t *testing.T) {
 			},
 		},
 		{
+			Name: "redirect-root-full-url",
+			Actual: calcRoutes(
+				"test",
+				"/",
+				[]*RedirectRule{
+					{
+						From:   "/*",
+						To:     "https://pico.sh",
+						Status: 301,
+					},
+				},
+			),
+			Expected: []*HttpReply{
+				{Filepath: "test/index.html", Status: 200},
+				{Filepath: "https://pico.sh", Status: 301},
+			},
+		},
+		{
+			Name: "redirect-empty-route-full-url",
+			Actual: calcRoutes(
+				"test",
+				"",
+				[]*RedirectRule{
+					{
+						From:   "/*",
+						To:     "https://pico.sh",
+						Status: 301,
+					},
+				},
+			),
+			Expected: []*HttpReply{
+				{Filepath: "test/index.html", Status: 200},
+				{Filepath: "https://pico.sh", Status: 301},
+			},
+		},
+		{
 			Name: "redirect-full-url-directory",
 			Actual: calcRoutes(
 				"test",

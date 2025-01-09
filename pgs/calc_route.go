@@ -186,8 +186,11 @@ func genRedirectRoute(actual string, fromStr string, to string) string {
 
 func calcRoutes(projectName, fp string, userRedirects []*RedirectRule) []*HttpReply {
 	rts := []*HttpReply{}
+	if fp == "" {
+		fp = "/"
+	}
 	// add route as-is without expansion
-	if fp != "" && !strings.HasSuffix(fp, "/") {
+	if !strings.HasSuffix(fp, "/") {
 		defRoute := shared.GetAssetFileName(&utils.FileEntry{
 			Filepath: filepath.Join(projectName, fp),
 		})
