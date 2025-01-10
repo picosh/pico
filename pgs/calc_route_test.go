@@ -624,6 +624,26 @@ func TestCalcRoutes(t *testing.T) {
 				{Filepath: "public/404.html", Status: 404},
 			},
 		},
+		{
+			Name: "implicit-prefix-slash-redirect",
+			Actual: calcRoutes(
+				"public",
+				"software/scripts",
+				[]*RedirectRule{
+					{
+						From:   "/software/concat/*",
+						To:     "/software/scripts/:splat",
+						Status: 301,
+					},
+				},
+			),
+			Expected: []*HttpReply{
+				{Filepath: "public/software/scripts", Status: 200},
+				{Filepath: "public/software/scripts.html", Status: 200},
+				{Filepath: "/software/scripts/", Status: 301},
+				{Filepath: "public/404.html", Status: 404},
+			},
+		},
 	}
 
 	for _, fixture := range fixtures {

@@ -194,8 +194,8 @@ func genRedirectRoute(actual string, fromStr string, to string) string {
 
 func calcRoutes(projectName, fp string, userRedirects []*RedirectRule) []*HttpReply {
 	rts := []*HttpReply{}
-	if fp == "" {
-		fp = "/"
+	if !strings.HasPrefix(fp, "/") {
+		fp = "/" + fp
 	}
 	// add route as-is without expansion
 	if !strings.HasSuffix(fp, "/") {
