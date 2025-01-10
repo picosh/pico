@@ -122,7 +122,7 @@ func parseRedirectText(text string) ([]*RedirectRule, error) {
 			to := rest[toIndex]
 			lastParts := rest[toIndex+1:]
 			conditions := map[string]string{}
-			sts := http.StatusOK
+			sts := http.StatusMovedPermanently
 			frcd := false
 			if len(lastParts) > 0 {
 				sts, frcd = hasStatusCode(lastParts[0])

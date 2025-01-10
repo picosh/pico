@@ -50,7 +50,7 @@ func TestParseRedirectText(t *testing.T) {
 			{
 				From:       "/wow",
 				To:         "/index.html",
-				Status:     200,
+				Status:     301,
 				Query:      empty,
 				Conditions: empty,
 			},
