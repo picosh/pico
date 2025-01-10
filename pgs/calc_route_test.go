@@ -604,6 +604,26 @@ func TestCalcRoutes(t *testing.T) {
 				{Filepath: "public/404.html", Status: 404},
 			},
 		},
+		{
+			Name: "non-match-dont-redirect",
+			Actual: calcRoutes(
+				"public",
+				"/scripts/asd",
+				[]*RedirectRule{
+					{
+						From:   "/concat/*",
+						To:     "/scripts/:splat",
+						Status: 301,
+					},
+				},
+			),
+			Expected: []*HttpReply{
+				{Filepath: "public/scripts/asd", Status: 200},
+				{Filepath: "public/scripts/asd.html", Status: 200},
+				{Filepath: "/scripts/asd/", Status: 301},
+				{Filepath: "public/404.html", Status: 404},
+			},
+		},
 	}
 
 	for _, fixture := range fixtures {
