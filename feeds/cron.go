@@ -153,6 +153,14 @@ func (f *Fetcher) RunPost(logger *slog.Logger, user *db.User, post *db.Post) err
 
 	parsed := shared.ListParseText(post.Text)
 
+	if parsed.Email == "" {
+		logger.Error("post does not have an email associated, removing post")
+		err := f.db.RemovePosts([]string{post.ID})
+		if err != nil {
+			return err
+		}
+	}
+
 	logger.Info("last digest at", "lastDigest", post.Data.LastDigest.Format(time.RFC3339))
 	err := f.Validate(post, parsed)
 	if err != nil {
