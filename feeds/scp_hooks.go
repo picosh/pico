@@ -1,11 +1,12 @@
 package feeds
 
 import (
+	"errors"
 	"fmt"
+	"net/url"
+
 	"strings"
 	"time"
-
-	"slices"
 
 	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
@@ -38,23 +39,41 @@ func (p *FeedHooks) FileValidate(s ssh.Session, data *filehandlers.PostMetaData)
 		return false, err
 	}
 
+	// Because we need to support sshfs, sftp runs our Write handler twice
+	// and on the first pass we do not have access to the file data.
+	// In that case we should skip the parsing validation
+	if data.Text == "" {
+		return true, nil
+	}
+
+	parsed := shared.ListParseText(string(data.Text))
+	if parsed.Email == "" {
+		return false, fmt.Errorf("ERROR: no email variable detected for %s, check the format of your file, skipping", data.Filename)
+	}
+
+	var allErr error
+	for _, txt := range parsed.Items {
+		u := ""
+		if txt.IsText {
+			u = txt.Value
+		} else if txt.IsURL {
+			u = string(txt.URL)
+		}
+
+		_, err := url.Parse(u)
+		if err != nil {
+			allErr = errors.Join(allErr, fmt.Errorf("%s: %w", u, err))
+			continue
+		}
+	}
+	if allErr != nil {
+		return false, fmt.Errorf("ERROR: some urls provided were invalid check the format of your file, skipping: %w", allErr)
+	}
+
 	return true, nil
 }
 
 func (p *FeedHooks) FileMeta(s ssh.Session, data *filehandlers.PostMetaData) error {
-	parsedText := shared.ListParseText(string(data.Text))
-
-	if parsedText.Title == "" {
-		data.Title = utils.ToUpper(data.Slug)
-	} else {
-		data.Title = parsedText.Title
-	}
-
-	data.Description = parsedText.Description
-	data.Tags = parsedText.Tags
-
-	data.Hidden = slices.Contains(p.Cfg.HiddenPosts, data.Filename)
-
 	if data.Data.LastDigest == nil {
 		now := time.Now()
 		data.Data.LastDigest = &now

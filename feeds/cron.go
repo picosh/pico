@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"math"
 	"net/http"
+	"net/url"
 	"strings"
 	"text/template"
 	"time"
@@ -161,23 +162,29 @@ func (f *Fetcher) RunPost(logger *slog.Logger, user *db.User, post *db.Post) err
 
 	urls := []string{}
 	for _, item := range parsed.Items {
-		url := ""
-		if item.IsText {
-			url = item.Value
+		u := ""
+		if item.IsText || item.IsURL {
+			u = item.Value
 		} else if item.IsURL {
-			url = string(item.URL)
+			u = string(item.Value)
 		}
 
-		if url == "" {
+		if u == "" {
 			continue
 		}
 
-		urls = append(urls, url)
+		_, err := url.Parse(string(item.URL))
+		if err != nil {
+			logger.Info("invalid url", "url", string(item.URL))
+			continue
+		}
+
+		urls = append(urls, u)
 	}
 
 	now := time.Now().UTC()
 	if post.ExpiresAt == nil {
-		expiresAt := time.Now().AddDate(0, 6, 0)
+		expiresAt := time.Now().AddDate(0, 12, 0)
 		post.ExpiresAt = &expiresAt
 	}
 	_, err = f.db.UpdatePost(post)
@@ -199,7 +206,7 @@ func (f *Fetcher) RunPost(logger *slog.Logger, user *db.User, post *db.Post) err
 		post.Data.Attempts += 1
 		logger.Error("could not fetch urls", "err", err, "attempts", post.Data.Attempts)
 
-		errBody := fmt.Sprintf(`There was an error attempting to fetch your feeds (%d) times.  After (3) attempts we remove the file from our system.  Please check all the URLs and re-upload.
+		errBody := fmt.Sprintf(`There was an error attempting to fetch your feeds (%d) times.  After (5) attempts we remove the file from our system.  Please check all the URLs and re-upload.
 Also, we have centralized logs in our pico.sh TUI that will display realtime feed errors so you can debug.
 
 
@@ -217,7 +224,7 @@ Also, we have centralized logs in our pico.sh TUI that will display realtime fee
 			return err
 		}
 
-		if post.Data.Attempts >= 3 {
+		if post.Data.Attempts >= 5 {
 			err = f.db.RemovePosts([]string{post.ID})
 			if err != nil {
 				return err
@@ -408,6 +415,10 @@ func (f *Fetcher) FetchAll(logger *slog.Logger, urls []string, inlineContent boo
 	feedItems, err := f.db.FindFeedItemsByPostID(post.ID)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(urls) == 0 {
+		return nil, fmt.Errorf("feed file does not contain any urls")
 	}
 
 	var allErrors error
