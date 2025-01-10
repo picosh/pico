@@ -25,7 +25,11 @@ func PlusView(username string, w int) string {
 - prose
   - no inherent storage limits
   - blog analytics
+- irc bouncer
 - 10GB total storage
+
+> You can use this same flow to add additional years to your membership,
+> including if you are already a pico+ user.
 
 There are a few ways to purchase a membership. We try our best to
 provide immediate access to pico+ regardless of payment

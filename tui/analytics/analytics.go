@@ -74,8 +74,8 @@ Shortcuts:
 
 - esc: leave page
 - tab: toggle between viewport and input box
-- ctrl+u: scroll viewport up a page
-- ctrl+d: scroll viewport down a page
+- u: scroll viewport up a page
+- d: scroll viewport down a page
 - j,k: scroll viewport
 
 Commands: [help, stats, site {domain}, post {slug}]
@@ -138,7 +138,6 @@ func (m Model) Init() tea.Cmd {
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	var cmd tea.Cmd
-	updateViewport := true
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.viewport.Width = headerWidth(msg.Width)
@@ -161,11 +160,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "q", "esc":
 			return m, pages.Navigate(pages.MenuPage)
-		// when typing in input, ignore viewport updates
-		case " ", "k", "j":
-			if m.input.Focused() {
-				updateViewport = false
-			}
 		case "tab":
 			if m.input.Focused() {
 				m.input.Blur()
@@ -215,7 +209,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	m.input, cmd = m.input.Update(msg)
 	cmds = append(cmds, cmd)
-	if updateViewport {
+	if !m.input.Focused() {
 		m.viewport, cmd = m.viewport.Update(msg)
 		cmds = append(cmds, cmd)
 	}

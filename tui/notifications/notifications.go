@@ -28,7 +28,7 @@ Add this URL to your RSS feed reader:
 
 ## Using our [rss-to-email](https://pico.sh/feeds) service
 
-Create a feeds file (e.g. pico.txt):`, url)
+Create a feeds file (using list file format, e.g. pico.txt):`, url)
 
 	md += "\n```\n"
 	md += fmt.Sprintf(`=: email rss@myemail.com

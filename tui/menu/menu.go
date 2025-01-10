@@ -16,12 +16,12 @@ type MenuChoiceMsg struct {
 const (
 	KeysChoice menuChoice = iota
 	TokensChoice
-	NotificationsChoice
-	PlusChoice
 	SettingsChoice
 	LogsChoice
 	AnalyticsChoice
 	ChatChoice
+	NotificationsChoice
+	PlusChoice
 	ExitChoice
 	UnsetChoice // set when no choice has been made
 )
@@ -30,12 +30,12 @@ const (
 var menuChoices = map[menuChoice]string{
 	KeysChoice:          "Manage pubkeys",
 	TokensChoice:        "Manage tokens",
-	NotificationsChoice: "Notifications",
-	PlusChoice:          "Pico+",
 	SettingsChoice:      "Settings",
 	LogsChoice:          "Logs",
 	AnalyticsChoice:     "Analytics",
 	ChatChoice:          "Chat",
+	NotificationsChoice: "Notifications",
+	PlusChoice:          "Pico+",
 	ExitChoice:          "Exit",
 }
 
