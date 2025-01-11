@@ -27,10 +27,6 @@ import (
 	"github.com/picosh/utils"
 )
 
-func authHandler(ctx ssh.Context, key ssh.PublicKey) bool {
-	return true
-}
-
 func createRouter(cfg *shared.ConfigSite, handler *UploadHandler, cliHandler *CliHandler) proxy.Router {
 	return func(sh ssh.Handler, s ssh.Session) []wish.Middleware {
 		return []wish.Middleware{
@@ -75,10 +71,14 @@ func StartSshServer() {
 		DBPool: dbpool,
 	}
 
+	sshAuth := shared.NewSshAuthHandler(dbpool, logger, cfg)
 	s, err := wish.NewServer(
 		wish.WithAddress(fmt.Sprintf("%s:%s", host, port)),
 		wish.WithHostKeyPath("ssh_data/term_info_ed25519"),
-		wish.WithPublicKeyAuth(authHandler),
+		wish.WithPublicKeyAuth(func(ctx ssh.Context, key ssh.PublicKey) bool {
+			sshAuth.PubkeyAuthHandler(ctx, key)
+			return true
+		}),
 		withProxy(
 			cfg,
 			handler,
