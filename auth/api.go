@@ -16,7 +16,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gorilla/feeds"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
@@ -326,27 +325,6 @@ func userHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 	}
 }
 
-func genFeedItem(now time.Time, expiresAt time.Time, warning time.Time, txt string) *feeds.Item {
-	if now.After(warning) {
-		content := fmt.Sprintf(
-			"Your pico+ membership is going to expire on %s",
-			expiresAt.Format("2006-01-02 15:04:05"),
-		)
-		return &feeds.Item{
-			Id:          fmt.Sprintf("%d", warning.Unix()),
-			Title:       fmt.Sprintf("pico+ %s expiration notice", txt),
-			Link:        &feeds.Link{Href: "https://pico.sh"},
-			Content:     content,
-			Created:     warning,
-			Updated:     warning,
-			Description: content,
-			Author:      &feeds.Author{Name: "team pico"},
-		}
-	}
-
-	return nil
-}
-
 func rssHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		apiToken := r.PathValue("token")
@@ -361,62 +339,15 @@ func rssHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 			return
 		}
 
-		href := fmt.Sprintf("https://auth.pico.sh/rss/%s", apiToken)
-
-		feed := &feeds.Feed{
-			Title:       "pico+",
-			Link:        &feeds.Link{Href: href},
-			Description: "get notified of important membership updates",
-			Author:      &feeds.Author{Name: "team pico"},
-		}
-		var feedItems []*feeds.Item
-
-		now := time.Now()
-		ff, err := apiConfig.Dbpool.FindFeatureForUser(user.ID, "plus")
+		feed, err := shared.UserFeed(apiConfig.Dbpool, user.ID, apiToken)
 		if err != nil {
-			// still want to send an empty feed
-		} else {
-			createdAt := ff.CreatedAt
-			createdAtStr := createdAt.Format("2006-01-02 15:04:05")
-			id := fmt.Sprintf("pico-plus-activated-%d", createdAt.Unix())
-			content := `Thanks for joining pico+! You now have access to all our premium services for exactly one year.  We will send you pico+ expiration notifications through this RSS feed.  Go to <a href="https://pico.sh/getting-started#next-steps">pico.sh/getting-started#next-steps</a> to start using our services.`
-			plus := &feeds.Item{
-				Id:          id,
-				Title:       fmt.Sprintf("pico+ membership activated on %s", createdAtStr),
-				Link:        &feeds.Link{Href: "https://pico.sh"},
-				Content:     content,
-				Created:     *createdAt,
-				Updated:     *createdAt,
-				Description: content,
-				Author:      &feeds.Author{Name: "team pico"},
-			}
-			feedItems = append(feedItems, plus)
-
-			oneMonthWarning := ff.ExpiresAt.AddDate(0, -1, 0)
-			mo := genFeedItem(now, *ff.ExpiresAt, oneMonthWarning, "1-month")
-			if mo != nil {
-				feedItems = append(feedItems, mo)
-			}
-
-			oneWeekWarning := ff.ExpiresAt.AddDate(0, 0, -7)
-			wk := genFeedItem(now, *ff.ExpiresAt, oneWeekWarning, "1-week")
-			if wk != nil {
-				feedItems = append(feedItems, wk)
-			}
-
-			oneDayWarning := ff.ExpiresAt.AddDate(0, 0, -2)
-			day := genFeedItem(now, *ff.ExpiresAt, oneDayWarning, "1-day")
-			if day != nil {
-				feedItems = append(feedItems, day)
-			}
+			return
 		}
-
-		feed.Items = feedItems
 
 		rss, err := feed.ToAtom()
 		if err != nil {
-			apiConfig.Cfg.Logger.Error(err.Error())
-			http.Error(w, "Could not generate atom rss feed", http.StatusInternalServerError)
+			apiConfig.Cfg.Logger.Error("could not generate atom rss feed", "err", err.Error())
+			http.Error(w, "could not generate atom rss feed", http.StatusInternalServerError)
 		}
 
 		w.Header().Add("Content-Type", "application/atom+xml")
@@ -528,6 +459,14 @@ func paymentWebhookHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 		status := event.Data.Attr.Status
 		txID := fmt.Sprint(event.Data.Attr.OrderNumber)
 
+		user, err := apiConfig.Dbpool.FindUserForName(username)
+		if err != nil {
+			logger.Error("no user found with username", "username", username)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("no user found with username"))
+			return
+		}
+
 		log := logger.With(
 			"username", username,
 			"email", email,
@@ -535,6 +474,8 @@ func paymentWebhookHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 			"paymentStatus", status,
 			"txId", txID,
 		)
+		log = shared.LoggerWithUser(log, user)
+
 		log.Info(
 			"order_created event",
 		)
@@ -562,13 +503,56 @@ func paymentWebhookHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 			return
 		}
 
+		err = AddPlusFeedForUser(dbpool, user.ID, email)
+		if err != nil {
+			log.Error("failed to add feed for user", "err", err)
+		}
+
 		log.Info("successfully added pico+ user")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("successfully added pico+ user"))
 	}
 }
 
-// URL shortener for out pico+ URL.
+func AddPlusFeedForUser(dbpool db.DB, userID, email string) error {
+	// check if they already have a post grepping for the auth rss url
+	posts, err := dbpool.FindPostsForUser(&db.Pager{Num: 1000, Page: 0}, userID, "feeds")
+	if err != nil {
+		return err
+	}
+
+	found := false
+	for _, post := range posts.Data {
+		if strings.Contains(post.Text, "https://auth.pico.sh/rss/") {
+			found = true
+		}
+	}
+
+	// don't need to do anything, they already have an auth post
+	if found {
+		return nil
+	}
+
+	token, err := dbpool.UpsertToken(userID, "pico-rss")
+	if err != nil {
+		return err
+	}
+
+	href := fmt.Sprintf("https://auth.pico.sh/rss/%s", token)
+	text := fmt.Sprintf(`=: email %s
+=: digest_interval 1day
+=> %s`, email, href)
+	_, err = dbpool.InsertPost(&db.Post{
+		UserID:   userID,
+		Text:     text,
+		Space:    "feeds",
+		Slug:     "pico-plus",
+		Filename: "pico-plus",
+	})
+	return err
+}
+
+// URL shortener for our pico+ URL.
 func checkoutHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		username := r.PathValue("username")

@@ -52,6 +52,22 @@ func TestPaymentWebhook(t *testing.T) {
 	mux.ServeHTTP(responseRecorder, request)
 
 	testResponse(t, responseRecorder, 200, "text/plain")
+
+	posts, err := apiConfig.Dbpool.FindPostsForUser(&db.Pager{Num: 1000, Page: 0}, testUserID, "feeds")
+	if err != nil {
+		t.Error("could not find posts for user")
+	}
+	for _, post := range posts.Data {
+		if post.Filename != "pico-plus" {
+			continue
+		}
+		expectedText := `=: email auth@pico.test
+=: digest_interval 1day
+=> https://auth.pico.sh/rss/123`
+		if post.Text != expectedText {
+			t.Errorf("Want pico plus feed file %s, got %s", expectedText, post.Text)
+		}
+	}
 }
 
 func TestUser(t *testing.T) {
@@ -195,6 +211,7 @@ type ApiExample struct {
 
 type AuthDb struct {
 	*stub.StubDB
+	Posts []*db.Post
 }
 
 func (a *AuthDb) AddPicoPlusUser(username, email, from, txid string) error {
@@ -228,6 +245,21 @@ func (a *AuthDb) FindFeatureForUser(userID string, feature string) (*db.FeatureF
 	now := time.Date(2021, 8, 15, 14, 30, 45, 100, time.UTC)
 	oneDayWarning := now.AddDate(0, 0, 1)
 	return &db.FeatureFlag{ID: "2", UserID: userID, Name: "plus", ExpiresAt: &oneDayWarning, CreatedAt: &now}, nil
+}
+
+func (a *AuthDb) InsertPost(post *db.Post) (*db.Post, error) {
+	a.Posts = append(a.Posts, post)
+	return post, nil
+}
+
+func (a *AuthDb) FindPostsForUser(pager *db.Pager, userID, space string) (*db.Paginate[*db.Post], error) {
+	return &db.Paginate[*db.Post]{
+		Data: a.Posts,
+	}, nil
+}
+
+func (a *AuthDb) UpsertToken(string, string) (string, error) {
+	return "123", nil
 }
 
 func NewAuthDb(logger *slog.Logger) *AuthDb {

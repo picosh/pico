@@ -22,6 +22,9 @@ user-specific notifications. This is where we will send pico+
 expiration notices, among other alerts. To be clear, this is
 optional but **highly** recommended.
 
+> As of 2025/01/11 we automatically add this feed for pico+ users
+> when they purchase a membership.
+
 Add this URL to your RSS feed reader:
 
 %s
