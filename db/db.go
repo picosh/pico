@@ -326,6 +326,12 @@ var DenyList = []string{
 	"create",
 	"www",
 	"public",
+	"global",
+	"g",
+	"root",
+	"localhost",
+	"ams",
+	"ash",
 }
 
 type DB interface {
