@@ -39,6 +39,7 @@
     </div>
     <hr class="mt-2" />
 </header>
+
 <main>
     {{range .Posts}}
     <article class="my">
@@ -53,22 +54,6 @@
         </div>
     </article>
     {{end}}
-
-    <div class="mt">
-        {{if .PrevPage}}<a href="{{.PrevPage}}" class="link-alt">prev</a>{{else}}<span class="text-grey">prev</span>{{end}}
-        {{if .NextPage}}<a href="{{.NextPage}}" class="link-alt">next</a>{{else}}<span class="text-grey">next</span>{{end}}
-    </div>
-
-    <div class="flex items-center">
-        <div class="post-date"></div>
-        <div class="flex-1">
-        {{range .Tags}}
-        <code class="pill"><a href="/read?tag={{.}}">#{{.}}</a></code>
-        {{end}}
-        </div>
-    </div>
-    {{if .HasFilter}}<a href="/read">clear filter</a>{{end}}
-
 </main>
 {{template "marketing-footer" .}}
 {{end}}

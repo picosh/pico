@@ -284,3 +284,7 @@ func (me *StubDB) RemoveFeature(userID string, name string) error {
 func (me *StubDB) AddPicoPlusUser(username, email, paymentType, txId string) error {
 	return notImpl
 }
+
+func (me *StubDB) FindTagsForUser(userID string, tag string) ([]string, error) {
+	return []string{}, notImpl
+}

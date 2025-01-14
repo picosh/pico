@@ -81,3 +81,7 @@ func (p *FeedHooks) FileMeta(s ssh.Session, data *filehandlers.PostMetaData) err
 
 	return nil
 }
+
+func (p *FeedHooks) FileSuccess(s ssh.Session, data *filehandlers.SuccesHook) error {
+	return nil
+}

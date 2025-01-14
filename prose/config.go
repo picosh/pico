@@ -10,7 +10,7 @@ func NewConfigSite() *shared.ConfigSite {
 	domain := utils.GetEnv("PROSE_DOMAIN", "prose.sh")
 	port := utils.GetEnv("PROSE_WEB_PORT", "3000")
 	protocol := utils.GetEnv("PROSE_PROTOCOL", "https")
-	storageDir := utils.GetEnv("IMGS_STORAGE_DIR", ".storage")
+	storageDir := utils.GetEnv("PROSE_STORAGE_DIR", ".storage")
 	minioURL := utils.GetEnv("MINIO_URL", "")
 	minioUser := utils.GetEnv("MINIO_ROOT_USER", "")
 	minioPass := utils.GetEnv("MINIO_ROOT_PASSWORD", "")

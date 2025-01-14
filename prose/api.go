@@ -98,6 +98,7 @@ type HeaderTxt struct {
 	ImageCard  string
 	Favicon    template.URL
 	WithStyles bool
+	Domain     string
 }
 
 type ReadmeTxt struct {

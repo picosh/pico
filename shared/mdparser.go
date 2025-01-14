@@ -41,6 +41,7 @@ type MetaData struct {
 	Favicon     string
 	Hidden      bool
 	WithStyles  bool
+	Domain      string
 }
 
 type ParsedText struct {
@@ -274,6 +275,12 @@ func ParseText(text string) (*ParsedText, error) {
 		return &parsed, fmt.Errorf("front-matter field (%s): %w", "description", err)
 	}
 	parsed.MetaData.Description = description
+
+	domain, err := toString(metaData["domain"])
+	if err != nil {
+		return &parsed, fmt.Errorf("front-matter field (%s): %w", "domain", err)
+	}
+	parsed.MetaData.Domain = domain
 
 	layout, err := toString(metaData["layout"])
 	if err != nil {

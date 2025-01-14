@@ -381,6 +381,7 @@ type DB interface {
 	FindPostsByTag(pager *Pager, tag, space string) (*Paginate[*Post], error)
 	FindPopularTags(space string) ([]string, error)
 	FindTagsForPost(postID string) ([]string, error)
+	FindTagsForUser(userID string, space string) ([]string, error)
 
 	ReplaceAliasesForPost(aliases []string, postID string) error
 

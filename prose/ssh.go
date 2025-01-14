@@ -3,6 +3,7 @@ package prose
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
@@ -25,6 +26,7 @@ import (
 	"github.com/picosh/send/protocols/sftp"
 	"github.com/picosh/send/proxy"
 	"github.com/picosh/utils"
+	pipeUtil "github.com/picosh/utils/pipe"
 )
 
 func createRouter(handler *filehandlers.FileHandlerRouter, cliHandler *CliHandler) proxy.Router {
@@ -53,6 +55,20 @@ func withProxy(handler *filehandlers.FileHandlerRouter, cliHandler *CliHandler, 
 	}
 }
 
+func createPubProseDrain(ctx context.Context, logger *slog.Logger) *pipeUtil.ReconnectReadWriteCloser {
+	info := shared.NewPicoPipeClient()
+	send := pipeUtil.NewReconnectReadWriteCloser(
+		ctx,
+		logger,
+		info,
+		"pub to prose-drain",
+		"pub prose-drain -b=false",
+		100,
+		-1,
+	)
+	return send
+}
+
 func StartSshServer() {
 	host := utils.GetEnv("PROSE_HOST", "0.0.0.0")
 	port := utils.GetEnv("PROSE_SSH_PORT", "2222")
@@ -61,9 +77,15 @@ func StartSshServer() {
 	logger := cfg.Logger
 	dbh := postgres.NewDB(cfg.DbURL, cfg.Logger)
 	defer dbh.Close()
+
+	ctx := context.Background()
+	defer ctx.Done()
+	pipeClient := createPubProseDrain(ctx, logger)
+
 	hooks := &MarkdownHooks{
-		Cfg: cfg,
-		Db:  dbh,
+		Cfg:  cfg,
+		Db:   dbh,
+		Pipe: pipeClient,
 	}
 
 	var st storage.StorageServe
@@ -75,14 +97,14 @@ func StartSshServer() {
 	}
 
 	if err != nil {
-		logger.Error(err.Error())
+		logger.Error("storage", "err", err.Error())
 		return
 	}
 
 	fileMap := map[string]filehandlers.ReadWriteHandler{
 		".md":      filehandlers.NewScpPostHandler(dbh, cfg, hooks, st),
 		".css":     filehandlers.NewScpPostHandler(dbh, cfg, hooks, st),
-		"fallback": uploadimgs.NewUploadImgHandler(dbh, cfg, st),
+		"fallback": uploadimgs.NewUploadImgHandler(dbh, cfg, st, pipeClient),
 	}
 	handler := filehandlers.NewFileHandlerRouter(cfg, dbh, fileMap)
 	handler.Spaces = []string{cfg.Space, "imgs"}
@@ -104,7 +126,7 @@ func StartSshServer() {
 		),
 	)
 	if err != nil {
-		logger.Error(err.Error())
+		logger.Error("wish server", "err", err.Error())
 		return
 	}
 

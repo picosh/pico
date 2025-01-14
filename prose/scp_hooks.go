@@ -1,6 +1,7 @@
 package prose
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -11,11 +12,13 @@ import (
 	"github.com/picosh/pico/filehandlers"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/utils"
+	pipeUtil "github.com/picosh/utils/pipe"
 )
 
 type MarkdownHooks struct {
-	Cfg *shared.ConfigSite
-	Db  db.DB
+	Cfg  *shared.ConfigSite
+	Db   db.DB
+	Pipe *pipeUtil.ReconnectReadWriteCloser
 }
 
 func (p *MarkdownHooks) FileValidate(s ssh.Session, data *filehandlers.PostMetaData) (bool, error) {
@@ -71,4 +74,14 @@ func (p *MarkdownHooks) FileMeta(s ssh.Session, data *filehandlers.PostMetaData)
 	data.Hidden = parsedText.MetaData.Hidden || isHiddenFilename
 
 	return nil
+}
+
+func (p *MarkdownHooks) FileSuccess(s ssh.Session, data *filehandlers.SuccesHook) error {
+	out, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	out = append(out, '\n')
+	_, err = p.Pipe.Write(out)
+	return err
 }

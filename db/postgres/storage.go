@@ -219,6 +219,12 @@ const (
 	GROUP BY name
 	ORDER BY tally DESC
 	LIMIT 5`
+	sqlSelectTagsForUser = `
+	SELECT name
+	FROM post_tags
+	LEFT JOIN posts ON posts.id = post_id
+	WHERE posts.user_id = $1 AND posts.cur_space = $2
+	GROUP BY name`
 	sqlSelectTagsForPost     = `SELECT name FROM post_tags WHERE post_id=$1`
 	sqlSelectFeedItemsByPost = `SELECT id, post_id, guid, data, created_at FROM feed_items WHERE post_id=$1`
 
@@ -1300,6 +1306,7 @@ func (me *PsqlDB) insertAliasesForPost(tx *sql.Tx, aliases []string, postID stri
 	denyList := []string{
 		"rss",
 		"rss.xml",
+		"rss.atom",
 		"atom.xml",
 		"feed.xml",
 		"smol.css",
@@ -1423,6 +1430,27 @@ func (me *PsqlDB) FindPopularTags(space string) ([]string, error) {
 		name := ""
 		tally := 0
 		err := rs.Scan(&name, &tally)
+		if err != nil {
+			return tags, err
+		}
+
+		tags = append(tags, name)
+	}
+	if rs.Err() != nil {
+		return tags, rs.Err()
+	}
+	return tags, nil
+}
+
+func (me *PsqlDB) FindTagsForUser(userID string, space string) ([]string, error) {
+	tags := []string{}
+	rs, err := me.Db.Query(sqlSelectTagsForUser, userID, space)
+	if err != nil {
+		return tags, err
+	}
+	for rs.Next() {
+		name := ""
+		err := rs.Scan(&name)
 		if err != nil {
 			return tags, err
 		}

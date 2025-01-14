@@ -2,6 +2,7 @@ package uploadimgs
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -14,11 +15,13 @@ import (
 	"github.com/charmbracelet/ssh"
 	exifremove "github.com/neurosnap/go-exif-remove"
 	"github.com/picosh/pico/db"
+	"github.com/picosh/pico/filehandlers"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pobj"
 	sendutils "github.com/picosh/send/utils"
 	"github.com/picosh/utils"
+	pipeUtil "github.com/picosh/utils/pipe"
 )
 
 var Space = "imgs"
@@ -37,13 +40,15 @@ type UploadImgHandler struct {
 	DBPool  db.DB
 	Cfg     *shared.ConfigSite
 	Storage storage.StorageServe
+	Pipe    *pipeUtil.ReconnectReadWriteCloser
 }
 
-func NewUploadImgHandler(dbpool db.DB, cfg *shared.ConfigSite, storage storage.StorageServe) *UploadImgHandler {
+func NewUploadImgHandler(dbpool db.DB, cfg *shared.ConfigSite, storage storage.StorageServe, pipeClient *pipeUtil.ReconnectReadWriteCloser) *UploadImgHandler {
 	return &UploadImgHandler{
 		DBPool:  dbpool,
 		Cfg:     cfg,
 		Storage: storage,
+		Pipe:    pipeClient,
 	}
 }
 
@@ -84,6 +89,16 @@ func (h *UploadImgHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os.F
 	reader := pobj.NewAllReaderAt(contents)
 
 	return fileInfo, reader, nil
+}
+
+func (h *UploadImgHandler) Success(s ssh.Session, data *filehandlers.SuccesHook) error {
+	out, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	out = append(out, '\n')
+	_, err = h.Pipe.Write(out)
+	return err
 }
 
 func (h *UploadImgHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (string, error) {
@@ -171,6 +186,12 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (str
 		return "", err
 	}
 
+	_ = h.Success(s, &filehandlers.SuccesHook{
+		UserID:   user.ID,
+		Action:   "create",
+		Filename: metadata.Filename,
+	})
+
 	curl := shared.NewCreateURL(h.Cfg)
 	url := h.Cfg.FullPostURL(
 		curl,
@@ -223,12 +244,17 @@ func (h *UploadImgHandler) Delete(s ssh.Session, entry *sendutils.FileEntry) err
 		return err
 	}
 
+	logger.Info("deleting image")
 	err = h.Storage.DeleteObject(bucket, filename)
 	if err != nil {
 		return err
 	}
 
-	logger.Info("deleting image")
+	_ = h.Success(s, &filehandlers.SuccesHook{
+		UserID:   user.ID,
+		Action:   "delete",
+		Filename: filename,
+	})
 
 	return nil
 }

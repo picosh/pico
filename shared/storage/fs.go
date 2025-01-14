@@ -17,7 +17,7 @@ type StorageFS struct {
 }
 
 func NewStorageFS(logger *slog.Logger, dir string) (*StorageFS, error) {
-	st, err := sst.NewStorageFS(dir)
+	st, err := sst.NewStorageFS(logger, dir)
 	if err != nil {
 		return nil, err
 	}

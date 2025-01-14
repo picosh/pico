@@ -29,6 +29,20 @@ func TestParseRedirectText(t *testing.T) {
 		},
 	}
 
+	rss := RedirectFixture{
+		name:  "rss",
+		input: "/rss /rss.atom 200",
+		expect: []*RedirectRule{
+			{
+				From:       "/rss",
+				To:         "/rss.atom",
+				Status:     200,
+				Query:      empty,
+				Conditions: empty,
+			},
+		},
+	}
+
 	withStatus := RedirectFixture{
 		name:  "with-status",
 		input: "/wow     /index.html     301",
@@ -80,6 +94,7 @@ func TestParseRedirectText(t *testing.T) {
 
 	fixtures := []RedirectFixture{
 		spa,
+		rss,
 		withStatus,
 		noStatus,
 		absoluteUriNoProto,
