@@ -265,7 +265,7 @@ func StartSshServer() {
 	logger := shared.CreateLogger("imgs")
 	logger.Info("bootup", "registry", registryUrl, "minio", minioUrl)
 	dbh := postgres.NewDB(dbUrl, logger)
-	st, err := storage.NewStorageMinio(minioUrl, minioUser, minioPass)
+	st, err := storage.NewStorageMinio(logger, minioUrl, minioUser, minioPass)
 	if err != nil {
 		panic(err)
 	}

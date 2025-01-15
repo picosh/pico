@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -202,7 +203,7 @@ func (img *ImgProcessOpts) String() string {
 	return processOpts
 }
 
-func HandleProxy(dataURL string, opts *ImgProcessOpts) (io.ReadCloser, *storage.ObjectInfo, error) {
+func HandleProxy(logger *slog.Logger, dataURL string, opts *ImgProcessOpts) (io.ReadCloser, *storage.ObjectInfo, error) {
 	imgProxyURL := os.Getenv("IMGPROXY_URL")
 	imgProxySalt := os.Getenv("IMGPROXY_SALT")
 	imgProxyKey := os.Getenv("IMGPROXY_KEY")
@@ -242,13 +243,15 @@ func HandleProxy(dataURL string, opts *ImgProcessOpts) (io.ReadCloser, *storage.
 	lastModified := res.Header.Get("Last-Modified")
 	parsedTime, err := time.Parse(time.RFC1123, lastModified)
 	if err != nil {
-		return nil, nil, fmt.Errorf("decoding last-modified: %w", err)
+		logger.Error("decoding last-modified", "err", err)
 	}
 	info := &storage.ObjectInfo{
-		Size:         res.ContentLength,
-		LastModified: parsedTime,
-		ETag:         trimEtag(res.Header.Get("etag")),
-		Metadata:     res.Header,
+		Size:     res.ContentLength,
+		ETag:     trimEtag(res.Header.Get("etag")),
+		Metadata: res.Header,
+	}
+	if !parsedTime.IsZero() {
+		info.LastModified = parsedTime
 	}
 
 	return res.Body, info, nil

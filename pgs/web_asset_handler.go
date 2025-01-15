@@ -131,15 +131,19 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		attempts = append(attempts, fp.Filepath)
-		logger = logger.With("filename", fp.Filepath)
 		var c io.ReadCloser
+		fpath := fp.Filepath
+		attempts = append(attempts, fpath)
+		logger = logger.With("object", fpath)
+		logger.Info("serving object")
 		c, info, err = h.Storage.ServeObject(
 			h.Bucket,
-			fp.Filepath,
+			fpath,
 			h.ImgProcessOpts,
 		)
-		if err == nil {
+		if err != nil {
+			logger.Error("serving object", "err", err)
+		} else {
 			contents = c
 			assetFilepath = fp.Filepath
 			status = fp.Status

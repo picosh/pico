@@ -3,6 +3,7 @@ package storage
 import (
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,14 +13,15 @@ import (
 
 type StorageFS struct {
 	*sst.StorageFS
+	Logger *slog.Logger
 }
 
-func NewStorageFS(dir string) (*StorageFS, error) {
+func NewStorageFS(logger *slog.Logger, dir string) (*StorageFS, error) {
 	st, err := sst.NewStorageFS(dir)
 	if err != nil {
 		return nil, err
 	}
-	return &StorageFS{st}, nil
+	return &StorageFS{st, logger}, nil
 }
 
 func (s *StorageFS) ServeObject(bucket sst.Bucket, fpath string, opts *ImgProcessOpts) (io.ReadCloser, *sst.ObjectInfo, error) {
@@ -37,7 +39,7 @@ func (s *StorageFS) ServeObject(bucket sst.Bucket, fpath string, opts *ImgProces
 	} else {
 		filePath := filepath.Join(bucket.Name, fpath)
 		dataURL := fmt.Sprintf("s3://%s", filePath)
-		rc, info, err = HandleProxy(dataURL, opts)
+		rc, info, err = HandleProxy(s.Logger, dataURL, opts)
 	}
 	if err != nil {
 		return nil, nil, err

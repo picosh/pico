@@ -53,9 +53,9 @@ func StartApiServer() {
 	var st storage.StorageServe
 	var err error
 	if cfg.MinioURL == "" {
-		st, err = storage.NewStorageFS(cfg.StorageDir)
+		st, err = storage.NewStorageFS(cfg.Logger, cfg.StorageDir)
 	} else {
-		st, err = storage.NewStorageMinio(cfg.MinioURL, cfg.MinioUser, cfg.MinioPass)
+		st, err = storage.NewStorageMinio(cfg.Logger, cfg.MinioURL, cfg.MinioUser, cfg.MinioPass)
 	}
 
 	if err != nil {
@@ -472,8 +472,8 @@ func (web *WebRouter) ServeAsset(fname string, opts *storage.ImgProcessOpts, fro
 		bucket, err = web.Storage.GetBucket(shared.GetImgsBucketName(user.ID))
 	} else {
 		bucket, err = web.Storage.GetBucket(shared.GetAssetBucketName(user.ID))
-		project, err := web.Dbpool.FindProjectByName(user.ID, props.ProjectName)
-		if err != nil {
+		project, perr := web.Dbpool.FindProjectByName(user.ID, props.ProjectName)
+		if perr != nil {
 			logger.Info("project not found")
 			http.Error(w, "project not found", http.StatusNotFound)
 			return
@@ -499,7 +499,7 @@ func (web *WebRouter) ServeAsset(fname string, opts *storage.ImgProcessOpts, fro
 	}
 
 	if err != nil {
-		logger.Info("bucket not found")
+		logger.Error("bucket not found", "err", err)
 		http.Error(w, "bucket not found", http.StatusNotFound)
 		return
 	}

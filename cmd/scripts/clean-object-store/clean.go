@@ -45,7 +45,7 @@ func main() {
 
 	var st storage.StorageServe
 	var err error
-	st, err = storage.NewStorageMinio(picoCfg.MinioURL, picoCfg.MinioUser, picoCfg.MinioPass)
+	st, err = storage.NewStorageMinio(logger, picoCfg.MinioURL, picoCfg.MinioUser, picoCfg.MinioPass)
 	bail(err)
 
 	logger.Info("fetching all users")
