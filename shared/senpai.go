@@ -10,61 +10,66 @@ import (
 	"github.com/containerd/console"
 )
 
+type consoleData struct {
+	data []byte
+	err  error
+}
+
 type VConsole struct {
 	ssh.Session
 	pty ssh.Pty
 
-	sizeEnableOnce  sync.Once
-	primaryAttrOnce sync.Once
-
-	sendSizeMu sync.Mutex
-	sendSize   bool
+	sizeEnableOnce sync.Once
 
 	windowMu      sync.Mutex
 	currentWindow ssh.Window
+
+	readReq  chan []byte
+	dataChan chan consoleData
+
+	wg sync.WaitGroup
 }
 
 func (v *VConsole) Read(p []byte) (int, error) {
+	v.wg.Add(1)
+	defer v.wg.Done()
 	tot := 0
+
+	if len(v.readReq) == 0 {
+		select {
+		case v.readReq <- make([]byte, len(p)):
+		case <-v.Session.Context().Done():
+			return 0, v.Session.Context().Err()
+		}
+	}
 
 	v.sizeEnableOnce.Do(func() {
 		tot += copy(p, []byte("\x1b[?2048h"))
-		v.sendSizeMu.Lock()
-		v.sendSize = true
-		v.sendSizeMu.Unlock()
-	})
-
-	if tot > 0 {
-		return tot, nil
-	}
-
-	ok := v.sendSizeMu.TryLock()
-	if ok {
-		if v.sendSize {
-			v.sendSize = false
-
-			v.windowMu.Lock()
-			tot += copy(p, []byte(fmt.Sprintf("\x1b[48;%d;%d;%d;%dt", v.currentWindow.Height, v.currentWindow.Width, v.currentWindow.HeightPixels, v.currentWindow.WidthPixels)))
-			v.windowMu.Unlock()
+		v.windowMu.Lock()
+		select {
+		case v.dataChan <- consoleData{[]byte(fmt.Sprintf("\x1b[48;%d;%d;%d;%dt", v.currentWindow.Height, v.currentWindow.Width, v.currentWindow.HeightPixels, v.currentWindow.WidthPixels)), nil}:
+		case <-v.Session.Context().Done():
+			return
 		}
-
-		v.sendSizeMu.Unlock()
-	}
-
-	if tot > 0 {
-		return tot, nil
-	}
-
-	v.primaryAttrOnce.Do(func() {
-		tot += copy(p, []byte("\x1b[?1;0c"))
+		v.windowMu.Unlock()
+		select {
+		case v.dataChan <- consoleData{[]byte("\x1b[?1;0c"), nil}:
+		case <-v.Session.Context().Done():
+			return
+		}
 	})
 
 	if tot > 0 {
 		return tot, nil
 	}
 
-	n, err := v.Session.Read(p)
-	return tot + n, err
+	select {
+	case data := <-v.dataChan:
+		tot += copy(p, data.data)
+		return tot, data.err
+	case <-v.Session.Context().Done():
+		return 0, v.Session.Context().Err()
+	}
 }
 
 func (v *VConsole) Resize(winSize console.WinSize) error {
@@ -110,6 +115,14 @@ func (v *VConsole) Name() string {
 	return v.pty.Name()
 }
 
+func (v *VConsole) Close() error {
+	err := v.Session.Close()
+	v.wg.Wait()
+	close(v.readReq)
+	close(v.dataChan)
+	return err
+}
+
 func NewSenpaiApp(sesh ssh.Session, username, pass string) (*senpai.App, error) {
 	pty, win, ok := sesh.Pty()
 	if !ok {
@@ -121,17 +134,45 @@ func NewSenpaiApp(sesh ssh.Session, username, pass string) (*senpai.App, error) 
 		pty:           pty,
 		Session:       sesh,
 		currentWindow: pty.Window,
+		readReq:       make(chan []byte, 100),
+		dataChan:      make(chan consoleData, 100),
 	}
 
-	go func() {
-		for w := range win {
-			vty.windowMu.Lock()
-			vty.currentWindow = w
-			vty.windowMu.Unlock()
+	vty.wg.Add(2)
 
-			vty.sendSizeMu.Lock()
-			vty.sendSize = true
-			vty.sendSizeMu.Unlock()
+	go func() {
+		defer vty.wg.Done()
+		for {
+			select {
+			case <-sesh.Context().Done():
+				return
+			case data := <-vty.readReq:
+				n, err := vty.Session.Read(data)
+				select {
+				case vty.dataChan <- consoleData{data[:n], err}:
+				case <-sesh.Context().Done():
+					return
+				}
+			}
+		}
+	}()
+
+	go func() {
+		defer vty.wg.Done()
+		for {
+			select {
+			case <-sesh.Context().Done():
+				return
+			case w := <-win:
+				vty.windowMu.Lock()
+				vty.currentWindow = w
+				vty.windowMu.Unlock()
+				select {
+				case vty.dataChan <- consoleData{[]byte(fmt.Sprintf("\x1b[48;%d;%d;%d;%dt", w.Height, w.Width, w.HeightPixels, w.WidthPixels)), nil}:
+				case <-sesh.Context().Done():
+					return
+				}
+			}
 		}
 	}()
 
