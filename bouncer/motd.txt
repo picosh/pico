@@ -1,0 +1,29 @@
+Welcome to irc.pico.sh!
+
+This is a hosted Internet Relay Chat (IRC) bouncer service for pico users.
+
+Documentation for this service is available online:
+
+https://pico.sh/bouncer
+
+In order to chat with other users, you must configure an IRC network.
+IRC networks are independent entities which are not affiliated with pico.
+
+The recommended network for pico users is Libera Chat: https://libera.chat
+
+To connect to Libera Chat now, enter the following commands:
+
+/msg BouncerServ help
+
+# in the private message
+network create -addr irc.libera.chat -nick <user> -enabled false
+
+# if you don't have an account skip this step
+sasl set-plain -network libera <user> <sasl-pass>
+
+network update libera -enabled true
+/j #pico.sh
+
+Once connected, it is recommended to register an account with the network.
+Type "/msg NickServ help register" to send a message to the Libera Chat account
+registration system for details.

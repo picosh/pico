@@ -49,6 +49,7 @@ COPY --from=builder /app/soju/soju .
 COPY --from=builder /app/soju/sojuctl .
 
 COPY soju.config .
+COPY motd.txt .
 
 EXPOSE 6697
 EXPOSE 8080
