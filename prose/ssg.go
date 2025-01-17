@@ -53,22 +53,7 @@ func (ssg *SSG) tmpl(fpath string) string {
 	return filepath.Join(ssg.TmplDir, fpath)
 }
 
-func (ssg *SSG) blogPage(w io.Writer, user *db.User, tag string) error {
-	pager := &db.Pager{Num: 250, Page: 0}
-	var err error
-	var posts []*db.Post
-	var p *db.Paginate[*db.Post]
-	if tag == "" {
-		p, err = ssg.DB.FindPostsForUser(pager, user.ID, Space)
-	} else {
-		p, err = ssg.DB.FindUserPostsByTag(pager, tag, user.ID, Space)
-	}
-	posts = p.Data
-
-	if err != nil {
-		return err
-	}
-
+func (ssg *SSG) blogPage(w io.Writer, user *db.User, blog *UserBlogData, tag string) error {
 	files := []string{
 		ssg.tmpl("blog.page.tmpl"),
 		ssg.tmpl("blog-default.partial.tmpl"),
@@ -91,9 +76,8 @@ func (ssg *SSG) blogPage(w io.Writer, user *db.User, tag string) error {
 		Domain:     getBlogDomain(user.Name, ssg.Cfg.Domain),
 	}
 	readmeTxt := &ReadmeTxt{}
-
-	readme, err := ssg.DB.FindPostWithFilename("_readme.md", user.ID, Space)
-	if err == nil {
+	readme := blog.Readme
+	if readme != nil {
 		parsedText, err := shared.ParseText(readme.Text)
 		if err != nil {
 			return err
@@ -126,17 +110,23 @@ func (ssg *SSG) blogPage(w io.Writer, user *db.User, tag string) error {
 		}
 	}
 
-	hasCSS := false
-	_, err = ssg.DB.FindPostWithFilename("_styles.css", user.ID, Space)
-	if err == nil {
-		hasCSS = true
-	}
+	hasCSS := blog.CSS != nil
+	postCollection := []PostItemData{}
+	for _, post := range blog.Posts {
+		if tag != "" {
+			parsed, err := shared.ParseText(post.Text)
+			if err != nil {
+				blog.Logger.Error("post parse text", "err", err)
+				continue
+			}
+			if !slices.Contains(parsed.Tags, tag) {
+				continue
+			}
+		}
 
-	postCollection := make([]PostItemData, 0, len(posts))
-	for _, post := range posts {
 		p := PostItemData{
 			URL: template.URL(
-				fmt.Sprintf("/%s.html", post.Slug),
+				fmt.Sprintf("/%s", post.Slug),
 			),
 			BlogURL:        template.URL("/"),
 			Title:          utils.FilenameToTitle(post.Filename, post.Title),
@@ -167,23 +157,7 @@ func (ssg *SSG) blogPage(w io.Writer, user *db.User, tag string) error {
 	return ts.Execute(w, data)
 }
 
-func (ssg *SSG) rssBlogPage(w io.Writer, user *db.User, tag string) error {
-	var err error
-	pager := &db.Pager{Num: 10, Page: 0}
-	var posts []*db.Post
-	var p *db.Paginate[*db.Post]
-	if tag == "" {
-		p, err = ssg.DB.FindPostsForUser(pager, user.ID, Space)
-	} else {
-		p, err = ssg.DB.FindUserPostsByTag(pager, tag, user.ID, Space)
-	}
-
-	if err != nil {
-		return err
-	}
-
-	posts = p.Data
-
+func (ssg *SSG) rssBlogPage(w io.Writer, user *db.User, blog *UserBlogData) error {
 	ts, err := template.ParseFiles(ssg.tmpl("rss.page.tmpl"))
 	if err != nil {
 		return err
@@ -194,8 +168,8 @@ func (ssg *SSG) rssBlogPage(w io.Writer, user *db.User, tag string) error {
 		Domain: getBlogDomain(user.Name, ssg.Cfg.Domain),
 	}
 
-	readme, err := ssg.DB.FindPostWithFilename("_readme.md", user.ID, Space)
-	if err == nil {
+	readme := blog.Readme
+	if readme != nil {
 		parsedText, err := shared.ParseText(readme.Text)
 		if err != nil {
 			return err
@@ -225,7 +199,7 @@ func (ssg *SSG) rssBlogPage(w io.Writer, user *db.User, tag string) error {
 	}
 
 	var feedItems []*feeds.Item
-	for _, post := range posts {
+	for _, post := range blog.Posts {
 		if slices.Contains(ssg.Cfg.HiddenPosts, post.Filename) {
 			continue
 		}
@@ -234,9 +208,9 @@ func (ssg *SSG) rssBlogPage(w io.Writer, user *db.User, tag string) error {
 			return err
 		}
 
-		footer, err := ssg.DB.FindPostWithFilename("_footer.md", user.ID, Space)
+		footer := blog.Footer
 		var footerHTML string
-		if err == nil {
+		if footer != nil {
 			footerParsed, err := shared.ParseText(footer.Text)
 			if err != nil {
 				return err
@@ -261,7 +235,7 @@ func (ssg *SSG) rssBlogPage(w io.Writer, user *db.User, tag string) error {
 			Link:        &feeds.Link{Href: realUrl},
 			Content:     tpl.String(),
 			Updated:     *post.UpdatedAt,
-			Created:     *post.CreatedAt,
+			Created:     *post.PublishAt,
 			Description: post.Description,
 		}
 
@@ -282,40 +256,31 @@ func (ssg *SSG) rssBlogPage(w io.Writer, user *db.User, tag string) error {
 	return err
 }
 
-func (ssg *SSG) postPage(w io.Writer, user *db.User, post *db.Post) ([]string, error) {
+func (ssg *SSG) writePostPage(w io.Writer, user *db.User, post *db.Post, blog *UserBlogData) (*shared.ParsedText, error) {
 	blogName := getBlogName(user.Name)
 	favicon := ""
 	ogImage := ""
 	ogImageCard := ""
-	hasCSS := false
 	withStyles := true
 	domain := getBlogDomain(user.Name, ssg.Cfg.Domain)
 	var data PostPageData
-	aliases := []string{}
 
-	css, err := ssg.DB.FindPostWithFilename("_styles.css", user.ID, Space)
-	if err == nil {
-		if len(css.Text) > 0 {
-			hasCSS = true
-		}
-	}
-
-	footer, err := ssg.DB.FindPostWithFilename("_footer.md", user.ID, Space)
+	footer := blog.Footer
 	var footerHTML template.HTML
-	if err == nil {
+	if footer != nil {
 		footerParsed, err := shared.ParseText(footer.Text)
 		if err != nil {
-			return aliases, err
+			return nil, err
 		}
 		footerHTML = template.HTML(footerParsed.Html)
 	}
 
 	// we need the blog name from the readme unfortunately
-	readme, err := ssg.DB.FindPostWithFilename("_readme.md", user.ID, Space)
-	if err == nil {
+	readme := blog.Readme
+	if readme != nil {
 		readmeParsed, err := shared.ParseText(readme.Text)
 		if err != nil {
-			return aliases, err
+			return nil, err
 		}
 		if readmeParsed.MetaData.Title != "" {
 			blogName = readmeParsed.MetaData.Title
@@ -332,7 +297,7 @@ func (ssg *SSG) postPage(w io.Writer, user *db.User, post *db.Post) ([]string, e
 	diff := ""
 	parsedText, err := shared.ParseText(post.Text)
 	if err != nil {
-		return aliases, err
+		return nil, err
 	}
 
 	if parsedText.Image != "" {
@@ -342,8 +307,6 @@ func (ssg *SSG) postPage(w io.Writer, user *db.User, post *db.Post) ([]string, e
 	if parsedText.ImageCard != "" {
 		ogImageCard = parsedText.ImageCard
 	}
-
-	aliases = parsedText.Aliases
 
 	unlisted := false
 	if post.Hidden || post.PublishAt.After(time.Now()) {
@@ -365,7 +328,7 @@ func (ssg *SSG) postPage(w io.Writer, user *db.User, post *db.Post) ([]string, e
 		Username:     user.Name,
 		BlogName:     blogName,
 		Contents:     template.HTML(parsedText.Html),
-		HasCSS:       hasCSS,
+		HasCSS:       blog.CSS != nil,
 		CssURL:       template.URL("/_styles.css"),
 		Tags:         parsedText.Tags,
 		Image:        template.URL(ogImage),
@@ -385,10 +348,10 @@ func (ssg *SSG) postPage(w io.Writer, user *db.User, post *db.Post) ([]string, e
 	}
 	ts, err := template.ParseFiles(files...)
 	if err != nil {
-		return aliases, err
+		return nil, err
 	}
 
-	return aliases, ts.Execute(w, data)
+	return parsedText, ts.Execute(w, data)
 }
 
 func (ssg *SSG) discoverPage(w io.Writer) error {
@@ -511,9 +474,9 @@ func (ssg *SSG) discoverRssPage(w io.Writer) error {
 	return err
 }
 
-func (ssg *SSG) upload(bucket sst.Bucket, fpath string, rdr io.Reader) error {
-	toSite := filepath.Join("prose-blog", fpath)
-	ssg.Logger.Info("uploading object", "bucket", bucket.Name, "object", toSite)
+func (ssg *SSG) upload(logger *slog.Logger, bucket sst.Bucket, fpath string, rdr io.Reader) error {
+	toSite := filepath.Join("prose", fpath)
+	logger.Info("uploading object", "bucket", bucket.Name, "object", toSite)
 	buf := &bytes.Buffer{}
 	size, err := io.Copy(buf, rdr)
 	if err != nil {
@@ -527,25 +490,18 @@ func (ssg *SSG) upload(bucket sst.Bucket, fpath string, rdr io.Reader) error {
 	return err
 }
 
-func (ssg *SSG) notFoundPage(w io.Writer, user *db.User) error {
+func (ssg *SSG) notFoundPage(w io.Writer, user *db.User, blog *UserBlogData) error {
 	ogImage := ""
 	ogImageCard := ""
 	favicon := ""
 	contents := template.HTML("Oops!  we can't seem to find this post.")
 	title := "Post not found"
 	desc := "Post not found"
-	hasCSS := false
+	hasCSS := blog.CSS != nil
 
-	css, err := ssg.DB.FindPostWithFilename("_styles.css", user.ID, Space)
-	if err == nil {
-		if len(css.Text) > 0 {
-			hasCSS = true
-		}
-	}
-
-	footer, err := ssg.DB.FindPostWithFilename("_footer.md", user.ID, Space)
+	footer := blog.Footer
 	var footerHTML template.HTML
-	if err == nil {
+	if footer != nil {
 		footerParsed, err := shared.ParseText(footer.Text)
 		if err != nil {
 			return err
@@ -554,8 +510,8 @@ func (ssg *SSG) notFoundPage(w io.Writer, user *db.User) error {
 	}
 
 	// we need the blog name from the readme unfortunately
-	readme, err := ssg.DB.FindPostWithFilename("_readme.md", user.ID, Space)
-	if err == nil {
+	readme := blog.Readme
+	if readme != nil {
 		readmeParsed, err := shared.ParseText(readme.Text)
 		if err != nil {
 			return err
@@ -565,11 +521,11 @@ func (ssg *SSG) notFoundPage(w io.Writer, user *db.User) error {
 		favicon = readmeParsed.Favicon
 	}
 
-	notFound, err := ssg.DB.FindPostWithFilename("_404.md", user.ID, Space)
-	if err == nil {
+	notFound := blog.NotFound
+	if notFound != nil {
 		notFoundParsed, err := shared.ParseText(notFound.Text)
 		if err != nil {
-			ssg.Logger.Error("could not parse markdown", "err", err.Error())
+			blog.Logger.Error("could not parse markdown", "err", err.Error())
 			return err
 		}
 		if notFoundParsed.MetaData.Title != "" {
@@ -616,10 +572,10 @@ func (ssg *SSG) notFoundPage(w io.Writer, user *db.User) error {
 	return ts.Execute(w, data)
 }
 
-func (ssg *SSG) images(user *db.User, bucket sst.Bucket) error {
+func (ssg *SSG) images(user *db.User, blog *UserBlogData) error {
 	imgBucket, err := ssg.Storage.GetBucket(shared.GetImgsBucketName(user.ID))
 	if err != nil {
-		ssg.Logger.Info("user does not have an images dir, skipping")
+		blog.Logger.Info("user does not have an images dir, skipping")
 		return nil
 	}
 	imgs, err := ssg.Storage.ListObjects(imgBucket, "/", false)
@@ -632,7 +588,7 @@ func (ssg *SSG) images(user *db.User, bucket sst.Bucket) error {
 		if err != nil {
 			return err
 		}
-		err = ssg.upload(bucket, inf.Name(), rdr)
+		err = ssg.upload(blog.Logger, blog.Bucket, inf.Name(), rdr)
 		if err != nil {
 			return err
 		}
@@ -641,7 +597,7 @@ func (ssg *SSG) images(user *db.User, bucket sst.Bucket) error {
 	return nil
 }
 
-func (ssg *SSG) static(bucket sst.Bucket) error {
+func (ssg *SSG) static(logger *slog.Logger, bucket sst.Bucket) error {
 	files, err := os.ReadDir(ssg.StaticDir)
 	if err != nil {
 		return err
@@ -655,7 +611,7 @@ func (ssg *SSG) static(bucket sst.Bucket) error {
 		if err != nil {
 			return err
 		}
-		err = ssg.upload(bucket, file.Name(), fp)
+		err = ssg.upload(logger, bucket, file.Name(), fp)
 		if err != nil {
 			return err
 		}
@@ -690,12 +646,12 @@ func (ssg *SSG) Prose() error {
 	ssg.Logger.Info("generating _redirects file", "text", redirectsFile)
 	// create redirects file
 	redirects := strings.NewReader(redirectsFile)
-	err = ssg.upload(bucket, "_redirects", redirects)
+	err = ssg.upload(ssg.Logger, bucket, "_redirects", redirects)
 	if err != nil {
 		return err
 	}
 
-	err = ssg.upload(bucket, "index.html", rdr)
+	err = ssg.upload(ssg.Logger, bucket, "index.html", rdr)
 	if err != nil {
 		return err
 	}
@@ -710,13 +666,13 @@ func (ssg *SSG) Prose() error {
 		}
 	}()
 
-	err = ssg.upload(bucket, "rss.atom", rdr)
+	err = ssg.upload(ssg.Logger, bucket, "rss.atom", rdr)
 	if err != nil {
 		return err
 	}
 
 	ssg.Logger.Info("copying static folder for root", "dir", ssg.StaticDir)
-	err = ssg.static(bucket)
+	err = ssg.static(ssg.Logger, bucket)
 	if err != nil {
 		return err
 	}
@@ -746,87 +702,273 @@ func (ssg *SSG) Prose() error {
 	return nil
 }
 
+func (ssg *SSG) PostPage(user *db.User, blog *UserBlogData, post *db.Post) (pt *shared.ParsedText, err error) {
+	// create post file
+	rdr, wtr := io.Pipe()
+	var parsed *shared.ParsedText
+	go func() {
+		parsed, err = ssg.writePostPage(wtr, user, post, blog)
+		wtr.Close()
+		if err != nil {
+			blog.Logger.Error("post page", "err", err)
+		}
+	}()
+
+	fname := post.Slug + ".html"
+	err = ssg.upload(blog.Logger, blog.Bucket, fname, rdr)
+	if err != nil {
+		return parsed, err
+	}
+	return parsed, nil
+}
+
+func (ssg *SSG) NotFoundPage(logger *slog.Logger, user *db.User, blog *UserBlogData) error {
+	// create 404 page
+	logger.Info("generating 404 page")
+	rdr, wtr := io.Pipe()
+	go func() {
+		err := ssg.notFoundPage(wtr, user, blog)
+		wtr.Close()
+		if err != nil {
+			blog.Logger.Error("not found page", "err", err)
+		}
+	}()
+
+	err := ssg.upload(blog.Logger, blog.Bucket, "404.html", rdr)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (ssg *SSG) findPost(username string, bucket sst.Bucket, filename string, modTime time.Time) (*db.Post, error) {
+	updatedAt := modTime
+	fp := filepath.Join("prose/", filename)
+	logger := ssg.Logger.With("filename", fp)
+	rdr, info, err := ssg.Storage.GetObject(bucket, fp)
+	if err != nil {
+		logger.Error("get object", "err", err)
+		return nil, err
+	}
+	txtb, err := io.ReadAll(rdr)
+	if err != nil {
+		logger.Error("reader to string", "err", err)
+		return nil, err
+	}
+	txt := string(txtb)
+	parsed, err := shared.ParseText(txt)
+	if err != nil {
+		logger.Error("parse text", "err", err)
+		return nil, err
+	}
+	if parsed.PublishAt == nil || parsed.PublishAt.IsZero() {
+		ca := info.Metadata.Get("Date")
+		if ca != "" {
+			dt, err := time.Parse(time.RFC1123, ca)
+			if err != nil {
+				return nil, err
+			}
+			parsed.PublishAt = &dt
+		}
+	}
+
+	slug := utils.SanitizeFileExt(filename)
+
+	return &db.Post{
+		IsVirtual:   true,
+		Slug:        slug,
+		Filename:    filename,
+		FileSize:    len(txt),
+		Text:        txt,
+		PublishAt:   parsed.PublishAt,
+		UpdatedAt:   &updatedAt,
+		Hidden:      parsed.Hidden,
+		Description: parsed.Description,
+		Title:       utils.FilenameToTitle(filename, parsed.Title),
+		Username:    username,
+	}, nil
+}
+
+func (ssg *SSG) findPostByName(userID, username string, bucket sst.Bucket, filename string, modTime time.Time) (*db.Post, error) {
+	post, err := ssg.findPost(username, bucket, filename, modTime)
+	if err == nil {
+		return post, nil
+	}
+	return ssg.DB.FindPostWithFilename(filename, userID, Space)
+}
+
+func (ssg *SSG) findPosts(blog *UserBlogData) ([]*db.Post, bool, error) {
+	posts := []*db.Post{}
+	blog.Logger.Info("finding posts")
+	objs, _ := ssg.Storage.ListObjects(blog.Bucket, "prose/", true)
+	if len(objs) > 0 {
+		blog.Logger.Info("found posts in bucket, using them")
+	}
+	for _, obj := range objs {
+		if obj.IsDir() {
+			continue
+		}
+
+		ext := filepath.Ext(obj.Name())
+		if ext == ".md" {
+			post, err := ssg.findPost(blog.User.Name, blog.Bucket, obj.Name(), obj.ModTime())
+			if err != nil {
+				blog.Logger.Error("find post", "err", err, "filename", obj.Name())
+				continue
+			}
+			posts = append(posts, post)
+		}
+	}
+
+	// we found markdown files in the pgs site so the assumption is
+	// the pgs site is now the source of truth and we can ignore the posts table
+	if len(posts) > 0 {
+		return posts, true, nil
+	}
+
+	blog.Logger.Info("no posts found in bucket, using posts table")
+	data, err := ssg.DB.FindPostsForUser(&db.Pager{Num: 1000, Page: 0}, blog.User.ID, Space)
+	if err != nil {
+		return nil, false, err
+	}
+	return data.Data, false, nil
+}
+
+type UserBlogData struct {
+	Bucket   sst.Bucket
+	User     *db.User
+	Posts    []*db.Post
+	Readme   *db.Post
+	Footer   *db.Post
+	CSS      *db.Post
+	NotFound *db.Post
+	Logger   *slog.Logger
+}
+
 func (ssg *SSG) ProseBlog(user *db.User, bucket sst.Bucket) error {
 	// programmatically generate redirects file based on aliases
 	// and other routes that were in prose that need to be available
 	redirectsFile := "/rss /rss.atom 301\n"
 	logger := shared.LoggerWithUser(ssg.Logger, user)
+	logger.Info("generating blog for user")
 
-	data, err := ssg.DB.FindPostsForUser(&db.Pager{Num: 1000, Page: 0}, user.ID, Space)
+	_, err := ssg.DB.FindProjectByName(user.ID, "prose")
 	if err != nil {
-		return err
+		_, err := ssg.DB.InsertProject(user.ID, "prose", "prose")
+		if err != nil {
+			return err
+		}
+		return ssg.ProseBlog(user, bucket)
 	}
 
-	// don't generate a site with 0 posts
-	if data.Total == 0 {
+	blog := &UserBlogData{
+		User:   user,
+		Bucket: bucket,
+		Logger: logger,
+	}
+
+	posts, isVirtual, err := ssg.findPosts(blog)
+	if err != nil {
+		// no posts found, bail on generating an empty blog
+		// TODO: gen the index anyway?
 		return nil
 	}
 
-	for _, post := range data.Data {
+	blog.Posts = posts
+
+	css, _ := ssg.findPostByName(user.ID, user.Name, bucket, "_styles.css", time.Time{})
+	if css != nil && !css.IsVirtual {
+		stylerdr := strings.NewReader(css.Text)
+		err = ssg.upload(blog.Logger, bucket, "_styles.css", stylerdr)
+		if err != nil {
+			return err
+		}
+	}
+	blog.CSS = css
+
+	readme, _ := ssg.findPostByName(user.ID, user.Name, bucket, "_readme.md", time.Time{})
+	if readme != nil && !readme.IsVirtual {
+		rdr := strings.NewReader(readme.Text)
+		err = ssg.upload(blog.Logger, bucket, "_readme.md", rdr)
+		if err != nil {
+			return err
+		}
+	}
+	blog.Readme = readme
+
+	footer, _ := ssg.findPostByName(user.ID, user.Name, bucket, "_footer.md", time.Time{})
+	if readme != nil && !readme.IsVirtual {
+		rdr := strings.NewReader(footer.Text)
+		err = ssg.upload(blog.Logger, bucket, "_footer.md", rdr)
+		if err != nil {
+			return err
+		}
+	}
+	blog.Footer = footer
+
+	notFound, _ := ssg.findPostByName(user.ID, user.Name, bucket, "_404.md", time.Time{})
+	if notFound != nil && !notFound.IsVirtual {
+		rdr := strings.NewReader(notFound.Text)
+		err = ssg.upload(blog.Logger, bucket, "_404.md", rdr)
+		if err != nil {
+			return err
+		}
+	}
+	blog.NotFound = notFound
+
+	tagMap := map[string]string{}
+	for _, post := range posts {
 		if post.Slug == "" {
 			logger.Warn("post slug empty, skipping")
 			continue
 		}
 
 		logger.Info("generating post", "slug", post.Slug)
-		fpath := fmt.Sprintf("%s.html", post.Slug)
 
-		// create post file
-		rdr, wtr := io.Pipe()
-		go func() {
-			aliases, err := ssg.postPage(wtr, user, post)
-			wtr.Close()
-			if err != nil {
-				ssg.Logger.Error("post page", "err", err)
-			}
-			// add aliases to redirects file
-			for _, alias := range aliases {
-				redirectsFile += fmt.Sprintf("%s %s 200\n", alias, "/"+fpath)
-			}
-		}()
-
-		err = ssg.upload(bucket, fpath, rdr)
+		parsed, err := ssg.PostPage(user, blog, post)
 		if err != nil {
 			return err
+		}
+		// add aliases to redirects file
+		for _, alias := range parsed.Aliases {
+			redirectsFile += fmt.Sprintf("%s %s 301\n", alias, "/"+post.Slug)
+		}
+		for _, tag := range parsed.Tags {
+			tagMap[tag] = tag
 		}
 
 		// create raw post file
-		fpath = post.Slug + ".md"
-		mdRdr := strings.NewReader(post.Text)
-		err = ssg.upload(bucket, fpath, mdRdr)
-		if err != nil {
-			return err
+		// only generate md file if we dont already have it in our pgs site
+		if !post.IsVirtual {
+			fpath := post.Slug + ".md"
+			mdRdr := strings.NewReader(post.Text)
+			err = ssg.upload(blog.Logger, bucket, fpath, mdRdr)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
-	// create 404 page
-	logger.Info("generating 404 page")
-	rdr, wtr := io.Pipe()
-	go func() {
-		err = ssg.notFoundPage(wtr, user)
-		wtr.Close()
-		if err != nil {
-			ssg.Logger.Error("not found page", "err", err)
-		}
-	}()
-
-	err = ssg.upload(bucket, "404.html", rdr)
+	err = ssg.NotFoundPage(logger, user, blog)
 	if err != nil {
 		return err
 	}
 
-	tags, err := ssg.DB.FindTagsForUser(user.ID, Space)
-	tags = append(tags, "")
+	tags := []string{""}
+	for k := range tagMap {
+		tags = append(tags, k)
+	}
 
 	// create index files
 	for _, tag := range tags {
 		logger.Info("generating blog index page", "tag", tag)
 		rdr, wtr := io.Pipe()
 		go func() {
-			err = ssg.blogPage(wtr, user, tag)
+			err = ssg.blogPage(wtr, user, blog, tag)
 			wtr.Close()
 			if err != nil {
-				ssg.Logger.Error("blog page", "err", err)
+				blog.Logger.Error("blog page", "err", err)
 			}
 		}()
 
@@ -834,24 +976,24 @@ func (ssg *SSG) ProseBlog(user *db.User, bucket sst.Bucket) error {
 		if tag != "" {
 			fpath = fmt.Sprintf("index-%s.html", tag)
 		}
-		err = ssg.upload(bucket, fpath, rdr)
+		err = ssg.upload(blog.Logger, bucket, fpath, rdr)
 		if err != nil {
 			return err
 		}
 	}
 
 	logger.Info("generating blog rss page", "tag", "")
-	rdr, wtr = io.Pipe()
+	rdr, wtr := io.Pipe()
 	go func() {
-		err = ssg.rssBlogPage(wtr, user, "")
+		err = ssg.rssBlogPage(wtr, user, blog)
 		wtr.Close()
 		if err != nil {
-			ssg.Logger.Error("blog rss page", "err", err)
+			blog.Logger.Error("blog rss page", "err", err)
 		}
 	}()
 
 	fpath := "rss.atom"
-	err = ssg.upload(bucket, fpath, rdr)
+	err = ssg.upload(blog.Logger, bucket, fpath, rdr)
 	if err != nil {
 		return err
 	}
@@ -859,31 +1001,25 @@ func (ssg *SSG) ProseBlog(user *db.User, bucket sst.Bucket) error {
 	logger.Info("generating _redirects file", "text", redirectsFile)
 	// create redirects file
 	redirects := strings.NewReader(redirectsFile)
-	err = ssg.upload(bucket, "_redirects", redirects)
+	err = ssg.upload(blog.Logger, bucket, "_redirects", redirects)
 	if err != nil {
 		return err
 	}
 
-	post, _ := ssg.DB.FindPostWithFilename("_styles.css", user.ID, Space)
-	if post != nil {
-		stylerdr := strings.NewReader(post.Text)
-		err = ssg.upload(bucket, "_styles.css", stylerdr)
+	logger.Info("copying static folder", "dir", ssg.StaticDir)
+	err = ssg.static(blog.Logger, bucket)
+	if err != nil {
+		return err
+	}
+
+	if !isVirtual {
+		logger.Info("copying images")
+		err = ssg.images(user, blog)
 		if err != nil {
 			return err
 		}
 	}
 
-	logger.Info("copying static folder", "dir", ssg.StaticDir)
-	err = ssg.static(bucket)
-	if err != nil {
-		return err
-	}
-
-	logger.Info("copying images")
-	err = ssg.images(user, bucket)
-	if err != nil {
-		return err
-	}
-
+	logger.Info("success!")
 	return nil
 }

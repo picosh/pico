@@ -218,6 +218,7 @@ func ParseText(text string) (*ParsedText, error) {
 			Tags:       []string{},
 			Aliases:    []string{},
 			WithStyles: true,
+			PublishAt:  &time.Time{},
 		},
 	}
 	hili := highlighting.NewHighlighting(
@@ -318,7 +319,7 @@ func ParseText(text string) (*ParsedText, error) {
 	}
 	parsed.MetaData.Favicon = favicon
 
-	var publishAt *time.Time = nil
+	publishAt := &time.Time{}
 	date, err := toString(metaData["date"])
 	if err != nil {
 		return &parsed, fmt.Errorf("front-matter field (%s): %w", "date", err)

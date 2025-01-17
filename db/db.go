@@ -131,6 +131,9 @@ type Post struct {
 	MimeType    string     `json:"mime_type"`
 	Data        PostData   `json:"data"`
 	Tags        []string   `json:"tags"`
+
+	// computed
+	IsVirtual bool
 }
 
 type Paginate[T any] struct {
