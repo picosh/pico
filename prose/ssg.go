@@ -683,16 +683,12 @@ func (ssg *SSG) Prose() error {
 	}
 
 	for _, user := range users {
-		if user.Name != "erock" {
-			continue
-		}
-
 		bucket, err := ssg.Storage.UpsertBucket(shared.GetAssetBucketName(user.ID))
 		if err != nil {
 			return err
 		}
 
-		err = ssg.ProseBlog(user, bucket)
+		err = ssg.ProseBlog(user, bucket, "prose")
 		if err != nil {
 			log := shared.LoggerWithUser(ssg.Logger, user)
 			log.Error("could not generate blog for user", "err", err)
@@ -742,11 +738,12 @@ func (ssg *SSG) NotFoundPage(logger *slog.Logger, user *db.User, blog *UserBlogD
 	return nil
 }
 
-func (ssg *SSG) findPost(username string, bucket sst.Bucket, filename string, modTime time.Time) (*db.Post, error) {
-	updatedAt := modTime
+func (ssg *SSG) UpsertPost(userID, username string, bucket sst.Bucket, filename string) (*db.Post, error) {
+	slug := utils.SanitizeFileExt(filename)
+	updatedAt := time.Now()
 	fp := filepath.Join("prose/", filename)
 	logger := ssg.Logger.With("filename", fp)
-	rdr, info, err := ssg.Storage.GetObject(bucket, fp)
+	rdr, _, err := ssg.Storage.GetObject(bucket, fp)
 	if err != nil {
 		logger.Error("get object", "err", err)
 		return nil, err
@@ -762,20 +759,8 @@ func (ssg *SSG) findPost(username string, bucket sst.Bucket, filename string, mo
 		logger.Error("parse text", "err", err)
 		return nil, err
 	}
-	if parsed.PublishAt == nil || parsed.PublishAt.IsZero() {
-		ca := info.Metadata.Get("Date")
-		if ca != "" {
-			dt, err := time.Parse(time.RFC1123, ca)
-			if err != nil {
-				return nil, err
-			}
-			parsed.PublishAt = &dt
-		}
-	}
 
-	slug := utils.SanitizeFileExt(filename)
-
-	return &db.Post{
+	post := &db.Post{
 		IsVirtual:   true,
 		Slug:        slug,
 		Filename:    filename,
@@ -787,47 +772,22 @@ func (ssg *SSG) findPost(username string, bucket sst.Bucket, filename string, mo
 		Description: parsed.Description,
 		Title:       utils.FilenameToTitle(filename, parsed.Title),
 		Username:    username,
-	}, nil
+	}
+
+	origPost, _ := ssg.DB.FindPostWithSlug(slug, userID, "prose")
+	if origPost != nil {
+		post.PublishAt = origPost.PublishAt
+		return ssg.DB.UpdatePost(post)
+	}
+	return ssg.DB.InsertPost(post)
 }
 
 func (ssg *SSG) findPostByName(userID, username string, bucket sst.Bucket, filename string, modTime time.Time) (*db.Post, error) {
-	post, err := ssg.findPost(username, bucket, filename, modTime)
-	if err == nil {
-		return post, nil
-	}
 	return ssg.DB.FindPostWithFilename(filename, userID, Space)
 }
 
-func (ssg *SSG) findPosts(blog *UserBlogData) ([]*db.Post, bool, error) {
-	posts := []*db.Post{}
+func (ssg *SSG) findPosts(blog *UserBlogData, service string) ([]*db.Post, bool, error) {
 	blog.Logger.Info("finding posts")
-	objs, _ := ssg.Storage.ListObjects(blog.Bucket, "prose/", true)
-	if len(objs) > 0 {
-		blog.Logger.Info("found posts in bucket, using them")
-	}
-	for _, obj := range objs {
-		if obj.IsDir() {
-			continue
-		}
-
-		ext := filepath.Ext(obj.Name())
-		if ext == ".md" {
-			post, err := ssg.findPost(blog.User.Name, blog.Bucket, obj.Name(), obj.ModTime())
-			if err != nil {
-				blog.Logger.Error("find post", "err", err, "filename", obj.Name())
-				continue
-			}
-			posts = append(posts, post)
-		}
-	}
-
-	// we found markdown files in the pgs site so the assumption is
-	// the pgs site is now the source of truth and we can ignore the posts table
-	if len(posts) > 0 {
-		return posts, true, nil
-	}
-
-	blog.Logger.Info("no posts found in bucket, using posts table")
 	data, err := ssg.DB.FindPostsForUser(&db.Pager{Num: 1000, Page: 0}, blog.User.ID, Space)
 	if err != nil {
 		return nil, false, err
@@ -846,7 +806,7 @@ type UserBlogData struct {
 	Logger   *slog.Logger
 }
 
-func (ssg *SSG) ProseBlog(user *db.User, bucket sst.Bucket) error {
+func (ssg *SSG) ProseBlog(user *db.User, bucket sst.Bucket, service string) error {
 	// programmatically generate redirects file based on aliases
 	// and other routes that were in prose that need to be available
 	redirectsFile := "/rss /rss.atom 301\n"
@@ -859,7 +819,7 @@ func (ssg *SSG) ProseBlog(user *db.User, bucket sst.Bucket) error {
 		if err != nil {
 			return err
 		}
-		return ssg.ProseBlog(user, bucket)
+		return ssg.ProseBlog(user, bucket, service)
 	}
 
 	blog := &UserBlogData{
@@ -868,7 +828,7 @@ func (ssg *SSG) ProseBlog(user *db.User, bucket sst.Bucket) error {
 		Logger: logger,
 	}
 
-	posts, isVirtual, err := ssg.findPosts(blog)
+	posts, isVirtual, err := ssg.findPosts(blog, service)
 	if err != nil {
 		// no posts found, bail on generating an empty blog
 		// TODO: gen the index anyway?

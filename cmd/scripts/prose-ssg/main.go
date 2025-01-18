@@ -4,16 +4,14 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"log/slog"
 	"sync"
 	"time"
 
 	"github.com/picosh/pico/db/postgres"
-	"github.com/picosh/pico/filehandlers"
+	fileshared "github.com/picosh/pico/filehandlers/shared"
 	"github.com/picosh/pico/prose"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
-	"github.com/picosh/utils/pipe"
 )
 
 func bail(err error) {
@@ -22,20 +20,27 @@ func bail(err error) {
 	}
 }
 
-func render(ssg *prose.SSG, ch chan string) {
+type RenderEvent struct {
+	UserID  string
+	Service string
+}
+
+// run queue on an interval to merge file uploads from same user.
+func render(ssg *prose.SSG, ch chan RenderEvent) {
 	var pendingFlushes sync.Map
 	tick := time.Tick(10 * time.Second)
 	for {
 		select {
-		case userID := <-ch:
-			ssg.Logger.Info("received request to generate blog", "userId", userID)
-			pendingFlushes.Store(userID, userID)
+		case event := <-ch:
+			ssg.Logger.Info("received request to generate blog", "userId", event.UserID)
+			pendingFlushes.Store(event.UserID, event.Service)
 		case <-tick:
 			ssg.Logger.Info("flushing ssg requests")
 			go func() {
 				pendingFlushes.Range(func(key, value any) bool {
 					pendingFlushes.Delete(key)
-					user, err := ssg.DB.FindUser(value.(string))
+					event := value.(RenderEvent)
+					user, err := ssg.DB.FindUser(event.UserID)
 					if err != nil {
 						ssg.Logger.Error("cannot find user", "err", err)
 						return true
@@ -47,7 +52,7 @@ func render(ssg *prose.SSG, ch chan string) {
 						return true
 					}
 
-					err = ssg.ProseBlog(user, bucket)
+					err = ssg.ProseBlog(user, bucket, event.Service)
 					if err != nil {
 						ssg.Logger.Error("cannot generate blog", "err", err)
 					}
@@ -56,20 +61,6 @@ func render(ssg *prose.SSG, ch chan string) {
 			}()
 		}
 	}
-}
-
-func createSubProseDrain(ctx context.Context, logger *slog.Logger) *pipe.ReconnectReadWriteCloser {
-	info := shared.NewPicoPipeClient()
-	send := pipe.NewReconnectReadWriteCloser(
-		ctx,
-		logger,
-		info,
-		"sub to prose-drain",
-		"sub prose-drain -k",
-		100,
-		-1,
-	)
-	return send
 }
 
 func main() {
@@ -89,15 +80,15 @@ func main() {
 	}
 
 	ctx := context.Background()
-	drain := createSubProseDrain(ctx, cfg.Logger)
+	drain := fileshared.CreateSubUploadDrain(ctx, cfg.Logger)
 
-	ch := make(chan string)
+	ch := make(chan RenderEvent)
 	go render(ssg, ch)
 
 	for {
 		scanner := bufio.NewScanner(drain)
 		for scanner.Scan() {
-			var data filehandlers.SuccesHook
+			var data fileshared.FileUploaded
 
 			err := json.Unmarshal(scanner.Bytes(), &data)
 			if err != nil {
@@ -105,26 +96,52 @@ func main() {
 				continue
 			}
 
+			// we don't care about any other pgs sites so ignore them
+			if data.Service == "pgs" && data.ProjectName != "prose" {
+				continue
+			}
+
 			logger = logger.With(
 				"userId", data.UserID,
 				"filename", data.Filename,
 				"action", data.Action,
+				"project", data.ProjectName,
+				"service", data.Service,
 			)
 
+			bucket, err := ssg.Storage.GetBucket(shared.GetAssetBucketName(data.UserID))
+			if err != nil {
+				ssg.Logger.Error("cannot find bucket", "err", err)
+				continue
+			}
+			user, err := ssg.DB.FindUser(data.UserID)
+			if err != nil {
+				logger.Error("cannot find user", "err", err)
+				continue
+			}
+
 			if data.Action == "delete" {
-				bucket, err := ssg.Storage.GetBucket(shared.GetAssetBucketName(data.UserID))
-				if err != nil {
-					ssg.Logger.Error("cannot find bucket", "err", err)
-					continue
-				}
 				err = st.DeleteObject(bucket, data.Filename)
 				if err != nil {
 					logger.Error("cannot delete object", "err", err)
+				}
+				post, err := ssg.DB.FindPostWithFilename(data.Filename, data.UserID, "prose")
+				if err != nil {
+					logger.Error("cannot find post", "err", err)
+				} else {
+					err = ssg.DB.RemovePosts([]string{post.ID})
+					if err != nil {
+						logger.Error("cannot delete post", "err", err)
+					}
+				}
+				ch <- RenderEvent{data.UserID, data.Service}
+			} else if data.Action == "create" || data.Action == "update" {
+				_, err := ssg.UpsertPost(user.ID, user.Name, bucket, data.Filename)
+				if err != nil {
+					logger.Error("cannot upsert post", "err", err)
 					continue
 				}
-				ch <- data.UserID
-			} else if data.Action == "create" || data.Action == "update" {
-				ch <- data.UserID
+				ch <- RenderEvent{data.UserID, data.Service}
 			}
 		}
 	}

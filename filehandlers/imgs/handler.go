@@ -15,7 +15,7 @@ import (
 	"github.com/charmbracelet/ssh"
 	exifremove "github.com/neurosnap/go-exif-remove"
 	"github.com/picosh/pico/db"
-	"github.com/picosh/pico/filehandlers"
+	fileshared "github.com/picosh/pico/filehandlers/shared"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pobj"
@@ -91,7 +91,7 @@ func (h *UploadImgHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os.F
 	return fileInfo, reader, nil
 }
 
-func (h *UploadImgHandler) Success(s ssh.Session, data *filehandlers.SuccesHook) error {
+func (h *UploadImgHandler) Success(s ssh.Session, data *fileshared.FileUploaded) error {
 	out, err := json.Marshal(data)
 	if err != nil {
 		return err
@@ -186,10 +186,11 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (str
 		return "", err
 	}
 
-	_ = h.Success(s, &filehandlers.SuccesHook{
+	_ = h.Success(s, &fileshared.FileUploaded{
 		UserID:   user.ID,
 		Action:   "create",
 		Filename: metadata.Filename,
+		Service:  "prose",
 	})
 
 	curl := shared.NewCreateURL(h.Cfg)
@@ -250,10 +251,11 @@ func (h *UploadImgHandler) Delete(s ssh.Session, entry *sendutils.FileEntry) err
 		return err
 	}
 
-	_ = h.Success(s, &filehandlers.SuccesHook{
+	_ = h.Success(s, &fileshared.FileUploaded{
 		UserID:   user.ID,
 		Action:   "delete",
 		Filename: filename,
+		Service:  "prose",
 	})
 
 	return nil

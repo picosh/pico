@@ -12,6 +12,7 @@ import (
 
 	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
+	fileshared "github.com/picosh/pico/filehandlers/shared"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
 	sendutils "github.com/picosh/send/utils"
@@ -27,17 +28,10 @@ type PostMetaData struct {
 	Aliases   []string
 }
 
-type SuccesHook struct {
-	UserID   string `json:"user_id"`
-	PostID   string `json:"post_id"`
-	Action   string `json:"action"`
-	Filename string `json:"filename"`
-}
-
 type ScpFileHooks interface {
 	FileValidate(s ssh.Session, data *PostMetaData) (bool, error)
 	FileMeta(s ssh.Session, data *PostMetaData) error
-	FileSuccess(s ssh.Session, data *SuccesHook) error
+	FileSuccess(s ssh.Session, data *fileshared.FileUploaded) error
 }
 
 type ScpUploadHandler struct {
@@ -267,11 +261,11 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (str
 		}
 	}
 
-	_ = h.Hooks.FileSuccess(s, &SuccesHook{
+	_ = h.Hooks.FileSuccess(s, &fileshared.FileUploaded{
 		UserID:   user.ID,
-		PostID:   post.ID,
 		Action:   action,
 		Filename: metadata.Filename,
+		Service:  h.Cfg.Space,
 	})
 	curl := shared.NewCreateURL(h.Cfg)
 	return h.Cfg.FullPostURL(curl, user.Name, metadata.Slug), nil
@@ -307,11 +301,11 @@ func (h *ScpUploadHandler) Delete(s ssh.Session, entry *sendutils.FileEntry) err
 		logger.Error("post could not remove", "err", err.Error())
 		return fmt.Errorf("error for %s: %v", filename, err)
 	}
-	_ = h.Hooks.FileSuccess(s, &SuccesHook{
+	_ = h.Hooks.FileSuccess(s, &fileshared.FileUploaded{
 		UserID:   user.ID,
-		PostID:   post.ID,
 		Action:   "delete",
 		Filename: filename,
+		Service:  h.Cfg.Space,
 	})
 	return nil
 }

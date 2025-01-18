@@ -6,7 +6,7 @@ go 1.23.1
 
 // replace github.com/picosh/send => ../send
 
-// replace github.com/picosh/pobj => ../pobj
+replace github.com/picosh/pobj => ../pobj
 
 // replace github.com/picosh/pubsub => ../pubsub
 
@@ -50,7 +50,7 @@ require (
 	github.com/neurosnap/go-exif-remove v0.0.0-20221010134343-50d1e3c35577
 	github.com/picosh/pobj v0.0.0-20250115045405-73c816ed76c2
 	github.com/picosh/pubsub v0.0.0-20241114191831-ec8f16c0eb88
-	github.com/picosh/send v0.0.0-20241218031305-056b1fe8ff80
+	github.com/picosh/send v0.0.0-20250118030432-81b0df1712ac
 	github.com/picosh/tunkit v0.0.0-20240905223921-532404cef9d9
 	github.com/picosh/utils v0.0.0-20241120033529-8ca070c09bf4
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06

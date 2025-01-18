@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/filehandlers"
+	fileshared "github.com/picosh/pico/filehandlers/shared"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/utils"
 )
@@ -82,6 +83,6 @@ func (p *FeedHooks) FileMeta(s ssh.Session, data *filehandlers.PostMetaData) err
 	return nil
 }
 
-func (p *FeedHooks) FileSuccess(s ssh.Session, data *filehandlers.SuccesHook) error {
+func (p *FeedHooks) FileSuccess(s ssh.Session, data *fileshared.FileUploaded) error {
 	return nil
 }

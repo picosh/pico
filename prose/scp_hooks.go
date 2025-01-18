@@ -1,7 +1,6 @@
 package prose
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -10,6 +9,7 @@ import (
 	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/filehandlers"
+	fileshared "github.com/picosh/pico/filehandlers/shared"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/utils"
 	pipeUtil "github.com/picosh/utils/pipe"
@@ -76,12 +76,6 @@ func (p *MarkdownHooks) FileMeta(s ssh.Session, data *filehandlers.PostMetaData)
 	return nil
 }
 
-func (p *MarkdownHooks) FileSuccess(s ssh.Session, data *filehandlers.SuccesHook) error {
-	out, err := json.Marshal(data)
-	if err != nil {
-		return err
-	}
-	out = append(out, '\n')
-	_, err = p.Pipe.Write(out)
-	return err
+func (p *MarkdownHooks) FileSuccess(s ssh.Session, data *fileshared.FileUploaded) error {
+	return fileshared.WriteUploadDrain(p.Pipe, data)
 }
