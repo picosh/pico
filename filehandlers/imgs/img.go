@@ -3,6 +3,7 @@ package uploadimgs
 import (
 	"bytes"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -49,7 +50,7 @@ func (h *UploadImgHandler) metaImg(data *PostMetaData) error {
 		return nil
 	}
 
-	bucket, err := h.Storage.UpsertBucket(data.User.ID)
+	bucket, err := h.Storage.UpsertBucket(shared.GetAssetBucketName(data.User.ID))
 	if err != nil {
 		return err
 	}
@@ -58,7 +59,7 @@ func (h *UploadImgHandler) metaImg(data *PostMetaData) error {
 
 	fname, _, err := h.Storage.PutObject(
 		bucket,
-		data.Filename,
+		filepath.Join("prose", data.Filename),
 		sendutils.NopReaderAtCloser(reader),
 		&sendutils.FileEntry{},
 	)

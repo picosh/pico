@@ -76,6 +76,7 @@ func main() {
 	for _, user := range users {
 		bucket, err := st.UpsertBucket(shared.GetAssetBucketName(user.ID))
 		bail(err)
+		_, _ = picoDb.InsertProject(user.ID, "prose", "prose")
 		bail(images(logger, st, bucket, user))
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"os"
 	"strconv"
@@ -16,7 +17,6 @@ import (
 	"github.com/gorilla/feeds"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
-	"github.com/picosh/pico/imgs"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/utils"
@@ -438,14 +438,6 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			WithStyles:   withStyles,
 		}
 	} else {
-		// TODO: HACK to support imgs slugs inside prose
-		// We definitely want to kill this feature in time
-		imgPost, err := imgs.FindImgPost(r, user, slug)
-		if err == nil && imgPost != nil {
-			imgs.ImgRequest(w, r)
-			return
-		}
-
 		notFound, err := dbpool.FindPostWithFilename("_404.md", user.ID, cfg.Space)
 		contents := template.HTML("Oops!  we can't seem to find this post.")
 		title := "Post not found"
@@ -859,6 +851,24 @@ func createMainRoutes(staticRoutes []shared.Route) []shared.Route {
 	return routes
 }
 
+func imgRequest(w http.ResponseWriter, r *http.Request) {
+	username := shared.GetUsernameFromRequest(r)
+	destUrl, err := url.Parse(fmt.Sprintf("https://%s-prose.pgs.sh", username))
+	if err != nil {
+		http.Error(w, "site not found", http.StatusNotFound)
+		return
+	}
+
+	proxy := httputil.NewSingleHostReverseProxy(destUrl)
+	oldDirector := proxy.Director
+	proxy.Director = func(r *http.Request) {
+		oldDirector(r)
+		r.Host = destUrl.Host
+		r.URL = destUrl
+	}
+	proxy.ServeHTTP(w, r)
+}
+
 func createSubdomainRoutes(staticRoutes []shared.Route) []shared.Route {
 	routes := []shared.Route{
 		shared.NewRoute("GET", "/", blogHandler),
@@ -881,9 +891,8 @@ func createSubdomainRoutes(staticRoutes []shared.Route) []shared.Route {
 	routes = append(
 		routes,
 		shared.NewRoute("GET", "/raw/(.+)", postRawHandler),
-		shared.NewRoute("GET", "/([^/]+)/(.+)", imgs.ImgRequest),
-		shared.NewRoute("GET", "/(.+.(?:jpg|jpeg|png|gif|webp|svg))$", imgs.ImgRequest),
-		shared.NewRoute("GET", "/i", imgs.ImgsListHandler),
+		shared.NewRoute("GET", "/([^/]+)/(.+)", imgRequest),
+		shared.NewRoute("GET", "/(.+.(?:jpg|jpeg|png|gif|webp|svg))$", imgRequest),
 		shared.NewRoute("GET", "/(.+)", postHandler),
 	)
 
