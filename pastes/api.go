@@ -11,7 +11,6 @@ import (
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
-	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/utils"
 )
 
@@ -370,19 +369,6 @@ func StartApiServer() {
 	defer db.Close()
 	logger := cfg.Logger
 
-	var st storage.StorageServe
-	var err error
-	if cfg.MinioURL == "" {
-		st, err = storage.NewStorageFS(cfg.Logger, cfg.StorageDir)
-	} else {
-		st, err = storage.NewStorageMinio(cfg.Logger, cfg.MinioURL, cfg.MinioUser, cfg.MinioPass)
-	}
-
-	if err != nil {
-		logger.Error("could not create storage adapter", "err", err.Error())
-		return
-	}
-
 	go CronDeleteExpiredPosts(cfg, db)
 
 	staticRoutes := createStaticRoutes()
@@ -395,9 +381,8 @@ func StartApiServer() {
 	subdomainRoutes := createSubdomainRoutes(staticRoutes)
 
 	apiConfig := &shared.ApiConfig{
-		Cfg:     cfg,
-		Dbpool:  db,
-		Storage: st,
+		Cfg:    cfg,
+		Dbpool: db,
 	}
 	handler := shared.CreateServe(mainRoutes, subdomainRoutes, apiConfig)
 	router := http.HandlerFunc(handler)

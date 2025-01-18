@@ -12,9 +12,7 @@ import (
 
 	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
-	fileshared "github.com/picosh/pico/filehandlers/shared"
 	"github.com/picosh/pico/shared"
-	"github.com/picosh/pico/shared/storage"
 	sendutils "github.com/picosh/send/utils"
 	"github.com/picosh/utils"
 )
@@ -31,7 +29,6 @@ type PostMetaData struct {
 type ScpFileHooks interface {
 	FileValidate(s ssh.Session, data *PostMetaData) (bool, error)
 	FileMeta(s ssh.Session, data *PostMetaData) error
-	FileSuccess(s ssh.Session, data *fileshared.FileUploaded) error
 }
 
 type ScpUploadHandler struct {
@@ -40,7 +37,7 @@ type ScpUploadHandler struct {
 	Hooks  ScpFileHooks
 }
 
-func NewScpPostHandler(dbpool db.DB, cfg *shared.ConfigSite, hooks ScpFileHooks, st storage.StorageServe) *ScpUploadHandler {
+func NewScpPostHandler(dbpool db.DB, cfg *shared.ConfigSite, hooks ScpFileHooks) *ScpUploadHandler {
 	return &ScpUploadHandler{
 		DBPool: dbpool,
 		Cfg:    cfg,
@@ -157,9 +154,7 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (str
 		modTime = time.Unix(entry.Mtime, 0)
 	}
 
-	action := ""
 	if post == nil {
-		action = "create"
 		logger.Info("file not found, adding record")
 		insertPost := db.Post{
 			UserID: userID,
@@ -216,7 +211,6 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (str
 			return h.Cfg.FullPostURL(curl, user.Name, metadata.Slug), nil
 		}
 
-		action = "update"
 		logger.Info("file found, updating record")
 
 		updatePost := db.Post{
@@ -261,12 +255,6 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (str
 		}
 	}
 
-	_ = h.Hooks.FileSuccess(s, &fileshared.FileUploaded{
-		UserID:   user.ID,
-		Action:   action,
-		Filename: metadata.Filename,
-		Service:  h.Cfg.Space,
-	})
 	curl := shared.NewCreateURL(h.Cfg)
 	return h.Cfg.FullPostURL(curl, user.Name, metadata.Slug), nil
 }
@@ -301,11 +289,5 @@ func (h *ScpUploadHandler) Delete(s ssh.Session, entry *sendutils.FileEntry) err
 		logger.Error("post could not remove", "err", err.Error())
 		return fmt.Errorf("error for %s: %v", filename, err)
 	}
-	_ = h.Hooks.FileSuccess(s, &fileshared.FileUploaded{
-		UserID:   user.ID,
-		Action:   "delete",
-		Filename: filename,
-		Service:  h.Cfg.Space,
-	})
 	return nil
 }

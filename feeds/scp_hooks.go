@@ -11,7 +11,6 @@ import (
 	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/filehandlers"
-	fileshared "github.com/picosh/pico/filehandlers/shared"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/utils"
 )
@@ -80,9 +79,5 @@ func (p *FeedHooks) FileMeta(s ssh.Session, data *filehandlers.PostMetaData) err
 		data.Data.LastDigest = &now
 	}
 
-	return nil
-}
-
-func (p *FeedHooks) FileSuccess(s ssh.Session, data *fileshared.FileUploaded) error {
 	return nil
 }

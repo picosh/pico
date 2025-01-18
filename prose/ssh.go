@@ -14,7 +14,6 @@ import (
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/filehandlers"
 	uploadimgs "github.com/picosh/pico/filehandlers/imgs"
-	fileshared "github.com/picosh/pico/filehandlers/shared"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
 	wsh "github.com/picosh/pico/wish"
@@ -63,14 +62,9 @@ func StartSshServer() {
 	dbh := postgres.NewDB(cfg.DbURL, cfg.Logger)
 	defer dbh.Close()
 
-	ctx := context.Background()
-	defer ctx.Done()
-	pipeClient := fileshared.CreatePubUploadDrain(ctx, logger)
-
 	hooks := &MarkdownHooks{
-		Cfg:  cfg,
-		Db:   dbh,
-		Pipe: pipeClient,
+		Cfg: cfg,
+		Db:  dbh,
 	}
 
 	var st storage.StorageServe
@@ -87,9 +81,9 @@ func StartSshServer() {
 	}
 
 	fileMap := map[string]filehandlers.ReadWriteHandler{
-		".md":      filehandlers.NewScpPostHandler(dbh, cfg, hooks, st),
-		".css":     filehandlers.NewScpPostHandler(dbh, cfg, hooks, st),
-		"fallback": uploadimgs.NewUploadImgHandler(dbh, cfg, st, pipeClient),
+		".md":      filehandlers.NewScpPostHandler(dbh, cfg, hooks),
+		".css":     filehandlers.NewScpPostHandler(dbh, cfg, hooks),
+		"fallback": uploadimgs.NewUploadImgHandler(dbh, cfg, st),
 	}
 	handler := filehandlers.NewFileHandlerRouter(cfg, dbh, fileMap)
 	handler.Spaces = []string{cfg.Space, "imgs"}

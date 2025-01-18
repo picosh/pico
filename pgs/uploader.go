@@ -18,13 +18,11 @@ import (
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
 	"github.com/picosh/pico/db"
-	fileshared "github.com/picosh/pico/filehandlers/shared"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pobj"
 	sst "github.com/picosh/pobj/storage"
 	sendutils "github.com/picosh/send/utils"
 	"github.com/picosh/utils"
-	pipeutils "github.com/picosh/utils/pipe"
 	ignore "github.com/sabhiram/go-gitignore"
 )
 
@@ -105,7 +103,6 @@ type UploadAssetHandler struct {
 	Cfg                *shared.ConfigSite
 	Storage            sst.ObjectStorage
 	CacheClearingQueue chan string
-	UploadDrain        *pipeutils.ReconnectReadWriteCloser
 }
 
 func NewUploadAssetHandler(dbpool db.DB, cfg *shared.ConfigSite, storage sst.ObjectStorage, ctx context.Context) *UploadAssetHandler {
@@ -113,13 +110,11 @@ func NewUploadAssetHandler(dbpool db.DB, cfg *shared.ConfigSite, storage sst.Obj
 	ch := make(chan string, 100)
 	go runCacheQueue(cfg, ctx, ch)
 	// publish all file uploads to a pipe topic
-	drain := fileshared.CreatePubUploadDrain(ctx, cfg.Logger)
 	return &UploadAssetHandler{
 		DBPool:             dbpool,
 		Cfg:                cfg,
 		Storage:            storage,
 		CacheClearingQueue: ch,
-		UploadDrain:        drain,
 	}
 }
 
@@ -418,21 +413,6 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (s
 	surrogate := getSurrogateKey(user.Name, projectName)
 	h.CacheClearingQueue <- surrogate
 
-	action := ""
-	if curFileSize == 0 {
-		action = "create"
-	} else {
-		action = "updated"
-	}
-	upload := &fileshared.FileUploaded{
-		UserID:      user.ID,
-		Action:      action,
-		Filename:    assetFilename,
-		Service:     h.Cfg.Space,
-		ProjectName: projectName,
-	}
-	err = fileshared.WriteUploadDrain(h.UploadDrain, upload)
-
 	return str, err
 }
 
@@ -507,14 +487,6 @@ func (h *UploadAssetHandler) Delete(s ssh.Session, entry *sendutils.FileEntry) e
 		return err
 	}
 
-	upload := &fileshared.FileUploaded{
-		UserID:      user.ID,
-		Action:      "delete",
-		Filename:    assetFilepath,
-		Service:     h.Cfg.Space,
-		ProjectName: projectName,
-	}
-	err = fileshared.WriteUploadDrain(h.UploadDrain, upload)
 	return err
 }
 

@@ -8,7 +8,6 @@ import (
 
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
-	"github.com/picosh/pico/shared/storage"
 )
 
 func createStaticRoutes() []shared.Route {
@@ -78,18 +77,6 @@ func StartApiServer() {
 	defer db.Close()
 	logger := cfg.Logger
 
-	var st storage.StorageServe
-	var err error
-	if cfg.MinioURL == "" {
-		st, err = storage.NewStorageFS(cfg.Logger, cfg.StorageDir)
-	} else {
-		st, err = storage.NewStorageMinio(cfg.Logger, cfg.MinioURL, cfg.MinioUser, cfg.MinioPass)
-	}
-
-	if err != nil {
-		logger.Error(err.Error())
-	}
-
 	// cron daily digest
 	fetcher := NewFetcher(db, cfg)
 	go fetcher.Loop()
@@ -103,9 +90,8 @@ func StartApiServer() {
 	mainRoutes := createMainRoutes(staticRoutes)
 
 	apiConfig := &shared.ApiConfig{
-		Cfg:     cfg,
-		Dbpool:  db,
-		Storage: st,
+		Cfg:    cfg,
+		Dbpool: db,
 	}
 	handler := shared.CreateServe(mainRoutes, []shared.Route{}, apiConfig)
 	router := http.HandlerFunc(handler)

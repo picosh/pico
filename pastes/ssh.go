@@ -14,7 +14,6 @@ import (
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/filehandlers"
 	"github.com/picosh/pico/shared"
-	"github.com/picosh/pico/shared/storage"
 	wsh "github.com/picosh/pico/wish"
 	"github.com/picosh/send/auth"
 	"github.com/picosh/send/list"
@@ -64,21 +63,8 @@ func StartSshServer() {
 		Db:  dbh,
 	}
 
-	var st storage.StorageServe
-	var err error
-	if cfg.MinioURL == "" {
-		st, err = storage.NewStorageFS(cfg.Logger, cfg.StorageDir)
-	} else {
-		st, err = storage.NewStorageMinio(cfg.Logger, cfg.MinioURL, cfg.MinioUser, cfg.MinioPass)
-	}
-
-	if err != nil {
-		logger.Error(err.Error())
-		return
-	}
-
 	fileMap := map[string]filehandlers.ReadWriteHandler{
-		"fallback": filehandlers.NewScpPostHandler(dbh, cfg, hooks, st),
+		"fallback": filehandlers.NewScpPostHandler(dbh, cfg, hooks),
 	}
 	handler := filehandlers.NewFileHandlerRouter(cfg, dbh, fileMap)
 	sshAuth := shared.NewSshAuthHandler(dbh, logger, cfg)

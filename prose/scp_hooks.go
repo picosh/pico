@@ -9,7 +9,6 @@ import (
 	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/filehandlers"
-	fileshared "github.com/picosh/pico/filehandlers/shared"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/utils"
 	pipeUtil "github.com/picosh/utils/pipe"
@@ -74,8 +73,4 @@ func (p *MarkdownHooks) FileMeta(s ssh.Session, data *filehandlers.PostMetaData)
 	data.Hidden = parsedText.MetaData.Hidden || isHiddenFilename
 
 	return nil
-}
-
-func (p *MarkdownHooks) FileSuccess(s ssh.Session, data *fileshared.FileUploaded) error {
-	return fileshared.WriteUploadDrain(p.Pipe, data)
 }
