@@ -1,19 +1,13 @@
 package imgs
 
 import (
-	"bytes"
 	"fmt"
 	"html/template"
 	"net/http"
 	"net/url"
 	"path/filepath"
-	"time"
 
-	_ "net/http/pprof"
-
-	"github.com/gorilla/feeds"
 	"github.com/picosh/pico/db"
-	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/pgs"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
@@ -87,82 +81,6 @@ func ImgsListHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		logger.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-}
-
-func ImgsRssHandler(w http.ResponseWriter, r *http.Request) {
-	dbpool := shared.GetDB(r)
-	logger := shared.GetLogger(r)
-	cfg := shared.GetCfg(r)
-
-	pager, err := dbpool.FindAllPosts(&db.Pager{Num: 25, Page: 0}, Space)
-	if err != nil {
-		logger.Error(err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	ts, err := template.ParseFiles(cfg.StaticPath("html/rss.page.tmpl"))
-	if err != nil {
-		logger.Error(err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	feed := &feeds.Feed{
-		Title:       fmt.Sprintf("%s imgs feed", cfg.Domain),
-		Link:        &feeds.Link{Href: cfg.HomeURL()},
-		Description: fmt.Sprintf("%s latest image", cfg.Domain),
-		Author:      &feeds.Author{Name: cfg.Domain},
-		Created:     time.Now(),
-	}
-
-	curl := shared.CreateURLFromRequest(cfg, r)
-
-	var feedItems []*feeds.Item
-	for _, post := range pager.Data {
-		var tpl bytes.Buffer
-		data := &PostPageData{
-			ImgURL: template.URL(cfg.ImgURL(curl, post.Username, post.Filename)),
-		}
-		if err := ts.Execute(&tpl, data); err != nil {
-			continue
-		}
-
-		realUrl := cfg.FullPostURL(curl, post.Username, post.Filename)
-		if !curl.Subdomain && !curl.UsernameInRoute {
-			realUrl = fmt.Sprintf("%s://%s%s", cfg.Protocol, r.Host, realUrl)
-		}
-
-		item := &feeds.Item{
-			Id:          realUrl,
-			Title:       post.Title,
-			Link:        &feeds.Link{Href: realUrl},
-			Content:     tpl.String(),
-			Created:     *post.PublishAt,
-			Updated:     *post.UpdatedAt,
-			Description: post.Description,
-			Author:      &feeds.Author{Name: post.Username},
-		}
-
-		if post.Description != "" {
-			item.Description = post.Description
-		}
-
-		feedItems = append(feedItems, item)
-	}
-	feed.Items = feedItems
-
-	rss, err := feed.ToAtom()
-	if err != nil {
-		logger.Error(err.Error())
-		http.Error(w, "Could not generate atom rss feed", http.StatusInternalServerError)
-	}
-
-	w.Header().Add("Content-Type", "application/atom+xml")
-	_, err = w.Write([]byte(rss))
-	if err != nil {
-		logger.Error(err.Error())
 	}
 }
 
@@ -247,103 +165,4 @@ func ImgRequest(w http.ResponseWriter, r *http.Request) {
 func FindImgPost(r *http.Request, user *db.User, slug string) (*db.Post, error) {
 	dbpool := shared.GetDB(r)
 	return dbpool.FindPostWithSlug(slug, user.ID, Space)
-}
-
-func redirectHandler(w http.ResponseWriter, r *http.Request) {
-	username := shared.GetUsernameFromRequest(r)
-	url := fmt.Sprintf("https://%s.prose.sh/i", username)
-	http.Redirect(w, r, url, http.StatusMovedPermanently)
-}
-
-func createMainRoutes(staticRoutes []shared.Route) []shared.Route {
-	routes := []shared.Route{
-		shared.NewRoute("GET", "/check", shared.CheckHandler),
-		shared.NewRoute("GET", "/", func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, "https://prose.sh", http.StatusMovedPermanently)
-		}),
-	}
-
-	routes = append(
-		routes,
-		staticRoutes...,
-	)
-
-	routes = append(
-		routes,
-		shared.NewRoute("GET", "/rss", ImgsRssHandler),
-		shared.NewRoute("GET", "/rss.xml", ImgsRssHandler),
-		shared.NewRoute("GET", "/atom.xml", ImgsRssHandler),
-		shared.NewRoute("GET", "/feed.xml", ImgsRssHandler),
-
-		shared.NewRoute("GET", "/([^/]+)", redirectHandler),
-		shared.NewRoute("GET", "/([^/]+)/o/([^/]+)", ImgRequest),
-		shared.NewRoute("GET", "/([^/]+)/([^/]+)", ImgRequest),
-		shared.NewRoute("GET", "/([^/]+)/([^/]+)/(.+)", ImgRequest),
-	)
-
-	return routes
-}
-
-func createSubdomainRoutes(staticRoutes []shared.Route) []shared.Route {
-	routes := []shared.Route{}
-
-	routes = append(
-		routes,
-		staticRoutes...,
-	)
-
-	routes = append(
-		routes,
-		shared.NewRoute("GET", "/", redirectHandler),
-		shared.NewRoute("GET", "/o/([^/]+)", ImgRequest),
-		shared.NewRoute("GET", "/([^/]+)", ImgRequest),
-		shared.NewRoute("GET", "/([^/]+)/(.+)", ImgRequest),
-	)
-
-	return routes
-}
-
-func StartApiServer() {
-	cfg := NewConfigSite()
-	logger := cfg.Logger
-
-	db := postgres.NewDB(cfg.DbURL, cfg.Logger)
-	defer db.Close()
-
-	var st storage.StorageServe
-	var err error
-	if cfg.MinioURL == "" {
-		st, err = storage.NewStorageFS(cfg.Logger, cfg.StorageDir)
-	} else {
-		st, err = storage.NewStorageMinio(cfg.Logger, cfg.MinioURL, cfg.MinioUser, cfg.MinioPass)
-	}
-
-	if err != nil {
-		logger.Error(err.Error())
-	}
-
-	staticRoutes := []shared.Route{}
-	if cfg.Debug {
-		staticRoutes = shared.CreatePProfRoutes(staticRoutes)
-	}
-
-	mainRoutes := createMainRoutes(staticRoutes)
-	subdomainRoutes := createSubdomainRoutes(staticRoutes)
-
-	apiConfig := &shared.ApiConfig{
-		Cfg:     cfg,
-		Dbpool:  db,
-		Storage: st,
-	}
-	handler := shared.CreateServe(mainRoutes, subdomainRoutes, apiConfig)
-	router := http.HandlerFunc(handler)
-
-	portStr := fmt.Sprintf(":%s", cfg.Port)
-	logger.Info(
-		"Starting server on port",
-		"port", cfg.Port,
-		"domain", cfg.Domain,
-	)
-
-	logger.Error(http.ListenAndServe(portStr, router).Error())
 }

@@ -11,13 +11,6 @@ services:
     ports:
       - "9000:9000"
       - "9001:9001"
-  registry:
-    env_file:
-      - .env.example
-    ports:
-      - "5000:5000"
-    volumes:
-      - ./imgs/registry.yml:/etc/docker/registry/config.yml
   imgproxy:
     env_file:
       - .env.example
@@ -87,29 +80,6 @@ services:
       - ./data/prose-ssh/data:/app/ssh_data
     ports:
       - "2222:2222"
-  imgs-web:
-    build:
-      args:
-        APP: imgs
-      target: release-web
-    env_file:
-      - .env.example
-    volumes:
-      - ./data/storage/data:/app/.storage
-    ports:
-      - "3003:3000"
-  imgs-ssh:
-    build:
-      args:
-        APP: imgs
-      target: release-ssh
-    env_file:
-      - .env.example
-    volumes:
-      - ./data/storage/data:/app/.storage
-      - ./data/imgs-ssh/data:/app/ssh_data
-    ports:
-      - "2223:2222"
   pgs-web:
     build:
       args:

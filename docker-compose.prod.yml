@@ -35,13 +35,6 @@ services:
       - .env.prod
     volumes:
       - ./data/pipemgr/data/term_info_ed25519:/key:ro
-  registry:
-    env_file:
-      - .env.prod
-    volumes:
-      - ./imgs/registry.yml:/etc/docker/registry/config.yml
-    networks:
-      - imgs
   imgproxy:
     env_file:
       - .env.prod
@@ -186,53 +179,6 @@ services:
     ports:
       - "${PROSE_SSH_V4:-22}:2222"
       - "${PROSE_SSH_V6:-[::1]:22}:2222"
-  imgs-caddy:
-    image: ghcr.io/picosh/pico/caddy:latest
-    restart: always
-    networks:
-      - imgs
-    env_file:
-      - .env.prod
-    environment:
-      APP_DOMAIN: ${IMGS_DOMAIN:-imgs.sh}
-      APP_EMAIL: ${IMGS_EMAIL:-hello@pico.sh}
-    volumes:
-      - ${IMGS_CADDYFILE}:/etc/caddy/Caddyfile
-      - ./data/imgs-caddy/data:/data
-      - ./data/imgs-caddy/config:/config
-    ports:
-      - "${IMGS_HTTPS_V4:-443}:443"
-      - "${IMGS_HTTP_V4:-80}:80"
-      - "${IMGS_HTTPS_V6:-[::1]:443}:443"
-      - "${IMGS_HTTP_V6:-[::1]:80}:80"
-    profiles:
-      - imgs
-      - caddy
-      - all
-  imgs-web:
-    networks:
-      imgs:
-        aliases:
-          - web
-    env_file:
-      - .env.prod
-    volumes:
-      - ./data/storage/data:/app/.storage
-      - ./data/imgs-ssh/data:/app/ssh_data
-  imgs-ssh:
-    networks:
-      imgs:
-        aliases:
-          - ssh
-    env_file:
-      - .env.prod
-    volumes:
-      - ./data/storage/data:/app/.storage
-      - ./data/imgs-ssh/data:/app/ssh_data
-      - ./data/imgs-tmp:/tmp
-    ports:
-      - "${IMGS_SSH_V4:-22}:2222"
-      - "${IMGS_SSH_V6:-[::1]:22}:2222"
   pgs-caddy:
     image: ghcr.io/picosh/pico/caddy:latest
     restart: always
@@ -392,12 +338,6 @@ networks:
     ipam:
       config:
         - subnet: 172.19.0.0/16
-  imgs:
-    driver_opts:
-      com.docker.network.bridge.name: imgs
-    ipam:
-      config:
-        - subnet: 172.21.0.0/16
   feeds:
     driver_opts:
       com.docker.network.bridge.name: feeds
