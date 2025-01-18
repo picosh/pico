@@ -6,7 +6,7 @@ go 1.23.1
 
 // replace github.com/picosh/send => ../send
 
-replace github.com/picosh/pobj => ../pobj
+// replace github.com/picosh/pobj => ../pobj
 
 // replace github.com/picosh/pubsub => ../pubsub
 
