@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"os"
 	"strconv"
@@ -16,7 +17,6 @@ import (
 	"github.com/gorilla/feeds"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/db/postgres"
-	"github.com/picosh/pico/imgs"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/utils"
@@ -169,13 +169,6 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 		p, err = dbpool.FindUserPostsByTag(pager, tag, user.ID, cfg.Space)
 	}
 	posts = p.Data
-
-	byUpdated := strings.Contains(r.URL.Path, "live")
-	if byUpdated {
-		slices.SortFunc(posts, func(a *db.Post, b *db.Post) int {
-			return b.UpdatedAt.Compare(*a.UpdatedAt)
-		})
-	}
 
 	if err != nil {
 		logger.Error(err.Error())
@@ -438,14 +431,6 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			WithStyles:   withStyles,
 		}
 	} else {
-		// TODO: HACK to support imgs slugs inside prose
-		// We definitely want to kill this feature in time
-		imgPost, err := imgs.FindImgPost(r, user, slug)
-		if err == nil && imgPost != nil {
-			imgs.ImgRequest(w, r)
-			return
-		}
-
 		notFound, err := dbpool.FindPostWithFilename("_404.md", user.ID, cfg.Space)
 		contents := template.HTML("Oops!  we can't seem to find this post.")
 		title := "Post not found"
@@ -645,13 +630,6 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 	curl := shared.CreateURLFromRequest(cfg, r)
 	blogUrl := cfg.FullBlogURL(curl, username)
 
-	byUpdated := strings.Contains(r.URL.Path, "live")
-	if byUpdated {
-		slices.SortFunc(posts, func(a *db.Post, b *db.Post) int {
-			return b.UpdatedAt.Compare(*a.UpdatedAt)
-		})
-	}
-
 	feed := &feeds.Feed{
 		Id:          blogUrl,
 		Title:       headerTxt.Title,
@@ -691,10 +669,6 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 
 		realUrl := cfg.FullPostURL(curl, post.Username, post.Slug)
 		feedId := realUrl
-
-		if byUpdated {
-			feedId = fmt.Sprintf("%s:%s", realUrl, post.UpdatedAt.Format(time.RFC3339))
-		}
 
 		item := &feeds.Item{
 			Id:          feedId,
@@ -859,13 +833,32 @@ func createMainRoutes(staticRoutes []shared.Route) []shared.Route {
 	return routes
 }
 
+func imgRequest(w http.ResponseWriter, r *http.Request) {
+	logger := shared.GetLogger(r)
+	username := shared.GetUsernameFromRequest(r)
+	destUrl, err := url.Parse(fmt.Sprintf("https://%s-prose.pgs.sh%s", username, r.URL.Path))
+	if err != nil {
+		logger.Error("could not parse image proxy url", "username", username)
+		http.Error(w, "could not parse image proxy url", http.StatusInternalServerError)
+		return
+	}
+	logger.Info("proxy image request", "url", destUrl.String())
+
+	proxy := httputil.NewSingleHostReverseProxy(destUrl)
+	oldDirector := proxy.Director
+	proxy.Director = func(r *http.Request) {
+		oldDirector(r)
+		r.Host = destUrl.Host
+		r.URL = destUrl
+	}
+	proxy.ServeHTTP(w, r)
+}
+
 func createSubdomainRoutes(staticRoutes []shared.Route) []shared.Route {
 	routes := []shared.Route{
 		shared.NewRoute("GET", "/", blogHandler),
-		shared.NewRoute("GET", "/live", blogHandler),
 		shared.NewRoute("GET", "/_styles.css", blogStyleHandler),
 		shared.NewRoute("GET", "/rss", rssBlogHandler),
-		shared.NewRoute("GET", "/live/rss", rssBlogHandler),
 		shared.NewRoute("GET", "/rss.xml", rssBlogHandler),
 		shared.NewRoute("GET", "/atom.xml", rssBlogHandler),
 		shared.NewRoute("GET", "/feed.xml", rssBlogHandler),
@@ -881,9 +874,10 @@ func createSubdomainRoutes(staticRoutes []shared.Route) []shared.Route {
 	routes = append(
 		routes,
 		shared.NewRoute("GET", "/raw/(.+)", postRawHandler),
-		shared.NewRoute("GET", "/([^/]+)/(.+)", imgs.ImgRequest),
-		shared.NewRoute("GET", "/(.+.(?:jpg|jpeg|png|gif|webp|svg))$", imgs.ImgRequest),
-		shared.NewRoute("GET", "/i", imgs.ImgsListHandler),
+		shared.NewRoute("GET", "/(.+).md", postRawHandler),
+		shared.NewRoute("GET", "/([^/]+)/(.+)", imgRequest),
+		shared.NewRoute("GET", "/(.+.(?:jpg|jpeg|png|gif|webp|svg))$", imgRequest),
+		shared.NewRoute("GET", "/(.+).html", postHandler),
 		shared.NewRoute("GET", "/(.+)", postHandler),
 	)
 

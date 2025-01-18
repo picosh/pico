@@ -397,7 +397,6 @@ var imgRegex = regexp.MustCompile("(.+.(?:jpg|jpeg|png|gif|webp|svg))(/.+)")
 func (web *WebRouter) AssetRequest(w http.ResponseWriter, r *http.Request) {
 	fname := r.PathValue("fname")
 	if imgRegex.MatchString(fname) {
-		fmt.Println("HIT")
 		web.ImageRequest(w, r)
 		return
 	}
@@ -415,7 +414,6 @@ func (web *WebRouter) ImageRequest(w http.ResponseWriter, r *http.Request) {
 	if len(matches) >= 3 {
 		imgOpts = matches[2]
 	}
-	fmt.Println("ZZZ", fname, imgOpts)
 
 	opts, err := storage.UriToImgProcessOpts(imgOpts)
 	if err != nil {

@@ -47,6 +47,10 @@ func NewUploadImgHandler(dbpool db.DB, cfg *shared.ConfigSite, storage storage.S
 	}
 }
 
+func (h *UploadImgHandler) getObjectPath(fpath string) string {
+	return filepath.Join("prose", fpath)
+}
+
 func (h *UploadImgHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os.FileInfo, sendutils.ReaderAtCloser, error) {
 	user, err := h.DBPool.FindUser(s.Permissions().Extensions["user_id"])
 	if err != nil {
@@ -71,12 +75,12 @@ func (h *UploadImgHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os.F
 		FModTime: *post.UpdatedAt,
 	}
 
-	bucket, err := h.Storage.GetBucket(user.ID)
+	bucket, err := h.Storage.GetBucket(shared.GetAssetBucketName(user.ID))
 	if err != nil {
 		return nil, nil, err
 	}
 
-	contents, _, err := h.Storage.GetObject(bucket, post.Filename)
+	contents, _, err := h.Storage.GetObject(bucket, h.getObjectPath(post.Filename))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -218,13 +222,13 @@ func (h *UploadImgHandler) Delete(s ssh.Session, entry *sendutils.FileEntry) err
 		return fmt.Errorf("error for %s: %v", filename, err)
 	}
 
-	bucket, err := h.Storage.UpsertBucket(user.ID)
+	bucket, err := h.Storage.UpsertBucket(shared.GetAssetBucketName(user.ID))
 	if err != nil {
 		return err
 	}
 
 	logger.Info("deleting image")
-	err = h.Storage.DeleteObject(bucket, filename)
+	err = h.Storage.DeleteObject(bucket, h.getObjectPath(filename))
 	if err != nil {
 		return err
 	}

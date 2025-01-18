@@ -49,7 +49,7 @@ func (h *UploadImgHandler) metaImg(data *PostMetaData) error {
 		return nil
 	}
 
-	bucket, err := h.Storage.UpsertBucket(data.User.ID)
+	bucket, err := h.Storage.UpsertBucket(shared.GetAssetBucketName(data.User.ID))
 	if err != nil {
 		return err
 	}
@@ -58,7 +58,7 @@ func (h *UploadImgHandler) metaImg(data *PostMetaData) error {
 
 	fname, _, err := h.Storage.PutObject(
 		bucket,
-		data.Filename,
+		h.getObjectPath(data.Filename),
 		sendutils.NopReaderAtCloser(reader),
 		&sendutils.FileEntry{},
 	)
@@ -128,18 +128,6 @@ func (h *UploadImgHandler) writeImg(s ssh.Session, data *PostMetaData) error {
 			logger.Error("post could not create", "err", err.Error())
 			return fmt.Errorf("error for %s: %v", data.Filename, err)
 		}
-
-		if len(data.Tags) > 0 {
-			logger.Info(
-				"found post tags, replacing with old tags",
-				"tags", strings.Join(data.Tags, ","),
-			)
-			err = h.DBPool.ReplaceTagsForPost(data.Tags, data.Post.ID)
-			if err != nil {
-				logger.Error("post could not replace tags", "err", err.Error())
-				return fmt.Errorf("error for %s: %v", data.Filename, err)
-			}
-		}
 	} else {
 		if data.Shasum == data.Cur.Shasum && modTime.Equal(*data.Cur.UpdatedAt) {
 			logger.Info("image found, but image is identical, skipping")
@@ -165,16 +153,6 @@ func (h *UploadImgHandler) writeImg(s ssh.Session, data *PostMetaData) error {
 		_, err = h.DBPool.UpdatePost(&updatePost)
 		if err != nil {
 			logger.Error("post could not update", "err", err.Error())
-			return fmt.Errorf("error for %s: %v", data.Filename, err)
-		}
-
-		logger.Info(
-			"found post tags, replacing with old tags",
-			"tags", strings.Join(data.Tags, ","),
-		)
-		err = h.DBPool.ReplaceTagsForPost(data.Tags, data.Cur.ID)
-		if err != nil {
-			logger.Error("post could not replace tags", "err", err.Error())
 			return fmt.Errorf("error for %s: %v", data.Filename, err)
 		}
 	}
