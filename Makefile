@@ -62,7 +62,7 @@ bp-%: bp-setup
 	$(DOCKER_BUILDX_BUILD) --build-arg "APP=$*" -t "ghcr.io/picosh/pico/$*-web:$(DOCKER_TAG)" --target release-web .
 .PHONY: bp-%
 
-bp-all: bp-prose bp-pastes bp-imgs bp-feeds bp-pgs bp-auth bp-bouncer bp-pipe
+bp-all: bp-prose bp-pastes bp-feeds bp-pgs bp-auth bp-bouncer bp-pipe
 .PHONY: bp-all
 
 build-auth:
@@ -78,7 +78,7 @@ build-%:
 	go build -o "build/$*-ssh" "./cmd/$*/ssh"
 .PHONY: build-%
 
-build: build-prose build-pastes build-imgs build-feeds build-pgs build-auth build-pico build-pipe
+build: build-prose build-pastes build-feeds build-pgs build-auth build-pico build-pipe
 .PHONY: build
 
 scripts:
@@ -145,11 +145,3 @@ restore:
 	$(DOCKER_CMD) exec -it $(DB_CONTAINER) /bin/bash
 	# psql postgres -U postgres -d pico < /backup.sql
 .PHONY: restore
-
-registry-clean:
-	# https://github.com/distribution/distribution/issues/3200#issuecomment-671062638
-	# NOTICE: if using s3 you need an empty file inside:
-	#   - `imgs/docker/registry/v2/repositories` and
-	#   - `imgs/docker/registry/v2/blobs`
-	docker compose exec registry bin/registry garbage-collect /etc/docker/registry/config.yml --delete-untagged
-.PHONY: registry-clean

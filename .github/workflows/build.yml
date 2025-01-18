@@ -27,7 +27,7 @@ jobs:
     needs: test
     strategy:
       matrix:
-        APP: [prose, pastes, imgs, pgs, feeds, pipe]
+        APP: [prose, pastes, pgs, feeds, pipe]
     steps:
     - name: Checkout repo
       uses: actions/checkout@v3
