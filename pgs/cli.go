@@ -52,7 +52,7 @@ func projectTable(styles common.Styles, projects []*db.Project, width int) *tabl
 	return t
 }
 
-func getHelpText(styles common.Styles, userName string, width int) string {
+func getHelpText(styles common.Styles, width int) string {
 	helpStr := "Commands: [help, stats, ls, fzf, rm, link, unlink, prune, retain, depends, acl, cache]\n"
 	helpStr += styles.Note.Render("NOTICE:") + " *must* append with `--write` for the changes to persist.\n"
 
@@ -201,17 +201,7 @@ func (c *Cmd) RmProjectAssets(projectName string) error {
 }
 
 func (c *Cmd) help() {
-	c.output(getHelpText(c.Styles, c.User.Name, c.Width))
-}
-
-func (c *Cmd) statsByProject(_ string) error {
-	msg := fmt.Sprintf(
-		"%s\n\nRun %s to access pico's analytics TUI",
-		c.Styles.Logo.Render("DEPRECATED"),
-		c.Styles.Code.Render("ssh pico.sh"),
-	)
-	c.output(c.Styles.RoundedBorder.Render(msg))
-	return nil
+	c.output(getHelpText(c.Styles, c.Width))
 }
 
 func (c *Cmd) stats(cfgMaxSize uint64) error {
@@ -253,9 +243,6 @@ func (c *Cmd) stats(cfgMaxSize uint64) error {
 		Headers(headers...).
 		Rows(data)
 	c.output(t.String())
-
-	c.output("Site usage analytics:")
-	_ = c.statsByProject("")
 
 	return nil
 }
