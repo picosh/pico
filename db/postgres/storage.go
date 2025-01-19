@@ -1990,3 +1990,23 @@ func (me *PsqlDB) AddPicoPlusUser(username, email, paymentType, txId string) err
 
 	return tx.Commit()
 }
+
+func (me *PsqlDB) UpsertProject(userID, projectName, projectDir string) (*db.Project, error) {
+	project, err := me.FindProjectByName(userID, projectName)
+	if err == nil {
+		// this just updates the `createdAt` timestamp, useful for book-keeping
+		err = me.UpdateProject(userID, projectName)
+		if err != nil {
+			me.Logger.Error("could not update project", "err", err)
+			return nil, err
+		}
+		return project, nil
+	}
+
+	_, err = me.InsertProject(userID, projectName, projectName)
+	if err != nil {
+		me.Logger.Error("could not create project", "err", err)
+		return nil, err
+	}
+	return me.FindProjectByName(userID, projectName)
+}

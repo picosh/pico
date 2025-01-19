@@ -213,6 +213,10 @@ func (me *StubDB) FindFeedItemsByPostID(postID string) ([]*db.FeedItem, error) {
 	return []*db.FeedItem{}, notImpl
 }
 
+func (me *StubDB) UpsertProject(userID, name, projectDir string) (*db.Project, error) {
+	return nil, notImpl
+}
+
 func (me *StubDB) InsertProject(userID, name, projectDir string) (string, error) {
 	return "", notImpl
 }

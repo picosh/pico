@@ -279,24 +279,10 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (s
 
 	// find, create, or update project if we haven't already done it
 	if project == nil {
-		project, err = h.DBPool.FindProjectByName(user.ID, projectName)
-		if err == nil {
-			err = h.DBPool.UpdateProject(user.ID, projectName)
-			if err != nil {
-				logger.Error("could not update project", "err", err.Error())
-				return "", err
-			}
-		} else {
-			_, err = h.DBPool.InsertProject(user.ID, projectName, projectName)
-			if err != nil {
-				logger.Error("could not create project", "err", err.Error())
-				return "", err
-			}
-			project, err = h.DBPool.FindProjectByName(user.ID, projectName)
-			if err != nil {
-				logger.Error("could not find project", "err", err.Error())
-				return "", err
-			}
+		project, err = h.DBPool.UpsertProject(user.ID, projectName, projectName)
+		if err != nil {
+			logger.Error("upsert project", "err", err.Error())
+			return "", err
 		}
 		setProject(s, project)
 	}

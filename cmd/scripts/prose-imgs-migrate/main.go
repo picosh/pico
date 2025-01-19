@@ -64,7 +64,7 @@ func images(logger *slog.Logger, dbh db.DB, st storage.StorageServe, bucket sst.
 		rdr, _, err := st.GetObject(imgBucket, posts.Filename)
 		if err != nil {
 			logger.Error("get object", "err", err)
-			return err
+			continue
 		}
 		err = upload(logger, st, bucket, posts.Filename, rdr)
 		if err != nil {
@@ -86,6 +86,9 @@ func main() {
 	bail(err)
 
 	for _, user := range users {
+		if user.Name != "erock" {
+			continue
+		}
 		logger.Info("migrating user images", "user", user.Name)
 
 		bucket, err := st.UpsertBucket(shared.GetAssetBucketName(user.ID))

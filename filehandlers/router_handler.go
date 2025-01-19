@@ -15,6 +15,7 @@ import (
 )
 
 type ReadWriteHandler interface {
+	List(s ssh.Session, fpath string, isDir bool, recursive bool) ([]os.FileInfo, error)
 	Write(ssh.Session, *utils.FileEntry) (string, error)
 	Read(ssh.Session, *utils.FileEntry) (os.FileInfo, utils.ReaderAtCloser, error)
 	Delete(ssh.Session, *utils.FileEntry) error
@@ -39,8 +40,8 @@ func NewFileHandlerRouter(cfg *shared.ConfigSite, dbpool db.DB, mapper map[strin
 	}
 }
 
-func (r *FileHandlerRouter) findHandler(entry *utils.FileEntry) (ReadWriteHandler, error) {
-	fext := filepath.Ext(entry.Filepath)
+func (r *FileHandlerRouter) findHandler(fp string) (ReadWriteHandler, error) {
+	fext := filepath.Ext(fp)
 	handler, ok := r.FileMap[fext]
 	if !ok {
 		hand, hasFallback := r.FileMap["fallback"]
@@ -57,7 +58,7 @@ func (r *FileHandlerRouter) Write(s ssh.Session, entry *utils.FileEntry) (string
 		return "", os.ErrInvalid
 	}
 
-	handler, err := r.findHandler(entry)
+	handler, err := r.findHandler(entry.Filepath)
 	if err != nil {
 		return "", err
 	}
@@ -65,7 +66,7 @@ func (r *FileHandlerRouter) Write(s ssh.Session, entry *utils.FileEntry) (string
 }
 
 func (r *FileHandlerRouter) Delete(s ssh.Session, entry *utils.FileEntry) error {
-	handler, err := r.findHandler(entry)
+	handler, err := r.findHandler(entry.Filepath)
 	if err != nil {
 		return err
 	}
@@ -73,11 +74,47 @@ func (r *FileHandlerRouter) Delete(s ssh.Session, entry *utils.FileEntry) error 
 }
 
 func (r *FileHandlerRouter) Read(s ssh.Session, entry *utils.FileEntry) (os.FileInfo, utils.ReaderAtCloser, error) {
-	handler, err := r.findHandler(entry)
+	handler, err := r.findHandler(entry.Filepath)
 	if err != nil {
 		return nil, nil, err
 	}
 	return handler.Read(s, entry)
+}
+
+func (r *FileHandlerRouter) List(s ssh.Session, fpath string, isDir bool, recursive bool) ([]os.FileInfo, error) {
+	files := []os.FileInfo{}
+	for key, handler := range r.FileMap {
+		// TODO: hack because we have duplicate keys for .md and .css
+		if key == ".css" {
+			continue
+		}
+
+		ff, err := handler.List(s, fpath, isDir, recursive)
+		if err != nil {
+			r.GetLogger().Error("handler list", "err", err)
+			continue
+		}
+		files = append(files, ff...)
+	}
+	return files, nil
+}
+
+func (r *FileHandlerRouter) GetLogger() *slog.Logger {
+	return r.Cfg.Logger
+}
+
+func (r *FileHandlerRouter) Validate(s ssh.Session) error {
+	user, err := r.DBPool.FindUser(s.Permissions().Extensions["user_id"])
+	if err != nil {
+		return err
+	}
+
+	r.Cfg.Logger.Info(
+		"attempting to upload files",
+		"user", user.Name,
+		"space", r.Cfg.Space,
+	)
+	return nil
 }
 
 func BaseList(s ssh.Session, fpath string, isDir bool, recursive bool, spaces []string, dbpool db.DB) ([]os.FileInfo, error) {
@@ -112,7 +149,6 @@ func BaseList(s ssh.Session, fpath string, isDir bool, recursive bool, spaces []
 		}
 	} else {
 		for _, space := range spaces {
-
 			p, e := dbpool.FindPostWithFilename(cleanFilename, user.ID, space)
 			if e != nil {
 				err = e
@@ -142,26 +178,4 @@ func BaseList(s ssh.Session, fpath string, isDir bool, recursive bool, spaces []
 	}
 
 	return fileList, nil
-}
-
-func (r *FileHandlerRouter) List(s ssh.Session, fpath string, isDir bool, recursive bool) ([]os.FileInfo, error) {
-	return BaseList(s, fpath, isDir, recursive, r.Spaces, r.DBPool)
-}
-
-func (r *FileHandlerRouter) GetLogger() *slog.Logger {
-	return r.Cfg.Logger
-}
-
-func (r *FileHandlerRouter) Validate(s ssh.Session) error {
-	user, err := r.DBPool.FindUser(s.Permissions().Extensions["user_id"])
-	if err != nil {
-		return err
-	}
-
-	r.Cfg.Logger.Info(
-		"attempting to upload files",
-		"user", user.Name,
-		"space", r.Cfg.Space,
-	)
-	return nil
 }

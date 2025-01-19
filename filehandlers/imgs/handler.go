@@ -1,15 +1,15 @@
 package uploadimgs
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
-	"time"
-
 	"slices"
+	"strings"
 
 	"github.com/charmbracelet/ssh"
 	exifremove "github.com/neurosnap/go-exif-remove"
@@ -17,6 +17,7 @@ import (
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/pobj"
+	sst "github.com/picosh/pobj/storage"
 	sendutils "github.com/picosh/send/utils"
 	"github.com/picosh/utils"
 )
@@ -24,13 +25,13 @@ import (
 var Space = "imgs"
 
 type PostMetaData struct {
-	*db.Post
-	OrigText []byte
-	Cur      *db.Post
-	Tags     []string
-	User     *db.User
-	*sendutils.FileEntry
-	FeatureFlag *db.FeatureFlag
+	Text          []byte
+	FileSize      int
+	TotalFileSize int
+	Filename      string
+	User          *db.User
+	FeatureFlag   *db.FeatureFlag
+	Bucket        sst.Bucket
 }
 
 type UploadImgHandler struct {
@@ -51,6 +52,51 @@ func (h *UploadImgHandler) getObjectPath(fpath string) string {
 	return filepath.Join("prose", fpath)
 }
 
+func (h *UploadImgHandler) List(s ssh.Session, fpath string, isDir bool, recursive bool) ([]os.FileInfo, error) {
+	var fileList []os.FileInfo
+
+	user, err := h.DBPool.FindUser(s.Permissions().Extensions["user_id"])
+	if err != nil {
+		return fileList, err
+	}
+
+	cleanFilename := fpath
+
+	bucketName := shared.GetAssetBucketName(user.ID)
+	bucket, err := h.Storage.GetBucket(bucketName)
+	if err != nil {
+		return fileList, err
+	}
+
+	if cleanFilename == "" || cleanFilename == "." {
+		name := cleanFilename
+		if name == "" {
+			name = "/"
+		}
+
+		info := &sendutils.VirtualFile{
+			FName:  name,
+			FIsDir: true,
+		}
+
+		fileList = append(fileList, info)
+	} else {
+		fp := h.getObjectPath(cleanFilename)
+		if fp != "/" && isDir {
+			fp += "/"
+		}
+
+		foundList, err := h.Storage.ListObjects(bucket, fp, recursive)
+		if err != nil {
+			return fileList, err
+		}
+
+		fileList = append(fileList, foundList...)
+	}
+
+	return fileList, nil
+}
+
 func (h *UploadImgHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os.FileInfo, sendutils.ReaderAtCloser, error) {
 	user, err := h.DBPool.FindUser(s.Permissions().Extensions["user_id"])
 	if err != nil {
@@ -63,29 +109,23 @@ func (h *UploadImgHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os.F
 		return nil, nil, os.ErrNotExist
 	}
 
-	post, err := h.DBPool.FindPostWithFilename(cleanFilename, user.ID, Space)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	fileInfo := &sendutils.VirtualFile{
-		FName:    post.Filename,
-		FIsDir:   false,
-		FSize:    int64(post.FileSize),
-		FModTime: *post.UpdatedAt,
-	}
-
 	bucket, err := h.Storage.GetBucket(shared.GetAssetBucketName(user.ID))
 	if err != nil {
 		return nil, nil, err
 	}
 
-	contents, _, err := h.Storage.GetObject(bucket, h.getObjectPath(post.Filename))
+	contents, info, err := h.Storage.GetObject(bucket, h.getObjectPath(cleanFilename))
 	if err != nil {
 		return nil, nil, err
 	}
-
 	reader := pobj.NewAllReaderAt(contents)
+
+	fileInfo := &sendutils.VirtualFile{
+		FName:    cleanFilename,
+		FIsDir:   false,
+		FSize:    info.Size,
+		FModTime: info.LastModified,
+	}
 
 	return fileInfo, reader, nil
 }
@@ -125,53 +165,33 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (str
 		}
 	}
 
-	now := time.Now()
 	fileSize := binary.Size(text)
-	shasum := utils.Shasum(text)
-	slug := utils.SanitizeFileExt(filename)
-
-	nextPost := db.Post{
-		Filename:  filename,
-		Slug:      slug,
-		PublishAt: &now,
-		Text:      string(text),
-		MimeType:  mimeType,
-		FileSize:  fileSize,
-		Shasum:    shasum,
-	}
-
-	post, err := h.DBPool.FindPostWithFilename(
-		nextPost.Filename,
-		user.ID,
-		Space,
-	)
-	if err != nil {
-		logger.Info("unable to find image, continuing", "filename", nextPost.Filename, "err", err.Error())
-	}
-
 	featureFlag := shared.FindPlusFF(h.DBPool, h.Cfg, user.ID)
-	metadata := PostMetaData{
-		OrigText:    text,
-		Post:        &nextPost,
-		User:        user,
-		FileEntry:   entry,
-		Cur:         post,
-		FeatureFlag: featureFlag,
-	}
 
-	if post != nil {
-		metadata.Post.PublishAt = post.PublishAt
-	}
-
-	err = h.writeImg(s, &metadata)
+	bucket, err := h.Storage.UpsertBucket(shared.GetAssetBucketName(user.ID))
 	if err != nil {
-		logger.Error("could not write img", "err", err.Error())
 		return "", err
 	}
 
-	totalFileSize, err := h.DBPool.FindTotalSizeForUser(user.ID)
+	totalFileSize, err := h.Storage.GetBucketQuota(bucket)
 	if err != nil {
-		logger.Error("could not find total storage size for user", "err", err.Error())
+		logger.Error("bucket quota", "err", err)
+		return "", err
+	}
+
+	metadata := PostMetaData{
+		Filename:      filename,
+		FileSize:      fileSize,
+		Text:          text,
+		User:          user,
+		FeatureFlag:   featureFlag,
+		Bucket:        bucket,
+		TotalFileSize: int(totalFileSize),
+	}
+
+	err = h.writeImg(&metadata)
+	if err != nil {
+		logger.Error("could not write img", "err", err.Error())
 		return "", err
 	}
 
@@ -185,7 +205,7 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (str
 	str := fmt.Sprintf(
 		"%s (space: %.2f/%.2fGB, %.2f%%)",
 		url,
-		utils.BytesToGB(totalFileSize),
+		utils.BytesToGB(metadata.TotalFileSize+fileSize),
 		utils.BytesToGB(maxSize),
 		(float32(totalFileSize)/float32(maxSize))*100,
 	)
@@ -206,22 +226,6 @@ func (h *UploadImgHandler) Delete(s ssh.Session, entry *sendutils.FileEntry) err
 		"filename", filename,
 	)
 
-	post, err := h.DBPool.FindPostWithFilename(
-		filename,
-		user.ID,
-		Space,
-	)
-	if err != nil {
-		logger.Info("unable to find image, continuing", "err", err.Error())
-		return err
-	}
-
-	err = h.DBPool.RemovePosts([]string{post.ID})
-	if err != nil {
-		logger.Error("error removing image", "error", err)
-		return fmt.Errorf("error for %s: %v", filename, err)
-	}
-
 	bucket, err := h.Storage.UpsertBucket(shared.GetAssetBucketName(user.ID))
 	if err != nil {
 		return err
@@ -230,6 +234,85 @@ func (h *UploadImgHandler) Delete(s ssh.Session, entry *sendutils.FileEntry) err
 	logger.Info("deleting image")
 	err = h.Storage.DeleteObject(bucket, h.getObjectPath(filename))
 	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (h *UploadImgHandler) validateImg(data *PostMetaData) (bool, error) {
+	fileMax := data.FeatureFlag.Data.FileMax
+	if int64(data.FileSize) > fileMax {
+		return false, fmt.Errorf("ERROR: file (%s) has exceeded maximum file size (%d bytes)", data.Filename, fileMax)
+	}
+
+	storageMax := data.FeatureFlag.Data.StorageMax
+	if uint64(data.TotalFileSize+data.FileSize) > storageMax {
+		return false, fmt.Errorf("ERROR: user (%s) has exceeded (%d bytes) max (%d bytes)", data.User.Name, data.TotalFileSize, storageMax)
+	}
+
+	if !utils.IsExtAllowed(data.Filename, h.Cfg.AllowedExt) {
+		extStr := strings.Join(h.Cfg.AllowedExt, ",")
+		err := fmt.Errorf(
+			"ERROR: (%s) invalid file, format must be (%s), skipping",
+			data.Filename,
+			extStr,
+		)
+		return false, err
+	}
+
+	return true, nil
+}
+
+func (h *UploadImgHandler) metaImg(data *PostMetaData) error {
+	// if the file is empty that means we should delete it
+	// so we can skip all the meta info
+	if data.FileSize == 0 {
+		return nil
+	}
+
+	// make sure we have a bucket
+	bucket, err := h.Storage.UpsertBucket(shared.GetAssetBucketName(data.User.ID))
+	if err != nil {
+		return err
+	}
+
+	// make sure we have a prose project to upload to
+	_, err = h.DBPool.UpsertProject(data.User.ID, "prose", "prose")
+	if err != nil {
+		return err
+	}
+
+	reader := bytes.NewReader([]byte(data.Text))
+	_, _, err = h.Storage.PutObject(
+		bucket,
+		h.getObjectPath(data.Filename),
+		sendutils.NopReaderAtCloser(reader),
+		&sendutils.FileEntry{},
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (h *UploadImgHandler) writeImg(data *PostMetaData) error {
+	valid, err := h.validateImg(data)
+	if !valid {
+		return err
+	}
+
+	logger := h.Cfg.Logger
+	logger = shared.LoggerWithUser(logger, data.User)
+	logger = logger.With(
+		"filename", data.Filename,
+	)
+
+	logger.Info("uploading image")
+	err = h.metaImg(data)
+	if err != nil {
+		logger.Error("meta img", "err", err)
 		return err
 	}
 

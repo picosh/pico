@@ -403,6 +403,7 @@ type DB interface {
 	InsertFeedItems(postID string, items []*FeedItem) error
 	FindFeedItemsByPostID(postID string) ([]*FeedItem, error)
 
+	UpsertProject(userID, name, projectDir string) (*Project, error)
 	InsertProject(userID, name, projectDir string) (string, error)
 	UpdateProject(userID, name string) error
 	UpdateProjectAcl(userID, name string, acl ProjectAcl) error

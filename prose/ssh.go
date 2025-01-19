@@ -85,7 +85,6 @@ func StartSshServer() {
 		"fallback": uploadimgs.NewUploadImgHandler(dbh, cfg, st),
 	}
 	handler := filehandlers.NewFileHandlerRouter(cfg, dbh, fileMap)
-	handler.Spaces = []string{cfg.Space, "imgs"}
 
 	sshAuth := shared.NewSshAuthHandler(dbh, logger, cfg)
 	s, err := wish.NewServer(

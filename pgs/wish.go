@@ -148,10 +148,6 @@ func WishMiddleware(handler *UploadAssetHandler) wish.Middleware {
 				err := opts.fzf(projectName)
 				opts.bail(err)
 				return
-			} else if cmd == "stats" {
-				err := opts.statsByProject(projectName)
-				opts.bail(err)
-				return
 			} else if cmd == "link" {
 				linkCmd, write := flagSet("link", sesh)
 				linkTo := linkCmd.String("to", "", "symbolic link to this project")
