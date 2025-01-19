@@ -335,6 +335,7 @@ var DenyList = []string{
 	"localhost",
 	"ams",
 	"ash",
+	"nue",
 }
 
 type DB interface {
