@@ -17,7 +17,7 @@ import (
 	"github.com/picosh/utils"
 )
 
-func projectTable(styles common.Styles, projects []*db.Project, width int) *table.Table {
+func projectTable(projects []*db.Project, width int) *table.Table {
 	headers := []string{
 		"Name",
 		"Last Updated",
@@ -257,7 +257,7 @@ func (c *Cmd) ls() error {
 		c.output("no projects found")
 	}
 
-	t := projectTable(c.Styles, projects, c.Width)
+	t := projectTable(projects, c.Width)
 	c.output(t.String())
 
 	return nil
@@ -374,7 +374,7 @@ func (c *Cmd) depends(projectName string) error {
 		return nil
 	}
 
-	t := projectTable(c.Styles, projects, c.Width)
+	t := projectTable(projects, c.Width)
 	c.output(t.String())
 
 	return nil
@@ -385,6 +385,10 @@ func (c *Cmd) depends(projectName string) error {
 func (c *Cmd) prune(prefix string, keepNumLatest int) error {
 	c.Log.Info("user running `clean` command", "user", c.User.Name, "prefix", prefix)
 	c.output(fmt.Sprintf("searching for projects that match prefix (%s) and are not linked to other projects", prefix))
+
+	if prefix == "prose" {
+		return fmt.Errorf("cannot delete `prose` because it is used by prose.sh and is protected")
+	}
 
 	if prefix == "" || prefix == "*" {
 		e := fmt.Errorf("must provide valid prefix")
@@ -462,6 +466,10 @@ func (c *Cmd) prune(prefix string, keepNumLatest int) error {
 
 func (c *Cmd) rm(projectName string) error {
 	c.Log.Info("user running `rm` command", "user", c.User.Name, "project", projectName)
+	if projectName == "prose" {
+		return fmt.Errorf("cannot delete `prose` because it is used by prose.sh and is protected")
+	}
+
 	project, err := c.Dbpool.FindProjectByName(c.User.ID, projectName)
 	if err == nil {
 		c.Log.Info("found project, checking dependencies", "project", projectName, "projectID", project.ID)
