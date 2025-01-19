@@ -53,7 +53,7 @@ func projectTable(styles common.Styles, projects []*db.Project, width int) *tabl
 }
 
 func getHelpText(styles common.Styles, userName string, width int) string {
-	helpStr := "Commands: [help, stats, ls, rm, link, unlink, prune, retain, depends, acl, cache]\n"
+	helpStr := "Commands: [help, stats, ls, fzf, rm, link, unlink, prune, retain, depends, acl, cache]\n"
 	helpStr += styles.Note.Render("NOTICE:") + " *must* append with `--write` for the changes to persist.\n"
 
 	projectName := "projA"
@@ -70,6 +70,10 @@ func getHelpText(styles common.Styles, userName string, width int) string {
 		{
 			"ls",
 			"lists projects",
+		},
+		{
+			fmt.Sprintf("fzf %s", projectName),
+			fmt.Sprintf("lists urls of all assets in %s", projectName),
 		},
 		{
 			fmt.Sprintf("rm %s", projectName),
@@ -284,6 +288,37 @@ func (c *Cmd) unlink(projectName string) error {
 		return err
 	}
 	c.output(fmt.Sprintf("(%s) unlinked", project.Name))
+
+	return nil
+}
+
+func (c *Cmd) fzf(projectName string) error {
+	project, err := c.Dbpool.FindProjectByName(c.User.ID, projectName)
+	if err != nil {
+		return err
+	}
+
+	bucket, err := c.Store.GetBucket(shared.GetAssetBucketName(c.User.ID))
+	if err != nil {
+		return err
+	}
+
+	objs, err := c.Store.ListObjects(bucket, project.ProjectDir, true)
+	if err != nil {
+		return err
+	}
+
+	for _, obj := range objs {
+		if strings.Contains(obj.Name(), "._pico_keep_dir") {
+			continue
+		}
+		url := c.Cfg.AssetURL(
+			c.User.Name,
+			project.Name,
+			strings.TrimPrefix(obj.Name(), "/"),
+		)
+		c.output(url)
+	}
 
 	return nil
 }

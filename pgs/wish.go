@@ -144,7 +144,11 @@ func WishMiddleware(handler *UploadAssetHandler) wish.Middleware {
 				"cmdArgs", cmdArgs,
 			)
 
-			if cmd == "stats" {
+			if cmd == "fzf" {
+				err := opts.fzf(projectName)
+				opts.bail(err)
+				return
+			} else if cmd == "stats" {
 				err := opts.statsByProject(projectName)
 				opts.bail(err)
 				return
