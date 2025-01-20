@@ -542,12 +542,14 @@ func AddPlusFeedForUser(dbpool db.DB, userID, email string) error {
 	text := fmt.Sprintf(`=: email %s
 =: digest_interval 1day
 => %s`, email, href)
+	now := time.Now()
 	_, err = dbpool.InsertPost(&db.Post{
-		UserID:   userID,
-		Text:     text,
-		Space:    "feeds",
-		Slug:     "pico-plus",
-		Filename: "pico-plus",
+		UserID:    userID,
+		Text:      text,
+		Space:     "feeds",
+		Slug:      "pico-plus",
+		Filename:  "pico-plus",
+		PublishAt: &now,
 	})
 	return err
 }
