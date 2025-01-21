@@ -715,8 +715,8 @@ github.com/picosh/pobj v0.0.0-20250115045405-73c816ed76c2 h1:fOz+o8pymr93p5OeJke
 github.com/picosh/pobj v0.0.0-20250115045405-73c816ed76c2/go.mod h1:cF+eAl4G1vU+WOD8cYCKaxokHo6MWmbR8J4/SJnvESg=
 github.com/picosh/pubsub v0.0.0-20241114191831-ec8f16c0eb88 h1:hdxE6rquHHw1/eeqS1b+ojLaxGtN8zOiTUclPwaVbPg=
 github.com/picosh/pubsub v0.0.0-20241114191831-ec8f16c0eb88/go.mod h1:+9hDKIDHQCvGFigCVlIl589BwpT9R4boKhUVc/OgRU4=
-github.com/picosh/send v0.0.0-20250121195306-98b94b3f7dfc h1:7YXvrM2qx+AJXfxPqetiQ1X0mPzLiYHIr0Cikzs3spM=
-github.com/picosh/send v0.0.0-20250121195306-98b94b3f7dfc/go.mod h1:dtmWF9oKPLbLnVE31kLO8he+4UVY7MyV1dmzWcaGzEg=
+github.com/picosh/send v0.0.0-20250121195737-daab6db117d5 h1:pcgpzOJAag0FkGa5he6Fl7k5E3ekZQh3e2qpjGGYipU=
+github.com/picosh/send v0.0.0-20250121195737-daab6db117d5/go.mod h1:dtmWF9oKPLbLnVE31kLO8he+4UVY7MyV1dmzWcaGzEg=
 github.com/picosh/tunkit v0.0.0-20240905223921-532404cef9d9 h1:g5oZmnDFr11HarA8IAXcc4o9PBlolSM59QIATCSoato=
 github.com/picosh/tunkit v0.0.0-20240905223921-532404cef9d9/go.mod h1:UrDH/VCIc1wg/L6iY2zSYt4TiGw+25GsKSnkVkU40Dw=
 github.com/picosh/utils v0.0.0-20241120033529-8ca070c09bf4 h1:pwbgY9shKyMlpYvpUalTyV0ZVd5paj8pSEYT4OPOYTk=

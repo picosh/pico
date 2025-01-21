@@ -50,7 +50,7 @@ require (
 	github.com/neurosnap/go-exif-remove v0.0.0-20221010134343-50d1e3c35577
 	github.com/picosh/pobj v0.0.0-20250115045405-73c816ed76c2
 	github.com/picosh/pubsub v0.0.0-20241114191831-ec8f16c0eb88
-	github.com/picosh/send v0.0.0-20250121195306-98b94b3f7dfc
+	github.com/picosh/send v0.0.0-20250121195737-daab6db117d5
 	github.com/picosh/tunkit v0.0.0-20240905223921-532404cef9d9
 	github.com/picosh/utils v0.0.0-20241120033529-8ca070c09bf4
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06
