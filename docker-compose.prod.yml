@@ -30,6 +30,10 @@ services:
       - .env.prod
     volumes:
       - ./data/minio-data:/data
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
   pipemgr:
     env_file:
       - .env.prod
@@ -41,6 +45,10 @@ services:
     volumes:
       - ./data/imgs-storage/data:/storage/imgs
       - ./data/pgs-storage/data:/storage/pgs
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
   pastes-caddy:
     image: ghcr.io/picosh/pico/caddy:latest
     restart: always
