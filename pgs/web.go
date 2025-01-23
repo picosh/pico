@@ -33,13 +33,10 @@ type CachedHttp struct {
 }
 
 func (c *CachedHttp) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
-	err := c.handler.ServeHTTP(writer, req, func(w http.ResponseWriter, r *http.Request) error {
+	_ = c.handler.ServeHTTP(writer, req, func(w http.ResponseWriter, r *http.Request) error {
 		c.routes.ServeHTTP(w, r)
 		return nil
 	})
-	if err != nil {
-		c.routes.Logger.Error("serve http", "err", err)
-	}
 }
 
 func StartApiServer() {
