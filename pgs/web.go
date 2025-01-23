@@ -539,16 +539,6 @@ func (web *WebRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		router = web.UserRouter
 	}
 
-	// enable cors
-	// TODO: I don't think we want this for pgs as a default
-	// users can enable cors headers using `_headers` file
-	/* if r.Method == "OPTIONS" {
-		shared.CorsHeaders(w.Header())
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-	shared.CorsHeaders(w.Header()) */
-
 	ctx := r.Context()
 	ctx = context.WithValue(ctx, shared.CtxSubdomainKey{}, subdomain)
 	router.ServeHTTP(w, r.WithContext(ctx))
