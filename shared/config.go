@@ -277,6 +277,7 @@ func (c *ConfigSite) AssetURL(username, projectName, fpath string) string {
 func CreateLogger(space string) *slog.Logger {
 	opts := &slog.HandlerOptions{
 		AddSource: true,
+		Level:     slog.LevelInfo,
 	}
 	log := slog.New(
 		slog.NewTextHandler(os.Stdout, opts),
