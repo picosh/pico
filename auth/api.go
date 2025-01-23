@@ -696,19 +696,19 @@ func metricDrainSub(ctx context.Context, dbpool db.DB, logger *slog.Logger, secr
 
 			visit, err := accessLogToVisit(dbpool, clean)
 			if err != nil {
-				logger.Debug("could not convert access log to a visit", "err", err)
+				// logger.Debug("could not convert access log to a visit", "err", err)
 				continue
 			}
 
 			logger.Info("received visit", "visit", visit)
 			err = shared.AnalyticsVisitFromVisit(visit, dbpool, secret)
 			if err != nil {
-				logger.Debug("could not record analytics visit", "err", err)
+				// logger.Debug("could not record analytics visit", "err", err)
 				continue
 			}
 
 			if !strings.HasPrefix(visit.ContentType, "text/html") {
-				logger.Debug("invalid content type", "contentType", visit.ContentType)
+				// logger.Debug("invalid content type", "contentType", visit.ContentType)
 				continue
 			}
 

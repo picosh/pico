@@ -83,7 +83,6 @@ func StartApiServer() {
 			MaxBodyBytes:        uint64(cfg.MaxAssetSize),
 			DefaultCacheControl: cfg.CacheControl,
 		},
-		LogLevel: "info",
 	}
 	c.SetLogger(&CompatLogger{logger})
 	storages.InitFromConfiguration(c)
