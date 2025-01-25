@@ -10,15 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/picosh/pico/db"
-	"github.com/picosh/pico/db/stub"
+	pgsdb "github.com/picosh/pico/pgs/db"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
 	sst "github.com/picosh/pobj/storage"
 )
-
-var testUserID = "user-1"
-var testUsername = "user"
 
 type ApiExample struct {
 	name        string
@@ -29,63 +25,34 @@ type ApiExample struct {
 	status      int
 	contentType string
 
-	dbpool  db.DB
 	storage map[string]map[string]string
 }
 
 type PgsDb struct {
-	*stub.StubDB
+	*pgsdb.MemoryDB
 }
 
 func NewPgsDb(logger *slog.Logger) *PgsDb {
-	sb := stub.NewStubDB(logger)
+	sb := pgsdb.NewDBMemory(logger)
+	sb.SetupTestData()
+	_, err := sb.InsertProject(sb.Users[0].ID, "test", "test")
+	if err != nil {
+		panic(err)
+	}
 	return &PgsDb{
-		StubDB: sb,
+		MemoryDB: sb,
 	}
 }
 
-func (p *PgsDb) FindUserForName(name string) (*db.User, error) {
-	return &db.User{
-		ID:   testUserID,
-		Name: testUsername,
-	}, nil
-}
-
-func (p *PgsDb) FindProjectByName(userID, name string) (*db.Project, error) {
-	return &db.Project{
-		ID:         "project-1",
-		UserID:     userID,
-		Name:       name,
-		ProjectDir: name,
-		Username:   testUsername,
-		Acl: db.ProjectAcl{
-			Type: "public",
-		},
-	}, nil
-}
-
-type PgsAnalyticsDb struct {
-	*PgsDb
-}
-
-func NewPgsAnalticsDb(logger *slog.Logger) *PgsAnalyticsDb {
-	return &PgsAnalyticsDb{
-		PgsDb: NewPgsDb(logger),
-	}
-}
-
-func (p *PgsAnalyticsDb) HasFeatureForUser(userID, feature string) bool {
-	return true
-}
-
-func mkpath(path string) string {
-	return fmt.Sprintf("https://%s-test.pgs.test%s", testUsername, path)
+func (p *PgsDb) mkpath(path string) string {
+	return fmt.Sprintf("https://%s-test.pgs.test%s", p.Users[0].Name, path)
 }
 
 func TestApiBasic(t *testing.T) {
-	bucketName := shared.GetAssetBucketName(testUserID)
-	cfg := NewConfigSite()
-	cfg.Domain = "pgs.test"
+	logger := slog.Default()
+	dbpool := NewPgsDb(logger)
+	bucketName := shared.GetAssetBucketName(dbpool.Users[0].ID)
+
 	tt := []*ApiExample{
 		{
 			name:        "basic",
@@ -94,7 +61,6 @@ func TestApiBasic(t *testing.T) {
 			status:      http.StatusOK,
 			contentType: "text/html",
 
-			dbpool: NewPgsDb(cfg.Logger),
 			storage: map[string]map[string]string{
 				bucketName: {
 					"test/index.html": "hello world!",
@@ -108,7 +74,6 @@ func TestApiBasic(t *testing.T) {
 			status:      http.StatusOK,
 			contentType: "text/html",
 
-			dbpool: NewPgsDb(cfg.Logger),
 			storage: map[string]map[string]string{
 				bucketName: {
 					"test/test.html": "hello world!",
@@ -122,7 +87,6 @@ func TestApiBasic(t *testing.T) {
 			status:      http.StatusMovedPermanently,
 			contentType: "text/html; charset=utf-8",
 
-			dbpool: NewPgsDb(cfg.Logger),
 			storage: map[string]map[string]string{
 				bucketName: {
 					"test/subdir/index.html": "hello world!",
@@ -136,7 +100,6 @@ func TestApiBasic(t *testing.T) {
 			status:      http.StatusMovedPermanently,
 			contentType: "text/html; charset=utf-8",
 
-			dbpool: NewPgsDb(cfg.Logger),
 			storage: map[string]map[string]string{
 				bucketName: {
 					"test/_redirects": "/anything /about.html 301",
@@ -151,7 +114,6 @@ func TestApiBasic(t *testing.T) {
 			status:      http.StatusOK,
 			contentType: "text/html",
 
-			dbpool: NewPgsDb(cfg.Logger),
 			storage: map[string]map[string]string{
 				bucketName: {
 					"test/subdir/index.html": "hello world!",
@@ -165,7 +127,6 @@ func TestApiBasic(t *testing.T) {
 			status:      http.StatusOK,
 			contentType: "text/html",
 
-			dbpool: NewPgsDb(cfg.Logger),
 			storage: map[string]map[string]string{
 				bucketName: {
 					"test/_redirects": "/* /index.html 200",
@@ -180,7 +141,6 @@ func TestApiBasic(t *testing.T) {
 			status:      http.StatusNotFound,
 			contentType: "text/plain; charset=utf-8",
 
-			dbpool: NewPgsDb(cfg.Logger),
 			storage: map[string]map[string]string{
 				bucketName: {},
 			},
@@ -192,7 +152,6 @@ func TestApiBasic(t *testing.T) {
 			status:      http.StatusNotFound,
 			contentType: "text/html",
 
-			dbpool: NewPgsDb(cfg.Logger),
 			storage: map[string]map[string]string{
 				bucketName: {
 					"test/404.html": "boom!",
@@ -206,7 +165,6 @@ func TestApiBasic(t *testing.T) {
 			status:      http.StatusOK,
 			contentType: "image/jpeg",
 
-			dbpool: NewPgsDb(cfg.Logger),
 			storage: map[string]map[string]string{
 				bucketName: {
 					"test/profile.jpg": "image",
@@ -221,7 +179,6 @@ func TestApiBasic(t *testing.T) {
 			status:      http.StatusMovedPermanently,
 			contentType: "text/html; charset=utf-8",
 
-			dbpool: NewPgsDb(cfg.Logger),
 			storage: map[string]map[string]string{
 				bucketName: {
 					"test/_redirects": "/anything /about.html 301",
@@ -239,7 +196,6 @@ func TestApiBasic(t *testing.T) {
 			status:      http.StatusNotModified,
 			contentType: "",
 
-			dbpool: NewPgsDb(cfg.Logger),
 			storage: map[string]map[string]string{
 				bucketName: {
 					"test/test.html": "hello world!",
@@ -256,7 +212,6 @@ func TestApiBasic(t *testing.T) {
 			status:      http.StatusOK,
 			contentType: "text/html",
 
-			dbpool: NewPgsDb(cfg.Logger),
 			storage: map[string]map[string]string{
 				bucketName: {
 					"test/test.html": "hello world!",
@@ -273,7 +228,6 @@ func TestApiBasic(t *testing.T) {
 			status:      http.StatusNotModified,
 			contentType: "",
 
-			dbpool: NewPgsDb(cfg.Logger),
 			storage: map[string]map[string]string{
 				bucketName: {
 					"test/test.html": "hello world!",
@@ -290,7 +244,6 @@ func TestApiBasic(t *testing.T) {
 			status:      http.StatusOK,
 			contentType: "text/html",
 
-			dbpool: NewPgsDb(cfg.Logger),
 			storage: map[string]map[string]string{
 				bucketName: {
 					"test/test.html": "hello world!",
@@ -309,7 +262,6 @@ func TestApiBasic(t *testing.T) {
 			status:      http.StatusNotModified,
 			contentType: "",
 
-			dbpool: NewPgsDb(cfg.Logger),
 			storage: map[string]map[string]string{
 				bucketName: {
 					"test/test.html": "hello world!",
@@ -320,14 +272,16 @@ func TestApiBasic(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
-			request := httptest.NewRequest("GET", mkpath(tc.path), strings.NewReader(""))
+			request := httptest.NewRequest("GET", dbpool.mkpath(tc.path), strings.NewReader(""))
 			for key, val := range tc.reqHeaders {
 				request.Header.Set(key, val)
 			}
 			responseRecorder := httptest.NewRecorder()
 
 			st, _ := storage.NewStorageMemory(tc.storage)
-			router := NewWebRouter(cfg, cfg.Logger, tc.dbpool, st)
+			cfg := NewPgsConfig(logger, dbpool, st)
+			cfg.Domain = "pgs.test"
+			router := NewWebRouter(cfg)
 			router.ServeHTTP(responseRecorder, request)
 
 			if responseRecorder.Code != tc.status {
@@ -348,6 +302,10 @@ func TestApiBasic(t *testing.T) {
 				location, err := responseRecorder.Result().Location()
 				if err != nil {
 					t.Errorf("err: %s", err.Error())
+				}
+				if location == nil {
+					t.Error("no location header in response")
+					return
 				}
 				if tc.wantUrl != location.String() {
 					t.Errorf("Want '%s', got '%s'", tc.wantUrl, location.String())
@@ -374,9 +332,9 @@ func (s *ImageStorageMemory) ServeObject(bucket sst.Bucket, fpath string, opts *
 }
 
 func TestImageManipulation(t *testing.T) {
-	bucketName := shared.GetAssetBucketName(testUserID)
-	cfg := NewConfigSite()
-	cfg.Domain = "pgs.test"
+	logger := slog.Default()
+	dbpool := NewPgsDb(logger)
+	bucketName := shared.GetAssetBucketName(dbpool.Users[0].ID)
 
 	tt := []ApiExample{
 		{
@@ -386,7 +344,6 @@ func TestImageManipulation(t *testing.T) {
 			status:      http.StatusOK,
 			contentType: "image/jpeg",
 
-			dbpool: NewPgsDb(cfg.Logger),
 			storage: map[string]map[string]string{
 				bucketName: {
 					"test/app.jpg": "hello world!",
@@ -400,7 +357,6 @@ func TestImageManipulation(t *testing.T) {
 			status:      http.StatusOK,
 			contentType: "image/jpeg",
 
-			dbpool: NewPgsDb(cfg.Logger),
 			storage: map[string]map[string]string{
 				bucketName: {
 					"test/subdir/app.jpg": "hello world!",
@@ -411,7 +367,7 @@ func TestImageManipulation(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
-			request := httptest.NewRequest("GET", mkpath(tc.path), strings.NewReader(""))
+			request := httptest.NewRequest("GET", dbpool.mkpath(tc.path), strings.NewReader(""))
 			responseRecorder := httptest.NewRecorder()
 
 			memst, _ := storage.NewStorageMemory(tc.storage)
@@ -421,7 +377,9 @@ func TestImageManipulation(t *testing.T) {
 					Ratio: &storage.Ratio{},
 				},
 			}
-			router := NewWebRouter(cfg, cfg.Logger, tc.dbpool, st)
+			cfg := NewPgsConfig(logger, dbpool, st)
+			cfg.Domain = "pgs.test"
+			router := NewWebRouter(cfg)
 			router.ServeHTTP(responseRecorder, request)
 
 			if responseRecorder.Code != tc.status {

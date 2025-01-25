@@ -42,7 +42,7 @@ func StartSshServer() {
 		Access:  syncmap.New[string, []string](),
 	}
 
-	sshAuth := shared.NewSshAuthHandler(dbh, logger, cfg)
+	sshAuth := shared.NewSshAuthHandler(dbh, logger)
 	s, err := wish.NewServer(
 		wish.WithAddress(fmt.Sprintf("%s:%s", host, port)),
 		wish.WithHostKeyPath("ssh_data/term_info_ed25519"),

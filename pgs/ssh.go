@@ -11,9 +11,7 @@ import (
 	"github.com/charmbracelet/promwish"
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
-	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
-	"github.com/picosh/pico/shared/storage"
 	wsh "github.com/picosh/pico/wish"
 	"github.com/picosh/send/auth"
 	"github.com/picosh/send/list"
@@ -52,49 +50,28 @@ func withProxy(handler *UploadAssetHandler, otherMiddleware ...wish.Middleware) 
 	}
 }
 
-func StartSshServer() {
+func StartSshServer(cfg *PgsConfig, killCh chan error) {
 	host := utils.GetEnv("PGS_HOST", "0.0.0.0")
 	port := utils.GetEnv("PGS_SSH_PORT", "2222")
 	promPort := utils.GetEnv("PGS_PROM_PORT", "9222")
-	cfg := NewConfigSite()
 	logger := cfg.Logger
-	dbpool := postgres.NewDB(cfg.DbURL, cfg.Logger)
-	defer dbpool.Close()
-
-	var st storage.StorageServe
-	var err error
-	if cfg.MinioURL == "" {
-		st, err = storage.NewStorageFS(cfg.Logger, cfg.StorageDir)
-	} else {
-		st, err = storage.NewStorageMinio(cfg.Logger, cfg.MinioURL, cfg.MinioUser, cfg.MinioPass)
-	}
-
-	if err != nil {
-		logger.Error(err.Error())
-		return
-	}
 
 	ctx := context.Background()
 	defer ctx.Done()
+
+	cacheClearingQueue := make(chan string, 100)
 	handler := NewUploadAssetHandler(
-		dbpool,
 		cfg,
-		st,
+		cacheClearingQueue,
 		ctx,
 	)
 
-	apiConfig := &shared.ApiConfig{
-		Cfg:     cfg,
-		Dbpool:  dbpool,
-		Storage: st,
-	}
-
 	webTunnel := &tunkit.WebTunnelHandler{
 		Logger:      logger,
-		HttpHandler: createHttpHandler(apiConfig),
+		HttpHandler: createHttpHandler(cfg),
 	}
 
-	sshAuth := shared.NewSshAuthHandler(dbpool, logger, cfg)
+	sshAuth := shared.NewSshAuthHandler(cfg.DB, logger)
 	s, err := wish.NewServer(
 		wish.WithAddress(fmt.Sprintf("%s:%s", host, port)),
 		wish.WithHostKeyPath("ssh_data/term_info_ed25519"),
@@ -120,12 +97,16 @@ func StartSshServer() {
 		}
 	}()
 
-	<-done
-	logger.Info("stopping SSH server")
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer func() { cancel() }()
-	if err := s.Shutdown(ctx); err != nil {
-		logger.Error("shutdown", "err", err.Error())
-		os.Exit(1)
+	select {
+	case <-done:
+		logger.Info("stopping ssh server")
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer func() { cancel() }()
+		if err := s.Shutdown(ctx); err != nil {
+			logger.Error("shutdown", "err", err.Error())
+			os.Exit(1)
+		}
+	case <-killCh:
+		logger.Info("stopping ssh server")
 	}
 }

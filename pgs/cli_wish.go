@@ -11,19 +11,20 @@ import (
 	bm "github.com/charmbracelet/wish/bubbletea"
 	"github.com/muesli/termenv"
 	"github.com/picosh/pico/db"
+	pgsdb "github.com/picosh/pico/pgs/db"
 	"github.com/picosh/pico/tui/common"
 	sendutils "github.com/picosh/send/utils"
 	"github.com/picosh/utils"
 )
 
-func getUser(s ssh.Session, dbpool db.DB) (*db.User, error) {
+func getUser(s ssh.Session, dbpool pgsdb.PgsDB) (*db.User, error) {
 	if s.PublicKey() == nil {
 		return nil, fmt.Errorf("key not found")
 	}
 
 	key := utils.KeyForKeyText(s.PublicKey())
 
-	user, err := dbpool.FindUserForKey(s.User(), key)
+	user, err := dbpool.FindUserByPubkey(key)
 	if err != nil {
 		return nil, err
 	}
@@ -64,10 +65,10 @@ func flagCheck(cmd *flag.FlagSet, posArg string, cmdArgs []string) bool {
 }
 
 func WishMiddleware(handler *UploadAssetHandler) wish.Middleware {
-	dbpool := handler.DBPool
+	dbpool := handler.Cfg.DB
 	log := handler.Cfg.Logger
 	cfg := handler.Cfg
-	store := handler.Storage
+	store := handler.Cfg.Storage
 
 	return func(next ssh.Handler) ssh.Handler {
 		return func(sesh ssh.Session) {

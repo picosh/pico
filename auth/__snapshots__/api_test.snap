@@ -87,7 +87,7 @@ successfully added pico+ user
 ---
 
 [TestUser - 1]
-[{"id":"1","user_id":"user-1","name":"my-key","key":"nice-pubkey","created_at":"0001-01-01T00:00:00Z"}]
+[{"id":"1","user_id":"user-1","name":"my-key","public_key":"nice-pubkey","created_at":"0001-01-01T00:00:00Z"}]
 ---
 
 [TestAuthApi/rss - 1]

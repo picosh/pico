@@ -7,10 +7,12 @@ import (
 	"log/slog"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
 	"github.com/picosh/pico/db"
+	pgsdb "github.com/picosh/pico/pgs/db"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/tui/common"
 	sst "github.com/picosh/pobj/storage"
@@ -124,12 +126,12 @@ type Cmd struct {
 	Session utils.CmdSession
 	Log     *slog.Logger
 	Store   sst.ObjectStorage
-	Dbpool  db.DB
+	Dbpool  pgsdb.PgsDB
 	Write   bool
 	Styles  common.Styles
 	Width   int
 	Height  int
-	Cfg     *shared.ConfigSite
+	Cfg     *PgsConfig
 }
 
 func (c *Cmd) output(out string) {
@@ -205,7 +207,7 @@ func (c *Cmd) help() {
 }
 
 func (c *Cmd) stats(cfgMaxSize uint64) error {
-	ff, err := c.Dbpool.FindFeatureForUser(c.User.ID, "plus")
+	ff, err := c.Dbpool.FindFeature(c.User.ID, "plus")
 	if err != nil {
 		ff = db.NewFeatureFlag(c.User.ID, "plus", cfgMaxSize, 0, 0)
 	}
@@ -539,7 +541,14 @@ func (c *Cmd) cache(projectName string) error {
 }
 
 func (c *Cmd) cacheAll() error {
-	isAdmin := c.Dbpool.HasFeatureForUser(c.User.ID, "admin")
+	isAdmin := false
+	ff, _ := c.Dbpool.FindFeature(c.User.ID, "admin")
+	if ff != nil {
+		if ff.ExpiresAt.Before(time.Now()) {
+			isAdmin = true
+		}
+	}
+
 	if !isAdmin {
 		return fmt.Errorf("must be admin to use this command")
 	}

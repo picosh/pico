@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/picosh/pico/db"
-	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/pgs"
+	pgsdb "github.com/picosh/pico/pgs/db"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/utils"
@@ -41,10 +41,10 @@ func main() {
 	picoCfg.MinioURL = os.Getenv("MINIO_URL")
 	picoCfg.MinioUser = os.Getenv("MINIO_ROOT_USER")
 	picoCfg.MinioPass = os.Getenv("MINIO_ROOT_PASSWORD")
-	picoDb := postgres.NewDB(picoCfg.DbURL, picoCfg.Logger)
+	picoDb, err := pgsdb.NewDB(picoCfg.DbURL, picoCfg.Logger)
+	bail(err)
 
 	var st storage.StorageServe
-	var err error
 	st, err = storage.NewStorageMinio(logger, picoCfg.MinioURL, picoCfg.MinioUser, picoCfg.MinioPass)
 	bail(err)
 

@@ -41,7 +41,7 @@ func hasProtocol(url string) bool {
 func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	logger := h.Logger
 	var redirects []*RedirectRule
-	redirectFp, redirectInfo, err := h.Storage.GetObject(h.Bucket, filepath.Join(h.ProjectDir, "_redirects"))
+	redirectFp, redirectInfo, err := h.Cfg.Storage.GetObject(h.Bucket, filepath.Join(h.ProjectDir, "_redirects"))
 	if err == nil {
 		defer redirectFp.Close()
 		if redirectInfo != nil && redirectInfo.Size > h.Cfg.MaxSpecialFileSize {
@@ -85,7 +85,7 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			// before redirecting, this saves a hop that will just end up a 404
 			if !hasProtocol(fp.Filepath) && strings.HasSuffix(fp.Filepath, "/") {
 				next := filepath.Join(h.ProjectDir, fp.Filepath, "index.html")
-				obj, _, err := h.Storage.GetObject(h.Bucket, next)
+				obj, _, err := h.Cfg.Storage.GetObject(h.Bucket, next)
 				if err != nil {
 					continue
 				}
@@ -137,7 +137,7 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		attempts = append(attempts, fpath)
 		logger = logger.With("object", fpath)
 		logger.Info("serving object")
-		c, info, err = h.Storage.ServeObject(
+		c, info, err = h.Cfg.Storage.ServeObject(
 			h.Bucket,
 			fpath,
 			h.ImgProcessOpts,
@@ -164,7 +164,7 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer contents.Close()
 
 	var headers []*HeaderRule
-	headersFp, headersInfo, err := h.Storage.GetObject(h.Bucket, filepath.Join(h.ProjectDir, "_headers"))
+	headersFp, headersInfo, err := h.Cfg.Storage.GetObject(h.Bucket, filepath.Join(h.ProjectDir, "_headers"))
 	if err == nil {
 		defer headersFp.Close()
 		if headersInfo != nil && headersInfo.Size > h.Cfg.MaxSpecialFileSize {

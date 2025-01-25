@@ -9,42 +9,24 @@ import (
 )
 
 type SshAuthHandler struct {
-	DBPool db.DB
+	DB     AuthFindUser
 	Logger *slog.Logger
-	Cfg    *ConfigSite
 }
 
-func NewSshAuthHandler(dbpool db.DB, logger *slog.Logger, cfg *ConfigSite) *SshAuthHandler {
+type AuthFindUser interface {
+	FindUserByPubkey(key string) (*db.User, error)
+}
+
+func NewSshAuthHandler(dbh AuthFindUser, logger *slog.Logger) *SshAuthHandler {
 	return &SshAuthHandler{
-		DBPool: dbpool,
+		DB:     dbh,
 		Logger: logger,
-		Cfg:    cfg,
 	}
-}
-
-func FindPlusFF(dbpool db.DB, cfg *ConfigSite, userID string) *db.FeatureFlag {
-	ff, _ := dbpool.FindFeatureForUser(userID, "plus")
-	// we have free tiers so users might not have a feature flag
-	// in which case we set sane defaults
-	if ff == nil {
-		ff = db.NewFeatureFlag(
-			userID,
-			"plus",
-			cfg.MaxSize,
-			cfg.MaxAssetSize,
-			cfg.MaxSpecialFileSize,
-		)
-	}
-	// this is jank
-	ff.Data.StorageMax = ff.FindStorageMax(cfg.MaxSize)
-	ff.Data.FileMax = ff.FindFileMax(cfg.MaxAssetSize)
-	ff.Data.SpecialFileMax = ff.FindSpecialFileMax(cfg.MaxSpecialFileSize)
-	return ff
 }
 
 func (r *SshAuthHandler) PubkeyAuthHandler(ctx ssh.Context, key ssh.PublicKey) bool {
 	pubkey := utils.KeyForKeyText(key)
-	user, err := r.DBPool.FindUserForKey(ctx.User(), pubkey)
+	user, err := r.DB.FindUserByPubkey(pubkey)
 	if err != nil {
 		r.Logger.Error(
 			"could not find user for key",
@@ -65,4 +47,24 @@ func (r *SshAuthHandler) PubkeyAuthHandler(ctx ssh.Context, key ssh.PublicKey) b
 	ctx.Permissions().Extensions["user_id"] = user.ID
 	ctx.Permissions().Extensions["pubkey"] = pubkey
 	return true
+}
+
+func FindPlusFF(dbpool db.DB, cfg *ConfigSite, userID string) *db.FeatureFlag {
+	ff, _ := dbpool.FindFeatureForUser(userID, "plus")
+	// we have free tiers so users might not have a feature flag
+	// in which case we set sane defaults
+	if ff == nil {
+		ff = db.NewFeatureFlag(
+			userID,
+			"plus",
+			cfg.MaxSize,
+			cfg.MaxAssetSize,
+			cfg.MaxSpecialFileSize,
+		)
+	}
+	// this is jank
+	ff.Data.StorageMax = ff.FindStorageMax(cfg.MaxSize)
+	ff.Data.FileMax = ff.FindFileMax(cfg.MaxAssetSize)
+	ff.Data.SpecialFileMax = ff.FindSpecialFileMax(cfg.MaxSpecialFileSize)
+	return ff
 }

@@ -15,18 +15,18 @@ var ErrNameInvalid = errors.New("username has invalid characters in it")
 var ErrPublicKeyTaken = errors.New("public key is already associated with another user")
 
 type PublicKey struct {
-	ID        string     `json:"id"`
-	UserID    string     `json:"user_id"`
-	Name      string     `json:"name"`
-	Key       string     `json:"key"`
-	CreatedAt *time.Time `json:"created_at"`
+	ID        string     `json:"id" db:"id"`
+	UserID    string     `json:"user_id" db:"user_id"`
+	Name      string     `json:"name" db:"name"`
+	Key       string     `json:"public_key" db:"public_key"`
+	CreatedAt *time.Time `json:"created_at" db:"created_at"`
 }
 
 type User struct {
-	ID        string     `json:"id"`
-	Name      string     `json:"name"`
-	PublicKey *PublicKey `json:"public_key,omitempty"`
-	CreatedAt *time.Time `json:"created_at"`
+	ID        string     `json:"id" db:"id"`
+	Name      string     `json:"name" db:"name"`
+	PublicKey *PublicKey `json:"public_key,omitempty" db:"public_key,omitempty"`
+	CreatedAt *time.Time `json:"created_at" db:"created_at"`
 }
 
 type PostData struct {
@@ -53,20 +53,20 @@ func (p *PostData) Scan(value interface{}) error {
 }
 
 type Project struct {
-	ID         string     `json:"id"`
-	UserID     string     `json:"user_id"`
-	Name       string     `json:"name"`
-	ProjectDir string     `json:"project_dir"`
-	Username   string     `json:"username"`
-	Acl        ProjectAcl `json:"acl"`
-	Blocked    string     `json:"blocked"`
-	CreatedAt  *time.Time `json:"created_at"`
-	UpdatedAt  *time.Time `json:"updated_at"`
+	ID         string     `json:"id" db:"id"`
+	UserID     string     `json:"user_id" db:"user_id"`
+	Name       string     `json:"name" db:"name"`
+	ProjectDir string     `json:"project_dir" db:"project_dir"`
+	Username   string     `json:"username" db:"username"`
+	Acl        ProjectAcl `json:"acl" db:"acl"`
+	Blocked    string     `json:"blocked" db:"blocked"`
+	CreatedAt  *time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt  *time.Time `json:"updated_at" db:"updated_at"`
 }
 
 type ProjectAcl struct {
-	Type string   `json:"type"`
-	Data []string `json:"data"`
+	Type string   `json:"type" db:"type"`
+	Data []string `json:"data" db:"data"`
 }
 
 // Make the Attrs struct implement the driver.Valuer interface. This method
@@ -218,13 +218,13 @@ type Token struct {
 }
 
 type FeatureFlag struct {
-	ID               string          `json:"id"`
-	UserID           string          `json:"user_id"`
-	PaymentHistoryID string          `json:"payment_history_id"`
-	Name             string          `json:"name"`
-	CreatedAt        *time.Time      `json:"created_at"`
-	ExpiresAt        *time.Time      `json:"expires_at"`
-	Data             FeatureFlagData `json:"data"`
+	ID               string          `json:"id" db:"id"`
+	UserID           string          `json:"user_id" db:"user_id"`
+	PaymentHistoryID string          `json:"payment_history_id" db:"payment_history_id"`
+	Name             string          `json:"name" db:"name"`
+	CreatedAt        *time.Time      `json:"created_at" db:"created_at"`
+	ExpiresAt        *time.Time      `json:"expires_at" db:"expires_at"`
+	Data             FeatureFlagData `json:"data" db:"data"`
 }
 
 func NewFeatureFlag(userID, name string, storageMax uint64, fileMax int64, specialFileMax int64) *FeatureFlag {
@@ -268,9 +268,9 @@ func (ff *FeatureFlag) IsValid() bool {
 }
 
 type FeatureFlagData struct {
-	StorageMax     uint64 `json:"storage_max"`
-	FileMax        int64  `json:"file_max"`
-	SpecialFileMax int64  `json:"special_file_max"`
+	StorageMax     uint64 `json:"storage_max" db:"storage_max"`
+	FileMax        int64  `json:"file_max" db:"file_max"`
+	SpecialFileMax int64  `json:"special_file_max" db:"special_file_max"`
 }
 
 // Make the Attrs struct implement the driver.Valuer interface. This method
@@ -354,6 +354,7 @@ type DB interface {
 	FindUserForName(name string) (*User, error)
 	FindUserForNameAndKey(name string, pubkey string) (*User, error)
 	FindUserForKey(name string, pubkey string) (*User, error)
+	FindUserByPubkey(pubkey string) (*User, error)
 	FindUser(userID string) (*User, error)
 	ValidateName(name string) (bool, error)
 	SetUserName(userID string, name string) error
@@ -405,16 +406,7 @@ type DB interface {
 	FindFeedItemsByPostID(postID string) ([]*FeedItem, error)
 
 	UpsertProject(userID, name, projectDir string) (*Project, error)
-	InsertProject(userID, name, projectDir string) (string, error)
-	UpdateProject(userID, name string) error
-	UpdateProjectAcl(userID, name string, acl ProjectAcl) error
-	LinkToProject(userID, projectID, projectDir string, commit bool) error
-	RemoveProject(projectID string) error
 	FindProjectByName(userID, name string) (*Project, error)
-	FindProjectLinks(userID, name string) ([]*Project, error)
-	FindProjectsByUser(userID string) ([]*Project, error)
-	FindProjectsByPrefix(userID, name string) ([]*Project, error)
-	FindAllProjects(page *Pager, by string) (*Paginate[*Project], error)
 
 	Close() error
 }

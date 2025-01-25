@@ -71,7 +71,7 @@ func StartSshServer() {
 		DBPool: dbpool,
 	}
 
-	sshAuth := shared.NewSshAuthHandler(dbpool, logger, cfg)
+	sshAuth := shared.NewSshAuthHandler(dbpool, logger)
 	s, err := wish.NewServer(
 		wish.WithAddress(fmt.Sprintf("%s:%s", host, port)),
 		wish.WithHostKeyPath("ssh_data/term_info_ed25519"),

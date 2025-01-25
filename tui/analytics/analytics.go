@@ -158,8 +158,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "q", "esc":
+		case "esc":
 			return m, pages.Navigate(pages.MenuPage)
+		case "q":
+			if !m.input.Focused() {
+				return m, pages.Navigate(pages.MenuPage)
+			}
 		case "tab":
 			if m.input.Focused() {
 				m.input.Blur()

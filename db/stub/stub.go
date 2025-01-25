@@ -69,6 +69,10 @@ func (me *StubDB) FindUserForKey(username string, key string) (*db.User, error) 
 	return nil, notImpl
 }
 
+func (me *StubDB) FindUserByPubkey(key string) (*db.User, error) {
+	return nil, notImpl
+}
+
 func (me *StubDB) FindUser(userID string) (*db.User, error) {
 	return nil, notImpl
 }
@@ -225,36 +229,8 @@ func (me *StubDB) UpdateProject(userID, name string) error {
 	return notImpl
 }
 
-func (me *StubDB) UpdateProjectAcl(userID, name string, acl db.ProjectAcl) error {
-	return notImpl
-}
-
-func (me *StubDB) LinkToProject(userID, projectID, projectDir string, commit bool) error {
-	return notImpl
-}
-
-func (me *StubDB) RemoveProject(projectID string) error {
-	return notImpl
-}
-
 func (me *StubDB) FindProjectByName(userID, name string) (*db.Project, error) {
 	return &db.Project{}, notImpl
-}
-
-func (me *StubDB) FindProjectLinks(userID, name string) ([]*db.Project, error) {
-	return []*db.Project{}, notImpl
-}
-
-func (me *StubDB) FindProjectsByPrefix(userID, prefix string) ([]*db.Project, error) {
-	return []*db.Project{}, notImpl
-}
-
-func (me *StubDB) FindProjectsByUser(userID string) ([]*db.Project, error) {
-	return []*db.Project{}, notImpl
-}
-
-func (me *StubDB) FindAllProjects(page *db.Pager, by string) (*db.Paginate[*db.Project], error) {
-	return &db.Paginate[*db.Project]{}, notImpl
 }
 
 func (me *StubDB) InsertToken(userID, name string) (string, error) {

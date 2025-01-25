@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
@@ -43,10 +44,9 @@ func getInfoFromUser(user string) (string, string) {
 	return "", user
 }
 
-func createHttpHandler(apiConfig *shared.ApiConfig) CtxHttpBridge {
+func createHttpHandler(cfg *PgsConfig) CtxHttpBridge {
 	return func(ctx ssh.Context) http.Handler {
-		dbh := apiConfig.Dbpool
-		logger := apiConfig.Cfg.Logger
+		logger := cfg.Logger
 		asUser, subdomain := getInfoFromUser(ctx.User())
 		log := logger.With(
 			"subdomain", subdomain,
@@ -69,7 +69,7 @@ func createHttpHandler(apiConfig *shared.ApiConfig) CtxHttpBridge {
 			return http.HandlerFunc(shared.UnauthorizedHandler)
 		}
 
-		owner, err := dbh.FindUserForName(props.Username)
+		owner, err := cfg.DB.FindUserByName(props.Username)
 		if err != nil {
 			log.Error(
 				"could not find user from name",
@@ -82,13 +82,13 @@ func createHttpHandler(apiConfig *shared.ApiConfig) CtxHttpBridge {
 			"owner", owner.Name,
 		)
 
-		project, err := dbh.FindProjectByName(owner.ID, props.ProjectName)
+		project, err := cfg.DB.FindProjectByName(owner.ID, props.ProjectName)
 		if err != nil {
 			log.Error("could not get project by name", "project", props.ProjectName, "err", err.Error())
 			return http.HandlerFunc(shared.UnauthorizedHandler)
 		}
 
-		requester, _ := dbh.FindUserForKey("", pubkey)
+		requester, _ := cfg.DB.FindUserByPubkey(pubkey)
 		if requester != nil {
 			log = log.With(
 				"requester", requester.Name,
@@ -97,12 +97,19 @@ func createHttpHandler(apiConfig *shared.ApiConfig) CtxHttpBridge {
 
 		// impersonation logic
 		if asUser != "" {
-			isAdmin := dbh.HasFeatureForUser(requester.ID, "admin")
+			isAdmin := false
+			ff, _ := cfg.DB.FindFeature(requester.ID, "admin")
+			if ff != nil {
+				if ff.ExpiresAt.Before(time.Now()) {
+					isAdmin = true
+				}
+			}
+
 			if !isAdmin {
 				log.Error("impersonation attempt failed")
 				return http.HandlerFunc(shared.UnauthorizedHandler)
 			}
-			requester, _ = dbh.FindUserForName(asUser)
+			requester, _ = cfg.DB.FindUserByName(asUser)
 		}
 
 		ctx.Permissions().Extensions["user_id"] = requester.ID
@@ -118,12 +125,7 @@ func createHttpHandler(apiConfig *shared.ApiConfig) CtxHttpBridge {
 
 		log.Info("user has access to site")
 
-		routes := NewWebRouter(
-			apiConfig.Cfg,
-			logger,
-			apiConfig.Dbpool,
-			apiConfig.Storage,
-		)
+		routes := NewWebRouter(cfg)
 		tunnelRouter := TunnelWebRouter{routes, subdomain}
 		tunnelRouter.initRouters()
 		return &tunnelRouter

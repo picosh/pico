@@ -256,7 +256,6 @@ const (
 
 	sqlInsertProject        = `INSERT INTO projects (user_id, name, project_dir) VALUES ($1, $2, $3) RETURNING id;`
 	sqlUpdateProject        = `UPDATE projects SET updated_at = $3 WHERE user_id = $1 AND name = $2;`
-	sqlUpdateProjectAcl     = `UPDATE projects SET acl = $3, updated_at = $4 WHERE user_id = $1 AND name = $2;`
 	sqlFindProjectByName    = `SELECT id, user_id, name, project_dir, acl, blocked, created_at, updated_at FROM projects WHERE user_id = $1 AND name = $2;`
 	sqlSelectProjectCount   = `SELECT count(id) FROM projects`
 	sqlFindProjectsByUser   = `SELECT id, user_id, name, project_dir, acl, blocked, created_at, updated_at FROM projects WHERE user_id = $1 ORDER BY name ASC, updated_at DESC;`
@@ -622,6 +621,22 @@ func (me *PsqlDB) FindUserForKey(username string, key string) (*db.User, error) 
 	}
 
 	return nil, err
+}
+
+func (me *PsqlDB) FindUserByPubkey(key string) (*db.User, error) {
+	me.Logger.Info("attempting to find user with only public key", "key", key)
+	pk, err := me.FindPublicKeyForKey(key)
+	if err != nil {
+		return nil, err
+	}
+
+	me.Logger.Info("found pubkey, looking for user", "key", key, "userId", pk.UserID)
+	user, err := me.FindUser(pk.UserID)
+	if err != nil {
+		return nil, err
+	}
+	user.PublicKey = pk
+	return user, nil
 }
 
 func (me *PsqlDB) FindUser(userID string) (*db.User, error) {
@@ -1639,60 +1654,6 @@ func (me *PsqlDB) UpdateProject(userID, name string) error {
 	return err
 }
 
-func (me *PsqlDB) UpdateProjectAcl(userID, name string, acl db.ProjectAcl) error {
-	_, err := me.Db.Exec(sqlUpdateProjectAcl, userID, name, acl, time.Now())
-	return err
-}
-
-func (me *PsqlDB) LinkToProject(userID, projectID, projectDir string, commit bool) error {
-	linkToProject, err := me.FindProjectByName(userID, projectDir)
-	if err != nil {
-		return err
-	}
-	isAlreadyLinked := linkToProject.Name != linkToProject.ProjectDir
-	sameProject := linkToProject.ID == projectID
-
-	/*
-		A project linked to another project which is also linked to a
-		project is forbidden.  CI/CD Example:
-			- ProjectProd links to ProjectStaging
-			- ProjectStaging links to ProjectMain
-			- We merge `main` and trigger a deploy which uploads to ProjectMain
-			- All three get updated immediately
-		This scenario was not the intent of our CI/CD.  What we actually
-		wanted was to create a snapshot of ProjectMain and have ProjectStaging
-		link to the snapshot, but that's not the intended design of pgs.
-
-		So we want to close that gap here.
-
-		We ensure that `project.Name` and `project.ProjectDir` are identical
-		when there is no aliasing.
-	*/
-	if !sameProject && isAlreadyLinked {
-		return fmt.Errorf(
-			"cannot link (%s) to (%s) because it is also a link to (%s)",
-			projectID,
-			projectDir,
-			linkToProject.ProjectDir,
-		)
-	}
-
-	if commit {
-		_, err = me.Db.Exec(
-			sqlLinkToProject,
-			projectDir,
-			time.Now(),
-			projectID,
-		)
-	}
-	return err
-}
-
-func (me *PsqlDB) RemoveProject(projectID string) error {
-	_, err := me.Db.Exec(sqlRemoveProject, projectID)
-	return err
-}
-
 func (me *PsqlDB) FindProjectByName(userID, name string) (*db.Project, error) {
 	project := &db.Project{}
 	r := me.Db.QueryRow(sqlFindProjectByName, userID, name)
@@ -1711,152 +1672,6 @@ func (me *PsqlDB) FindProjectByName(userID, name string) (*db.Project, error) {
 	}
 
 	return project, nil
-}
-
-func (me *PsqlDB) FindProjectLinks(userID, name string) ([]*db.Project, error) {
-	var projects []*db.Project
-	rs, err := me.Db.Query(sqlFindProjectLinks, userID, name)
-	if err != nil {
-		return nil, err
-	}
-	for rs.Next() {
-		project := &db.Project{}
-		err := rs.Scan(
-			&project.ID,
-			&project.UserID,
-			&project.Name,
-			&project.ProjectDir,
-			&project.Acl,
-			&project.Blocked,
-			&project.CreatedAt,
-			&project.UpdatedAt,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		projects = append(projects, project)
-	}
-
-	if rs.Err() != nil {
-		return nil, rs.Err()
-	}
-
-	return projects, nil
-}
-
-func (me *PsqlDB) FindProjectsByPrefix(userID, prefix string) ([]*db.Project, error) {
-	var projects []*db.Project
-	rs, err := me.Db.Query(sqlFindProjectsByPrefix, userID, prefix+"%")
-	if err != nil {
-		return nil, err
-	}
-	for rs.Next() {
-		project := &db.Project{}
-		err := rs.Scan(
-			&project.ID,
-			&project.UserID,
-			&project.Name,
-			&project.ProjectDir,
-			&project.Acl,
-			&project.Blocked,
-			&project.CreatedAt,
-			&project.UpdatedAt,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		projects = append(projects, project)
-	}
-
-	if rs.Err() != nil {
-		return nil, rs.Err()
-	}
-
-	return projects, nil
-}
-
-func (me *PsqlDB) FindProjectsByUser(userID string) ([]*db.Project, error) {
-	var projects []*db.Project
-	rs, err := me.Db.Query(sqlFindProjectsByUser, userID)
-	if err != nil {
-		return nil, err
-	}
-	for rs.Next() {
-		project := &db.Project{}
-		err := rs.Scan(
-			&project.ID,
-			&project.UserID,
-			&project.Name,
-			&project.ProjectDir,
-			&project.Acl,
-			&project.Blocked,
-			&project.CreatedAt,
-			&project.UpdatedAt,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		projects = append(projects, project)
-	}
-
-	if rs.Err() != nil {
-		return nil, rs.Err()
-	}
-
-	return projects, nil
-}
-
-func (me *PsqlDB) FindAllProjects(page *db.Pager, by string) (*db.Paginate[*db.Project], error) {
-	var projects []*db.Project
-	sqlFindAllProjects := fmt.Sprintf(`
-	SELECT projects.id, user_id, app_users.name as username, projects.name, project_dir, projects.acl, projects.blocked, projects.created_at, projects.updated_at
-	FROM projects
-	LEFT JOIN app_users ON app_users.id = projects.user_id
-	ORDER BY %s DESC
-	LIMIT $1 OFFSET $2`, by)
-	rs, err := me.Db.Query(sqlFindAllProjects, page.Num, page.Num*page.Page)
-	if err != nil {
-		return nil, err
-	}
-	for rs.Next() {
-		project := &db.Project{}
-		err := rs.Scan(
-			&project.ID,
-			&project.UserID,
-			&project.Username,
-			&project.Name,
-			&project.ProjectDir,
-			&project.Acl,
-			&project.Blocked,
-			&project.CreatedAt,
-			&project.UpdatedAt,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		projects = append(projects, project)
-	}
-
-	if rs.Err() != nil {
-		return nil, rs.Err()
-	}
-
-	var count int
-	err = me.Db.QueryRow(sqlSelectProjectCount).Scan(&count)
-	if err != nil {
-		return nil, err
-	}
-
-	pager := &db.Paginate[*db.Project]{
-		Data:  projects,
-		Total: int(math.Ceil(float64(count) / float64(page.Num))),
-	}
-
-	return pager, nil
 }
 
 func (me *PsqlDB) InsertToken(userID, name string) (string, error) {
