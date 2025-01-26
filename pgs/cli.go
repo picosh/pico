@@ -214,7 +214,7 @@ func (c *Cmd) stats(cfgMaxSize uint64) error {
 	storageMax := ff.Data.StorageMax
 
 	bucketName := shared.GetAssetBucketName(c.User.ID)
-	bucket, err := c.Store.UpsertBucket(bucketName)
+	bucket, err := c.Store.GetBucket(bucketName)
 	if err != nil {
 		return err
 	}
