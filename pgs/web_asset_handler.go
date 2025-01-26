@@ -85,10 +85,11 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			// before redirecting, this saves a hop that will just end up a 404
 			if !hasProtocol(fp.Filepath) && strings.HasSuffix(fp.Filepath, "/") {
 				next := filepath.Join(h.ProjectDir, fp.Filepath, "index.html")
-				_, _, err := h.Storage.GetObject(h.Bucket, next)
+				obj, _, err := h.Storage.GetObject(h.Bucket, next)
 				if err != nil {
 					continue
 				}
+				defer obj.Close()
 			}
 			logger.Info(
 				"redirecting request",

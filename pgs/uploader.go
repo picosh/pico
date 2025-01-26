@@ -236,8 +236,8 @@ func (h *UploadAssetHandler) findDenylist(bucket sst.Bucket, project *db.Project
 	if err != nil {
 		return "", fmt.Errorf("_pgs_ignore not found")
 	}
-
 	defer fp.Close()
+
 	buf := new(strings.Builder)
 	_, err = io.Copy(buf, fp)
 	if err != nil {
@@ -306,10 +306,13 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (s
 	// calculate the filsize difference between the same file already
 	// stored and the updated file being uploaded
 	assetFilename := shared.GetAssetFileName(entry)
-	_, info, _ := h.Storage.GetObject(bucket, assetFilename)
+	obj, info, _ := h.Storage.GetObject(bucket, assetFilename)
 	var curFileSize int64
 	if info != nil {
 		curFileSize = info.Size
+	}
+	if obj != nil {
+		defer obj.Close()
 	}
 
 	denylist := getDenylist(s)
