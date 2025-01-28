@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/gorilla/websocket"
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/utils/pipe"
@@ -23,6 +24,11 @@ import (
 var (
 	cleanRegex = regexp.MustCompile(`[^0-9a-zA-Z,/]`)
 	sshClient  *pipe.Client
+	upgrader   = websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool {
+			return true
+		},
+	}
 )
 
 func serveFile(file string, contentType string) http.HandlerFunc {
@@ -264,6 +270,118 @@ func handlePub(pubsub bool) http.HandlerFunc {
 	}
 }
 
+func handlePipe() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		logger := shared.GetLogger(r)
+
+		c, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			logger.Error("pipe upgrade error", "err", err.Error())
+			return
+		}
+
+		defer c.Close()
+
+		clientInfo := shared.NewPicoPipeClient()
+		topic, _ := url.PathUnescape(shared.GetField(r, 0))
+
+		topic = cleanRegex.ReplaceAllString(topic, "")
+
+		logger.Info("pipe", "topic", topic, "info", clientInfo)
+
+		params := "-p -c"
+		if r.URL.Query().Get("status") == "true" {
+			params = params[:len(params)-3]
+		}
+
+		if r.URL.Query().Get("replay") == "true" {
+			params += " -r"
+		}
+
+		messageType := websocket.TextMessage
+		if r.URL.Query().Get("binary") == "true" {
+			messageType = websocket.BinaryMessage
+		}
+
+		if accessList := r.URL.Query().Get("access"); accessList != "" {
+			logger.Info("adding access list", "topic", topic, "info", clientInfo, "access", accessList)
+			cleanList := cleanRegex.ReplaceAllString(accessList, "")
+			params += fmt.Sprintf(" -a=%s", cleanList)
+		}
+
+		id := uuid.NewString()
+
+		p, err := sshClient.AddSession(id, fmt.Sprintf("pipe %s %s", params, topic), 0, -1, -1)
+		if err != nil {
+			logger.Error("pipe error", "topic", topic, "info", clientInfo, "err", err.Error())
+			http.Error(w, "server error", http.StatusInternalServerError)
+			return
+		}
+
+		go func() {
+			<-r.Context().Done()
+			err := sshClient.RemoveSession(id)
+			if err != nil {
+				logger.Error("pipe remove error", "topic", topic, "info", clientInfo, "err", err.Error())
+			}
+			c.Close()
+		}()
+
+		var wg sync.WaitGroup
+		wg.Add(2)
+
+		go func() {
+			defer func() {
+				p.Close()
+				c.Close()
+				wg.Done()
+			}()
+
+			for {
+				_, message, err := c.ReadMessage()
+				if err != nil {
+					logger.Error("pipe read error", "topic", topic, "info", clientInfo, "err", err.Error())
+					break
+				}
+
+				_, err = p.Write(message)
+				if err != nil {
+					logger.Error("pipe write error", "topic", topic, "info", clientInfo, "err", err.Error())
+					break
+				}
+			}
+		}()
+
+		go func() {
+			defer func() {
+				p.Close()
+				c.Close()
+				wg.Done()
+			}()
+
+			for {
+				buf := make([]byte, 32*1024)
+
+				n, err := p.Read(buf)
+				if err != nil {
+					logger.Error("pipe read error", "topic", topic, "info", clientInfo, "err", err.Error())
+					break
+				}
+
+				buf = buf[:n]
+
+				err = c.WriteMessage(messageType, buf)
+				if err != nil {
+					logger.Error("pipe write error", "topic", topic, "info", clientInfo, "err", err.Error())
+					break
+				}
+			}
+		}()
+
+		wg.Wait()
+	}
+}
+
 func createMainRoutes(staticRoutes []shared.Route) []shared.Route {
 	routes := []shared.Route{
 		shared.NewRoute("GET", "/", shared.CreatePageHandler("html/marketing.page.tmpl")),
@@ -275,6 +393,7 @@ func createMainRoutes(staticRoutes []shared.Route) []shared.Route {
 		shared.NewRoute("POST", "/topic/(.+)", handlePub(false)),
 		shared.NewRoute("GET", "/pubsub/(.+)", handleSub(true)),
 		shared.NewRoute("POST", "/pubsub/(.+)", handlePub(true)),
+		shared.NewRoute("GET", "/pipe/(.+)", handlePipe()),
 	}
 
 	for _, route := range pipeRoutes {
