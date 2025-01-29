@@ -232,7 +232,19 @@ func logToStr(styles common.Styles, data map[string]any, match string) string {
 		dateStr = date.Format(time.RFC3339)
 	}
 
-	acc := fmt.Sprintf(
+	if status == 0 {
+		return fmt.Sprintf(
+			"%s %s %s %s %s %s",
+			dateStr,
+			service,
+			levelView(styles, level),
+			msg,
+			styles.Error.Render(errMsg),
+			url,
+		)
+	}
+
+	return fmt.Sprintf(
 		"%s %s %s %s %s %s %s",
 		dateStr,
 		service,
@@ -242,11 +254,13 @@ func logToStr(styles common.Styles, data map[string]any, match string) string {
 		statusView(styles, int(status)),
 		url,
 	)
-	return acc
 }
 
 func statusView(styles common.Styles, status int) string {
 	statusStr := fmt.Sprintf("%d", status)
+	if status == 0 {
+		return statusStr
+	}
 	if status >= 200 && status < 300 {
 		return statusStr
 	}

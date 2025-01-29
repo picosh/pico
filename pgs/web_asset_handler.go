@@ -136,7 +136,6 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fpath := fp.Filepath
 		attempts = append(attempts, fpath)
 		logger = logger.With("object", fpath)
-		logger.Info("serving object")
 		c, info, err = h.Cfg.Storage.ServeObject(
 			h.Bucket,
 			fpath,
