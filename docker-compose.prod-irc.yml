@@ -4,11 +4,9 @@ services:
     restart: always
     networks:
       - auth
-      - ${AUTH_NETWORK}
     env_file:
       - .env.prod
     environment:
-      APP_DOMAIN: imgs.sh
       APP_EMAIL: hello@pico.sh
     volumes:
       - ./caddy/Caddyfile.auth:/etc/caddy/Caddyfile
@@ -23,7 +21,7 @@ services:
     volumes:
       - ./data/auth-web/data:/app/ssh_data
     networks:
-      - ${AUTH_NETWORK}
+      - auth
     env_file:
       - .env.prod
   bouncer-prom-proxy:
@@ -37,7 +35,7 @@ services:
       - all
   bouncer:
     networks:
-      - ${AUTH_NETWORK}
+      - auth
     env_file:
       - .env.prod
     ports:
