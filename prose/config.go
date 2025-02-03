@@ -5,6 +5,8 @@ import (
 	"github.com/picosh/utils"
 )
 
+var MAX_FILE_SIZE = 3 * utils.MB
+
 func NewConfigSite() *shared.ConfigSite {
 	debug := utils.GetEnv("PROSE_DEBUG", "0")
 	domain := utils.GetEnv("PROSE_DOMAIN", "prose.sh")

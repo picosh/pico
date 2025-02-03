@@ -184,18 +184,25 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		logger = logger.With("filename", post.Filename)
 		logger.Info("paste found")
-		parsedText, err := ParseText(post.Filename, post.Text)
-		if err != nil {
-			logger.Error("could not parse text", "err", err)
-		}
 		expiresAt := "never"
-		if post.ExpiresAt != nil {
-			expiresAt = post.ExpiresAt.Format(time.DateOnly)
-		}
-
 		unlisted := false
-		if post.Hidden {
-			unlisted = true
+		parsedText := ""
+		// we dont want to syntax highlight huge files
+		if post.FileSize > 1*utils.MB {
+			logger.Warn("paste too large to parse and apply syntax highlighting")
+			parsedText = post.Text
+		} else {
+			parsedText, err = ParseText(post.Filename, post.Text)
+			if err != nil {
+				logger.Error("could not parse text", "err", err)
+			}
+			if post.ExpiresAt != nil {
+				expiresAt = post.ExpiresAt.Format(time.DateOnly)
+			}
+
+			if post.Hidden {
+				unlisted = true
+			}
 		}
 
 		data = PostPageData{

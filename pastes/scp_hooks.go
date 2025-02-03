@@ -24,10 +24,19 @@ type FileHooks struct {
 func (p *FileHooks) FileValidate(s ssh.Session, data *filehandlers.PostMetaData) (bool, error) {
 	if !utils.IsTextFile(string(data.Text)) {
 		err := fmt.Errorf(
-			"WARNING: (%s) invalid file must be plain text (utf-8), skipping",
+			"ERROR: (%s) invalid file must be plain text (utf-8), skipping",
 			data.Filename,
 		)
 		return false, err
+	}
+
+	maxFileSize := int(p.Cfg.MaxAssetSize)
+	if data.FileSize > maxFileSize {
+		return false, fmt.Errorf(
+			"ERROR: file (%s) has exceeded maximum file size (%d bytes)",
+			data.Filename,
+			maxFileSize,
+		)
 	}
 
 	return true, nil

@@ -17,16 +17,17 @@ func NewConfigSite() *shared.ConfigSite {
 	minioPass := utils.GetEnv("MINIO_ROOT_PASSWORD", "")
 
 	return &shared.ConfigSite{
-		Debug:      debug == "1",
-		Domain:     domain,
-		Port:       port,
-		Protocol:   protocol,
-		DbURL:      dbURL,
-		StorageDir: storageDir,
-		MinioURL:   minioURL,
-		MinioUser:  minioUser,
-		MinioPass:  minioPass,
-		Space:      "pastes",
-		Logger:     shared.CreateLogger("pastes"),
+		Debug:        debug == "1",
+		Domain:       domain,
+		Port:         port,
+		Protocol:     protocol,
+		DbURL:        dbURL,
+		StorageDir:   storageDir,
+		MinioURL:     minioURL,
+		MinioUser:    minioUser,
+		MinioPass:    minioPass,
+		Space:        "pastes",
+		Logger:       shared.CreateLogger("pastes"),
+		MaxAssetSize: int64(3 * utils.MB),
 	}
 }
