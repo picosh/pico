@@ -22,6 +22,10 @@
     <hr width="100%" class="m-0" />
   </div>
   <h1 class="text-2xl font-bold text-center">Authenticated *nix pipes over ssh</h1>
+  <div class="text-center flex gap">
+    <a href="https://pico.sh/getting-started" class="btn-link mt inline-block">GET STARTED</a>
+    <a href="https://pico.sh/pipe" class="btn-link mt inline-block">DOCS</a>
+  </div>
 </header>
 
 <article class="flex flex-col gap-2">
@@ -253,32 +257,7 @@
     <pre>ssh {{.Site.Domain}} sub mychan -p</pre>
   </div>
 
-  <div>
-    <h2 class="text-xl">Caveats</h2>
-    <p>
-      You must always pipe something into <code>pub</code> or else it will block
-      indefinitely until the process is killed.  However, you can provide a
-      flag to send an empty message: <code>pub xyz -e</code>.
-    </p>
-  </div>
-
-  <div>
-    <h2 class="text-xl">Inspiration</h2>
-    <p>
-      A special thanks to <a href="https://patchbay.pub">patchbay.pub</a> for our inspiration.
-    </p>
-  </div>
-
-  <div>
-    <h2 class="text-xl">Latest posts</h2>
-    <div class="flex items-center">
-      <div class="mr font-italic">2024-10-06</div>
-      <div><a href="https://blog.pico.sh/ann-022-pubsub">pipe: our pubsub ssh service</a></div>
-    </div>
-  </div>
-
   <div class="text-center mb-2">
-    <p>built on our <a href="https://github.com/picosh/pubsub">go pkg</a>.</p>
     <a href="https://pico.sh/getting-started" class="btn-link inline-block">GET STARTED</a>
   </div>
 </article>
