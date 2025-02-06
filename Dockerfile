@@ -68,7 +68,8 @@ ARG APP=prose
 
 COPY --from=builder-ssh /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder-ssh /go/bin/${APP}-ssh ./ssh
-COPY --from=builder-web /app/${APP}/html ./${APP}/html
+# some services require the html folder
+COPY --from=builder-ssh /app/${APP}/html ./${APP}/html
 
 
 ENTRYPOINT ["/app/ssh"]
