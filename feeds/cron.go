@@ -462,6 +462,7 @@ func (f *Fetcher) FetchAll(logger *slog.Logger, urls []string, inlineContent boo
 			uid := item.GUID
 			// sometimes guid is blank so we need to find another uid
 			if uid == "" {
+				logger.Info("no <guid> found for feed item, using <link> instead for its unique id")
 				uid = item.Link
 			}
 			fdi = append(fdi, &db.FeedItem{
