@@ -102,10 +102,19 @@ func DigestOptionToTime(lastDigest time.Time, interval string) time.Time {
 	}
 }
 
+func getFeedItemID(logger *slog.Logger, item *gofeed.Item) string {
+	guid := item.GUID
+	if item.GUID == "" {
+		logger.Info("no <guid> found for feed item, using <link> instead for its unique id")
+		return item.Link
+	}
+	return guid
+}
+
 // see if this feed item should be emailed to user.
-func isValidItem(item *gofeed.Item, feedItems []*db.FeedItem) bool {
+func isValidItem(logger *slog.Logger, item *gofeed.Item, feedItems []*db.FeedItem) bool {
 	for _, feedItem := range feedItems {
-		if item.GUID == feedItem.GUID {
+		if getFeedItemID(logger, item) == feedItem.GUID {
 			return false
 		}
 	}
@@ -345,7 +354,8 @@ func (f *Fetcher) Fetch(logger *slog.Logger, fp *gofeed.Parser, url string, user
 			continue
 		}
 
-		if !isValidItem(item, feedItems) {
+		if !isValidItem(logger, item, feedItems) {
+			logger.Info("feed item already served", "guid", item.GUID)
 			continue
 		}
 
@@ -459,12 +469,7 @@ func (f *Fetcher) FetchAll(logger *slog.Logger, urls []string, inlineContent boo
 	fdi := []*db.FeedItem{}
 	for _, feed := range feeds.Feeds {
 		for _, item := range feed.FeedItems {
-			uid := item.GUID
-			// sometimes guid is blank so we need to find another uid
-			if uid == "" {
-				logger.Info("no <guid> found for feed item, using <link> instead for its unique id")
-				uid = item.Link
-			}
+			uid := getFeedItemID(logger, item)
 			fdi = append(fdi, &db.FeedItem{
 				PostID: post.ID,
 				GUID:   uid,
