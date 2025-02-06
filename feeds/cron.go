@@ -81,7 +81,7 @@ func itemToTemplate(item *gofeed.Item) *FeedItemTmpl {
 	}
 }
 
-func digestOptionToTime(lastDigest time.Time, interval string) time.Time {
+func DigestOptionToTime(lastDigest time.Time, interval string) time.Time {
 	day := 24 * time.Hour
 	if interval == "10min" {
 		return lastDigest.Add(10 * time.Minute)
@@ -140,14 +140,14 @@ func (f *Fetcher) Validate(post *db.Post, parsed *shared.ListParsedText) error {
 		}
 	}
 
-	digestAt := digestOptionToTime(*lastDigest, parsed.DigestInterval)
+	digestAt := DigestOptionToTime(*lastDigest, parsed.DigestInterval)
 	if digestAt.After(now) {
 		return fmt.Errorf("(%s) not time to digest, skipping", digestAt.Format(time.RFC3339))
 	}
 	return nil
 }
 
-func (f *Fetcher) RunPost(logger *slog.Logger, user *db.User, post *db.Post) error {
+func (f *Fetcher) RunPost(logger *slog.Logger, user *db.User, post *db.Post, skipValidation bool) error {
 	logger = logger.With("filename", post.Filename)
 	logger.Info("running feed post")
 
@@ -165,7 +165,11 @@ func (f *Fetcher) RunPost(logger *slog.Logger, user *db.User, post *db.Post) err
 	err := f.Validate(post, parsed)
 	if err != nil {
 		logger.Info("validation failed", "err", err)
-		return nil
+		if skipValidation {
+			logger.Info("overriding validation error, continuing")
+		} else {
+			return nil
+		}
 	}
 
 	urls := []string{}
@@ -214,14 +218,15 @@ func (f *Fetcher) RunPost(logger *slog.Logger, user *db.User, post *db.Post) err
 		post.Data.Attempts += 1
 		logger.Error("could not fetch urls", "err", err, "attempts", post.Data.Attempts)
 
-		errBody := fmt.Sprintf(`There was an error attempting to fetch your feeds (%d) times.  After (5) attempts we remove the file from our system.  Please check all the URLs and re-upload.
+		maxAttempts := 10
+		errBody := fmt.Sprintf(`There was an error attempting to fetch your feeds (%d) times.  After (%d) attempts we remove the file from our system.  Please check all the URLs and re-upload.
 Also, we have centralized logs in our pico.sh TUI that will display realtime feed errors so you can debug.
 
 
 %s
 
 
-%s`, post.Data.Attempts, errForUser.Error(), post.Text)
+%s`, post.Data.Attempts, maxAttempts, errForUser.Error(), post.Text)
 		err = f.SendEmail(
 			logger, user.Name,
 			parsed.Email,
@@ -232,7 +237,7 @@ Also, we have centralized logs in our pico.sh TUI that will display realtime fee
 			return err
 		}
 
-		if post.Data.Attempts >= 5 {
+		if post.Data.Attempts >= maxAttempts {
 			err = f.db.RemovePosts([]string{post.ID})
 			if err != nil {
 				return err
@@ -280,7 +285,7 @@ func (f *Fetcher) RunUser(user *db.User) error {
 	}
 
 	for _, post := range posts.Data {
-		err = f.RunPost(logger, user, post)
+		err = f.RunPost(logger, user, post, false)
 		if err != nil {
 			logger.Error("run post failed", "err", err)
 		}

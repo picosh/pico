@@ -34,6 +34,7 @@ func createRouter(handler *filehandlers.FileHandlerRouter) proxy.Router {
 			wishrsync.Middleware(handler),
 			auth.Middleware(handler),
 			wsh.PtyMdw(wsh.DeprecatedNotice()),
+			WishMiddleware(handler.DBPool, handler.Cfg),
 			wsh.LogMiddleware(handler.GetLogger()),
 		}
 	}
