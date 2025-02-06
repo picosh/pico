@@ -63,7 +63,9 @@ func TestPaymentWebhook(t *testing.T) {
 		}
 		expectedText := `=: email auth@pico.test
 =: digest_interval 1day
-=> https://auth.pico.sh/rss/123`
+=: inline_content true
+=> https://auth.pico.sh/rss/123
+=> https://blog.pico.sh/rss`
 		if post.Text != expectedText {
 			t.Errorf("Want pico plus feed file %s, got %s", expectedText, post.Text)
 		}

@@ -76,8 +76,8 @@ func (p *FeedHooks) FileValidate(s ssh.Session, data *filehandlers.PostMetaData)
 func (p *FeedHooks) FileMeta(s ssh.Session, data *filehandlers.PostMetaData) error {
 	if data.Data.LastDigest == nil {
 		now := time.Now()
-		// only fetch posts in the last week
-		dd := now.AddDate(0, 0, -7)
+		// let it run on the next loop
+		dd := now.AddDate(0, 0, -31)
 		data.Data.LastDigest = &dd
 	}
 

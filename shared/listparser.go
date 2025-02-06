@@ -220,9 +220,10 @@ func ListParseText(text string) *ListParsedText {
 	textItems := SplitByNewline(text)
 	items := []*ListItem{}
 	meta := ListMetaData{
-		ListType: "disc",
-		Tags:     []string{},
-		Layout:   "default",
+		ListType:      "disc",
+		Tags:          []string{},
+		Layout:        "default",
+		InlineContent: true,
 	}
 	pre := false
 	skip := false

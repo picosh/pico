@@ -17,35 +17,39 @@ img {
 {{end}}
 
 <div class="feeds">
-{{range .Feeds}}
-<div style="margin-bottom: 10px;">
+  {{range .Feeds}}
+  <div style="margin-bottom: 10px;">
     <h1 style="margin-bottom: 3px;"><a href="{{.Link}}">{{.Title}}</a></h1>
     <div>{{.Description}}</div>
-</div>
+  </div>
 
-<div class="summary">
+  <div class="summary">
     <h2>Summary</h2>
     {{range .Items}}
     <ul>
-        <li><a href="{{.Link}}">{{.Title}}</a></li>
+      <li><a href="{{.Link}}">{{.Title}}</a></li>
     </ul>
     {{end}}
     <hr />
-</div>
+  </div>
 
-{{if $.Options.InlineContent}}
-<div>
+  {{if $.Options.InlineContent}}
+  <div>
     {{range .Items}}
     <div>
-        <h1><a href="{{.Link}}">{{.Title}}</a></h1>
-        <div>{{.Description}}</div>
-        <div>{{.Content}}</div>
+      <h1><a href="{{.Link}}">{{.Title}}</a></h1>
+      <div>{{.Description}}</div>
+      <div>{{.Content}}</div>
     </div>
     <hr />
     {{end}}
-</div>
-{{end}}
+  </div>
+  {{end}}
 
-<hr style="margin: 10px 0;" />
-{{end}}
+  <hr style="margin: 10px 0;" />
+  {{end}}
 </div>
+
+<blockquote>
+  <a href="{{.UnsubURL}}">unsubscribe</a> to this digest.
+</blockquote>

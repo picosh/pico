@@ -541,6 +541,7 @@ func AddPlusFeedForUser(dbpool db.DB, userID, email string) error {
 	href := fmt.Sprintf("https://auth.pico.sh/rss/%s", token)
 	text := fmt.Sprintf(`=: email %s
 =: digest_interval 1day
+=: inline_content true
 => %s
 => https://blog.pico.sh/rss`, email, href)
 	now := time.Now()

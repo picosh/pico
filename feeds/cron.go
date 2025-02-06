@@ -63,6 +63,7 @@ type DigestFeed struct {
 	Feeds        []*Feed
 	Options      DigestOptions
 	KeepAliveURL string
+	UnsubURL     string
 	DaysLeft     string
 	ShowBanner   bool
 }
@@ -200,6 +201,7 @@ func (f *Fetcher) RunPost(logger *slog.Logger, user *db.User, post *db.Post, ski
 			continue
 		}
 
+		logger.Info("found rss feed url", "url", u)
 		urls = append(urls, u)
 	}
 
@@ -418,6 +420,7 @@ type MsgBody struct {
 }
 
 func (f *Fetcher) FetchAll(logger *slog.Logger, urls []string, inlineContent bool, username string, post *db.Post) (*MsgBody, error) {
+	logger.Info("fetching feeds", "inlineContent", inlineContent)
 	fp := gofeed.NewParser()
 	daysLeft := ""
 	showBanner := false
@@ -431,6 +434,7 @@ func (f *Fetcher) FetchAll(logger *slog.Logger, urls []string, inlineContent boo
 	}
 	feeds := &DigestFeed{
 		KeepAliveURL: fmt.Sprintf("https://feeds.pico.sh/keep-alive/%s", post.ID),
+		UnsubURL:     fmt.Sprintf("https://feeds.pico.sh/unsub/%s", post.ID),
 		DaysLeft:     daysLeft,
 		ShowBanner:   showBanner,
 		Options:      DigestOptions{InlineContent: inlineContent},
