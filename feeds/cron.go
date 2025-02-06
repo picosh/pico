@@ -454,9 +454,14 @@ func (f *Fetcher) FetchAll(logger *slog.Logger, urls []string, inlineContent boo
 	fdi := []*db.FeedItem{}
 	for _, feed := range feeds.Feeds {
 		for _, item := range feed.FeedItems {
+			uid := item.GUID
+			// sometimes guid is blank so we need to find another uid
+			if uid == "" {
+				uid = item.Link
+			}
 			fdi = append(fdi, &db.FeedItem{
 				PostID: post.ID,
-				GUID:   item.GUID,
+				GUID:   uid,
 				Data: db.FeedItemData{
 					Title:       item.Title,
 					Description: item.Description,
