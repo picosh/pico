@@ -142,10 +142,11 @@ migrate:
 	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20250320_add_tunnel_id_to_tuns_event_logs_table.sql
 	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20250410_add_index_analytics_visits_host_list.sql
 	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20250418_add_project_post_idx_analytics.sql
+	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20250209_add_link_tree_table.sql
 .PHONY: migrate
 
 latest:
-	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20250418_add_project_post_idx_analytics.sql
+	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20250209_add_link_tree_table.sql
 .PHONY: latest
 
 psql:
