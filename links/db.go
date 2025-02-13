@@ -143,7 +143,7 @@ func (me *PsqlDB) FindLink(linkID string) (*LinkTree, error) {
 		lt.id, lt.user_id, lt.short_id, lt.path, lt.text, lt.url,
 		lt.title, lt.img_url, lt.perm, lt.created_at, lt.updated_at,
 		u.name as username,
-		(select sum(1) from votes where link_id=lt.id) as votes
+		coalesce((select sum(1) from votes where link_id=lt.id), 0) as votes
 	FROM link_tree as lt
 	LEFT JOIN app_users as u ON u.id=lt.user_id
 	WHERE lt.id=$1`
@@ -157,7 +157,7 @@ func (me *PsqlDB) FindLinkByShortID(shortID string) (*LinkTree, error) {
 		lt.id, lt.user_id, lt.short_id, lt.path, lt.text, lt.url,
 		lt.title, lt.img_url, lt.perm, lt.created_at, lt.updated_at,
 		u.name as username,
-		(select sum(1) from votes where link_id=lt.id) as votes
+		coalesce((select sum(1) from votes where link_id=lt.id), 0) as votes
 	FROM link_tree as lt
 	LEFT JOIN app_users as u ON u.id=lt.user_id
 	WHERE lt.short_id=$1`
@@ -171,7 +171,7 @@ func (me *PsqlDB) FindTopics(pager *db.Pager) (db.Paginate[*LinkTree], error) {
 		lt.id, lt.user_id, lt.short_id, lt.path, lt.text, lt.url,
 		lt.title, lt.img_url, lt.perm, lt.created_at, lt.updated_at,
 		u.name as username,
-		(select sum(1) from votes where link_id=lt.id) as votes
+		coalesce((select sum(1) from votes where link_id=lt.id), 0) as votes
 	FROM link_tree as lt
 	LEFT JOIN app_users as u ON u.id=lt.user_id
 	WHERE NLEVEL(path)=2 ORDER BY votes DESC, lt.created_at DESC`
