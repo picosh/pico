@@ -30,7 +30,8 @@ func (r *SshAuthHandler) PubkeyAuthHandler(ctx ssh.Context, key ssh.PublicKey) b
 	if err != nil {
 		r.Logger.Error(
 			"could not find user for key",
-			"key", key,
+			"keyType", key.Type(),
+			"key", key.Marshal(),
 			"err", err,
 		)
 		return false
