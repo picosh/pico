@@ -144,8 +144,8 @@ func NewCli(sesh ssh.Session, cfg *LinksConfig) *cli.App {
 						ident := len(sp) - len(orig)
 						col := strings.Repeat(" ", int(ident))
 						wish.Printf(
-							sesh, "%s|%d %s %s\n",
-							col, link.Votes, link.Username, link.Path,
+							sesh, "%s|%d %s %s.%s\n",
+							col, link.Votes, link.Username, link.Path, link.ShortID,
 						)
 						wish.Printf(sesh, "%s|%s\n", col, link.Text)
 					}
