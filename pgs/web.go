@@ -263,6 +263,7 @@ func (web *WebRouter) cacheMgmt(ctx context.Context, httpCache *middleware.Souin
 
 	for {
 		scanner := bufio.NewScanner(drain)
+		scanner.Buffer(make([]byte, 32*1024), 32*1024)
 		for scanner.Scan() {
 			surrogateKey := strings.TrimSpace(scanner.Text())
 			web.Cfg.Logger.Info("received cache-drain item", "surrogateKey", surrogateKey)

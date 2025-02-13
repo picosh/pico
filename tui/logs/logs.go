@@ -178,6 +178,7 @@ func (m Model) connectLogs(sub chan map[string]any) tea.Cmd {
 		}
 
 		scanner := bufio.NewScanner(drain)
+		scanner.Buffer(make([]byte, 32*1024), 32*1024)
 		for scanner.Scan() {
 			line := scanner.Text()
 			parsedData := map[string]any{}

@@ -78,6 +78,7 @@ func (c *Cmd) logs(ctx context.Context) error {
 	}
 
 	scanner := bufio.NewScanner(stdoutPipe)
+	scanner.Buffer(make([]byte, 32*1024), 32*1024)
 	for scanner.Scan() {
 		line := scanner.Text()
 		parsedData := map[string]any{}

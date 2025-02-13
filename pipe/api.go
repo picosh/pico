@@ -199,6 +199,7 @@ func handlePub(pubsub bool) http.HandlerFunc {
 			defer wg.Done()
 
 			s := bufio.NewScanner(p)
+			s.Buffer(make([]byte, 32*1024), 32*1024)
 
 			for s.Scan() {
 				if s.Text() == "sending msg ..." {
