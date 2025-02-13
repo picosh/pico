@@ -136,8 +136,6 @@ func NewCli(sesh ssh.Session, cfg *LinksConfig) *cli.App {
 						return err
 					}
 
-					wish.Printf(sesh, "breadcrumbs: %s\n\n", path)
-
 					orig := strings.Split(path, ".")
 					for _, link := range links.Data {
 						sp := strings.Split(link.Path, ".")
@@ -147,7 +145,10 @@ func NewCli(sesh ssh.Session, cfg *LinksConfig) *cli.App {
 							sesh, "%s|%d %s %s.%s\n",
 							col, link.Votes, link.Username, link.Path, link.ShortID,
 						)
-						wish.Printf(sesh, "%s|%s\n", col, link.Text)
+						lines := strings.Split(link.Text, "\n")
+						for _, line := range lines {
+							wish.Printf(sesh, "%s| %s\n", col, line)
+						}
 					}
 
 					return nil
@@ -186,8 +187,6 @@ func NewCli(sesh ssh.Session, cfg *LinksConfig) *cli.App {
 					if err != nil {
 						return err
 					}
-
-					wish.Printf(sesh, "breadcrumbs: %s\n\n", path)
 
 					writer := NewTabWriter(sesh)
 					fmt.Fprintln(writer, "URL\tShortID\tPath")
