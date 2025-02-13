@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS link_tree (
   short_id character varying(10),
   path ltree,
   text text NOT NULL DEFAULT '',
-  title character varying(255) NOT NULL,
+  title character varying(255),
   url text,
   img_url text,
   perm character varying(10) NOT NULL DEFAULT 'write',
@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS link_tree (
   REFERENCES app_users(id)
   ON DELETE CASCADE
   ON UPDATE CASCADE,
-  CONSTRAINT unique_url_for_link_tree UNIQUE (url)
+  CONSTRAINT unique_short_id_for_link_tree UNIQUE (short_id)
 );
 
 CREATE TABLE IF NOT EXISTS mods (

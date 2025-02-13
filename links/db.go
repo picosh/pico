@@ -1,6 +1,7 @@
 package links
 
 import (
+	"database/sql"
 	"fmt"
 	"log/slog"
 	"math/rand"
@@ -28,9 +29,10 @@ type DB interface {
 	Vote(linkID string, userID string) (int, error)
 
 	FindTopics(pager *db.Pager) (db.Paginate[*LinkTree], error)
-	FindComments(linkID string, pager *db.Pager) (db.Paginate[*LinkTree], error)
-	FindHotPosts(linkID string, pager *db.Pager) (db.Paginate[*LinkTree], error)
-	FindNewPosts(linkID string, pager *db.Pager) (db.Paginate[*LinkTree], error)
+	FindLinks(path string, pager *db.Pager) (db.Paginate[*LinkTree], error)
+	// FindComments(path string, pager *db.Pager) (db.Paginate[*LinkTree], error)
+	// FindHotPosts(linkID string, pager *db.Pager) (db.Paginate[*LinkTree], error)
+	// FindNewPosts(linkID string, pager *db.Pager) (db.Paginate[*LinkTree], error)
 
 	FindMod(modID string) (*Mod, error)
 	CreateMod(*Mod, *db.User) (*Mod, error)
@@ -41,44 +43,45 @@ type DB interface {
 
 type LinkTree struct {
 	// PK and FKs
-	ID      string
-	UserID  string
-	ShortID string
+	ID      string `db:"id"`
+	UserID  string `db:"user_id"`
+	ShortID string `db:"short_id"`
 	// ltree extension
-	Path string
+	Path string `db:"path"`
 	// data
-	Text   string
-	URL    string
-	Title  string
-	ImgURL string
-	Access string // write, read, hide
+	Text   string         `db:"text"`
+	URL    sql.NullString `db:"url"`
+	Title  sql.NullString `db:"title"`
+	ImgURL sql.NullString `db:"img_url"`
+	Perm   string         `db:"perm"` // write, read, hide
 	// timestamps
-	CreatedAt *time.Time
-	UpdatedAt *time.Time
+	CreatedAt *time.Time `db:"created_at"`
+	UpdatedAt *time.Time `db:"updated_at"`
 	// computed
-	Votes int
-	Score int
+	Votes    int    `db:"votes"`
+	Score    int    `db:"score"`
+	Username string `db:"username"`
 }
 
 type Mod struct {
 	// PK and FKs
-	ID     string
-	LinkID string
-	UserID string
+	ID     string `db:"id"`
+	LinkID string `db:"link_id"`
+	UserID string `db:"user_id"`
 	// data
-	Perm   string // apex, writer, read
-	Reason string
+	Perm   string `db:"perm"` // apex, writer, read
+	Reason string `db:"reason"`
 	// timestamps
-	CreatedAt *time.Time
+	CreatedAt *time.Time `db:"created_at"`
 }
 
 type Vote struct {
 	// PK and FKs
-	ID     string
-	UserID string
-	LinkID string
+	ID     string `db:"id"`
+	UserID string `db:"user_id"`
+	LinkID string `db:"link_id"`
 	// timestamps
-	CreatedAt *time.Time
+	CreatedAt *time.Time `db:"created_at"`
 }
 
 type PsqlDB struct {
@@ -110,7 +113,7 @@ func (me *PsqlDB) Close() error {
 
 func (me *PsqlDB) FindUserByPubkey(key string) (*db.User, error) {
 	pk := []db.PublicKey{}
-	err := me.Db.Select(&pk, "SELECT * FROM public_keys WHERE public_key=?", key)
+	err := me.Db.Select(&pk, "SELECT * FROM public_keys WHERE public_key=$1", key)
 	if err != nil {
 		return nil, err
 	}
@@ -130,20 +133,76 @@ func (me *PsqlDB) FindUserByPubkey(key string) (*db.User, error) {
 
 func (me *PsqlDB) FindUser(userID string) (*db.User, error) {
 	user := db.User{}
-	err := me.Db.Get(&user, "SELECT * FROM app_users WHERE id=?", userID)
+	err := me.Db.Get(&user, "SELECT * FROM app_users WHERE id=$1", userID)
 	return &user, err
 }
 
 func (me *PsqlDB) FindLink(linkID string) (*LinkTree, error) {
 	link := LinkTree{}
-	err := me.Db.Get(&link, "SELECT * FROM link_tree WHERE id=?", linkID)
+	query := `SELECT
+		lt.id, lt.user_id, lt.short_id, lt.path, lt.text, lt.url,
+		lt.title, lt.img_url, lt.perm, lt.created_at, lt.updated_at,
+		u.name as username,
+		(select sum(1) from votes where link_id=lt.id) as votes
+	FROM link_tree as lt
+	LEFT JOIN app_users as u ON u.id=lt.user_id
+	WHERE lt.id=$1`
+	err := me.Db.Get(&link, query, linkID)
 	return &link, err
 }
 
 func (me *PsqlDB) FindLinkByShortID(shortID string) (*LinkTree, error) {
 	link := LinkTree{}
-	err := me.Db.Get(&link, "SELECT * FROM link_tree WHERE short_id=?", shortID)
+	query := `SELECT
+		lt.id, lt.user_id, lt.short_id, lt.path, lt.text, lt.url,
+		lt.title, lt.img_url, lt.perm, lt.created_at, lt.updated_at,
+		u.name as username,
+		(select sum(1) from votes where link_id=lt.id) as votes
+	FROM link_tree as lt
+	LEFT JOIN app_users as u ON u.id=lt.user_id
+	WHERE lt.short_id=$1`
+	err := me.Db.Get(&link, query, shortID)
 	return &link, err
+}
+
+func (me *PsqlDB) FindTopics(pager *db.Pager) (db.Paginate[*LinkTree], error) {
+	links := []*LinkTree{}
+	query := `SELECT
+		lt.id, lt.user_id, lt.short_id, lt.path, lt.text, lt.url,
+		lt.title, lt.img_url, lt.perm, lt.created_at, lt.updated_at,
+		u.name as username,
+		(select sum(1) from votes where link_id=lt.id) as votes
+	FROM link_tree as lt
+	LEFT JOIN app_users as u ON u.id=lt.user_id
+	WHERE NLEVEL(path)=2 ORDER BY votes DESC, lt.created_at DESC`
+	err := me.Db.Select(&links, query)
+	page := db.Paginate[*LinkTree]{
+		Data:  links,
+		Total: len(links),
+	}
+	return page, err
+}
+
+func (me *PsqlDB) FindLinks(path string, pager *db.Pager) (db.Paginate[*LinkTree], error) {
+	links := []*LinkTree{}
+	err := me.Db.Select(
+		&links,
+		`SELECT
+			lt.id, lt.user_id, lt.short_id, lt.path, lt.text, lt.url,
+			lt.title, lt.img_url, lt.perm, lt.created_at, lt.updated_at,
+			u.name as username,
+			coalesce((select sum(1) from votes where link_id=lt.id), 0) as votes
+		FROM link_tree as lt
+		LEFT JOIN app_users as u ON u.id=lt.user_id
+		WHERE path <@ $1
+		ORDER BY lt.path ASC, votes DESC, lt.created_at DESC`,
+		path,
+	)
+	page := db.Paginate[*LinkTree]{
+		Data:  links,
+		Total: len(links),
+	}
+	return page, err
 }
 
 func urlFromText(txt string) (string, error) {
@@ -172,7 +231,7 @@ func (me *PsqlDB) CreateLink(link *LinkTree) (*LinkTree, error) {
 		me.Logger.Info("no url detected, assuming text post")
 	}
 	row := me.Db.QueryRow(
-		"INSERT INTO link_tree (user_id, short_id, path, text, url) VALUES (?, ?, ?, ?, ?) RETURNING id",
+		"INSERT INTO link_tree (user_id, short_id, path, text, url) VALUES ($1, $2, $3, $4, $5) RETURNING id",
 		link.UserID,
 		shortID,
 		link.Path,
@@ -190,7 +249,7 @@ func (me *PsqlDB) CreateLink(link *LinkTree) (*LinkTree, error) {
 
 func (me *PsqlDB) EditLink(link *LinkTree, user *db.User) error {
 	_, err := me.Db.Exec(
-		"UPDATE link_tree SET text=?, updated_at=? WHERE id=?",
+		"UPDATE link_tree SET text=$1, updated_at=$2 WHERE id=$3",
 		link.Text, time.Now(), link.ID,
 	)
 	return err
@@ -198,7 +257,7 @@ func (me *PsqlDB) EditLink(link *LinkTree, user *db.User) error {
 
 func (me *PsqlDB) DeleteLink(linkID string, user *db.User) error {
 	_, err := me.Db.Exec(
-		"DELETE FROM link_tree WHERE id=?",
+		"DELETE FROM link_tree WHERE id=$1",
 		linkID,
 	)
 	return err
@@ -206,7 +265,7 @@ func (me *PsqlDB) DeleteLink(linkID string, user *db.User) error {
 
 func (me *PsqlDB) hasVote(linkID, userID string) bool {
 	vote := Vote{}
-	err := me.Db.Get(&vote, "SELECT * FROM votes WHERE link_id=? AND user_id=?", linkID, userID)
+	err := me.Db.Get(&vote, "SELECT * FROM votes WHERE link_id=$1 AND user_id=$2", linkID, userID)
 	return err == nil
 }
 
@@ -214,13 +273,13 @@ func (me *PsqlDB) Vote(linkID, userID string) (int, error) {
 	var err error
 	if me.hasVote(linkID, userID) {
 		_, err = me.Db.Exec(
-			"INSERT INTO votes (link_id, user_id) VALUES (?, ?)",
+			"DELETE FROM votes WHERE link_id=$1 AND user_id=$2",
 			linkID,
 			userID,
 		)
 	} else {
 		_, err = me.Db.Exec(
-			"DELETE FROM votes WHERE link_id=? AND user_id=?",
+			"INSERT INTO votes (link_id, user_id) VALUES ($1, $2)",
 			linkID,
 			userID,
 		)
@@ -238,31 +297,7 @@ func (me *PsqlDB) Vote(linkID, userID string) (int, error) {
 	return link.Votes, err
 }
 
-func (me *PsqlDB) FindTopics(pager *db.Pager) (db.Paginate[*LinkTree], error) {
-	links := []*LinkTree{}
-	err := me.Db.Select(&links, "SELECT * FROM link_tree WHERE NLEVEL(path)=2 ORDER BY text DESC")
-	page := db.Paginate[*LinkTree]{
-		Data:  links,
-		Total: len(links),
-	}
-	return page, err
-}
-
-func (me *PsqlDB) FindComments(path string, pager *db.Pager) (db.Paginate[*LinkTree], error) {
-	links := []*LinkTree{}
-	err := me.Db.Select(
-		&links,
-		"SELECT * FROM link_tree WHERE path <@ ? AND path != ? ORDER BY created_at DESC",
-		path, path,
-	)
-	page := db.Paginate[*LinkTree]{
-		Data:  links,
-		Total: len(links),
-	}
-	return page, err
-}
-
-func (me *PsqlDB) FindHotPosts(linkID string, pager *db.Pager) (db.Paginate[*LinkTree], error) {
+/* func (me *PsqlDB) FindHotPosts(linkID string, pager *db.Pager) (db.Paginate[*LinkTree], error) {
 	links := []*LinkTree{}
 	query := `SELECT
 		lt.id, lt.user_id, lt.short_id, lt.path, lt.text, lt.url,
@@ -289,23 +324,23 @@ func (me *PsqlDB) FindNewPosts(linkID string, pager *db.Pager) (db.Paginate[*Lin
 		Total: len(links),
 	}
 	return page, err
-}
+} */
 
 func (me *PsqlDB) FindModsByLinkID(linkID string) ([]*Mod, error) {
 	mods := []*Mod{}
-	err := me.Db.Select(&mods, "SELECT * FROM mods WHERE link_id=?", linkID)
+	err := me.Db.Select(&mods, "SELECT * FROM mods WHERE link_id=$1", linkID)
 	return mods, err
 }
 
 func (me *PsqlDB) FindMod(modID string) (*Mod, error) {
 	mod := Mod{}
-	err := me.Db.Get(&mod, "SELECT * FROM mods WHERE id=?", modID)
+	err := me.Db.Get(&mod, "SELECT * FROM mods WHERE id=$1", modID)
 	return &mod, err
 }
 
 func (me *PsqlDB) CreateMod(mod *Mod, user *db.User) (*Mod, error) {
 	row := me.Db.QueryRow(
-		"INSERT INTO mods (link_id, user_id, perm, reason) VALUES (?, ?, ?, ?) RETURNING id",
+		"INSERT INTO mods (link_id, user_id, perm, reason) VALUES ($1, $2, $3, $4) RETURNING id",
 		mod.LinkID,
 		mod.UserID,
 		mod.Perm,
@@ -321,7 +356,7 @@ func (me *PsqlDB) CreateMod(mod *Mod, user *db.User) (*Mod, error) {
 
 func (me *PsqlDB) EditMod(mod *Mod, user *db.User) error {
 	_, err := me.Db.Exec(
-		"UPDATE mods SET perm=?, reason=?, updated_at=? WHERE id=?",
+		"UPDATE mods SET perm=$1, reason=$2, updated_at=$3 WHERE id=$4",
 		mod.Perm, mod.Reason, time.Now(), mod.ID,
 	)
 	return err
@@ -329,7 +364,7 @@ func (me *PsqlDB) EditMod(mod *Mod, user *db.User) error {
 
 func (me *PsqlDB) DeleteMod(modID string, user *db.User) error {
 	_, err := me.Db.Exec(
-		"DELETE FROM mods WHERE id=?",
+		"DELETE FROM mods WHERE id=$1",
 		modID,
 	)
 	return err
@@ -348,9 +383,9 @@ func (me *PsqlDB) generateShortID(attempt int) (string, error) {
 	if attempt >= 15 {
 		return "", fmt.Errorf("could not generate short id for link")
 	}
-	shortID := generateRandomString(5)
+	shortID := generateRandomString(6)
 	link, _ := me.FindLinkByShortID(shortID)
-	if link != nil {
+	if link == nil {
 		return me.generateShortID(attempt + 1)
 	}
 	return shortID, nil
