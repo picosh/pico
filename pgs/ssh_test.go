@@ -18,7 +18,7 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-func TestSshServer(t *testing.T) {
+func TestSshServerSftp(t *testing.T) {
 	logger := slog.Default()
 	dbpool := pgsdb.NewDBMemory(logger)
 	// setup test data
@@ -53,6 +53,52 @@ func TestSshServer(t *testing.T) {
 		t.Error(err)
 		return
 	}
+
+	done <- nil
+}
+
+func TestSshServerRsync(t *testing.T) {
+	logger := slog.Default()
+	dbpool := pgsdb.NewDBMemory(logger)
+	// setup test data
+	dbpool.SetupTestData()
+	st, err := storage.NewStorageMemory(map[string]map[string]string{})
+	if err != nil {
+		panic(err)
+	}
+	cfg := NewPgsConfig(logger, dbpool, st)
+	done := make(chan error)
+	go StartSshServer(cfg, done)
+	// Hack to wait for startup
+	time.Sleep(time.Millisecond * 100)
+
+	user := GenerateUser()
+	// add user's pubkey to the default test account
+	dbpool.Pubkeys = append(dbpool.Pubkeys, &db.PublicKey{
+		ID:     "nice-pubkey",
+		UserID: dbpool.Users[0].ID,
+		Key:    utils.KeyForKeyText(user.signer.PublicKey()),
+	})
+
+	/* client, err := user.NewClient()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer client.Close()
+
+	_, err = WriteFilesWithRsync(cfg, client, []string{"index.html", "about.html", "favicon.png", "profile.jpg"})
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	// test `--delete` functionality
+	_, err = WriteFilesWithRsync(cfg, client, []string{"index.html", "profile.jpg"})
+	if err != nil {
+		t.Error(err)
+		return
+	} */
 
 	done <- nil
 }
@@ -155,6 +201,10 @@ func GenerateUser() UserSSH {
 		username: "testuser",
 		signer:   userSigner,
 	}
+}
+
+func WriteFilesWithRsync(cfg *PgsConfig, conn *ssh.Client, files []string) (*os.FileInfo, error) {
+	return nil, nil
 }
 
 func WriteFileWithSftp(cfg *PgsConfig, conn *ssh.Client) (*os.FileInfo, error) {
