@@ -3,7 +3,6 @@ package pgs
 import (
 	"crypto/ed25519"
 	"crypto/rand"
-	"crypto/x509"
 	"encoding/pem"
 	"fmt"
 	"io"
@@ -15,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mikesmitty/edkey"
 	"github.com/picosh/pico/db"
 	pgsdb "github.com/picosh/pico/pgs/db"
 	"github.com/picosh/pico/shared/storage"
@@ -24,7 +24,13 @@ import (
 )
 
 func TestSshServerSftp(t *testing.T) {
-	logger := slog.Default()
+	opts := &slog.HandlerOptions{
+		AddSource: true,
+		Level:     slog.LevelInfo,
+	}
+	logger := slog.New(
+		slog.NewTextHandler(os.Stdout, opts),
+	)
 	dbpool := pgsdb.NewDBMemory(logger)
 	// setup test data
 	dbpool.SetupTestData()
@@ -63,7 +69,13 @@ func TestSshServerSftp(t *testing.T) {
 }
 
 func TestSshServerRsync(t *testing.T) {
-	logger := slog.Default()
+	opts := &slog.HandlerOptions{
+		AddSource: true,
+		Level:     slog.LevelInfo,
+	}
+	logger := slog.New(
+		slog.NewTextHandler(os.Stdout, opts),
+	)
 	dbpool := pgsdb.NewDBMemory(logger)
 	// setup test data
 	dbpool.SetupTestData()
@@ -107,10 +119,10 @@ func TestSshServerRsync(t *testing.T) {
 	}
 
 	// remove the temporary directory at the end of the program
-	defer os.RemoveAll(name)
+	// defer os.RemoveAll(name)
 
 	block := &pem.Block{
-		Type:  "PRIVATE KEY",
+		Type:  "OPENSSH PRIVATE KEY",
 		Bytes: user.privateKey,
 	}
 	keyFile := filepath.Join(name, "id_ed25519")
@@ -139,7 +151,7 @@ func TestSshServerRsync(t *testing.T) {
 	)
 
 	eCmd := fmt.Sprintf(
-		`"ssh -p 2222 -o IdentitiesOnly=yes -i %s -o StrictHostKeyChecking=no"`,
+		"ssh -p 2222 -o IdentitiesOnly=yes -i %s -o StrictHostKeyChecking=no",
 		keyFile,
 	)
 
@@ -154,13 +166,13 @@ func TestSshServerRsync(t *testing.T) {
 	}
 
 	// check it's there
-	fi, err := client.Lstat("about.html")
+	fi, err := client.Lstat("/test/about.html")
 	if err != nil {
 		cfg.Logger.Error("could not get stat for file", "err", err)
 		t.Error("about.html not found")
 		return
 	}
-	if fi.Size() != 0 {
+	if fi.Size() != 46 {
 		cfg.Logger.Error("about.html wrong size", "size", fi.Size())
 		t.Error("about.html wrong size")
 		return
@@ -171,8 +183,9 @@ func TestSshServerRsync(t *testing.T) {
 
 	// copy files with delete
 	delCmd := exec.Command("rsync", "-rv", "--delete", "-e", eCmd, name+"/", "localhost:/test")
-	err = delCmd.Run()
+	result, err = delCmd.CombinedOutput()
 	if err != nil {
+		fmt.Println(string(result), err)
 		t.Error(err)
 		return
 	}
@@ -284,11 +297,7 @@ func GenerateUser() UserSSH {
 		panic(err)
 	}
 
-	b, err := x509.MarshalPKCS8PrivateKey(userKey)
-	if err != nil {
-		panic(err)
-	}
-
+	b := edkey.MarshalED25519PrivateKey(userKey)
 	userSigner, err := ssh.NewSignerFromKey(userKey)
 	if err != nil {
 		panic(err)

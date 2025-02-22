@@ -48,6 +48,7 @@ require (
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/lib/pq v1.10.9
 	github.com/microcosm-cc/bluemonday v1.0.27
+	github.com/mikesmitty/edkey v0.0.0-20170222072505-3356ea4e686a
 	github.com/minio/minio-go/v7 v7.0.80
 	github.com/mmcdole/gofeed v1.3.0
 	github.com/muesli/reflow v0.3.0
