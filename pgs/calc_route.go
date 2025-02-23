@@ -229,7 +229,6 @@ func calcRoutes(projectName, fp string, userRedirects []*RedirectRule) []*HttpRe
 		case "none":
 			fallthrough
 		default:
-			break
 		}
 
 		if len(match) > 0 && match[0] != "" {

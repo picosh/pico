@@ -130,12 +130,18 @@ func TestSshServerRsync(t *testing.T) {
 		keyFile,
 		pem.EncodeToMemory(block), 0600,
 	)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	index := "<!doctype html><html><body>index</body></html>"
 	err = os.WriteFile(
 		filepath.Join(name, "index.html"),
 		[]byte(index), 0666,
 	)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	about := "<!doctype html><html><body>about</body></html>"
 	aboutFile := filepath.Join(name, "about.html")
@@ -143,12 +149,18 @@ func TestSshServerRsync(t *testing.T) {
 		aboutFile,
 		[]byte(about), 0666,
 	)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	contact := "<!doctype html><html><body>contact</body></html>"
 	err = os.WriteFile(
 		filepath.Join(name, "contact.html"),
 		[]byte(contact), 0666,
 	)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	eCmd := fmt.Sprintf(
 		"ssh -p 2222 -o IdentitiesOnly=yes -i %s -o StrictHostKeyChecking=no",
@@ -191,20 +203,6 @@ func TestSshServerRsync(t *testing.T) {
 	}
 
 	done <- nil
-}
-
-func createTmpFile(name, contents, ext string) *os.File {
-	file, err := os.CreateTemp("tmp", fmt.Sprintf("%s-*.%s", name, ext))
-	if err != nil {
-		panic(err)
-	}
-
-	data := []byte(contents)
-	if _, err := file.Write(data); err != nil {
-		panic(err)
-	}
-
-	return file
 }
 
 type UserSSH struct {

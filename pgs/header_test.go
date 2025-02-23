@@ -173,7 +173,7 @@ func TestParseHeaderText(t *testing.T) {
 			fmt.Println(results)
 			if cmp.Equal(results, fixture.expect) == false {
 				//nolint
-				t.Fatalf(cmp.Diff(fixture.expect, results))
+				t.Fatal(cmp.Diff(fixture.expect, results))
 			}
 		})
 	}
