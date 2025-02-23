@@ -90,15 +90,17 @@ func StartSshServer(cfg *PgsConfig, killCh chan error) {
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	logger.Info("starting SSH server on", "host", host, "port", port)
+
 	go func() {
 		if err = s.ListenAndServe(); err != nil {
-			logger.Error("serve", "err", err.Error())
-			os.Exit(1)
+			if err != ssh.ErrServerClosed {
+				logger.Error("serve", "err", err.Error())
+				os.Exit(1)
+			}
 		}
 	}()
 
-	select {
-	case <-done:
+	exit := func() {
 		logger.Info("stopping ssh server")
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer func() { cancel() }()
@@ -106,7 +108,12 @@ func StartSshServer(cfg *PgsConfig, killCh chan error) {
 			logger.Error("shutdown", "err", err.Error())
 			os.Exit(1)
 		}
+	}
+
+	select {
 	case <-killCh:
-		logger.Info("stopping ssh server")
+		exit()
+	case <-done:
+		exit()
 	}
 }

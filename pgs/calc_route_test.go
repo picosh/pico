@@ -650,7 +650,7 @@ func TestCalcRoutes(t *testing.T) {
 		t.Run(fixture.Name, func(t *testing.T) {
 			if cmp.Equal(fixture.Actual, fixture.Expected) == false {
 				//nolint
-				t.Fatalf(cmp.Diff(fixture.Expected, fixture.Actual))
+				t.Fatal(cmp.Diff(fixture.Expected, fixture.Actual))
 			}
 		})
 	}
