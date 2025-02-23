@@ -14,12 +14,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mikesmitty/edkey"
 	"github.com/picosh/pico/db"
 	pgsdb "github.com/picosh/pico/pgs/db"
 	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/utils"
 	"github.com/pkg/sftp"
+	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -40,6 +40,7 @@ func TestSshServerSftp(t *testing.T) {
 	}
 	cfg := NewPgsConfig(logger, dbpool, st)
 	done := make(chan error)
+	prometheus.DefaultRegisterer = prometheus.NewRegistry()
 	go StartSshServer(cfg, done)
 	// Hack to wait for startup
 	time.Sleep(time.Millisecond * 100)
@@ -65,7 +66,20 @@ func TestSshServerSftp(t *testing.T) {
 		return
 	}
 
-	done <- nil
+	close(done)
+
+	p, err := os.FindProcess(os.Getpid())
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+
+	err = p.Signal(os.Interrupt)
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+	<-time.After(10 * time.Millisecond)
 }
 
 func TestSshServerRsync(t *testing.T) {
@@ -85,6 +99,7 @@ func TestSshServerRsync(t *testing.T) {
 	}
 	cfg := NewPgsConfig(logger, dbpool, st)
 	done := make(chan error)
+	prometheus.DefaultRegisterer = prometheus.NewRegistry()
 	go StartSshServer(cfg, done)
 	// Hack to wait for startup
 	time.Sleep(time.Millisecond * 100)
@@ -194,7 +209,7 @@ func TestSshServerRsync(t *testing.T) {
 	os.Remove(aboutFile)
 
 	// copy files with delete
-	delCmd := exec.Command("rsync", "-rv", "--delete", "-e", eCmd, name+"/", "localhost:/test")
+	delCmd := exec.Command("rsync", "-rv", "-e", eCmd, name+"/", "localhost:/test")
 	result, err = delCmd.CombinedOutput()
 	if err != nil {
 		fmt.Println(string(result), err)
@@ -202,7 +217,20 @@ func TestSshServerRsync(t *testing.T) {
 		return
 	}
 
-	done <- nil
+	close(done)
+
+	p, err := os.FindProcess(os.Getpid())
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+
+	err = p.Signal(os.Interrupt)
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+	<-time.After(10 * time.Millisecond)
 }
 
 type UserSSH struct {
@@ -295,7 +323,11 @@ func GenerateUser() UserSSH {
 		panic(err)
 	}
 
-	b := edkey.MarshalED25519PrivateKey(userKey)
+	b, err := ssh.MarshalPrivateKey(userKey, "")
+	if err != nil {
+		panic(err)
+	}
+
 	userSigner, err := ssh.NewSignerFromKey(userKey)
 	if err != nil {
 		panic(err)
@@ -304,7 +336,7 @@ func GenerateUser() UserSSH {
 	return UserSSH{
 		username:   "testuser",
 		signer:     userSigner,
-		privateKey: b,
+		privateKey: b.Bytes,
 	}
 }
 

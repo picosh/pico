@@ -48,7 +48,6 @@ require (
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/lib/pq v1.10.9
 	github.com/microcosm-cc/bluemonday v1.0.27
-	github.com/mikesmitty/edkey v0.0.0-20170222072505-3356ea4e686a
 	github.com/minio/minio-go/v7 v7.0.80
 	github.com/mmcdole/gofeed v1.3.0
 	github.com/muesli/reflow v0.3.0
@@ -60,6 +59,7 @@ require (
 	github.com/picosh/tunkit v0.0.0-20240905223921-532404cef9d9
 	github.com/picosh/utils v0.0.0-20241120033529-8ca070c09bf4
 	github.com/pkg/sftp v1.13.7
+	github.com/prometheus/client_golang v1.20.5
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06
 	github.com/sendgrid/sendgrid-go v3.16.0+incompatible
 	github.com/simplesurance/go-ip-anonymizer v0.0.0-20200429124537-35a880f8e87d
@@ -264,7 +264,6 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect
 	github.com/pquerna/cachecontrol v0.2.0 // indirect
-	github.com/prometheus/client_golang v1.20.5 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.60.1 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
