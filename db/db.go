@@ -141,14 +141,6 @@ type Paginate[T any] struct {
 	Total int
 }
 
-type Analytics struct {
-	TotalUsers     int
-	UsersLastMonth int
-	TotalPosts     int
-	PostsLastMonth int
-	UsersWithPost  int
-}
-
 type VisitInterval struct {
 	Interval *time.Time `json:"interval"`
 	Visitors int        `json:"visitors"`
@@ -316,6 +308,21 @@ func (m *ErrMultiplePublicKeys) Error() string {
 	return "there are multiple users with this public key, you must provide the username when using SSH: `ssh <user>@<domain>`\n"
 }
 
+type UserStats struct {
+	Prose  UserServiceStats
+	Pastes UserServiceStats
+	Feeds  UserServiceStats
+	Pages  UserServiceStats
+}
+
+type UserServiceStats struct {
+	Service          string
+	Num              int
+	FirstCreatedAt   time.Time
+	LastestCreatedAt time.Time
+	LatestUpdatedAt  time.Time
+}
+
 var NameValidator = regexp.MustCompile("^[a-zA-Z0-9]{1,50}$")
 var DenyList = []string{
 	"admin",
@@ -347,8 +354,6 @@ type DB interface {
 	FindPublicKey(pubkeyID string) (*PublicKey, error)
 	FindKeysForUser(user *User) ([]*PublicKey, error)
 	RemoveKeys(pubkeyIDs []string) error
-
-	FindSiteAnalytics(space string) (*Analytics, error)
 
 	FindUsers() ([]*User, error)
 	FindUserForName(name string) (*User, error)
@@ -407,6 +412,8 @@ type DB interface {
 
 	UpsertProject(userID, name, projectDir string) (*Project, error)
 	FindProjectByName(userID, name string) (*Project, error)
+
+	FindUserStats(userID string) (*UserStats, error)
 
 	Close() error
 }

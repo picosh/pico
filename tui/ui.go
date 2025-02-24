@@ -1,210 +1,344 @@
 package tui
 
 import (
+	"errors"
 	"fmt"
+	"log/slog"
+	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/wish"
-	"github.com/muesli/reflow/wordwrap"
-	"github.com/muesli/reflow/wrap"
-	"github.com/picosh/pico/tui/analytics"
-	"github.com/picosh/pico/tui/chat"
-	"github.com/picosh/pico/tui/common"
-	"github.com/picosh/pico/tui/createaccount"
-	"github.com/picosh/pico/tui/createkey"
-	"github.com/picosh/pico/tui/createtoken"
-	"github.com/picosh/pico/tui/logs"
-	"github.com/picosh/pico/tui/menu"
-	"github.com/picosh/pico/tui/notifications"
-	"github.com/picosh/pico/tui/pages"
-	"github.com/picosh/pico/tui/plus"
-	"github.com/picosh/pico/tui/pubkeys"
-	"github.com/picosh/pico/tui/settings"
-	"github.com/picosh/pico/tui/tokens"
+	"git.sr.ht/~rockorager/vaxis"
+	"git.sr.ht/~rockorager/vaxis/vxfw"
+	"git.sr.ht/~rockorager/vaxis/vxfw/richtext"
+	"github.com/charmbracelet/ssh"
+	"github.com/picosh/pico/db"
+	"github.com/picosh/pico/shared"
+	"github.com/picosh/utils"
 )
 
-type state int
+var HOME = "dash"
 
-const (
-	initState state = iota
-	readyState
-)
-
-// Just a generic tea.Model to demo terminal information of ssh.
-type UI struct {
-	shared *common.SharedModel
-
-	state      state
-	activePage pages.Page
-	pages      []tea.Model
+type SharedModel struct {
+	Logger          *slog.Logger
+	Session         ssh.Session
+	Cfg             *shared.ConfigSite
+	Dbpool          db.DB
+	User            *db.User
+	PlusFeatureFlag *db.FeatureFlag
+	Impersonated    bool
+	App             *vxfw.App
 }
 
-func NewUI(shared *common.SharedModel) *UI {
-	m := &UI{
-		shared: shared,
-		state:  initState,
-		pages:  make([]tea.Model, 12),
+type Navigate struct{ To string }
+type PageIn struct{}
+type PageOut struct{}
+
+var fuschia = vaxis.HexColor(0xEE6FF8)
+var cream = vaxis.HexColor(0xFFFDF5)
+var green = vaxis.HexColor(0x04B575)
+var grey = vaxis.HexColor(0x5C5C5C)
+var red = vaxis.HexColor(0xED567A)
+
+// var white = vaxis.HexColor(0xFFFFFF).
+var oj = vaxis.HexColor(0xFFCA80)
+var purp = vaxis.HexColor(0xBD93F9)
+var black = vaxis.HexColor(0x282A36)
+
+func createDrawCtx(ctx vxfw.DrawContext, h uint16) vxfw.DrawContext {
+	return vxfw.DrawContext{
+		Characters: ctx.Characters,
+		Max: vxfw.Size{
+			Width:  ctx.Max.Width,
+			Height: h,
+		},
 	}
-	return m
 }
 
-func (m *UI) updateActivePage(msg tea.Msg) tea.Cmd {
-	nm, cmd := m.pages[m.activePage].Update(msg)
-	m.pages[m.activePage] = nm
-	return cmd
+type App struct {
+	shared *SharedModel
+	pages  map[string]vxfw.Widget
+	page   string
 }
 
-func (m *UI) setupUser() error {
-	user, err := findUser(m.shared)
-	if err != nil {
-		m.shared.Logger.Error("cannot find user", "err", err)
-		wish.Errorf(m.shared.Session, "\nERROR: %s\n\n", err)
-		return err
-	}
-
-	m.shared.User = user
-	ff, _ := findPlusFeatureFlag(m.shared)
-	m.shared.PlusFeatureFlag = ff
-
-	return nil
-}
-
-func (m *UI) Init() tea.Cmd {
-	// header height is required to calculate viewport for
-	// some pages
-	m.shared.HeaderHeight = lipgloss.Height(m.header()) + 1
-
-	m.pages[pages.MenuPage] = menu.NewModel(m.shared)
-	m.pages[pages.CreateAccountPage] = createaccount.NewModel(m.shared)
-	m.pages[pages.CreatePubkeyPage] = createkey.NewModel(m.shared)
-	m.pages[pages.CreateTokenPage] = createtoken.NewModel(m.shared)
-	m.pages[pages.CreateAccountPage] = createaccount.NewModel(m.shared)
-	m.pages[pages.PubkeysPage] = pubkeys.NewModel(m.shared)
-	m.pages[pages.TokensPage] = tokens.NewModel(m.shared)
-	m.pages[pages.NotificationsPage] = notifications.NewModel(m.shared)
-	m.pages[pages.PlusPage] = plus.NewModel(m.shared)
-	m.pages[pages.SettingsPage] = settings.NewModel(m.shared)
-	m.pages[pages.LogsPage] = logs.NewModel(m.shared)
-	m.pages[pages.AnalyticsPage] = analytics.NewModel(m.shared)
-	m.pages[pages.ChatPage] = chat.NewModel(m.shared)
-	if m.shared.User == nil {
-		m.activePage = pages.CreateAccountPage
-	} else {
-		m.activePage = pages.MenuPage
-	}
-	m.state = readyState
-	return nil
-}
-
-func (m *UI) updateModels(msg tea.Msg) tea.Cmd {
-	cmds := []tea.Cmd{}
-	for i, page := range m.pages {
-		if page == nil {
-			continue
+func (app *App) CaptureEvent(ev vaxis.Event) (vxfw.Command, error) {
+	switch msg := ev.(type) {
+	case vaxis.Key:
+		if msg.Matches('c', vaxis.ModCtrl) {
+			return vxfw.QuitCmd{}, nil
 		}
-		nm, cmd := page.Update(msg)
-		m.pages[i] = nm
-		cmds = append(cmds, cmd)
+		if msg.Matches(vaxis.KeyEsc) {
+			if app.page == "signup" || app.page == HOME {
+				return nil, nil
+			}
+			app.shared.App.PostEvent(Navigate{To: HOME})
+		}
 	}
-	return tea.Batch(cmds...)
+	return nil, nil
 }
 
-func (m *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmds []tea.Cmd
+type WidgetFooter interface {
+	Footer() []Shortcut
+}
 
-	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		m.shared.Width = msg.Width
-		m.shared.Height = msg.Height
-		return m, m.updateModels(msg)
+func (app *App) GetCurPage() vxfw.Widget {
+	return app.pages[app.page]
+}
 
-	case tea.KeyMsg:
-		switch msg.Type {
-		case tea.KeyCtrlC:
-			m.shared.Dbpool.Close()
-			return m, tea.Quit
+func (app *App) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
+	switch msg := ev.(type) {
+	case vxfw.Init:
+		page := HOME
+		// no user? kick them to the create account page
+		if app.shared.User == nil {
+			page = "signup"
+		}
+		app.shared.App.PostEvent(Navigate{To: page})
+		return nil, nil
+	case Navigate:
+		cmds := []vxfw.Command{}
+		cur := app.GetCurPage()
+		if cur != nil {
+			// send event to page notifying that we are leaving
+			cmd, _ := cur.HandleEvent(PageOut{}, vxfw.TargetPhase)
+			if cmd != nil {
+				cmds = append(cmds, cmd)
+			}
 		}
 
-	case pages.NavigateMsg:
-		// send message to the active page so it can teardown
-		// and reset itself
-		cmds = append(cmds, m.updateActivePage(msg))
-		m.activePage = msg.Page
+		// switch the page
+		app.page = msg.To
 
-	// user created account
-	case createaccount.CreateAccountMsg:
-		_ = m.setupUser()
-		// reset model and pages
-		return m, m.Init()
-
-	case menu.MenuChoiceMsg:
-		switch msg.MenuChoice {
-		case menu.KeysChoice:
-			m.activePage = pages.PubkeysPage
-		case menu.TokensChoice:
-			m.activePage = pages.TokensPage
-		case menu.NotificationsChoice:
-			m.activePage = pages.NotificationsPage
-		case menu.PlusChoice:
-			m.activePage = pages.PlusPage
-		case menu.SettingsChoice:
-			m.activePage = pages.SettingsPage
-		case menu.LogsChoice:
-			m.activePage = pages.LogsPage
-		case menu.AnalyticsChoice:
-			m.activePage = pages.AnalyticsPage
-		case menu.ChatChoice:
-			m.activePage = pages.ChatPage
-		case menu.ExitChoice:
-			m.shared.Dbpool.Close()
-			return m, tea.Quit
+		cur = app.GetCurPage()
+		if cur != nil {
+			// send event to page notifying that we are entering
+			cmd, _ := app.GetCurPage().HandleEvent(PageIn{}, vxfw.TargetPhase)
+			if cmd != nil {
+				cmds = append(cmds, cmd)
+			}
 		}
 
-		cmds = append(cmds, m.pages[m.activePage].Init())
+		cmds = append(
+			cmds,
+			vxfw.RedrawCmd{},
+		)
+		return vxfw.BatchCmd(cmds), nil
 	}
-
-	cmd := m.updateActivePage(msg)
-	cmds = append(cmds, cmd)
-
-	return m, tea.Batch(cmds...)
+	return nil, nil
 }
 
-func (m *UI) header() string {
+func (app *App) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
+	w := ctx.Max.Width
+	h := ctx.Max.Height
+	root := vxfw.NewSurface(w, ctx.Min.Height, app)
+
+	ah := 1
+	header := NewHeaderWdt(app.shared, app.page)
+	headerSurf, _ := header.Draw(vxfw.DrawContext{
+		Max:        vxfw.Size{Width: w, Height: 2},
+		Characters: ctx.Characters,
+	})
+	root.AddChild(1, ah, headerSurf)
+	ah += int(headerSurf.Size.Height)
+
+	cur := app.GetCurPage()
+	if cur != nil {
+		pageCtx := vxfw.DrawContext{
+			Characters: ctx.Characters,
+			Max:        vxfw.Size{Width: ctx.Max.Width - 1, Height: h - 2 - uint16(ah)},
+		}
+		surface, _ := app.GetCurPage().Draw(pageCtx)
+		root.AddChild(1, ah, surface)
+	}
+
+	wdgt, ok := cur.(WidgetFooter)
+	segs := []Shortcut{
+		{Shortcut: "^c", Text: "quit"},
+		{Shortcut: "esc", Text: "prev page"},
+	}
+	if ok {
+		segs = append(segs, wdgt.Footer()...)
+	}
+	footer := NewFooterWdt(app.shared, segs)
+	footerSurf, _ := footer.Draw(vxfw.DrawContext{
+		Max:        vxfw.Size{Width: w, Height: 2},
+		Characters: ctx.Characters,
+	})
+	root.AddChild(1, int(ctx.Max.Height)-2, footerSurf)
+
+	return root, nil
+}
+
+type HeaderWdgt struct {
+	shared *SharedModel
+
+	page string
+}
+
+func NewHeaderWdt(shrd *SharedModel, page string) *HeaderWdgt {
+	return &HeaderWdgt{
+		shared: shrd,
+		page:   page,
+	}
+}
+
+func (m *HeaderWdgt) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
+	return nil, nil
+}
+
+func (m *HeaderWdgt) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	logoTxt := "pico.sh"
 	ff := m.shared.PlusFeatureFlag
 	if ff != nil && ff.IsValid() {
 		logoTxt = "pico+"
 	}
 
-	logo := m.shared.
-		Styles.
-		Logo.
-		SetString(logoTxt)
-	title := m.shared.
-		Styles.
-		Note.
-		SetString(pages.ToTitle(m.activePage))
-	div := m.shared.
-		Styles.
-		HelpDivider.
-		Foreground(common.Green)
-	s := fmt.Sprintf("%s%s%s\n\n", logo, div, title)
-	return s
-}
+	root := vxfw.NewSurface(ctx.Max.Width, ctx.Max.Height, m)
+	// header
+	wdgt := richtext.New([]vaxis.Segment{
+		vaxis.Segment{Text: " " + logoTxt + " ", Style: vaxis.Style{Background: purp, Foreground: black}},
+		vaxis.Segment{Text: " • " + m.page, Style: vaxis.Style{Foreground: green}},
+	})
+	surf, _ := wdgt.Draw(ctx)
+	root.AddChild(0, 0, surf)
 
-func (m *UI) View() string {
-	s := m.header()
-
-	if m.pages[m.activePage] != nil {
-		s += m.pages[m.activePage].View()
+	if m.shared.User != nil {
+		user := richtext.New([]vaxis.Segment{
+			vaxis.Segment{Text: "~" + m.shared.User.Name, Style: vaxis.Style{Foreground: cream}},
+		})
+		surf, _ = user.Draw(ctx)
+		root.AddChild(int(ctx.Max.Width)-int(surf.Size.Width)-1, 0, surf)
 	}
 
-	width := m.shared.Width - m.shared.Styles.App.GetHorizontalFrameSize()
-	maxWidth := width
-	str := wrap.String(
-		wordwrap.String(s, maxWidth),
-		maxWidth,
-	)
-	return m.shared.Styles.App.Render(str)
+	return root, nil
+}
+
+type Shortcut struct {
+	Text     string
+	Shortcut string
+}
+
+type FooterWdgt struct {
+	shared *SharedModel
+
+	cmds []Shortcut
+}
+
+func NewFooterWdt(shrd *SharedModel, cmds []Shortcut) *FooterWdgt {
+	return &FooterWdgt{
+		shared: shrd,
+		cmds:   cmds,
+	}
+}
+
+func (m *FooterWdgt) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
+	return nil, nil
+}
+
+func (m *FooterWdgt) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
+	segs := []vaxis.Segment{}
+	for idx, shortcut := range m.cmds {
+		segs = append(
+			segs,
+			vaxis.Segment{Text: shortcut.Shortcut, Style: vaxis.Style{Foreground: fuschia}},
+			vaxis.Segment{Text: " " + shortcut.Text},
+		)
+		if idx < len(m.cmds)-1 {
+			segs = append(segs, vaxis.Segment{Text: " • "})
+		}
+	}
+	wdgt := richtext.New(segs)
+	return wdgt.Draw(ctx)
+}
+
+func initData(shrd *SharedModel) {
+	user, err := FindUser(shrd)
+	if err != nil {
+		panic(err)
+	}
+	shrd.User = user
+
+	ff, _ := FindPlusFeatureFlag(shrd)
+	shrd.PlusFeatureFlag = ff
+}
+
+func FindUser(shrd *SharedModel) (*db.User, error) {
+	logger := shrd.Cfg.Logger
+	var user *db.User
+	usr := shrd.Session.User()
+
+	if shrd.Session.PublicKey() == nil {
+		return nil, fmt.Errorf("unable to find public key")
+	}
+
+	key := utils.KeyForKeyText(shrd.Session.PublicKey())
+
+	user, err := shrd.Dbpool.FindUserForKey(usr, key)
+	if err != nil {
+		logger.Error("no user found for public key", "err", err.Error())
+		// we only want to throw an error for specific cases
+		if errors.Is(err, &db.ErrMultiplePublicKeys{}) {
+			return nil, err
+		}
+		// no user and not error indicates we need to create an account
+		return nil, nil
+	}
+
+	// impersonation
+	adminPrefix := "admin__"
+	if strings.HasPrefix(usr, adminPrefix) {
+		hasFeature := shrd.Dbpool.HasFeatureForUser(user.ID, "admin")
+		if !hasFeature {
+			return nil, fmt.Errorf("only admins can impersonate a user")
+		}
+		impersonate := strings.Replace(usr, adminPrefix, "", 1)
+		user, err = shrd.Dbpool.FindUserForName(impersonate)
+		if err != nil {
+			return nil, err
+		}
+		shrd.Impersonated = true
+	}
+
+	return user, nil
+}
+
+func FindPlusFeatureFlag(shrd *SharedModel) (*db.FeatureFlag, error) {
+	if shrd.User == nil {
+		return nil, nil
+	}
+
+	ff, err := shrd.Dbpool.FindFeatureForUser(shrd.User.ID, "plus")
+	if err != nil {
+		return nil, err
+	}
+
+	return ff, nil
+}
+
+func NewTui(opts vaxis.Options, shrd *SharedModel) {
+	initData(shrd)
+	app, err := vxfw.NewApp(opts)
+	if err != nil {
+		panic(err)
+	}
+
+	shrd.App = app
+	pages := map[string]vxfw.Widget{
+		HOME:         NewMenuPage(shrd),
+		"pubkeys":    NewPubkeysPage(shrd),
+		"add-pubkey": NewAddPubkeyPage(shrd),
+		"tokens":     NewTokensPage(shrd),
+		"add-token":  NewAddTokenPage(shrd),
+		"signup":     NewSignupPage(shrd),
+		"pico+":      NewPlusPage(shrd),
+		"logs":       NewLogsPage(shrd),
+		"analytics":  NewAnalyticsPage(shrd),
+	}
+	root := &App{
+		shared: shrd,
+		pages:  pages,
+	}
+
+	err = app.Run(root)
+	if err != nil {
+		panic(err)
+	}
 }

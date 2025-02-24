@@ -5,8 +5,6 @@ import (
 
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
-	bm "github.com/charmbracelet/wish/bubbletea"
-	"github.com/picosh/pico/tui/common"
 )
 
 func SessionMessage(sesh ssh.Session, msg string) {
@@ -16,15 +14,12 @@ func SessionMessage(sesh ssh.Session, msg string) {
 func DeprecatedNotice() wish.Middleware {
 	return func(next ssh.Handler) ssh.Handler {
 		return func(sesh ssh.Session) {
-			renderer := bm.MakeRenderer(sesh)
-			styles := common.DefaultStyles(renderer)
-
 			msg := fmt.Sprintf(
 				"%s\n\nRun %s to access pico's TUI",
-				styles.Logo.Render("DEPRECATED"),
-				styles.Code.Render("ssh pico.sh"),
+				"DEPRECATED",
+				"ssh pico.sh",
 			)
-			SessionMessage(sesh, styles.RoundedBorder.Render(msg))
+			SessionMessage(sesh, msg)
 			next(sesh)
 		}
 	}
