@@ -152,12 +152,6 @@ const (
 	sqlSelectTokensForUser      = `SELECT id, user_id, name, created_at, expires_at FROM tokens WHERE user_id = $1`
 	sqlSelectTokenByNameForUser = `SELECT token FROM tokens WHERE user_id = $1 AND name = $2`
 
-	sqlSelectTotalUsers          = `SELECT count(id) FROM app_users`
-	sqlSelectUsersAfterDate      = `SELECT count(id) FROM app_users WHERE created_at >= $1`
-	sqlSelectTotalPosts          = `SELECT count(id) FROM posts WHERE cur_space = $1`
-	sqlSelectTotalPostsAfterDate = `SELECT count(id) FROM posts WHERE created_at >= $1 AND cur_space = $2`
-	sqlSelectUsersWithPost       = `SELECT count(app_users.id) FROM app_users WHERE EXISTS (SELECT 1 FROM posts WHERE user_id = app_users.id AND cur_space = $1);`
-
 	sqlSelectFeatureForUser = `SELECT id, user_id, payment_history_id, name, data, created_at, expires_at FROM feature_flags WHERE user_id = $1 AND name = $2 ORDER BY expires_at DESC LIMIT 1`
 	sqlSelectSizeForUser    = `SELECT COALESCE(sum(file_size), 0) FROM posts WHERE user_id = $1`
 
@@ -531,45 +525,6 @@ func (me *PsqlDB) RemoveKeys(keyIDs []string) error {
 	param := "{" + strings.Join(keyIDs, ",") + "}"
 	_, err := me.Db.Exec(sqlRemoveKeys, param)
 	return err
-}
-
-func (me *PsqlDB) FindSiteAnalytics(space string) (*db.Analytics, error) {
-	analytics := &db.Analytics{}
-	r := me.Db.QueryRow(sqlSelectTotalUsers)
-	err := r.Scan(&analytics.TotalUsers)
-	if err != nil {
-		return nil, err
-	}
-
-	r = me.Db.QueryRow(sqlSelectTotalPosts, space)
-	err = r.Scan(&analytics.TotalPosts)
-	if err != nil {
-		return nil, err
-	}
-
-	now := time.Now()
-	year, month, _ := now.Date()
-	begMonth := time.Date(year, month, 1, 0, 0, 0, 0, now.Location())
-
-	r = me.Db.QueryRow(sqlSelectTotalPostsAfterDate, begMonth, space)
-	err = r.Scan(&analytics.PostsLastMonth)
-	if err != nil {
-		return nil, err
-	}
-
-	r = me.Db.QueryRow(sqlSelectUsersAfterDate, begMonth)
-	err = r.Scan(&analytics.UsersLastMonth)
-	if err != nil {
-		return nil, err
-	}
-
-	r = me.Db.QueryRow(sqlSelectUsersWithPost, space)
-	err = r.Scan(&analytics.UsersWithPost)
-	if err != nil {
-		return nil, err
-	}
-
-	return analytics, nil
 }
 
 func (me *PsqlDB) FindPostsBeforeDate(date *time.Time, space string) ([]*db.Post, error) {
@@ -1824,4 +1779,54 @@ func (me *PsqlDB) UpsertProject(userID, projectName, projectDir string) (*db.Pro
 		return nil, err
 	}
 	return me.FindProjectByName(userID, projectName)
+}
+
+func (me *PsqlDB) findPagesStats(userID string) (*db.UserServiceStats, error) {
+	stats := db.UserServiceStats{
+		Service: "pgs",
+	}
+	err := me.Db.QueryRow(
+		`SELECT count(id), min(created_at), max(created_at), max(updated_at) FROM projects WHERE user_id=$1`,
+		userID,
+	).Scan(&stats.Num, &stats.FirstCreatedAt, &stats.LastestCreatedAt, &stats.LatestUpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+
+	return &stats, nil
+}
+
+func (me *PsqlDB) FindUserStats(userID string) (*db.UserStats, error) {
+	stats := db.UserStats{}
+	rs, err := me.Db.Query(`SELECT cur_space, count(id), min(created_at), max(created_at), max(updated_at) FROM posts WHERE user_id=$1 GROUP BY cur_space`, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	for rs.Next() {
+		stat := db.UserServiceStats{}
+		err := rs.Scan(&stat.Service, &stat.Num, &stat.FirstCreatedAt, &stat.LastestCreatedAt, &stat.LatestUpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		switch stat.Service {
+		case "prose":
+			stats.Prose = stat
+		case "pastes":
+			stats.Pastes = stat
+		case "feeds":
+			stats.Feeds = stat
+		}
+	}
+
+	if rs.Err() != nil {
+		return nil, rs.Err()
+	}
+
+	pgs, err := me.findPagesStats(userID)
+	if err != nil {
+		return nil, err
+	}
+	stats.Pages = *pgs
+	return &stats, err
 }

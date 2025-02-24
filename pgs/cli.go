@@ -14,7 +14,6 @@ import (
 	"github.com/picosh/pico/db"
 	pgsdb "github.com/picosh/pico/pgs/db"
 	"github.com/picosh/pico/shared"
-	"github.com/picosh/pico/tui/common"
 	sst "github.com/picosh/pobj/storage"
 	"github.com/picosh/utils"
 )
@@ -54,9 +53,9 @@ func projectTable(projects []*db.Project, width int) *table.Table {
 	return t
 }
 
-func getHelpText(styles common.Styles, width int) string {
+func getHelpText(width int) string {
 	helpStr := "Commands: [help, stats, ls, fzf, rm, link, unlink, prune, retain, depends, acl, cache]\n"
-	helpStr += styles.Note.Render("NOTICE:") + " *must* append with `--write` for the changes to persist.\n"
+	helpStr += "NOTICE:" + " *must* append with `--write` for the changes to persist.\n"
 
 	projectName := "projA"
 	headers := []string{"Cmd", "Description"}
@@ -128,7 +127,6 @@ type Cmd struct {
 	Store   sst.ObjectStorage
 	Dbpool  pgsdb.PgsDB
 	Write   bool
-	Styles  common.Styles
 	Width   int
 	Height  int
 	Cfg     *PgsConfig
@@ -203,7 +201,7 @@ func (c *Cmd) RmProjectAssets(projectName string) error {
 }
 
 func (c *Cmd) help() {
-	c.output(getHelpText(c.Styles, c.Width))
+	c.output(getHelpText(c.Width))
 }
 
 func (c *Cmd) stats(cfgMaxSize uint64) error {

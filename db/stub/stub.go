@@ -57,10 +57,6 @@ func (me *StubDB) RemoveKeys(keyIDs []string) error {
 	return notImpl
 }
 
-func (me *StubDB) FindSiteAnalytics(space string) (*db.Analytics, error) {
-	return nil, notImpl
-}
-
 func (me *StubDB) FindPostsBeforeDate(date *time.Time, space string) ([]*db.Post, error) {
 	return []*db.Post{}, notImpl
 }
@@ -267,4 +263,8 @@ func (me *StubDB) AddPicoPlusUser(username, email, paymentType, txId string) err
 
 func (me *StubDB) FindTagsForUser(userID string, tag string) ([]string, error) {
 	return []string{}, notImpl
+}
+
+func (me *StubDB) FindUserStats(userID string) (*db.UserStats, error) {
+	return nil, notImpl
 }

@@ -4,32 +4,15 @@ go 1.24
 
 toolchain go1.24.0
 
-// replace github.com/picosh/tunkit => ../tunkit
-
 // replace github.com/picosh/send => ../send
-
-// replace github.com/picosh/go-rsync-receiver => ../go-rsync-receiver
-
-// replace github.com/picosh/pobj => ../pobj
-
-// replace github.com/picosh/pubsub => ../pubsub
-
-// replace github.com/picosh/utils => ../utils
-
-// replace git.sr.ht/~delthas/senpai => ../../senpai
-
-// replace git.sr.ht/~rockorager/vaxis => ../../vaxis
-
-// replace github.com/charmbracelet/wish => ../../wish
+// replace git.sr.ht/~rockorager/vaxis => ../../../src/vaxis
 
 require (
 	git.sr.ht/~delthas/senpai v0.3.1-0.20250311003540-18f699aaf9b0
+	git.sr.ht/~rockorager/vaxis v0.12.1-0.20250309233058-d6d466f8f9b1
 	github.com/alecthomas/chroma/v2 v2.14.0
 	github.com/antoniomika/syncmap v1.0.0
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
-	github.com/charmbracelet/bubbles v0.20.0
-	github.com/charmbracelet/bubbletea v1.3.4
-	github.com/charmbracelet/glamour v0.8.0
 	github.com/charmbracelet/lipgloss v1.0.0
 	github.com/charmbracelet/promwish v0.7.0
 	github.com/charmbracelet/ssh v0.0.0-20250213143314-8712ec3ff3ef
@@ -48,7 +31,6 @@ require (
 	github.com/microcosm-cc/bluemonday v1.0.27
 	github.com/minio/minio-go/v7 v7.0.87
 	github.com/mmcdole/gofeed v1.3.0
-	github.com/muesli/reflow v0.3.0
 	github.com/muesli/termenv v0.16.0
 	github.com/neurosnap/go-exif-remove v0.0.0-20221010134343-50d1e3c35577
 	github.com/picosh/pobj v0.0.0-20250304201248-a9c7179aa49b
@@ -77,7 +59,6 @@ require (
 	codeberg.org/emersion/go-scfg v0.1.0 // indirect
 	dario.cat/mergo v1.0.0 // indirect
 	filippo.io/edwards25519 v1.1.0 // indirect
-	git.sr.ht/~rockorager/vaxis v0.12.1-0.20250303214113-6cc9a0be8874 // indirect
 	github.com/AndreasBriese/bbloom v0.0.0-20190825152654-46b345b51c96 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver/v3 v3.2.0 // indirect
@@ -92,7 +73,6 @@ require (
 	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
 	github.com/armon/go-metrics v0.4.1 // indirect
 	github.com/aryann/difflib v0.0.0-20210328193216-ff5ff6dc229b // indirect
-	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.36.2 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.10 // indirect
 	github.com/aws/aws-sdk-go-v2/config v1.29.7 // indirect
@@ -124,11 +104,13 @@ require (
 	github.com/caddyserver/zerossl v0.1.3 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/charmbracelet/bubbletea v1.3.4 // indirect
 	github.com/charmbracelet/keygen v0.5.1 // indirect
 	github.com/charmbracelet/log v0.4.0 // indirect
 	github.com/charmbracelet/x/ansi v0.8.0 // indirect
 	github.com/charmbracelet/x/conpty v0.1.0 // indirect
 	github.com/charmbracelet/x/errors v0.0.0-20250226164017-59292a315e58 // indirect
+	github.com/charmbracelet/x/exp/golden v0.0.0-20240815200342-61de596daa2b // indirect
 	github.com/charmbracelet/x/input v0.3.1 // indirect
 	github.com/charmbracelet/x/term v0.2.1 // indirect
 	github.com/charmbracelet/x/termios v0.1.1 // indirect
@@ -309,7 +291,6 @@ require (
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	github.com/xujiajun/mmap-go v1.0.1 // indirect
 	github.com/xujiajun/utils v0.0.0-20220904132955-5f7c5b914235 // indirect
-	github.com/yuin/goldmark-emoji v1.0.4 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	github.com/zeebo/blake3 v0.2.3 // indirect
 	go.etcd.io/bbolt v1.3.9 // indirect

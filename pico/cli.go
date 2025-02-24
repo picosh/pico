@@ -12,9 +12,6 @@ import (
 	"github.com/charmbracelet/wish"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared"
-	"github.com/picosh/pico/tui/common"
-	"github.com/picosh/pico/tui/notifications"
-	"github.com/picosh/pico/tui/plus"
 	"github.com/picosh/utils"
 
 	pipeLogger "github.com/picosh/utils/pipe/log"
@@ -46,7 +43,6 @@ type Cmd struct {
 	Log        *slog.Logger
 	Dbpool     db.DB
 	Write      bool
-	Styles     common.Styles
 }
 
 func (c *Cmd) output(out string) {
@@ -56,17 +52,6 @@ func (c *Cmd) output(out string) {
 func (c *Cmd) help() {
 	helpStr := "Commands: [help, pico+]\n"
 	c.output(helpStr)
-}
-
-func (c *Cmd) plus() {
-	view := plus.PlusView(c.User.Name, 80)
-	c.output(view)
-}
-
-func (c *Cmd) notifications() error {
-	md := notifications.NotificationsView(c.Dbpool, c.User.ID, 80)
-	c.output(md)
-	return nil
 }
 
 func (c *Cmd) logs(ctx context.Context) error {
@@ -180,15 +165,6 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					return
 				} else if cmd == "logs" {
 					err = opts.logs(sesh.Context())
-					if err != nil {
-						wish.Fatalln(sesh, err)
-					}
-					return
-				} else if cmd == "pico+" {
-					opts.plus()
-					return
-				} else if cmd == "notifications" {
-					err := opts.notifications()
 					if err != nil {
 						wish.Fatalln(sesh, err)
 					}

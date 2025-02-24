@@ -12,7 +12,6 @@ import (
 	"github.com/muesli/termenv"
 	"github.com/picosh/pico/db"
 	pgsdb "github.com/picosh/pico/pgs/db"
-	"github.com/picosh/pico/tui/common"
 	sendutils "github.com/picosh/send/utils"
 	"github.com/picosh/utils"
 )
@@ -95,7 +94,6 @@ func WishMiddleware(handler *UploadAssetHandler) wish.Middleware {
 
 			renderer := bm.MakeRenderer(sesh)
 			renderer.SetColorProfile(termenv.TrueColor)
-			styles := common.DefaultStyles(renderer)
 
 			opts := Cmd{
 				Session: sesh,
@@ -104,7 +102,6 @@ func WishMiddleware(handler *UploadAssetHandler) wish.Middleware {
 				Log:     log,
 				Dbpool:  dbpool,
 				Write:   false,
-				Styles:  styles,
 				Width:   width,
 				Height:  height,
 				Cfg:     handler.Cfg,
