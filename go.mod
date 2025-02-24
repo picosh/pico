@@ -26,6 +26,7 @@ replace git.sr.ht/~delthas/senpai => github.com/antoniomika/senpai v0.0.0-202502
 
 require (
 	git.sr.ht/~delthas/senpai v0.3.1-0.20240425235039-206be659439e
+	git.sr.ht/~rockorager/vaxis v0.10.3
 	github.com/alecthomas/chroma/v2 v2.14.0
 	github.com/antoniomika/syncmap v1.0.0
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
