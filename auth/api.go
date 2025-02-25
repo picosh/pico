@@ -612,6 +612,9 @@ func deserializeCaddyAccessLog(dbpool db.DB, access *AccessLog) (*db.AnalyticsVi
 		subdomain = shared.GetCustomDomain(host, space)
 	}
 
+	subdomain = strings.TrimSuffix(subdomain, ".nue")
+	subdomain = strings.TrimSuffix(subdomain, ".ash")
+
 	// get user and namespace details from subdomain
 	props, err := shared.GetProjectFromSubdomain(subdomain)
 	if err != nil {
@@ -644,15 +647,10 @@ func deserializeCaddyAccessLog(dbpool db.DB, access *AccessLog) (*db.AnalyticsVi
 			cleanPath := strings.TrimPrefix(path, "/")
 			post, err := dbpool.FindPostWithSlug(cleanPath, user.ID, space)
 			if err != nil {
-				return nil, fmt.Errorf(
-					"could not find post with slug (path:%s, userId:%s, space:%s): %w",
-					cleanPath,
-					user.ID,
-					space,
-					err,
-				)
+				// skip
+			} else {
+				postID = post.ID
 			}
-			postID = post.ID
 		}
 	}
 
@@ -696,8 +694,6 @@ func metricDrainSub(ctx context.Context, dbpool db.DB, logger *slog.Logger, secr
 		for scanner.Scan() {
 			line := scanner.Text()
 			clean := strings.TrimSpace(line)
-
-			fmt.Println(line)
 
 			visit, err := accessLogToVisit(dbpool, clean)
 			if err != nil {
