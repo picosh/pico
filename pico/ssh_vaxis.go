@@ -14,6 +14,7 @@ import (
 	"github.com/charmbracelet/wish"
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
+	"github.com/picosh/pico/tui/common"
 	"github.com/picosh/pico/tuivax"
 	wsh "github.com/picosh/pico/wish"
 	"github.com/picosh/send/auth"
@@ -27,14 +28,22 @@ import (
 )
 
 func createRouterVaxis(cfg *shared.ConfigSite, handler *UploadHandler, cliHandler *CliHandler) proxy.Router {
-	return func(sh ssh.Handler, s ssh.Session) []wish.Middleware {
+	return func(sh ssh.Handler, sesh ssh.Session) []wish.Middleware {
+		shrd := &common.SharedModel{
+			Session: sesh,
+			Cfg:     cfg,
+			Dbpool:  handler.DBPool,
+			Width:   80,
+			Height:  24,
+			Logger:  cfg.Logger,
+		}
 		return []wish.Middleware{
 			pipe.Middleware(handler, ""),
 			list.Middleware(handler),
 			scp.Middleware(handler),
 			wishrsync.Middleware(handler),
 			auth.Middleware(handler),
-			wsh.PtyMdw(createTui()),
+			wsh.PtyMdw(createTui(shrd)),
 			WishMiddleware(cliHandler),
 			wsh.LogMiddleware(handler.GetLogger()),
 		}
@@ -52,7 +61,7 @@ func withProxyVaxis(cfg *shared.ConfigSite, handler *UploadHandler, cliHandler *
 	}
 }
 
-func createTui() wish.Middleware {
+func createTui(shrd *common.SharedModel) wish.Middleware {
 	return func(next ssh.Handler) ssh.Handler {
 		return func(sesh ssh.Session) {
 			vty, err := shared.NewVConsole(sesh)
@@ -62,7 +71,7 @@ func createTui() wish.Middleware {
 			opts := vaxis.Options{
 				WithConsole: vty,
 			}
-			tuivax.NewTui(opts)
+			tuivax.NewTui(opts, shrd)
 		}
 	}
 }
