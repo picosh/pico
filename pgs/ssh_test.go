@@ -209,11 +209,19 @@ func TestSshServerRsync(t *testing.T) {
 	os.Remove(aboutFile)
 
 	// copy files with delete
-	delCmd := exec.Command("rsync", "-rv", "-e", eCmd, name+"/", "localhost:/test")
+	delCmd := exec.Command("rsync", "-rv", "--delete", "-e", eCmd, name+"/", "localhost:/test")
 	result, err = delCmd.CombinedOutput()
 	if err != nil {
 		fmt.Println(string(result), err)
 		t.Error(err)
+		return
+	}
+
+	// check it's not there
+	_, err = client.Lstat("/test/about.html")
+	if err == nil {
+		cfg.Logger.Error("file still exists")
+		t.Error("about.html found")
 		return
 	}
 
