@@ -17,7 +17,7 @@ import (
 type ReadWriteHandler interface {
 	List(s ssh.Session, fpath string, isDir bool, recursive bool) ([]os.FileInfo, error)
 	Write(ssh.Session, *utils.FileEntry) (string, error)
-	Read(ssh.Session, *utils.FileEntry) (os.FileInfo, utils.ReaderAtCloser, error)
+	Read(ssh.Session, *utils.FileEntry) (os.FileInfo, utils.ReadAndReaderAtCloser, error)
 	Delete(ssh.Session, *utils.FileEntry) error
 }
 
@@ -73,7 +73,7 @@ func (r *FileHandlerRouter) Delete(s ssh.Session, entry *utils.FileEntry) error 
 	return handler.Delete(s, entry)
 }
 
-func (r *FileHandlerRouter) Read(s ssh.Session, entry *utils.FileEntry) (os.FileInfo, utils.ReaderAtCloser, error) {
+func (r *FileHandlerRouter) Read(s ssh.Session, entry *utils.FileEntry) (os.FileInfo, utils.ReadAndReaderAtCloser, error) {
 	handler, err := r.findHandler(entry.Filepath)
 	if err != nil {
 		return nil, nil, err

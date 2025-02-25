@@ -1,14 +1,16 @@
 module github.com/picosh/pico
 
-go 1.23.1
+go 1.24
+
+toolchain go1.24.0
 
 // replace github.com/picosh/tunkit => ../tunkit
 
-// replace github.com/picosh/send => ../send
+replace github.com/picosh/send => ../send
 
-// replace github.com/picosh/go-rsync-receiver => ../go-rsync-receiver
+replace github.com/picosh/go-rsync-receiver => ../go-rsync-receiver
 
-// replace github.com/picosh/pobj => ../pobj
+replace github.com/picosh/pobj => ../pobj
 
 // replace github.com/picosh/pubsub => ../pubsub
 
@@ -70,7 +72,7 @@ require (
 	go.abhg.dev/goldmark/anchor v0.1.1
 	go.abhg.dev/goldmark/hashtag v0.3.1
 	go.abhg.dev/goldmark/toc v0.10.0
-	golang.org/x/crypto v0.31.0
+	golang.org/x/crypto v0.33.0
 	google.golang.org/protobuf v1.35.2
 	gopkg.in/yaml.v2 v2.4.0
 )
@@ -81,7 +83,6 @@ require (
 	filippo.io/edwards25519 v1.1.0 // indirect
 	git.sr.ht/~rockorager/vaxis v0.10.3 // indirect
 	github.com/AndreasBriese/bbloom v0.0.0-20190825152654-46b345b51c96 // indirect
-	github.com/DavidGamba/go-getoptions v0.31.0 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver/v3 v3.2.0 // indirect
 	github.com/Masterminds/sprig/v3 v3.2.3 // indirect
@@ -197,7 +198,6 @@ require (
 	github.com/google/cel-go v0.20.1 // indirect
 	github.com/google/flatbuffers v23.1.21+incompatible // indirect
 	github.com/google/pprof v0.0.0-20240711041743-f6c9dda6c6da // indirect
-	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/gorilla/css v1.0.1 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-immutable-radix v1.3.1 // indirect
@@ -332,10 +332,10 @@ require (
 	golang.org/x/image v0.21.0 // indirect
 	golang.org/x/mod v0.22.0 // indirect
 	golang.org/x/net v0.31.0 // indirect
-	golang.org/x/sync v0.10.0 // indirect
-	golang.org/x/sys v0.28.0 // indirect
-	golang.org/x/term v0.27.0 // indirect
-	golang.org/x/text v0.21.0 // indirect
+	golang.org/x/sync v0.11.0 // indirect
+	golang.org/x/sys v0.30.0 // indirect
+	golang.org/x/term v0.29.0 // indirect
+	golang.org/x/text v0.22.0 // indirect
 	golang.org/x/time v0.8.0 // indirect
 	golang.org/x/tools v0.27.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240903143218-8af14fe29dc1 // indirect
