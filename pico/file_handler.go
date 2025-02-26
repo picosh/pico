@@ -55,7 +55,7 @@ func (h *UploadHandler) Delete(s ssh.Session, entry *sendutils.FileEntry) error 
 	return errors.New("unsupported")
 }
 
-func (h *UploadHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os.FileInfo, sendutils.ReaderAtCloser, error) {
+func (h *UploadHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os.FileInfo, sendutils.ReadAndReaderAtCloser, error) {
 	user, err := h.DBPool.FindUser(s.Permissions().Extensions["user_id"])
 	if err != nil {
 		return nil, nil, err
@@ -71,7 +71,7 @@ func (h *UploadHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os.File
 		if err != nil {
 			return nil, nil, err
 		}
-		reader := sendutils.NopReaderAtCloser(strings.NewReader(text))
+		reader := sendutils.NopReadAndReaderAtCloser(strings.NewReader(text))
 		return fileInfo, reader, nil
 	}
 

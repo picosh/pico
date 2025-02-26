@@ -116,7 +116,7 @@ func (h *UploadAssetHandler) GetLogger() *slog.Logger {
 	return h.Cfg.Logger
 }
 
-func (h *UploadAssetHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os.FileInfo, sendutils.ReaderAtCloser, error) {
+func (h *UploadAssetHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os.FileInfo, sendutils.ReadAndReaderAtCloser, error) {
 	user, err := h.Cfg.DB.FindUser(s.Permissions().Extensions["user_id"])
 	if err != nil {
 		return nil, nil, err

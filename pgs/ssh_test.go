@@ -184,10 +184,9 @@ func TestSshServerRsync(t *testing.T) {
 
 	// copy files
 	cmd := exec.Command("rsync", "-rv", "-e", eCmd, name+"/", "localhost:/test")
-	fmt.Println(cmd.Args)
 	result, err := cmd.CombinedOutput()
 	if err != nil {
-		fmt.Println(string(result), err)
+		cfg.Logger.Error("cannot upload", "err", err, "result", string(result))
 		t.Error(err)
 		return
 	}
@@ -209,11 +208,60 @@ func TestSshServerRsync(t *testing.T) {
 	os.Remove(aboutFile)
 
 	// copy files with delete
-	delCmd := exec.Command("rsync", "-rv", "-e", eCmd, name+"/", "localhost:/test")
+	delCmd := exec.Command("rsync", "-rv", "--delete", "-e", eCmd, name+"/", "localhost:/test")
 	result, err = delCmd.CombinedOutput()
 	if err != nil {
-		fmt.Println(string(result), err)
+		cfg.Logger.Error("cannot upload with delete", "err", err, "result", string(result))
 		t.Error(err)
+		return
+	}
+
+	// check it's not there
+	_, err = client.Lstat("/test/about.html")
+	if err == nil {
+		cfg.Logger.Error("file still exists")
+		t.Error("about.html found")
+		return
+	}
+
+	dlName, err := os.MkdirTemp("", "rsync-download")
+	if err != nil {
+		panic(err)
+	}
+	defer os.RemoveAll(dlName)
+	// download files
+	downloadCmd := exec.Command("rsync", "-rvvv", "-e", eCmd, "localhost:/test/", dlName+"/")
+	result, err = downloadCmd.CombinedOutput()
+	if err != nil {
+		cfg.Logger.Error("cannot download files", "err", err, "result", string(result))
+		t.Error(err)
+		return
+	}
+	// check contents
+	idx, err := os.ReadFile(filepath.Join(dlName, "index.html"))
+	if err != nil {
+		cfg.Logger.Error("cannot open file", "file", "index.html", "err", err)
+		t.Error(err)
+		return
+	}
+	if string(idx) != index {
+		t.Error("downloaded index.html file does not match original")
+		return
+	}
+	_, err = os.ReadFile(filepath.Join(dlName, "about.html"))
+	if err == nil {
+		cfg.Logger.Error("about file should not exist", "file", "about.html")
+		t.Error(err)
+		return
+	}
+	cnt, err := os.ReadFile(filepath.Join(dlName, "contact.html"))
+	if err != nil {
+		cfg.Logger.Error("cannot open file", "file", "contact.html", "err", err)
+		t.Error(err)
+		return
+	}
+	if string(cnt) != contact {
+		t.Error("downloaded contact.html file does not match original")
 		return
 	}
 

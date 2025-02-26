@@ -46,11 +46,11 @@ func (me *MemoryDB) SetupTestData() {
 	me.Feature = feature
 }
 
-var notImpl = fmt.Errorf("not implemented")
+var errNotImpl = fmt.Errorf("not implemented")
 
 func (me *MemoryDB) FindUsers() ([]*db.User, error) {
 	users := []*db.User{}
-	return users, notImpl
+	return users, errNotImpl
 }
 
 func (me *MemoryDB) FindUserByPubkey(key string) (*db.User, error) {
@@ -89,22 +89,33 @@ func (me *MemoryDB) Close() error {
 }
 
 func (me *MemoryDB) FindTotalSizeForUser(userID string) (int, error) {
-	return 0, notImpl
+	return 0, errNotImpl
 }
 
 func (me *MemoryDB) InsertProject(userID, name, projectDir string) (string, error) {
 	id := uuid.NewString()
+	now := time.Now()
 	me.Projects = append(me.Projects, &db.Project{
 		ID:         id,
 		UserID:     userID,
 		Name:       name,
 		ProjectDir: projectDir,
+		CreatedAt:  &now,
+		UpdatedAt:  &now,
 	})
 	return id, nil
 }
 
 func (me *MemoryDB) UpdateProject(userID, name string) error {
-	return notImpl
+	project, err := me.FindProjectByName(userID, name)
+	if err != nil {
+		return err
+	}
+
+	now := time.Now()
+	project.UpdatedAt = &now
+
+	return nil
 }
 
 func (me *MemoryDB) UpsertProject(userID, projectName, projectDir string) (*db.Project, error) {
@@ -128,11 +139,11 @@ func (me *MemoryDB) UpsertProject(userID, projectName, projectDir string) (*db.P
 }
 
 func (me *MemoryDB) LinkToProject(userID, projectID, projectDir string, commit bool) error {
-	return notImpl
+	return errNotImpl
 }
 
 func (me *MemoryDB) RemoveProject(projectID string) error {
-	return notImpl
+	return errNotImpl
 }
 
 func (me *MemoryDB) FindProjectByName(userID, name string) (*db.Project, error) {
@@ -151,21 +162,21 @@ func (me *MemoryDB) FindProjectByName(userID, name string) (*db.Project, error) 
 }
 
 func (me *MemoryDB) FindProjectLinks(userID, name string) ([]*db.Project, error) {
-	return []*db.Project{}, notImpl
+	return []*db.Project{}, errNotImpl
 }
 
 func (me *MemoryDB) FindProjectsByPrefix(userID, prefix string) ([]*db.Project, error) {
-	return []*db.Project{}, notImpl
+	return []*db.Project{}, errNotImpl
 }
 
 func (me *MemoryDB) FindProjectsByUser(userID string) ([]*db.Project, error) {
-	return []*db.Project{}, notImpl
+	return []*db.Project{}, errNotImpl
 }
 
 func (me *MemoryDB) FindProjects(userID string) ([]*db.Project, error) {
-	return []*db.Project{}, notImpl
+	return []*db.Project{}, errNotImpl
 }
 
 func (me *MemoryDB) UpdateProjectAcl(userID, name string, acl db.ProjectAcl) error {
-	return notImpl
+	return errNotImpl
 }

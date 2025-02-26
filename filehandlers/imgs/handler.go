@@ -97,7 +97,7 @@ func (h *UploadImgHandler) List(s ssh.Session, fpath string, isDir bool, recursi
 	return fileList, nil
 }
 
-func (h *UploadImgHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os.FileInfo, sendutils.ReaderAtCloser, error) {
+func (h *UploadImgHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os.FileInfo, sendutils.ReadAndReaderAtCloser, error) {
 	user, err := h.DBPool.FindUser(s.Permissions().Extensions["user_id"])
 	if err != nil {
 		return nil, nil, err
@@ -287,7 +287,7 @@ func (h *UploadImgHandler) metaImg(data *PostMetaData) error {
 	_, _, err = h.Storage.PutObject(
 		bucket,
 		h.getObjectPath(data.Filename),
-		sendutils.NopReaderAtCloser(reader),
+		sendutils.NopReadAndReaderAtCloser(reader),
 		&sendutils.FileEntry{},
 	)
 	if err != nil {

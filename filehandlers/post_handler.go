@@ -49,7 +49,7 @@ func (r *ScpUploadHandler) List(s ssh.Session, fpath string, isDir bool, recursi
 	return BaseList(s, fpath, isDir, recursive, []string{r.Cfg.Space}, r.DBPool)
 }
 
-func (h *ScpUploadHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os.FileInfo, sendutils.ReaderAtCloser, error) {
+func (h *ScpUploadHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os.FileInfo, sendutils.ReadAndReaderAtCloser, error) {
 	user, err := h.DBPool.FindUser(s.Permissions().Extensions["user_id"])
 	if err != nil {
 		return nil, nil, err
@@ -72,7 +72,7 @@ func (h *ScpUploadHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os.F
 		FModTime: *post.UpdatedAt,
 	}
 
-	reader := sendutils.NopReaderAtCloser(strings.NewReader(post.Text))
+	reader := sendutils.NopReadAndReaderAtCloser(strings.NewReader(post.Text))
 
 	return fileInfo, reader, nil
 }
