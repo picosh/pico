@@ -22,9 +22,7 @@ toolchain go1.24.0
 
 // replace github.com/charmbracelet/wish => ../../wish
 
-replace git.sr.ht/~delthas/senpai => github.com/antoniomika/senpai v0.0.0-20250114180426-3061ddccec76
-
-replace git.sr.ht/~rockorager/vaxis => github.com/antoniomika/vaxis v0.0.0-20250114030546-8524674789ca
+replace git.sr.ht/~delthas/senpai => github.com/antoniomika/senpai v0.0.0-20250222151844-ab59937d60cc
 
 require (
 	git.sr.ht/~delthas/senpai v0.3.1-0.20240425235039-206be659439e
@@ -81,7 +79,7 @@ require (
 	codeberg.org/emersion/go-scfg v0.1.0 // indirect
 	dario.cat/mergo v1.0.0 // indirect
 	filippo.io/edwards25519 v1.1.0 // indirect
-	git.sr.ht/~rockorager/vaxis v0.10.3 // indirect
+	git.sr.ht/~rockorager/vaxis v0.12.1-0.20250218200016-0e88f197413a // indirect
 	github.com/AndreasBriese/bbloom v0.0.0-20190825152654-46b345b51c96 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver/v3 v3.2.0 // indirect
@@ -275,7 +273,7 @@ require (
 	github.com/quic-go/quic-go v0.44.0 // indirect
 	github.com/redis/rueidis v1.0.39 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
-	github.com/rogpeppe/go-internal v1.12.0 // indirect
+	github.com/rogpeppe/go-internal v1.13.2-0.20241226121412-a5dc8ff20d0a // indirect
 	github.com/rs/xid v1.6.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/safchain/ethtool v0.5.10 // indirect
@@ -331,19 +329,19 @@ require (
 	go.uber.org/zap/exp v0.2.0 // indirect
 	golang.org/x/crypto/x509roots/fallback v0.0.0-20240507223354-67b13616a595 // indirect
 	golang.org/x/exp v0.0.0-20250218142911-aa4b98e5adaa // indirect
-	golang.org/x/image v0.21.0 // indirect
+	golang.org/x/image v0.24.0 // indirect
 	golang.org/x/mod v0.23.0 // indirect
 	golang.org/x/net v0.35.0 // indirect
 	golang.org/x/sync v0.11.0 // indirect
 	golang.org/x/sys v0.30.0 // indirect
 	golang.org/x/term v0.29.0 // indirect
 	golang.org/x/text v0.22.0 // indirect
-	golang.org/x/time v0.9.0 // indirect
+	golang.org/x/time v0.10.0 // indirect
 	golang.org/x/tools v0.30.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250115164207-1a7da9e5054f // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250115164207-1a7da9e5054f // indirect
 	google.golang.org/grpc v1.70.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	howett.net/plist v1.0.0 // indirect
-	mvdan.cc/xurls/v2 v2.5.0 // indirect
+	mvdan.cc/xurls/v2 v2.6.0 // indirect
 )
