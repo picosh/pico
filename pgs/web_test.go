@@ -63,7 +63,7 @@ func TestApiBasic(t *testing.T) {
 
 			storage: map[string]map[string]string{
 				bucketName: {
-					"test/index.html": "hello world!",
+					"/test/index.html": "hello world!",
 				},
 			},
 		},
@@ -76,7 +76,7 @@ func TestApiBasic(t *testing.T) {
 
 			storage: map[string]map[string]string{
 				bucketName: {
-					"test/test.html": "hello world!",
+					"/test/test.html": "hello world!",
 				},
 			},
 		},
@@ -89,7 +89,7 @@ func TestApiBasic(t *testing.T) {
 
 			storage: map[string]map[string]string{
 				bucketName: {
-					"test/subdir/index.html": "hello world!",
+					"/test/subdir/index.html": "hello world!",
 				},
 			},
 		},
@@ -102,8 +102,8 @@ func TestApiBasic(t *testing.T) {
 
 			storage: map[string]map[string]string{
 				bucketName: {
-					"test/_redirects": "/anything /about.html 301",
-					"test/about.html": "hello world!",
+					"/test/_redirects": "/anything /about.html 301",
+					"/test/about.html": "hello world!",
 				},
 			},
 		},
@@ -116,7 +116,7 @@ func TestApiBasic(t *testing.T) {
 
 			storage: map[string]map[string]string{
 				bucketName: {
-					"test/subdir/index.html": "hello world!",
+					"/test/subdir/index.html": "hello world!",
 				},
 			},
 		},
@@ -129,8 +129,8 @@ func TestApiBasic(t *testing.T) {
 
 			storage: map[string]map[string]string{
 				bucketName: {
-					"test/_redirects": "/* /index.html 200",
-					"test/index.html": "hello world!",
+					"/test/_redirects": "/* /index.html 200",
+					"/test/index.html": "hello world!",
 				},
 			},
 		},
@@ -154,7 +154,7 @@ func TestApiBasic(t *testing.T) {
 
 			storage: map[string]map[string]string{
 				bucketName: {
-					"test/404.html": "boom!",
+					"/test/404.html": "boom!",
 				},
 			},
 		},
@@ -167,7 +167,7 @@ func TestApiBasic(t *testing.T) {
 
 			storage: map[string]map[string]string{
 				bucketName: {
-					"test/profile.jpg": "image",
+					"/test/profile.jpg": "image",
 				},
 			},
 		},
@@ -181,8 +181,8 @@ func TestApiBasic(t *testing.T) {
 
 			storage: map[string]map[string]string{
 				bucketName: {
-					"test/_redirects": "/anything /about.html 301",
-					"test/about.html": "hello world!",
+					"/test/_redirects": "/anything /about.html 301",
+					"/test/about.html": "hello world!",
 				},
 			},
 		},
@@ -198,7 +198,7 @@ func TestApiBasic(t *testing.T) {
 
 			storage: map[string]map[string]string{
 				bucketName: {
-					"test/test.html": "hello world!",
+					"/test/test.html": "hello world!",
 				},
 			},
 		},
@@ -214,7 +214,7 @@ func TestApiBasic(t *testing.T) {
 
 			storage: map[string]map[string]string{
 				bucketName: {
-					"test/test.html": "hello world!",
+					"/test/test.html": "hello world!",
 				},
 			},
 		},
@@ -230,7 +230,7 @@ func TestApiBasic(t *testing.T) {
 
 			storage: map[string]map[string]string{
 				bucketName: {
-					"test/test.html": "hello world!",
+					"/test/test.html": "hello world!",
 				},
 			},
 		},
@@ -246,7 +246,7 @@ func TestApiBasic(t *testing.T) {
 
 			storage: map[string]map[string]string{
 				bucketName: {
-					"test/test.html": "hello world!",
+					"/test/test.html": "hello world!",
 				},
 			},
 		},
@@ -264,7 +264,7 @@ func TestApiBasic(t *testing.T) {
 
 			storage: map[string]map[string]string{
 				bucketName: {
-					"test/test.html": "hello world!",
+					"/test/test.html": "hello world!",
 				},
 			},
 		},
@@ -346,7 +346,7 @@ func TestImageManipulation(t *testing.T) {
 
 			storage: map[string]map[string]string{
 				bucketName: {
-					"test/app.jpg": "hello world!",
+					"/test/app.jpg": "hello world!",
 				},
 			},
 		},
@@ -359,7 +359,7 @@ func TestImageManipulation(t *testing.T) {
 
 			storage: map[string]map[string]string{
 				bucketName: {
-					"test/subdir/app.jpg": "hello world!",
+					"/test/subdir/app.jpg": "hello world!",
 				},
 			},
 		},
