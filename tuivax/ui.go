@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"git.sr.ht/~rockorager/vaxis"
+	"git.sr.ht/~rockorager/vaxis/vxfw"
+	"git.sr.ht/~rockorager/vaxis/vxfw/text"
 	"git.sr.ht/~rockorager/vaxis/widgets/border"
 	"git.sr.ht/~rockorager/vaxis/widgets/list"
 	"git.sr.ht/~rockorager/vaxis/widgets/textinput"
@@ -34,46 +36,104 @@ var menuChoices = []string{
 	"pico+",
 }
 
-type UIVx struct {
+type App struct {
 	shared *common.SharedModel
-	vx     *vaxis.Vaxis
 
-	page string
-	menu list.List
+	page          string
+	menu          *MenuPage
+	pubkeys       *PubkeysPage
+	createAccount *CreateAccountPage
+	addPubkey     *AddKeyPage
+}
+
+func (app *App) CaptureEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
+	switch ev := ev.(type) {
+	case vaxis.Key:
+		if ev.Matches('c', vaxis.ModCtrl) {
+			return vxfw.QuitCmd{}, nil
+		}
+	}
+	return nil, nil
+}
+
+func (app *App) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
+	switch ev := ev.(type) {
+	case vaxis.Key:
+		if ev.Matches('c', vaxis.ModCtrl) {
+			return vxfw.QuitCmd{}, nil
+		}
+	}
+	return nil, nil
+}
+
+func (app *App) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
+	fmt.Println(ctx.Max.Width, ctx.Max.Height)
+	surface := vxfw.Surface{}
+	root := vxfw.NewSurface(ctx.Max.Width, ctx.Min.Height, app)
+
+	txt := text.New(fmt.Sprintf("pico • %s\n", app.page))
+	header := vxfw.NewSurface(ctx.Max.Width, 2, txt)
+	root.AddChild(0, 0, header)
+
+	switch app.page {
+	case "menu":
+		menu, err := app.menu.Draw(ctx)
+		if err != nil {
+			return vxfw.Surface{}, err
+		}
+		surface = menu
+	}
+
+	root.AddChild(0, 2, surface)
+	return root, nil
 }
 
 type Navigate struct{ To string }
 type Quit struct{}
 
-func (ui *UIVx) menuPage(win vaxis.Window, ev vaxis.Event) {
+type MenuPage struct {
+	shared *common.SharedModel
+
+	menu list.List
+}
+
+func NewMenuPage(shrd *common.SharedModel) *MenuPage {
+	return &MenuPage{shared: shrd}
+}
+
+func (m *MenuPage) HandleEvent(ev vaxis.Event) {
 	switch msg := ev.(type) {
 	case vaxis.Key:
 		switch msg.String() {
 		case "Ctrl+c", "q", "Escape":
-			ui.vx.PostEvent(Quit{})
+			// m.ui.vx.PostEvent(Quit{})
 		case "Down", "j":
-			ui.menu.Down()
+			m.menu.Down()
 		case "Up", "k":
-			ui.menu.Up()
+			m.menu.Up()
 		case "Enter":
-			ui.vx.PostEvent(Navigate{To: menuChoices[ui.menu.Index()]})
+			// m.ui.vx.PostEvent(Navigate{To: menuChoices[m.menu.Index()]})
 		}
 	}
+}
 
-	createdAt := ui.shared.User.CreatedAt.Format(time.DateOnly)
+func (m *MenuPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
+	txt := text.New("menu!\n")
+	return vxfw.NewSurface(ctx.Max.Width, ctx.Min.Height, txt), nil
+	/* createdAt := m.shared.User.CreatedAt.Format(time.DateOnly)
 	pink := vaxis.Style{Foreground: fuschia}
 
 	segs := []vaxis.Segment{}
 	segs = append(
 		segs,
-		vaxis.Segment{Text: " Username: "}, vaxis.Segment{Text: ui.shared.User.Name, Style: pink},
+		vaxis.Segment{Text: " Username: "}, vaxis.Segment{Text: m.shared.User.Name, Style: pink},
 		vaxis.Segment{Text: "\n"},
 		vaxis.Segment{Text: " Joined: "}, vaxis.Segment{Text: createdAt, Style: pink},
 	)
 
 	brdH := 2
-	if ui.shared.PlusFeatureFlag != nil {
-		expiresAt := ui.shared.PlusFeatureFlag.ExpiresAt.Format(time.DateOnly)
+	if m.shared.PlusFeatureFlag != nil {
+		expiresAt := m.shared.PlusFeatureFlag.ExpiresAt.Format(time.DateOnly)
 		segs = append(segs,
 			vaxis.Segment{Text: "\n"},
 			vaxis.Segment{Text: " Pico+ Expires: "}, vaxis.Segment{Text: expiresAt, Style: pink},
@@ -89,22 +149,26 @@ func (ui *UIVx) menuPage(win vaxis.Window, ev vaxis.Event) {
 
 	menuWin := win.New(0, offset, win.Width, win.Height-offset)
 
-	ui.menu.Draw(menuWin)
+	m.menu.Draw(menuWin) */
 }
 
 type CreateAccountPage struct {
-	ui    UIVx
-	input *textinput.Model
-	focus string
-	msg   string
+	shared *common.SharedModel
+	input  *textinput.Model
+	focus  string
+	msg    string
+}
+
+func NewCreateAccountPage(shrd *common.SharedModel) *MenuPage {
+	return &MenuPage{shared: shrd}
 }
 
 func (m *CreateAccountPage) createAccount(name string) (*db.User, error) {
 	if name == "" {
 		return nil, fmt.Errorf("name is invalid")
 	}
-	key := utils.KeyForKeyText(m.ui.shared.Session.PublicKey())
-	return m.ui.shared.Dbpool.RegisterUser(name, key, "")
+	key := utils.KeyForKeyText(m.shared.Session.PublicKey())
+	return m.shared.Dbpool.RegisterUser(name, key, "")
 }
 
 func (m *CreateAccountPage) HandleEvent(ev vaxis.Event) {
@@ -116,7 +180,7 @@ func (m *CreateAccountPage) HandleEvent(ev vaxis.Event) {
 	case vaxis.Key:
 		switch msg.String() {
 		case "Ctrl+c", "q", "Escape":
-			m.ui.vx.PostEvent(Quit{})
+			// m.ui.vx.PostEvent(Quit{})
 		case "Tab":
 			if m.focus == "button" {
 				m.focus = "input"
@@ -130,15 +194,15 @@ func (m *CreateAccountPage) HandleEvent(ev vaxis.Event) {
 				if err != nil {
 					m.msg = err.Error()
 				}
-				m.ui.shared.User = user
-				m.ui.vx.PostEvent(Navigate{To: "menu"})
+				m.shared.User = user
+				// m.ui.vx.PostEvent(Navigate{To: "menu"})
 			}
 		}
 	}
 }
 
 func (m *CreateAccountPage) Draw(win vaxis.Window) {
-	fp := ssh.FingerprintSHA256(m.ui.shared.Session.PublicKey())
+	fp := ssh.FingerprintSHA256(m.shared.Session.PublicKey())
 	w, h := win.Size()
 	intro := win.New(0, 0, w, h-4)
 	logo := ""
@@ -200,7 +264,7 @@ func paginateWin(size, cur, winH, cellH int) PaginateWin {
 }
 
 type PubkeysPage struct {
-	ui UIVx
+	shared *common.SharedModel
 
 	selected int
 	keys     []*db.PublicKey
@@ -208,8 +272,14 @@ type PubkeysPage struct {
 	confirm  bool
 }
 
+func NewPubkeysPage(shrd *common.SharedModel) *PubkeysPage {
+	return &PubkeysPage{
+		shared: shrd,
+	}
+}
+
 func (m *PubkeysPage) fetchKeys() error {
-	keys, err := m.ui.shared.Dbpool.FindKeysForUser(m.ui.shared.User)
+	keys, err := m.shared.Dbpool.FindKeysForUser(m.shared.User)
 	if err != nil {
 		return err
 
@@ -238,10 +308,10 @@ func (m *PubkeysPage) HandleEvent(ev vaxis.Event) {
 	case vaxis.Key:
 		switch msg.String() {
 		case "Ctrl+c":
-			m.ui.vx.PostEvent(Quit{})
+			// m.ui.vx.PostEvent(Quit{})
 		case "q", "Escape":
 			m.reset()
-			m.ui.vx.PostEvent(Navigate{To: "menu"})
+			// m.ui.vx.PostEvent(Navigate{To: "menu"})
 		case "j", "Down":
 			m.selected = int(
 				math.Min(
@@ -266,7 +336,7 @@ func (m *PubkeysPage) HandleEvent(ev vaxis.Event) {
 			if m.confirm {
 				m.confirm = false
 				m.selected = 0
-				err := m.ui.shared.Dbpool.RemoveKeys([]string{m.keys[m.selected].ID})
+				err := m.shared.Dbpool.RemoveKeys([]string{m.keys[m.selected].ID})
 				if err != nil {
 					m.err = err
 					return
@@ -280,7 +350,7 @@ func (m *PubkeysPage) HandleEvent(ev vaxis.Event) {
 		case "n":
 			m.confirm = false
 		case "c":
-			m.ui.vx.PostEvent(Navigate{To: "add-key"})
+			// m.ui.vx.PostEvent(Navigate{To: "add-key"})
 		}
 	}
 }
@@ -362,11 +432,17 @@ func (m *PubkeysPage) Draw(win vaxis.Window) {
 }
 
 type AddKeyPage struct {
-	ui UIVx
+	shared *common.SharedModel
 
 	input *textinput.Model
 	err   error
 	focus string
+}
+
+func NewAddPubkeyPage(shrd *common.SharedModel) *AddKeyPage {
+	return &AddKeyPage{
+		shared: shrd,
+	}
 }
 
 func (m *AddKeyPage) reset() {
@@ -384,12 +460,12 @@ func (m *AddKeyPage) HandleEvent(ev vaxis.Event) {
 	case vaxis.Key:
 		switch msg.String() {
 		case "Ctrl+c":
-			m.ui.vx.PostEvent(Quit{})
+			// m.ui.vx.PostEvent(Quit{})
 		case "Escape":
-			m.ui.vx.PostEvent(Navigate{To: "pubkeys"})
+			// m.ui.vx.PostEvent(Navigate{To: "pubkeys"})
 		case "q":
 			if m.focus != "input" {
-				m.ui.vx.PostEvent(Navigate{To: "pubkeys"})
+				// m.ui.vx.PostEvent(Navigate{To: "pubkeys"})
 			}
 		case "Tab":
 			if m.focus == "input" {
@@ -402,7 +478,7 @@ func (m *AddKeyPage) HandleEvent(ev vaxis.Event) {
 				err := m.addPubkey(m.input.String())
 				m.err = err
 				if err == nil {
-					m.ui.vx.PostEvent(Navigate{To: "pubkeys"})
+					// m.ui.vx.PostEvent(Navigate{To: "pubkeys"})
 				}
 			}
 		}
@@ -417,8 +493,8 @@ func (m *AddKeyPage) addPubkey(pubkey string) error {
 
 	key := utils.KeyForKeyText(pk)
 
-	return m.ui.shared.Dbpool.InsertPublicKey(
-		m.ui.shared.User.ID, key, comment, nil,
+	return m.shared.Dbpool.InsertPublicKey(
+		m.shared.User.ID, key, comment, nil,
 	)
 }
 
@@ -443,74 +519,9 @@ func (m *AddKeyPage) Draw(win vaxis.Window) {
 	}
 }
 
-func (ui *UIVx) tokensPage(win vaxis.Window, ev vaxis.Event) {
-	switch msg := ev.(type) {
-	case vaxis.Key:
-		switch msg.String() {
-		case "Ctrl+c":
-			ui.vx.PostEvent(Quit{})
-		case "q", "Escape":
-			ui.vx.PostEvent(Navigate{To: "menu"})
-		}
-	}
-	win.Print(vaxis.Segment{Text: "TOKENS"})
-}
-
-func (ui *UIVx) settingsPage(win vaxis.Window, ev vaxis.Event) {
-	switch msg := ev.(type) {
-	case vaxis.Key:
-		switch msg.String() {
-		case "Ctrl+c":
-			ui.vx.PostEvent(Quit{})
-		case "q", "Escape":
-			ui.vx.PostEvent(Navigate{To: "menu"})
-		}
-	}
-	win.Print(vaxis.Segment{Text: "SETTINGS"})
-}
-
-func (ui *UIVx) logsPage(win vaxis.Window, ev vaxis.Event) {
-	switch msg := ev.(type) {
-	case vaxis.Key:
-		switch msg.String() {
-		case "Ctrl+c":
-			ui.vx.PostEvent(Quit{})
-		case "q", "Escape":
-			ui.vx.PostEvent(Navigate{To: "menu"})
-		}
-	}
-	win.Print(vaxis.Segment{Text: "LOGS"})
-}
-
-func (ui *UIVx) analyticsPage(win vaxis.Window, ev vaxis.Event) {
-	switch msg := ev.(type) {
-	case vaxis.Key:
-		switch msg.String() {
-		case "Ctrl+c":
-			ui.vx.PostEvent(Quit{})
-		case "q", "Escape":
-			ui.vx.PostEvent(Navigate{To: "menu"})
-		}
-	}
-	win.Print(vaxis.Segment{Text: "ANALYTICS"})
-}
-
-func (ui *UIVx) plusPage(win vaxis.Window, ev vaxis.Event) {
-	switch msg := ev.(type) {
-	case vaxis.Key:
-		switch msg.String() {
-		case "Ctrl+c":
-			ui.vx.PostEvent(Quit{})
-		case "q", "Escape":
-			ui.vx.PostEvent(Navigate{To: "menu"})
-		}
-	}
-	win.Print(vaxis.Segment{Text: "PLUS"})
-}
-
-func (ui *UIVx) loadChat() {
+func loadChat(shrd *common.SharedModel) {
 	sp := &chat.SenpaiCmd{
-		Shared: ui.shared,
+		Shared: shrd,
 	}
 	sp.Run()
 }
@@ -532,94 +543,108 @@ func NewTui(opts vaxis.Options, shrd *common.SharedModel) {
 	if shrd.User == nil {
 		page = "create-account"
 	}
-
-	vx, err := vaxis.New(opts)
+	app, err := vxfw.NewApp(opts)
 	if err != nil {
 		panic(err)
 	}
-	defer vx.Close()
 
-	ui := UIVx{
+	root := &App{
 		shared: shrd,
-		vx:     vx,
-
-		page: page,
-		menu: list.New(menuChoices),
+		page:   page,
+		menu:   NewMenuPage(shrd),
 	}
 
-	caPage := CreateAccountPage{
-		ui:    ui,
-		input: textinput.New(),
-		focus: "input",
+	err = app.Run(root)
+	if err != nil {
+		panic(err)
 	}
-	pubkeysPage := PubkeysPage{
-		ui: ui,
-	}
-	addKeyPage := AddKeyPage{
-		ui:    ui,
-		input: textinput.New(),
-		focus: "input",
-	}
-
-	for ev := range vx.Events() {
-		win := vx.Window()
-		win.Clear()
-
-		switch msg := ev.(type) {
-		case Quit:
-			return
-		case Navigate:
-			pubkeysPage.reset()
-			addKeyPage.reset()
-			ui.page = msg.To
+	/*
+		initData(shrd)
+		page := "menu"
+		if shrd.User == nil {
+			page = "create-account"
 		}
 
-		width, height := win.Size()
-		padWin := win.New(1, 1, width, height)
+		vx, err := vaxis.New(opts)
+		if err != nil {
+			panic(err)
+		}
+		defer vx.Close()
 
-		logoTxt := "pico.sh"
-		ff := ui.shared.PlusFeatureFlag
-		if ff != nil && ff.IsValid() {
-			logoTxt = "pico+"
+		ui := UIVx{
+			shared: shrd,
+			vx:     vx,
+
+			page: page,
+			menu: list.New(menuChoices),
+		}
+		menuPage := MenuPage{
+			ui: ui,
+		}
+		caPage := CreateAccountPage{
+			ui:    ui,
+			input: textinput.New(),
+			focus: "input",
+		}
+		pubkeysPage := PubkeysPage{
+			ui: ui,
+		}
+		addKeyPage := AddKeyPage{
+			ui:    ui,
+			input: textinput.New(),
+			focus: "input",
 		}
 
-		// header
-		padWin.Print(
-			vaxis.Segment{Text: " " + logoTxt + " ", Style: vaxis.Style{Background: indigo}},
-			vaxis.Segment{Text: " • " + ui.page, Style: vaxis.Style{Foreground: green}},
-		)
+		for ev := range vx.Events() {
+			win := vx.Window()
+			win.Clear()
 
-		// page window
-		padW, padH := padWin.Size()
-		pageWin := padWin.New(0, 2, padW, padH-2)
+			switch msg := ev.(type) {
+			case Quit:
+				return
+			case Navigate:
+				pubkeysPage.reset()
+				addKeyPage.reset()
+				ui.page = msg.To
+			}
 
-		switch ui.page {
-		case "create-account":
-			caPage.HandleEvent(ev)
-			caPage.Draw(pageWin)
-		case "menu":
-			ui.menuPage(pageWin, ev)
-		case "pubkeys":
-			pubkeysPage.HandleEvent(ev)
-			pubkeysPage.Draw(pageWin)
-		case "add-key":
-			addKeyPage.HandleEvent(ev)
-			addKeyPage.Draw(pageWin)
-		case "tokens":
-			ui.tokensPage(pageWin, ev)
-		case "settings":
-			ui.settingsPage(pageWin, ev)
-		case "logs":
-			ui.logsPage(pageWin, ev)
-		case "analytics":
-			ui.analyticsPage(pageWin, ev)
-		case "plus":
-			ui.plusPage(pageWin, ev)
-		case "chat":
-			ui.loadChat()
-			return
-		}
+			width, height := win.Size()
+			padWin := win.New(1, 1, width, height)
 
-		vx.Render()
-	}
+			logoTxt := "pico.sh"
+			ff := ui.shared.PlusFeatureFlag
+			if ff != nil && ff.IsValid() {
+				logoTxt = "pico+"
+			}
+
+			// header
+			padWin.Print(
+				vaxis.Segment{Text: " " + logoTxt + " ", Style: vaxis.Style{Background: indigo}},
+				vaxis.Segment{Text: " • " + ui.page, Style: vaxis.Style{Foreground: green}},
+			)
+
+			// page window
+			padW, padH := padWin.Size()
+			pageWin := padWin.New(0, 2, padW, padH-2)
+
+			switch ui.page {
+			case "create-account":
+				caPage.HandleEvent(ev)
+				caPage.Draw(pageWin)
+			case "menu":
+				menuPage.HandleEvent(ev)
+				menuPage.Draw(pageWin)
+			case "pubkeys":
+				pubkeysPage.HandleEvent(ev)
+				pubkeysPage.Draw(pageWin)
+			case "add-key":
+				addKeyPage.HandleEvent(ev)
+				addKeyPage.Draw(pageWin)
+			case "chat":
+				ui.loadChat()
+				return
+			}
+
+			vx.Render()
+		}*/
 }
