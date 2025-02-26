@@ -62,8 +62,11 @@ func (app *App) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command
 		if ev.Matches('c', vaxis.ModCtrl) {
 			return vxfw.QuitCmd{}, nil
 		}
+		if ev.Matches('q') {
+			return vxfw.QuitCmd{}, nil
+		}
 	}
-	return nil, nil
+	return vxfw.RedrawCmd{}, nil
 }
 
 func (app *App) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
@@ -72,12 +75,16 @@ func (app *App) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	root := vxfw.NewSurface(ctx.Max.Width, ctx.Min.Height, app)
 
 	txt := text.New(fmt.Sprintf("pico • %s\n", app.page))
-	header := vxfw.NewSurface(ctx.Max.Width, 2, txt)
-	root.AddChild(0, 0, header)
+	headerTxt, _ := txt.Draw(vxfw.DrawContext{
+		Max: vxfw.Size{Width: ctx.Max.Width, Height: 2},
+	})
+	root.AddChild(0, 0, headerTxt)
 
 	switch app.page {
 	case "menu":
-		menu, err := app.menu.Draw(ctx)
+		menu, err := app.menu.Draw(vxfw.DrawContext{
+			Max: vxfw.Size{Width: ctx.Max.Width, Height: ctx.Max.Height - 2},
+		})
 		if err != nil {
 			return vxfw.Surface{}, err
 		}
@@ -119,7 +126,7 @@ func (m *MenuPage) HandleEvent(ev vaxis.Event) {
 
 func (m *MenuPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	txt := text.New("menu!\n")
-	return vxfw.NewSurface(ctx.Max.Width, ctx.Min.Height, txt), nil
+	return txt.Draw(ctx)
 	/* createdAt := m.shared.User.CreatedAt.Format(time.DateOnly)
 	pink := vaxis.Style{Foreground: fuschia}
 
