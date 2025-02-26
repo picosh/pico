@@ -76,14 +76,16 @@ func (app *App) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 
 	txt := text.New(fmt.Sprintf("pico • %s\n", app.page))
 	headerTxt, _ := txt.Draw(vxfw.DrawContext{
-		Max: vxfw.Size{Width: ctx.Max.Width, Height: 2},
+		Max:        vxfw.Size{Width: ctx.Max.Width, Height: 2},
+		Characters: ctx.Characters,
 	})
 	root.AddChild(0, 0, headerTxt)
 
 	switch app.page {
 	case "menu":
 		menu, err := app.menu.Draw(vxfw.DrawContext{
-			Max: vxfw.Size{Width: ctx.Max.Width, Height: ctx.Max.Height - 2},
+			Max:        vxfw.Size{Width: ctx.Max.Width, Height: ctx.Max.Height - 2},
+			Characters: ctx.Characters,
 		})
 		if err != nil {
 			return vxfw.Surface{}, err
