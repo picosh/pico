@@ -719,6 +719,8 @@ github.com/picosh/go-rsync-receiver v0.0.0-20250226204508-de154908d143 h1:kJQF0l
 github.com/picosh/go-rsync-receiver v0.0.0-20250226204508-de154908d143/go.mod h1:4ZICsr6bESoHP8He9DqROlZiMw4hHHjcbDzhtTTDQzA=
 github.com/picosh/pobj v0.0.0-20250226205037-e02490348d72 h1:u4Q1HlA8F3+wnIeg5O3L+g+zC1zm7c8D59l/eiqZM3Q=
 github.com/picosh/pobj v0.0.0-20250226205037-e02490348d72/go.mod h1:opQ0Lp/suBL/wioQfVy3wd+mktpT2Rralq5LWP33jR4=
+github.com/picosh/pobj v0.0.0-20250226214525-3032185b0871 h1:rj6rKpa+UVow+VgV7+HhHQVS8+MWvHcugV4LjBmsRQU=
+github.com/picosh/pobj v0.0.0-20250226214525-3032185b0871/go.mod h1:opQ0Lp/suBL/wioQfVy3wd+mktpT2Rralq5LWP33jR4=
 github.com/picosh/pubsub v0.0.0-20241114191831-ec8f16c0eb88 h1:hdxE6rquHHw1/eeqS1b+ojLaxGtN8zOiTUclPwaVbPg=
 github.com/picosh/pubsub v0.0.0-20241114191831-ec8f16c0eb88/go.mod h1:+9hDKIDHQCvGFigCVlIl589BwpT9R4boKhUVc/OgRU4=
 github.com/picosh/send v0.0.0-20250226204721-03aad51a1f7d h1:KTw+/3E4O+VZ0O6h+3u9v1q4PEVS7jadVS0OixpWQy4=
