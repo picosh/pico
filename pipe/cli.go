@@ -160,7 +160,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				isAdmin = handler.DBPool.HasFeatureForUser(user.ID, "admin")
 
 				userName = user.Name
-				if user.PublicKey.Name != "" {
+				if user.PublicKey != nil && user.PublicKey.Name != "" {
 					userNameAddition = fmt.Sprintf("-%s", user.PublicKey.Name)
 				}
 			}

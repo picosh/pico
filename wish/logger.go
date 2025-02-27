@@ -14,7 +14,7 @@ type ctxLoggerKey struct{}
 type ctxUserKey struct{}
 
 type FindUserInterface interface {
-	FindUser(string) (*db.User, error)
+	FindUserByPubkey(string) (*db.User, error)
 }
 
 func LogMiddleware(defaultLogger *slog.Logger, db FindUserInterface) wish.Middleware {
@@ -28,7 +28,7 @@ func LogMiddleware(defaultLogger *slog.Logger, db FindUserInterface) wish.Middle
 
 				user := GetUser(s)
 				if user == nil {
-					user, err := db.FindUser(s.Permissions().Extensions["user_id"])
+					user, err := db.FindUserByPubkey(s.Permissions().Extensions["pubkey"])
 					if err == nil && user != nil {
 						logger = shared.LoggerWithUser(logger, user).With(
 							"ip", s.RemoteAddr(),
