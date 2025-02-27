@@ -86,6 +86,10 @@ func GetMimeType(fpath string) string {
 		return "application/vnd.ms-fontobject"
 	} else if ext == ".yml" || ext == ".yaml" {
 		return "text/x-yaml"
+	} else if ext == ".zip" {
+		return "application/zip"
+	} else if ext == ".rar" {
+		return "application/vnd.rar"
 	} else if ext == ".txt" {
 		return "text/plain"
 	}
