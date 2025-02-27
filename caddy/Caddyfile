@@ -1,8 +1,6 @@
 {
 	on_demand_tls {
 		ask http://web:3000/check
-		interval 1m
-		burst 10
 	}
 	servers {
 		metrics
