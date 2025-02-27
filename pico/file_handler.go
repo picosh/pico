@@ -15,6 +15,7 @@ import (
 	"github.com/charmbracelet/wish"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared"
+	wsh "github.com/picosh/pico/wish"
 	sendutils "github.com/picosh/send/utils"
 	"github.com/picosh/utils"
 )
@@ -56,10 +57,15 @@ func (h *UploadHandler) Delete(s ssh.Session, entry *sendutils.FileEntry) error 
 }
 
 func (h *UploadHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os.FileInfo, sendutils.ReadAndReaderAtCloser, error) {
-	user, err := h.DBPool.FindUser(s.Permissions().Extensions["user_id"])
-	if err != nil {
+	logger := wsh.GetLogger(s)
+	user := wsh.GetUser(s)
+
+	if user == nil {
+		err := fmt.Errorf("could not get user from ctx")
+		logger.Error("error getting user from ctx", "err", err)
 		return nil, nil, err
 	}
+
 	cleanFilename := filepath.Base(entry.Filepath)
 
 	if cleanFilename == "" || cleanFilename == "." {
@@ -80,10 +86,16 @@ func (h *UploadHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os.File
 
 func (h *UploadHandler) List(s ssh.Session, fpath string, isDir bool, recursive bool) ([]os.FileInfo, error) {
 	var fileList []os.FileInfo
-	user, err := h.DBPool.FindUser(s.Permissions().Extensions["user_id"])
-	if err != nil {
+
+	logger := wsh.GetLogger(s)
+	user := wsh.GetUser(s)
+
+	if user == nil {
+		err := fmt.Errorf("could not get user from ctx")
+		logger.Error("error getting user from ctx", "err", err)
 		return fileList, err
 	}
+
 	cleanFilename := filepath.Base(fpath)
 
 	if cleanFilename == "" || cleanFilename == "." || cleanFilename == "/" {
@@ -115,8 +127,8 @@ func (h *UploadHandler) List(s ssh.Session, fpath string, isDir bool, recursive 
 	return fileList, nil
 }
 
-func (h *UploadHandler) GetLogger() *slog.Logger {
-	return h.Cfg.Logger
+func (h *UploadHandler) GetLogger(s ssh.Session) *slog.Logger {
+	return wsh.GetLogger(s)
 }
 
 func (h *UploadHandler) Validate(s ssh.Session) error {
@@ -275,10 +287,12 @@ func (h *UploadHandler) ProcessAuthorizedKeys(text []byte, logger *slog.Logger, 
 }
 
 func (h *UploadHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (string, error) {
-	logger := h.Cfg.Logger
-	user, err := h.DBPool.FindUser(s.Permissions().Extensions["user_id"])
-	if err != nil {
-		logger.Error(err.Error())
+	logger := wsh.GetLogger(s)
+	user := wsh.GetUser(s)
+
+	if user == nil {
+		err := fmt.Errorf("could not get user from ctx")
+		logger.Error("error getting user from ctx", "err", err)
 		return "", err
 	}
 

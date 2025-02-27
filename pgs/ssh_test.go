@@ -26,11 +26,12 @@ import (
 func TestSshServerSftp(t *testing.T) {
 	opts := &slog.HandlerOptions{
 		AddSource: true,
-		Level:     slog.LevelInfo,
+		Level:     slog.LevelDebug,
 	}
 	logger := slog.New(
 		slog.NewTextHandler(os.Stdout, opts),
 	)
+	slog.SetDefault(logger)
 	dbpool := pgsdb.NewDBMemory(logger)
 	// setup test data
 	dbpool.SetupTestData()
@@ -85,11 +86,12 @@ func TestSshServerSftp(t *testing.T) {
 func TestSshServerRsync(t *testing.T) {
 	opts := &slog.HandlerOptions{
 		AddSource: true,
-		Level:     slog.LevelInfo,
+		Level:     slog.LevelDebug,
 	}
 	logger := slog.New(
 		slog.NewTextHandler(os.Stdout, opts),
 	)
+	slog.SetDefault(logger)
 	dbpool := pgsdb.NewDBMemory(logger)
 	// setup test data
 	dbpool.SetupTestData()

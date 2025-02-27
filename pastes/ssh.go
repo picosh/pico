@@ -20,7 +20,6 @@ import (
 	"github.com/picosh/send/pipe"
 	wishrsync "github.com/picosh/send/protocols/rsync"
 	"github.com/picosh/send/protocols/scp"
-	"github.com/picosh/send/protocols/sftp"
 	"github.com/picosh/send/proxy"
 	"github.com/picosh/utils"
 )
@@ -34,17 +33,22 @@ func createRouter(handler *filehandlers.FileHandlerRouter) proxy.Router {
 			wishrsync.Middleware(handler),
 			auth.Middleware(handler),
 			wsh.PtyMdw(wsh.DeprecatedNotice()),
-			wsh.LogMiddleware(handler.GetLogger()),
+			wsh.LogMiddleware(handler.GetLogger(s), handler.DBPool),
 		}
 	}
 }
 
 func withProxy(handler *filehandlers.FileHandlerRouter, otherMiddleware ...wish.Middleware) ssh.Option {
 	return func(server *ssh.Server) error {
-		err := sftp.SSHOption(handler)(server)
-		if err != nil {
-			return err
+		newSubsystemHandlers := map[string]ssh.SubsystemHandler{}
+
+		for name, subsystemHandlers := range server.SubsystemHandlers {
+			newSubsystemHandlers[name] = func(s ssh.Session) {
+				wsh.LogMiddleware(handler.GetLogger(s), handler.DBPool)(ssh.Handler(subsystemHandlers))
+			}
 		}
+
+		server.SubsystemHandlers = newSubsystemHandlers
 
 		return proxy.WithProxy(createRouter(handler), otherMiddleware...)(server)
 	}

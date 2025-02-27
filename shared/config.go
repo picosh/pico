@@ -288,7 +288,10 @@ func CreateLogger(space string) *slog.Logger {
 		newLogger = pipeLogger.RegisterReconnectLogger(context.Background(), log, conn, 100, 10*time.Millisecond)
 	}
 
-	return newLogger.With("service", space)
+	defaultLogger := newLogger.With("service", space)
+	slog.SetDefault(defaultLogger)
+
+	return defaultLogger
 }
 
 func LoggerWithUser(logger *slog.Logger, user *db.User) *slog.Logger {

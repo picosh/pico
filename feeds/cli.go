@@ -2,7 +2,6 @@ package feeds
 
 import (
 	"fmt"
-	"log/slog"
 	"text/tabwriter"
 	"time"
 
@@ -10,27 +9,9 @@ import (
 	"github.com/charmbracelet/wish"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared"
-	"github.com/picosh/utils"
+
+	wsh "github.com/picosh/pico/wish"
 )
-
-func getUser(s ssh.Session, dbpool db.DB) (*db.User, error) {
-	if s.PublicKey() == nil {
-		return nil, fmt.Errorf("key not found")
-	}
-
-	key := utils.KeyForKeyText(s.PublicKey())
-
-	user, err := dbpool.FindUserByPubkey(key)
-	if err != nil {
-		return nil, err
-	}
-
-	if user.Name == "" {
-		return nil, fmt.Errorf("must have username set")
-	}
-
-	return user, nil
-}
 
 func WishMiddleware(dbpool db.DB, cfg *shared.ConfigSite) wish.Middleware {
 	return func(next ssh.Handler) ssh.Handler {
@@ -41,9 +22,11 @@ func WishMiddleware(dbpool db.DB, cfg *shared.ConfigSite) wish.Middleware {
 				return
 			}
 
-			user, err := getUser(sesh, dbpool)
-			if err != nil {
-				wish.Errorln(sesh, err)
+			logger := wsh.GetLogger(sesh)
+			user := wsh.GetUser(sesh)
+
+			if user == nil {
+				wish.Errorln(sesh, fmt.Errorf("user not found"))
 				return
 			}
 
@@ -142,10 +125,6 @@ func WishMiddleware(dbpool db.DB, cfg *shared.ConfigSite) wish.Middleware {
 				}
 				wish.Printf(sesh, "running feed post: %s\n", filename)
 				fetcher := NewFetcher(dbpool, cfg)
-				logger := slog.New(
-					slog.NewTextHandler(sesh, &slog.HandlerOptions{}),
-				)
-				logger = shared.LoggerWithUser(logger, user)
 				err = fetcher.RunPost(logger, user, post, true)
 				if err != nil {
 					wish.Errorln(sesh, err)

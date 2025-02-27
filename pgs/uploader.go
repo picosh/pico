@@ -20,6 +20,7 @@ import (
 	"github.com/picosh/pico/db"
 	pgsdb "github.com/picosh/pico/pgs/db"
 	"github.com/picosh/pico/shared"
+	wsh "github.com/picosh/pico/wish"
 	"github.com/picosh/pobj"
 	sst "github.com/picosh/pobj/storage"
 	sendutils "github.com/picosh/send/utils"
@@ -112,13 +113,17 @@ func NewUploadAssetHandler(cfg *PgsConfig, ch chan string, ctx context.Context) 
 	}
 }
 
-func (h *UploadAssetHandler) GetLogger() *slog.Logger {
-	return h.Cfg.Logger
+func (h *UploadAssetHandler) GetLogger(s ssh.Session) *slog.Logger {
+	return wsh.GetLogger(s)
 }
 
 func (h *UploadAssetHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os.FileInfo, sendutils.ReadAndReaderAtCloser, error) {
-	user, err := h.Cfg.DB.FindUser(s.Permissions().Extensions["user_id"])
-	if err != nil {
+	logger := wsh.GetLogger(s)
+	user := wsh.GetUser(s)
+
+	if user == nil {
+		err := fmt.Errorf("could not get user from ctx")
+		logger.Error("error getting user from ctx", "err", err)
 		return nil, nil, err
 	}
 
@@ -151,8 +156,12 @@ func (h *UploadAssetHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os
 func (h *UploadAssetHandler) List(s ssh.Session, fpath string, isDir bool, recursive bool) ([]os.FileInfo, error) {
 	var fileList []os.FileInfo
 
-	user, err := h.Cfg.DB.FindUser(s.Permissions().Extensions["user_id"])
-	if err != nil {
+	logger := wsh.GetLogger(s)
+	user := wsh.GetUser(s)
+
+	if user == nil {
+		err := fmt.Errorf("could not get user from ctx")
+		logger.Error("error getting user from ctx", "err", err)
 		return fileList, err
 	}
 
@@ -193,8 +202,12 @@ func (h *UploadAssetHandler) List(s ssh.Session, fpath string, isDir bool, recur
 }
 
 func (h *UploadAssetHandler) Validate(s ssh.Session) error {
-	user, err := h.Cfg.DB.FindUser(s.Permissions().Extensions["user_id"])
-	if err != nil {
+	logger := wsh.GetLogger(s)
+	user := wsh.GetUser(s)
+
+	if user == nil {
+		err := fmt.Errorf("could not get user from ctx")
+		logger.Error("error getting user from ctx", "err", err)
 		return err
 	}
 
@@ -203,20 +216,23 @@ func (h *UploadAssetHandler) Validate(s ssh.Session) error {
 	if err != nil {
 		return err
 	}
+
 	s.Context().SetValue(ctxBucketKey{}, bucket)
 
 	totalStorageSize, err := h.Cfg.Storage.GetBucketQuota(bucket)
 	if err != nil {
 		return err
 	}
+
 	s.Context().SetValue(ctxStorageSizeKey{}, totalStorageSize)
-	h.Cfg.Logger.Info(
+
+	logger.Info(
 		"bucket size",
 		"user", user.Name,
 		"bytes", totalStorageSize,
 	)
 
-	h.Cfg.Logger.Info(
+	logger.Info(
 		"attempting to upload files",
 		"user", user.Name,
 		"txtPrefix", h.Cfg.TxtPrefix,
@@ -264,9 +280,12 @@ func findPlusFF(dbpool pgsdb.PgsDB, cfg *PgsConfig, userID string) *db.FeatureFl
 }
 
 func (h *UploadAssetHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (string, error) {
-	user, err := h.Cfg.DB.FindUser(s.Permissions().Extensions["user_id"])
-	if user == nil || err != nil {
-		h.Cfg.Logger.Error("user not found in ctx", "err", err.Error())
+	logger := wsh.GetLogger(s)
+	user := wsh.GetUser(s)
+
+	if user == nil {
+		err := fmt.Errorf("could not get user from ctx")
+		logger.Error("error getting user from ctx", "err", err)
 		return "", err
 	}
 
@@ -274,8 +293,6 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (s
 		entry.Filepath = strings.TrimPrefix(entry.Filepath, "/")
 	}
 
-	logger := h.GetLogger()
-	logger = shared.LoggerWithUser(logger, user)
 	logger = logger.With(
 		"file", entry.Filepath,
 		"size", entry.Size,
@@ -379,6 +396,7 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (s
 	}
 
 	fsize, err := h.writeAsset(
+		s,
 		utils.NewMaxBytesReader(data.Reader, int64(sizeRemaining)),
 		data,
 	)
@@ -425,9 +443,12 @@ func isSpecialFile(entry *sendutils.FileEntry) bool {
 }
 
 func (h *UploadAssetHandler) Delete(s ssh.Session, entry *sendutils.FileEntry) error {
-	user, err := h.Cfg.DB.FindUser(s.Permissions().Extensions["user_id"])
-	if err != nil {
-		h.Cfg.Logger.Error("user not found in ctx", "err", err.Error())
+	logger := wsh.GetLogger(s)
+	user := wsh.GetUser(s)
+
+	if user == nil {
+		err := fmt.Errorf("could not get user from ctx")
+		logger.Error("error getting user from ctx", "err", err)
 		return err
 	}
 
@@ -437,8 +458,6 @@ func (h *UploadAssetHandler) Delete(s ssh.Session, entry *sendutils.FileEntry) e
 
 	assetFilepath := shared.GetAssetFileName(entry)
 
-	logger := h.GetLogger()
-	logger = shared.LoggerWithUser(logger, user)
 	logger = logger.With(
 		"file", assetFilepath,
 	)
@@ -518,10 +537,10 @@ func (h *UploadAssetHandler) validateAsset(data *FileData) (bool, error) {
 	return true, nil
 }
 
-func (h *UploadAssetHandler) writeAsset(reader io.Reader, data *FileData) (int64, error) {
+func (h *UploadAssetHandler) writeAsset(s ssh.Session, reader io.Reader, data *FileData) (int64, error) {
 	assetFilepath := shared.GetAssetFileName(data.FileEntry)
 
-	logger := shared.LoggerWithUser(h.Cfg.Logger, data.User)
+	logger := h.GetLogger(s)
 	logger.Info(
 		"uploading file to bucket",
 		"bucket", data.Bucket.Name,

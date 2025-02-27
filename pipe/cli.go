@@ -18,8 +18,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared"
+	wsh "github.com/picosh/pico/wish"
 	psub "github.com/picosh/pubsub"
-	"github.com/picosh/utils"
 	gossh "golang.org/x/crypto/ssh"
 )
 
@@ -139,18 +139,9 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 
 	return func(next ssh.Handler) ssh.Handler {
 		return func(sesh ssh.Session) {
-			logger := handler.Logger
 			ctx := sesh.Context()
-
-			pubkey := utils.KeyForKeyText(sesh.PublicKey())
-			user, err := handler.DBPool.FindUserForKey(sesh.User(), pubkey)
-			if err != nil {
-				logger.Info("user not found", "err", err)
-			}
-
-			if user != nil {
-				logger = shared.LoggerWithUser(logger, user)
-			}
+			logger := wsh.GetLogger(sesh)
+			user := wsh.GetUser(sesh)
 
 			args := sesh.Command()
 
@@ -302,6 +293,8 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 			)
 
 			clientID := fmt.Sprintf("%s (%s%s@%s)", uuid.NewString(), userName, userNameAddition, sesh.RemoteAddr().String())
+
+			var err error
 
 			if cmd == "pub" {
 				pubCmd := flagSet("pub", sesh)

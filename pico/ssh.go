@@ -37,7 +37,7 @@ func createRouter(cfg *shared.ConfigSite, handler *UploadHandler, cliHandler *Cl
 			auth.Middleware(handler),
 			wsh.PtyMdw(bm.MiddlewareWithColorProfile(tui.CmsMiddleware(cfg), termenv.TrueColor)),
 			WishMiddleware(cliHandler),
-			wsh.LogMiddleware(handler.GetLogger()),
+			wsh.LogMiddleware(handler.GetLogger(s), handler.DBPool),
 		}
 	}
 }
@@ -48,6 +48,16 @@ func withProxy(cfg *shared.ConfigSite, handler *UploadHandler, cliHandler *CliHa
 		if err != nil {
 			return err
 		}
+
+		newSubsystemHandlers := map[string]ssh.SubsystemHandler{}
+
+		for name, subsystemHandler := range server.SubsystemHandlers {
+			newSubsystemHandlers[name] = func(s ssh.Session) {
+				wsh.LogMiddleware(handler.GetLogger(s), handler.DBPool)(ssh.Handler(subsystemHandler))(s)
+			}
+		}
+
+		server.SubsystemHandlers = newSubsystemHandlers
 
 		return proxy.WithProxy(createRouter(cfg, handler, cliHandler), otherMiddleware...)(server)
 	}

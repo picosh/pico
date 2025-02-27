@@ -53,7 +53,7 @@ func StartSshServer() {
 		wish.WithMiddleware(
 			WishMiddleware(handler),
 			promwish.Middleware(fmt.Sprintf("%s:%s", host, promPort), "pipe-ssh"),
-			wsh.LogMiddleware(logger),
+			wsh.LogMiddleware(logger, dbh),
 		),
 	)
 	if err != nil {

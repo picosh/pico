@@ -36,7 +36,7 @@ func createRouter(handler *filehandlers.FileHandlerRouter) proxy.Router {
 			wishrsync.Middleware(handler),
 			auth.Middleware(handler),
 			wsh.PtyMdw(wsh.DeprecatedNotice()),
-			wsh.LogMiddleware(handler.GetLogger()),
+			wsh.LogMiddleware(handler.GetLogger(s), handler.DBPool),
 		}
 	}
 }
@@ -47,6 +47,16 @@ func withProxy(handler *filehandlers.FileHandlerRouter, otherMiddleware ...wish.
 		if err != nil {
 			return err
 		}
+
+		newSubsystemHandlers := map[string]ssh.SubsystemHandler{}
+
+		for name, subsystemHandler := range server.SubsystemHandlers {
+			newSubsystemHandlers[name] = func(s ssh.Session) {
+				wsh.LogMiddleware(handler.GetLogger(s), handler.DBPool)(ssh.Handler(subsystemHandler))(s)
+			}
+		}
+
+		server.SubsystemHandlers = newSubsystemHandlers
 
 		return proxy.WithProxy(createRouter(handler), otherMiddleware...)(server)
 	}

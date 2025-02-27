@@ -13,6 +13,7 @@ import (
 	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared"
+	"github.com/picosh/pico/wish"
 	sendutils "github.com/picosh/send/utils"
 	"github.com/picosh/utils"
 )
@@ -50,10 +51,15 @@ func (r *ScpUploadHandler) List(s ssh.Session, fpath string, isDir bool, recursi
 }
 
 func (h *ScpUploadHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os.FileInfo, sendutils.ReadAndReaderAtCloser, error) {
-	user, err := h.DBPool.FindUser(s.Permissions().Extensions["user_id"])
-	if err != nil {
+	logger := wish.GetLogger(s)
+	user := wish.GetUser(s)
+
+	if user == nil {
+		err := fmt.Errorf("could not get user from ctx")
+		logger.Error("error getting user from ctx", "err", err)
 		return nil, nil, err
 	}
+
 	cleanFilename := filepath.Base(entry.Filepath)
 
 	if cleanFilename == "" || cleanFilename == "." {
@@ -78,16 +84,18 @@ func (h *ScpUploadHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os.F
 }
 
 func (h *ScpUploadHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (string, error) {
-	logger := h.Cfg.Logger
-	user, err := h.DBPool.FindUser(s.Permissions().Extensions["user_id"])
-	if err != nil {
-		logger.Error("error getting user from ctx", "err", err.Error())
+	logger := wish.GetLogger(s)
+	user := wish.GetUser(s)
+
+	if user == nil {
+		err := fmt.Errorf("could not get user from ctx")
+		logger.Error("error getting user from ctx", "err", err)
 		return "", err
 	}
 
 	userID := user.ID
 	filename := filepath.Base(entry.Filepath)
-	logger = shared.LoggerWithUser(logger, user)
+
 	logger = logger.With(
 		"filename", filename,
 	)
@@ -264,16 +272,17 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (str
 }
 
 func (h *ScpUploadHandler) Delete(s ssh.Session, entry *sendutils.FileEntry) error {
-	logger := h.Cfg.Logger
-	user, err := h.DBPool.FindUser(s.Permissions().Extensions["user_id"])
-	if err != nil {
-		logger.Error("could not get user from ctx", "err", err.Error())
+	logger := wish.GetLogger(s)
+	user := wish.GetUser(s)
+
+	if user == nil {
+		err := fmt.Errorf("could not get user from ctx")
+		logger.Error("error getting user from ctx", "err", err)
 		return err
 	}
 
 	userID := user.ID
 	filename := filepath.Base(entry.Filepath)
-	logger = shared.LoggerWithUser(logger, user)
 	logger = logger.With(
 		"filename", filename,
 	)

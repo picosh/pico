@@ -16,6 +16,7 @@ import (
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
+	"github.com/picosh/pico/wish"
 	"github.com/picosh/pobj"
 	sst "github.com/picosh/pobj/storage"
 	sendutils "github.com/picosh/send/utils"
@@ -55,8 +56,12 @@ func (h *UploadImgHandler) getObjectPath(fpath string) string {
 func (h *UploadImgHandler) List(s ssh.Session, fpath string, isDir bool, recursive bool) ([]os.FileInfo, error) {
 	var fileList []os.FileInfo
 
-	user, err := h.DBPool.FindUser(s.Permissions().Extensions["user_id"])
-	if err != nil {
+	logger := wish.GetLogger(s)
+	user := wish.GetUser(s)
+
+	if user == nil {
+		err := fmt.Errorf("could not get user from ctx")
+		logger.Error("error getting user from ctx", "err", err)
 		return fileList, err
 	}
 
@@ -98,8 +103,12 @@ func (h *UploadImgHandler) List(s ssh.Session, fpath string, isDir bool, recursi
 }
 
 func (h *UploadImgHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os.FileInfo, sendutils.ReadAndReaderAtCloser, error) {
-	user, err := h.DBPool.FindUser(s.Permissions().Extensions["user_id"])
-	if err != nil {
+	logger := wish.GetLogger(s)
+	user := wish.GetUser(s)
+
+	if user == nil {
+		err := fmt.Errorf("could not get user from ctx")
+		logger.Error("error getting user from ctx", "err", err)
 		return nil, nil, err
 	}
 
@@ -131,13 +140,14 @@ func (h *UploadImgHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os.F
 }
 
 func (h *UploadImgHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (string, error) {
-	logger := h.Cfg.Logger
-	user, err := h.DBPool.FindUser(s.Permissions().Extensions["user_id"])
-	if err != nil {
-		logger.Error("could not get user from ctx", "err", err.Error())
+	logger := wish.GetLogger(s)
+	user := wish.GetUser(s)
+
+	if user == nil {
+		err := fmt.Errorf("could not get user from ctx")
+		logger.Error("error getting user from ctx", "err", err)
 		return "", err
 	}
-	logger = shared.LoggerWithUser(logger, user)
 
 	filename := filepath.Base(entry.Filepath)
 
@@ -189,7 +199,7 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (str
 		TotalFileSize: int(totalFileSize),
 	}
 
-	err = h.writeImg(&metadata)
+	err = h.writeImg(s, &metadata)
 	if err != nil {
 		logger.Error("could not write img", "err", err.Error())
 		return "", err
@@ -213,15 +223,17 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (str
 }
 
 func (h *UploadImgHandler) Delete(s ssh.Session, entry *sendutils.FileEntry) error {
-	user, err := h.DBPool.FindUser(s.Permissions().Extensions["user_id"])
-	if err != nil {
+	logger := wish.GetLogger(s)
+	user := wish.GetUser(s)
+
+	if user == nil {
+		err := fmt.Errorf("could not get user from ctx")
+		logger.Error("error getting user from ctx", "err", err)
 		return err
 	}
 
 	filename := filepath.Base(entry.Filepath)
 
-	logger := h.Cfg.Logger
-	logger = shared.LoggerWithUser(logger, user)
 	logger = logger.With(
 		"filename", filename,
 	)
@@ -297,14 +309,13 @@ func (h *UploadImgHandler) metaImg(data *PostMetaData) error {
 	return nil
 }
 
-func (h *UploadImgHandler) writeImg(data *PostMetaData) error {
+func (h *UploadImgHandler) writeImg(s ssh.Session, data *PostMetaData) error {
 	valid, err := h.validateImg(data)
 	if !valid {
 		return err
 	}
 
-	logger := h.Cfg.Logger
-	logger = shared.LoggerWithUser(logger, data.User)
+	logger := wish.GetLogger(s)
 	logger = logger.With(
 		"filename", data.Filename,
 	)

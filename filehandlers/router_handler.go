@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared"
+	"github.com/picosh/pico/wish"
 	"github.com/picosh/send/utils"
 )
 
@@ -91,7 +92,7 @@ func (r *FileHandlerRouter) List(s ssh.Session, fpath string, isDir bool, recurs
 
 		ff, err := handler.List(s, fpath, isDir, recursive)
 		if err != nil {
-			r.GetLogger().Error("handler list", "err", err)
+			r.GetLogger(s).Error("handler list", "err", err)
 			continue
 		}
 		files = append(files, ff...)
@@ -99,17 +100,21 @@ func (r *FileHandlerRouter) List(s ssh.Session, fpath string, isDir bool, recurs
 	return files, nil
 }
 
-func (r *FileHandlerRouter) GetLogger() *slog.Logger {
-	return r.Cfg.Logger
+func (r *FileHandlerRouter) GetLogger(s ssh.Session) *slog.Logger {
+	return wish.GetLogger(s)
 }
 
 func (r *FileHandlerRouter) Validate(s ssh.Session) error {
-	user, err := r.DBPool.FindUser(s.Permissions().Extensions["user_id"])
-	if err != nil {
+	logger := wish.GetLogger(s)
+	user := wish.GetUser(s)
+
+	if user == nil {
+		err := fmt.Errorf("could not get user from ctx")
+		logger.Error("error getting user from ctx", "err", err)
 		return err
 	}
 
-	r.Cfg.Logger.Info(
+	logger.Info(
 		"attempting to upload files",
 		"user", user.Name,
 		"space", r.Cfg.Space,
@@ -119,10 +124,17 @@ func (r *FileHandlerRouter) Validate(s ssh.Session) error {
 
 func BaseList(s ssh.Session, fpath string, isDir bool, recursive bool, spaces []string, dbpool db.DB) ([]os.FileInfo, error) {
 	var fileList []os.FileInfo
-	user, err := dbpool.FindUser(s.Permissions().Extensions["user_id"])
-	if err != nil {
+	logger := wish.GetLogger(s)
+	user := wish.GetUser(s)
+
+	var err error
+
+	if user == nil {
+		err = fmt.Errorf("could not get user from ctx")
+		logger.Error("error getting user from ctx", "err", err)
 		return fileList, err
 	}
+
 	cleanFilename := filepath.Base(fpath)
 
 	var post *db.Post
