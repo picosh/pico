@@ -143,6 +143,7 @@ func (m *ListWdgt) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Comm
 }
 
 func (m *ListWdgt) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
+	richtext.New()
 	return vxfw.Surface{}, nil
 }
 
@@ -202,7 +203,7 @@ func (m *MenuPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 		brdH += 1
 	}
 
-	root := vxfw.NewSurface(ctx.Max.Width, ctx.Min.Height, m)
+	root := vxfw.NewSurface(ctx.Max.Width, ctx.Max.Height, m)
 
 	infoWdgt := richtext.New(segs)
 	infoSurf, _ := infoWdgt.Draw(ctx)
