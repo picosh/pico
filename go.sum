@@ -18,23 +18,8 @@ dario.cat/mergo v1.0.0 h1:AGCNq9Evsj31mOgNPcLyXc+4PNABt905YmuqPYYpBWk=
 dario.cat/mergo v1.0.0/go.mod h1:uNxQE+84aUszobStD9th8a29P2fMDhsBdgRYvZOxGmk=
 filippo.io/edwards25519 v1.1.0 h1:FNf4tywRC1HmFuKW5xopWpigGjJKiJSV0Cqo0cJWDaA=
 filippo.io/edwards25519 v1.1.0/go.mod h1:BxyFTGdWcka3PhytdK4V28tE5sGfRvvvRV7EaN4VDT4=
-<<<<<<< HEAD
-<<<<<<< HEAD
-git.sr.ht/~rockorager/vaxis v0.12.1-0.20250218200016-0e88f197413a h1:duJRKIJCDSWNUx1A7GmlGK2HcRxbVFrFiXSqAW2EBHE=
-git.sr.ht/~rockorager/vaxis v0.12.1-0.20250218200016-0e88f197413a/go.mod h1:h94aKek3frIV1hJbdXjqnBqaLkbWXvV+UxAsQHg9bns=
-=======
-git.sr.ht/~rockorager/vaxis v0.12.1-0.20250219164615-8231ece877f3 h1:h7OAVeUTeH09wJkelWf57GaOfEFEQE147JAMN28bjTQ=
-git.sr.ht/~rockorager/vaxis v0.12.1-0.20250219164615-8231ece877f3/go.mod h1:h94aKek3frIV1hJbdXjqnBqaLkbWXvV+UxAsQHg9bns=
->>>>>>> 1d21853 (chore(tui): setup page navigation)
-=======
-git.sr.ht/~rockorager/vaxis v0.12.1-0.20250226184702-15ca55637176 h1:3i4vTZC5+wYjC8xVQITAwM4urS5t+0n1+iO9UQIqh2Y=
-git.sr.ht/~rockorager/vaxis v0.12.1-0.20250226184702-15ca55637176/go.mod h1:RSNtZnMeIwpyQzgIEYo9EHJb8Wcl/RhFSxypLpD/ajg=
-<<<<<<< HEAD
->>>>>>> db2f7ac (chore: upgrade vaxis)
-=======
 git.sr.ht/~rockorager/vaxis v0.12.1-0.20250226221744-9e6f9b8846e4 h1:QQ4a2o9zDG/FNWrCc6qSIYb7lsvuKuU/seZkxzDla5c=
 git.sr.ht/~rockorager/vaxis v0.12.1-0.20250226221744-9e6f9b8846e4/go.mod h1:RSNtZnMeIwpyQzgIEYo9EHJb8Wcl/RhFSxypLpD/ajg=
->>>>>>> 8623146 (progress)
 github.com/AndreasBriese/bbloom v0.0.0-20190825152654-46b345b51c96 h1:cTp8I5+VIoKjsnZuH8vjyaysT/ses3EvZeaV/1UkF2M=
 github.com/AndreasBriese/bbloom v0.0.0-20190825152654-46b345b51c96/go.mod h1:bOvUY6CB00SOBii9/FifXqc0awNKxLFCL/+pkDPuyl8=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
