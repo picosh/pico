@@ -281,12 +281,14 @@ func CreateLogger(space string) *slog.Logger {
 				Level:     slog.LevelInfo,
 			},
 		),
-	).With("service", space)
+	)
 
 	if strings.ToLower(utils.GetEnv("PICO_PIPE_ENABLED", "true")) == "true" {
 		conn := NewPicoPipeClient()
 		logger = pipeLogger.RegisterReconnectLogger(context.Background(), logger, conn, 100, 10*time.Millisecond)
 	}
+
+	logger = logger.With("service", space)
 
 	hostname, err := os.Hostname()
 	if err == nil && hostname != "" {
