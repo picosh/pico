@@ -18,7 +18,7 @@ toolchain go1.24.0
 
 // replace git.sr.ht/~delthas/senpai => ../../senpai
 
-// replace git.sr.ht/~rockorager/vaxis => ../../../src/vaxis
+replace git.sr.ht/~rockorager/vaxis => ../../../src/vaxis
 
 // replace github.com/charmbracelet/wish => ../../wish
 

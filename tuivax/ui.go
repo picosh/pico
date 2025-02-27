@@ -45,27 +45,27 @@ type App struct {
 	addPubkey     *AddKeyPage
 }
 
-func (app *App) CaptureEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
-	switch ev := ev.(type) {
+func (app *App) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
+	switch msg := ev.(type) {
+	case vxfw.Init:
+		// only two options for init
+		if app.page == "menu" {
+			return app.menu.HandleEvent(ev, phase)
+		} else {
+			return app.createAccount.HandleEvent(ev, phase)
+		}
 	case vaxis.Key:
-		if ev.Matches('c', vaxis.ModCtrl) {
+		if msg.Matches('c', vaxis.ModCtrl) {
 			return vxfw.QuitCmd{}, nil
 		}
+	case Navigate:
+		app.page = msg.To
+		return vxfw.BatchCmd([]vxfw.Command{
+			vxfw.FocusWidgetCmd(app.pubkeys),
+			vxfw.RedrawCmd{},
+		}), nil
 	}
 	return nil, nil
-}
-
-func (app *App) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
-	switch ev := ev.(type) {
-	case vaxis.Key:
-		if ev.Matches('c', vaxis.ModCtrl) {
-			return vxfw.QuitCmd{}, nil
-		}
-		if ev.Matches('q') {
-			return vxfw.QuitCmd{}, nil
-		}
-	}
-	return vxfw.RedrawCmd{}, nil
 }
 
 func (app *App) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
@@ -89,6 +89,15 @@ func (app *App) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 			return vxfw.Surface{}, err
 		}
 		surface = menu
+	case "pubkeys":
+		pubkeys, err := app.pubkeys.Draw(vxfw.DrawContext{
+			Max:        vxfw.Size{Width: ctx.Max.Width, Height: ctx.Max.Height - 2},
+			Characters: ctx.Characters,
+		})
+		if err != nil {
+			return vxfw.Surface{}, err
+		}
+		surface = pubkeys
 	}
 
 	root.AddChild(1, 3, surface)
@@ -158,9 +167,13 @@ func NewMenuPage(shrd *common.SharedModel) *MenuPage {
 }
 
 func (m *MenuPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
-	switch ev.(type) {
+	switch msg := ev.(type) {
 	case vxfw.Init:
 		return vxfw.FocusWidgetCmd(&m.list), nil
+	case vaxis.Key:
+		if msg.Matches(vaxis.KeyEnter) {
+			m.shared.App.PostEvent(Navigate{To: menuChoices[m.list.Cursor()]})
+		}
 	}
 	return nil, nil
 }
@@ -354,9 +367,11 @@ type PubkeysPage struct {
 }
 
 func NewPubkeysPage(shrd *common.SharedModel) *PubkeysPage {
-	return &PubkeysPage{
+	m := &PubkeysPage{
 		shared: shrd,
 	}
+	m.list = list.Dynamic{DrawCursor: true, Builder: m.getWidget}
+	return m
 }
 
 type FetchPubkeys struct{}
@@ -378,19 +393,12 @@ func (m *PubkeysPage) reset() {
 	m.keys = []*db.PublicKey{}
 }
 
-func (m *PubkeysPage) CaptureEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
-	switch ev.(type) {
-	case vxfw.Init:
-	case FetchPubkeys:
-		m.err = m.fetchKeys()
-		return vxfw.RedrawCmd{}, nil
-	}
-
-	return nil, nil
-}
-
 func (m *PubkeysPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
 	switch msg := ev.(type) {
+	case vaxis.FocusIn:
+		m.err = m.fetchKeys()
+		fmt.Println("FOCUS")
+		return vxfw.FocusWidgetCmd(&m.list), nil
 	case vaxis.Key:
 		switch msg.String() {
 		case "q", "Escape":
@@ -424,6 +432,10 @@ func (m *PubkeysPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.C
 }
 
 func (m *PubkeysPage) getWidget(i uint, cursor uint) vxfw.Widget {
+	if int(i) >= len(m.keys) {
+		return nil
+	}
+
 	style := vaxis.Style{Foreground: grey}
 	isSelected := i == cursor
 	if isSelected {
@@ -438,17 +450,14 @@ func (m *PubkeysPage) getWidget(i uint, cursor uint) vxfw.Widget {
 	}
 
 	txt := richtext.New([]vaxis.Segment{
-		{Text: "│", Style: style},
 		{Text: " Name: ", Style: style},
 		{Text: pubkey.Name + "\n"},
 
-		{Text: "│", Style: style},
 		{Text: " Key: ", Style: style},
 		{Text: ssh.FingerprintSHA256(key) + "\n"},
 
-		{Text: "│", Style: style},
 		{Text: " Created: ", Style: style},
-		{Text: pubkey.CreatedAt.Format(time.DateOnly) + "\n"},
+		{Text: pubkey.CreatedAt.Format(time.DateOnly)},
 	})
 
 	return txt
@@ -631,9 +640,10 @@ func NewTui(opts vaxis.Options, shrd *common.SharedModel) {
 
 	shrd.App = app
 	root := &App{
-		shared: shrd,
-		page:   page,
-		menu:   NewMenuPage(shrd),
+		shared:  shrd,
+		page:    page,
+		menu:    NewMenuPage(shrd),
+		pubkeys: NewPubkeysPage(shrd),
 	}
 
 	err = app.Run(root)
