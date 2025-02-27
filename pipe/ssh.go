@@ -24,7 +24,7 @@ func StartSshServer() {
 	port := utils.GetEnv("PIPE_SSH_PORT", "2222")
 	portOverride := utils.GetEnv("PIPE_SSH_PORT_OVERRIDE", port)
 	promPort := utils.GetEnv("PIPE_PROM_PORT", "9222")
-	cfg := NewConfigSite()
+	cfg := NewConfigSite("pipe-ssh")
 	logger := cfg.Logger
 	dbh := postgres.NewDB(cfg.DbURL, cfg.Logger)
 	defer dbh.Close()

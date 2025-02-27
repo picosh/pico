@@ -76,7 +76,7 @@ func images(logger *slog.Logger, dbh db.DB, st storage.StorageServe, bucket sst.
 }
 
 func main() {
-	cfg := prose.NewConfigSite()
+	cfg := prose.NewConfigSite("prose-imgs-migrate")
 	logger := cfg.Logger
 	picoDb := postgres.NewDB(cfg.DbURL, logger)
 	st, err := storage.NewStorageMinio(logger, cfg.MinioURL, cfg.MinioUser, cfg.MinioPass)

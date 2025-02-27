@@ -7,7 +7,7 @@ import (
 
 var MAX_FILE_SIZE = 3 * utils.MB
 
-func NewConfigSite() *shared.ConfigSite {
+func NewConfigSite(service string) *shared.ConfigSite {
 	debug := utils.GetEnv("PROSE_DEBUG", "0")
 	domain := utils.GetEnv("PROSE_DOMAIN", "prose.sh")
 	port := utils.GetEnv("PROSE_WEB_PORT", "3000")
@@ -42,7 +42,7 @@ func NewConfigSite() *shared.ConfigSite {
 			".ico",
 		},
 		HiddenPosts:  []string{"_readme.md", "_styles.css", "_footer.md", "_404.md"},
-		Logger:       shared.CreateLogger("prose"),
+		Logger:       shared.CreateLogger(service),
 		MaxSize:      maxSize,
 		MaxAssetSize: maxImgSize,
 	}

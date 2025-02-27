@@ -13,7 +13,7 @@ func main() {
 	minioUser := utils.GetEnv("MINIO_ROOT_USER", "")
 	minioPass := utils.GetEnv("MINIO_ROOT_PASSWORD", "")
 	dbURL := utils.GetEnv("DATABASE_URL", "")
-	logger := shared.CreateLogger("pgs")
+	logger := shared.CreateLogger("pgs-ssh")
 	dbpool, err := pgsdb.NewDB(dbURL, logger)
 	if err != nil {
 		panic(err)

@@ -5,7 +5,7 @@ import (
 	"github.com/picosh/utils"
 )
 
-func NewConfigSite() *shared.ConfigSite {
+func NewConfigSite(service string) *shared.ConfigSite {
 	debug := utils.GetEnv("PASTES_DEBUG", "0")
 	domain := utils.GetEnv("PASTES_DOMAIN", "pastes.sh")
 	port := utils.GetEnv("PASTES_WEB_PORT", "3000")
@@ -27,7 +27,7 @@ func NewConfigSite() *shared.ConfigSite {
 		MinioUser:    minioUser,
 		MinioPass:    minioPass,
 		Space:        "pastes",
-		Logger:       shared.CreateLogger("pastes"),
+		Logger:       shared.CreateLogger(service),
 		MaxAssetSize: int64(3 * utils.MB),
 	}
 }

@@ -65,7 +65,7 @@ func StartSshServer() {
 	host := utils.GetEnv("LISTS_HOST", "0.0.0.0")
 	port := utils.GetEnv("LISTS_SSH_PORT", "2222")
 	promPort := utils.GetEnv("LISTS_PROM_PORT", "9222")
-	cfg := NewConfigSite()
+	cfg := NewConfigSite("feeds-ssh")
 	logger := cfg.Logger
 	dbh := postgres.NewDB(cfg.DbURL, cfg.Logger)
 	defer dbh.Close()

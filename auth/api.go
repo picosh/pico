@@ -779,7 +779,7 @@ func StartApiServer() {
 		panic("must provide PICO_SECRET environment variable")
 	}
 
-	logger := shared.CreateLogger("auth")
+	logger := shared.CreateLogger("auth-web")
 
 	cfg.Logger = logger
 

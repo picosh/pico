@@ -58,7 +58,7 @@ func StartSshServer() {
 	host := utils.GetEnv("PASTES_HOST", "0.0.0.0")
 	port := utils.GetEnv("PASTES_SSH_PORT", "2222")
 	promPort := utils.GetEnv("PASTES_PROM_PORT", "9222")
-	cfg := NewConfigSite()
+	cfg := NewConfigSite("pastes-ssh")
 	logger := cfg.Logger
 	dbh := postgres.NewDB(cfg.DbURL, cfg.Logger)
 	defer dbh.Close()

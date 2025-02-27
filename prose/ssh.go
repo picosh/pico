@@ -66,7 +66,7 @@ func StartSshServer() {
 	host := utils.GetEnv("PROSE_HOST", "0.0.0.0")
 	port := utils.GetEnv("PROSE_SSH_PORT", "2222")
 	promPort := utils.GetEnv("PROSE_PROM_PORT", "9222")
-	cfg := NewConfigSite()
+	cfg := NewConfigSite("prose-ssh")
 	logger := cfg.Logger
 	dbh := postgres.NewDB(cfg.DbURL, cfg.Logger)
 	defer dbh.Close()

@@ -67,7 +67,7 @@ func StartSshServer() {
 	host := utils.GetEnv("PICO_HOST", "0.0.0.0")
 	port := utils.GetEnv("PICO_SSH_PORT", "2222")
 	promPort := utils.GetEnv("PICO_PROM_PORT", "9222")
-	cfg := NewConfigSite()
+	cfg := NewConfigSite("pico-ssh")
 	logger := cfg.Logger
 	dbpool := postgres.NewDB(cfg.DbURL, cfg.Logger)
 	defer dbpool.Close()

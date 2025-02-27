@@ -273,25 +273,34 @@ func (c *ConfigSite) AssetURL(username, projectName, fpath string) string {
 }
 
 func CreateLogger(space string) *slog.Logger {
-	opts := &slog.HandlerOptions{
-		AddSource: true,
-		Level:     slog.LevelInfo,
-	}
-	log := slog.New(
-		slog.NewTextHandler(os.Stdout, opts),
-	)
-
-	newLogger := log
+	logger := slog.New(
+		slog.NewTextHandler(
+			os.Stdout,
+			&slog.HandlerOptions{
+				AddSource: true,
+				Level:     slog.LevelInfo,
+			},
+		),
+	).With("service")
 
 	if strings.ToLower(utils.GetEnv("PICO_PIPE_ENABLED", "true")) == "true" {
 		conn := NewPicoPipeClient()
-		newLogger = pipeLogger.RegisterReconnectLogger(context.Background(), log, conn, 100, 10*time.Millisecond)
+		logger = pipeLogger.RegisterReconnectLogger(context.Background(), logger, conn, 100, 10*time.Millisecond)
 	}
 
-	defaultLogger := newLogger.With("service", space)
-	slog.SetDefault(defaultLogger)
+	hostname, err := os.Hostname()
+	if err == nil && hostname != "" {
+		logger = logger.With("hostname", hostname)
+	}
 
-	return defaultLogger
+	nodename := os.Getenv("NODE_NAME")
+	if nodename != "" {
+		logger = logger.With("nodename", nodename)
+	}
+
+	slog.SetDefault(logger)
+
+	return logger
 }
 
 func LoggerWithUser(logger *slog.Logger, user *db.User) *slog.Logger {

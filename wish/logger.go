@@ -31,7 +31,7 @@ func LogMiddleware(defaultLogger *slog.Logger, db FindUserInterface) wish.Middle
 					user, err := db.FindUserByPubkey(s.Permissions().Extensions["pubkey"])
 					if err == nil && user != nil {
 						logger = shared.LoggerWithUser(logger, user).With(
-							"ip", s.RemoteAddr(),
+							"ip", s.RemoteAddr().String(),
 						)
 						s.Context().SetValue(ctxUserKey{}, user)
 					}

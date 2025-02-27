@@ -5,12 +5,12 @@ import (
 	"github.com/picosh/utils"
 )
 
-func NewConfigSite() *shared.ConfigSite {
+func NewConfigSite(service string) *shared.ConfigSite {
 	dbURL := utils.GetEnv("DATABASE_URL", "")
 
 	return &shared.ConfigSite{
 		DbURL:  dbURL,
 		Space:  "pico",
-		Logger: shared.CreateLogger("pico"),
+		Logger: shared.CreateLogger(service),
 	}
 }

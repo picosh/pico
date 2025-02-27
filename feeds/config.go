@@ -5,7 +5,7 @@ import (
 	"github.com/picosh/utils"
 )
 
-func NewConfigSite() *shared.ConfigSite {
+func NewConfigSite(service string) *shared.ConfigSite {
 	debug := utils.GetEnv("FEEDS_DEBUG", "0")
 	domain := utils.GetEnv("FEEDS_DOMAIN", "feeds.pico.sh")
 	port := utils.GetEnv("FEEDS_WEB_PORT", "3000")
@@ -31,6 +31,6 @@ func NewConfigSite() *shared.ConfigSite {
 		Space:       "feeds",
 		AllowedExt:  []string{".txt"},
 		HiddenPosts: []string{"_header.txt", "_readme.txt"},
-		Logger:      shared.CreateLogger("feeds"),
+		Logger:      shared.CreateLogger(service),
 	}
 }

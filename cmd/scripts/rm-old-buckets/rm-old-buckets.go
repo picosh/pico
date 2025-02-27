@@ -18,7 +18,7 @@ func bail(err error) {
 }
 
 func main() {
-	cfg := prose.NewConfigSite()
+	cfg := prose.NewConfigSite("prose-rm-old-buckets")
 	logger := cfg.Logger
 	picoDb := postgres.NewDB(cfg.DbURL, logger)
 	endpoint, err := url.Parse(cfg.MinioURL)

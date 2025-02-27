@@ -5,7 +5,7 @@ import (
 	"github.com/picosh/utils"
 )
 
-func NewConfigSite() *shared.ConfigSite {
+func NewConfigSite(service string) *shared.ConfigSite {
 	domain := utils.GetEnv("PIPE_DOMAIN", "pipe.pico.sh")
 	port := utils.GetEnv("PIPE_WEB_PORT", "3000")
 	dbURL := utils.GetEnv("DATABASE_URL", "")
@@ -16,7 +16,7 @@ func NewConfigSite() *shared.ConfigSite {
 		Port:     port,
 		Protocol: protocol,
 		DbURL:    dbURL,
-		Logger:   shared.CreateLogger("pipe"),
+		Logger:   shared.CreateLogger(service),
 		Space:    "pipe",
 	}
 }

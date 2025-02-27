@@ -411,7 +411,7 @@ func createMainRoutes(staticRoutes []shared.Route) []shared.Route {
 }
 
 func StartApiServer() {
-	cfg := NewConfigSite()
+	cfg := NewConfigSite("pipe-web")
 	db := postgres.NewDB(cfg.DbURL, cfg.Logger)
 	defer db.Close()
 	logger := cfg.Logger
