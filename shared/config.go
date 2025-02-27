@@ -281,7 +281,7 @@ func CreateLogger(space string) *slog.Logger {
 				Level:     slog.LevelInfo,
 			},
 		),
-	).With("service")
+	).With("service", space)
 
 	if strings.ToLower(utils.GetEnv("PICO_PIPE_ENABLED", "true")) == "true" {
 		conn := NewPicoPipeClient()
@@ -293,7 +293,7 @@ func CreateLogger(space string) *slog.Logger {
 		logger = logger.With("hostname", hostname)
 	}
 
-	nodename := os.Getenv("NODE_NAME")
+	nodename := os.Getenv("NODENAME")
 	if nodename != "" {
 		logger = logger.With("nodename", nodename)
 	}
