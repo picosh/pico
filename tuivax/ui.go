@@ -7,7 +7,7 @@ import (
 
 	"git.sr.ht/~rockorager/vaxis"
 	"git.sr.ht/~rockorager/vaxis/vxfw"
-	"git.sr.ht/~rockorager/vaxis/vxfw/text"
+	"git.sr.ht/~rockorager/vaxis/vxfw/richtext"
 	"git.sr.ht/~rockorager/vaxis/widgets/border"
 	"git.sr.ht/~rockorager/vaxis/widgets/list"
 	"git.sr.ht/~rockorager/vaxis/widgets/textinput"
@@ -74,12 +74,12 @@ func (app *App) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	surface := vxfw.Surface{}
 	root := vxfw.NewSurface(ctx.Max.Width, ctx.Min.Height, app)
 
-	txt := text.New(fmt.Sprintf("pico • %s\n", app.page))
-	headerTxt, _ := txt.Draw(vxfw.DrawContext{
+	header := NewHeaderWdt(app.shared, app.page)
+	headerSurf, _ := header.Draw(vxfw.DrawContext{
 		Max:        vxfw.Size{Width: ctx.Max.Width, Height: 2},
 		Characters: ctx.Characters,
 	})
-	root.AddChild(0, 0, headerTxt)
+	root.AddChild(0, 0, headerSurf)
 
 	switch app.page {
 	case "menu":
@@ -97,8 +97,54 @@ func (app *App) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	return root, nil
 }
 
+type HeaderWdgt struct {
+	shared *common.SharedModel
+
+	page string
+}
+
+func NewHeaderWdt(shrd *common.SharedModel, page string) *HeaderWdgt {
+	return &HeaderWdgt{
+		shared: shrd,
+		page:   page,
+	}
+}
+
+func (m *HeaderWdgt) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
+	return nil, nil
+}
+
+func (m *HeaderWdgt) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
+	logoTxt := "pico.sh"
+	ff := m.shared.PlusFeatureFlag
+	if ff != nil && ff.IsValid() {
+		logoTxt = "pico+"
+	}
+
+	// header
+	wdgt := richtext.New([]vaxis.Segment{
+		vaxis.Segment{Text: " " + logoTxt + " ", Style: vaxis.Style{Background: indigo}},
+		vaxis.Segment{Text: " • " + m.page, Style: vaxis.Style{Foreground: green}},
+	})
+	return wdgt.Draw(ctx)
+}
+
 type Navigate struct{ To string }
 type Quit struct{}
+
+type ListWdgt struct{}
+
+func NewListWdgt() *ListWdgt {
+	return &ListWdgt{}
+}
+
+func (m *ListWdgt) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
+	return nil, nil
+}
+
+func (m *ListWdgt) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
+	return vxfw.Surface{}, nil
+}
 
 type MenuPage struct {
 	shared *common.SharedModel
@@ -110,7 +156,7 @@ func NewMenuPage(shrd *common.SharedModel) *MenuPage {
 	return &MenuPage{shared: shrd}
 }
 
-func (m *MenuPage) HandleEvent(ev vaxis.Event) {
+func (m *MenuPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
 	switch msg := ev.(type) {
 	case vaxis.Key:
 		switch msg.String() {
@@ -124,20 +170,24 @@ func (m *MenuPage) HandleEvent(ev vaxis.Event) {
 			// m.ui.vx.PostEvent(Navigate{To: menuChoices[m.menu.Index()]})
 		}
 	}
+
+	return nil, nil
 }
 
 func (m *MenuPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
-	txt := text.New("menu!\n")
-	return txt.Draw(ctx)
-	/* createdAt := m.shared.User.CreatedAt.Format(time.DateOnly)
+	createdAt := m.shared.User.CreatedAt.Format(time.DateOnly)
 	pink := vaxis.Style{Foreground: fuschia}
 
 	segs := []vaxis.Segment{}
 	segs = append(
 		segs,
-		vaxis.Segment{Text: " Username: "}, vaxis.Segment{Text: m.shared.User.Name, Style: pink},
+		vaxis.Segment{Text: "│", Style: pink},
+		vaxis.Segment{Text: " Username: "},
+		vaxis.Segment{Text: m.shared.User.Name, Style: pink},
 		vaxis.Segment{Text: "\n"},
-		vaxis.Segment{Text: " Joined: "}, vaxis.Segment{Text: createdAt, Style: pink},
+		vaxis.Segment{Text: "│", Style: pink},
+		vaxis.Segment{Text: " Joined: "},
+		vaxis.Segment{Text: createdAt, Style: pink},
 	)
 
 	brdH := 2
@@ -145,20 +195,31 @@ func (m *MenuPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 		expiresAt := m.shared.PlusFeatureFlag.ExpiresAt.Format(time.DateOnly)
 		segs = append(segs,
 			vaxis.Segment{Text: "\n"},
+			vaxis.Segment{Text: "│", Style: pink},
 			vaxis.Segment{Text: " Pico+ Expires: "}, vaxis.Segment{Text: expiresAt, Style: pink},
 			vaxis.Segment{Text: "\n"},
 		)
 		brdH += 1
 	}
-	w, _ := win.Size()
-	desc := win.New(0, 0, w, brdH)
-	brd := border.Left(desc, pink)
-	brd.Print(segs...)
+
+	root := vxfw.NewSurface(ctx.Max.Width, ctx.Min.Height, m)
+
+	infoWdgt := richtext.New(segs)
+	infoSurf, _ := infoWdgt.Draw(ctx)
+	root.AddChild(0, 0, infoSurf)
+
+	listWdgt := NewListWdgt()
 	offset := brdH + 1
-
-	menuWin := win.New(0, offset, win.Width, win.Height-offset)
-
-	m.menu.Draw(menuWin) */
+	listSurf, _ := listWdgt.Draw(vxfw.DrawContext{
+		Characters: ctx.Characters,
+		Max: vxfw.Size{
+			Width:  ctx.Max.Width,
+			Height: ctx.Max.Height - uint16(offset),
+		},
+	})
+	root.AddChild(0, offset, listSurf)
+	// menuWin := win.New(0, offset, win.Width, win.Height-offset)
+	return root, nil
 }
 
 type CreateAccountPage struct {
