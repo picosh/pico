@@ -3,6 +3,7 @@ package common
 import (
 	"log/slog"
 
+	"git.sr.ht/~rockorager/vaxis/vxfw"
 	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/shared"
@@ -20,4 +21,5 @@ type SharedModel struct {
 	HeaderHeight    int
 	Styles          Styles
 	Impersonated    bool
+	App             *vxfw.App
 }

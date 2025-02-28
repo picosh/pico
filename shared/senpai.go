@@ -123,10 +123,9 @@ func (v *VConsole) Close() error {
 	return err
 }
 
-func NewSenpaiApp(sesh ssh.Session, username, pass string) (*senpai.App, error) {
+func NewVConsole(sesh ssh.Session) (*VConsole, error) {
 	pty, win, ok := sesh.Pty()
 	if !ok {
-		slog.Error("PTY not found")
 		return nil, fmt.Errorf("PTY not found")
 	}
 
@@ -175,6 +174,16 @@ func NewSenpaiApp(sesh ssh.Session, username, pass string) (*senpai.App, error) 
 			}
 		}
 	}()
+
+	return vty, nil
+}
+
+func NewSenpaiApp(sesh ssh.Session, username, pass string) (*senpai.App, error) {
+	vty, err := NewVConsole(sesh)
+	if err != nil {
+		slog.Error("PTY not found")
+		return nil, err
+	}
 
 	senpaiCfg := senpai.Defaults()
 	senpaiCfg.TLS = true

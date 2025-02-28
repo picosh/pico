@@ -9,15 +9,15 @@ import (
 )
 
 type SenpaiCmd struct {
-	shared *common.SharedModel
+	Shared *common.SharedModel
 }
 
 func (m *SenpaiCmd) Run() error {
-	pass, err := m.shared.Dbpool.UpsertToken(m.shared.User.ID, "pico-chat")
+	pass, err := m.Shared.Dbpool.UpsertToken(m.Shared.User.ID, "pico-chat")
 	if err != nil {
 		return err
 	}
-	app, err := shared.NewSenpaiApp(m.shared.Session, m.shared.User.Name, pass)
+	app, err := shared.NewSenpaiApp(m.Shared.Session, m.Shared.User.Name, pass)
 	if err != nil {
 		return err
 	}
@@ -32,7 +32,7 @@ func (m *SenpaiCmd) SetStderr(io.Writer) {}
 
 func LoadChat(shrd *common.SharedModel) tea.Cmd {
 	sp := &SenpaiCmd{
-		shared: shrd,
+		Shared: shrd,
 	}
 	return tea.Exec(sp, func(err error) tea.Msg {
 		return tea.Quit()

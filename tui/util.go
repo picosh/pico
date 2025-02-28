@@ -10,7 +10,7 @@ import (
 	"github.com/picosh/utils"
 )
 
-func findUser(shrd *common.SharedModel) (*db.User, error) {
+func FindUser(shrd *common.SharedModel) (*db.User, error) {
 	logger := shrd.Cfg.Logger
 	var user *db.User
 	usr := shrd.Session.User()
@@ -50,7 +50,7 @@ func findUser(shrd *common.SharedModel) (*db.User, error) {
 	return user, nil
 }
 
-func findPlusFeatureFlag(shrd *common.SharedModel) (*db.FeatureFlag, error) {
+func FindPlusFeatureFlag(shrd *common.SharedModel) (*db.FeatureFlag, error) {
 	if shrd.User == nil {
 		return nil, nil
 	}

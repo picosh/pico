@@ -18,14 +18,17 @@ toolchain go1.24.0
 
 // replace git.sr.ht/~delthas/senpai => ../../senpai
 
-// replace git.sr.ht/~rockorager/vaxis => ../../vaxis
+replace git.sr.ht/~rockorager/vaxis => ../../../src/vaxis
 
 // replace github.com/charmbracelet/wish => ../../wish
 
 replace git.sr.ht/~delthas/senpai => github.com/antoniomika/senpai v0.0.0-20250222151844-ab59937d60cc
 
+// replace git.sr.ht/~rockorager/vaxis => github.com/antoniomika/vaxis v0.0.0-20250114030546-8524674789ca
+
 require (
 	git.sr.ht/~delthas/senpai v0.3.1-0.20240425235039-206be659439e
+	git.sr.ht/~rockorager/vaxis v0.12.1-0.20250227165032-6d540bf8af50
 	github.com/alecthomas/chroma/v2 v2.14.0
 	github.com/antoniomika/syncmap v1.0.0
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
@@ -79,7 +82,6 @@ require (
 	codeberg.org/emersion/go-scfg v0.1.0 // indirect
 	dario.cat/mergo v1.0.0 // indirect
 	filippo.io/edwards25519 v1.1.0 // indirect
-	git.sr.ht/~rockorager/vaxis v0.12.1-0.20250218200016-0e88f197413a // indirect
 	github.com/AndreasBriese/bbloom v0.0.0-20190825152654-46b345b51c96 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver/v3 v3.2.0 // indirect
