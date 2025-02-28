@@ -10,6 +10,7 @@ import (
 	"git.sr.ht/~rockorager/vaxis/vxfw/list"
 	"git.sr.ht/~rockorager/vaxis/vxfw/richtext"
 	"git.sr.ht/~rockorager/vaxis/vxfw/text"
+	"git.sr.ht/~rockorager/vaxis/vxfw/textfield"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/tui"
 	"github.com/picosh/pico/tui/chat"
@@ -48,20 +49,24 @@ type App struct {
 func (app *App) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
 	switch msg := ev.(type) {
 	case vxfw.Init:
-		// only two options for init
-		if app.page == "menu" {
-			return app.menu.HandleEvent(ev, phase)
-		} else {
-			return app.createAccount.HandleEvent(ev, phase)
-		}
+		return vxfw.FocusWidgetCmd(app.menu), nil
 	case vaxis.Key:
 		if msg.Matches('c', vaxis.ModCtrl) {
 			return vxfw.QuitCmd{}, nil
 		}
 	case Navigate:
 		app.page = msg.To
+		var fcs vxfw.FocusWidgetCmd
+		switch app.page {
+		case "menu":
+			fcs = vxfw.FocusWidgetCmd(app.menu)
+		case "pubkeys":
+			fcs = vxfw.FocusWidgetCmd(app.pubkeys)
+		case "add-pubkey":
+			fcs = vxfw.FocusWidgetCmd(app.addPubkey)
+		}
 		return vxfw.BatchCmd([]vxfw.Command{
-			vxfw.FocusWidgetCmd(app.pubkeys),
+			fcs,
 			vxfw.RedrawCmd{},
 		}), nil
 	}
@@ -69,35 +74,26 @@ func (app *App) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command
 }
 
 func (app *App) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
+	w := ctx.Max.Width
+	h := ctx.Max.Height
 	surface := vxfw.Surface{}
-	root := vxfw.NewSurface(ctx.Max.Width, ctx.Min.Height, app)
+	root := vxfw.NewSurface(w, ctx.Min.Height, app)
 
 	header := NewHeaderWdt(app.shared, app.page)
 	headerSurf, _ := header.Draw(vxfw.DrawContext{
-		Max:        vxfw.Size{Width: ctx.Max.Width, Height: 2},
+		Max:        vxfw.Size{Width: w, Height: 2},
 		Characters: ctx.Characters,
 	})
 	root.AddChild(1, 1, headerSurf)
+	pageCtx := createDrawCtx(ctx, h-2)
 
 	switch app.page {
 	case "menu":
-		menu, err := app.menu.Draw(vxfw.DrawContext{
-			Max:        vxfw.Size{Width: ctx.Max.Width, Height: ctx.Max.Height - 2},
-			Characters: ctx.Characters,
-		})
-		if err != nil {
-			return vxfw.Surface{}, err
-		}
-		surface = menu
+		surface, _ = app.menu.Draw(pageCtx)
 	case "pubkeys":
-		pubkeys, err := app.pubkeys.Draw(vxfw.DrawContext{
-			Max:        vxfw.Size{Width: ctx.Max.Width, Height: ctx.Max.Height - 2},
-			Characters: ctx.Characters,
-		})
-		if err != nil {
-			return vxfw.Surface{}, err
-		}
-		surface = pubkeys
+		surface, _ = app.pubkeys.Draw(pageCtx)
+	case "add-pubkey":
+		surface, _ = app.addPubkey.Draw(pageCtx)
 	}
 
 	root.AddChild(1, 3, surface)
@@ -168,7 +164,7 @@ func NewMenuPage(shrd *common.SharedModel) *MenuPage {
 
 func (m *MenuPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
 	switch msg := ev.(type) {
-	case vxfw.Init:
+	case vaxis.FocusIn:
 		return vxfw.FocusWidgetCmd(&m.list), nil
 	case vaxis.Key:
 		if msg.Matches(vaxis.KeyEnter) {
@@ -397,12 +393,14 @@ func (m *PubkeysPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.C
 	switch msg := ev.(type) {
 	case vaxis.FocusIn:
 		m.err = m.fetchKeys()
-		fmt.Println("FOCUS")
 		return vxfw.FocusWidgetCmd(&m.list), nil
 	case vaxis.Key:
-		switch msg.String() {
+		if msg.Matches('c') {
+			m.shared.App.PostEvent(Navigate{To: "add-pubkey"})
+		}
+		/* switch msg.String() {
 		case "q", "Escape":
-			m.reset()
+			m.shared.App.PostEvent(Navigate{To: "menu"})
 			// m.ui.vx.PostEvent(Navigate{To: "menu"})
 		case "x":
 			if len(m.keys) < 2 {
@@ -425,7 +423,7 @@ func (m *PubkeysPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.C
 			m.confirm = false
 		case "c":
 			// m.ui.vx.PostEvent(Navigate{To: "add-key"})
-		}
+		*/
 	}
 
 	return nil, nil
@@ -523,11 +521,19 @@ type AddKeyPage struct {
 
 	err   error
 	focus string
+	input *textfield.TextField
+	btn   *richtext.RichText
 }
 
 func NewAddPubkeyPage(shrd *common.SharedModel) *AddKeyPage {
+	btnStyle := vaxis.Style{Background: grey}
 	return &AddKeyPage{
 		shared: shrd,
+
+		input: &textfield.TextField{},
+		btn: richtext.New([]vaxis.Segment{
+			vaxis.Segment{Text: " ADD ", Style: btnStyle},
+		}),
 	}
 }
 
@@ -538,37 +544,38 @@ func (m *AddKeyPage) reset() {
 }
 
 func (m *AddKeyPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
-	/* if m.focus == "input" {
-		m.input.Update(ev)
-	}
-
 	switch msg := ev.(type) {
+	case vaxis.FocusIn:
+		m.focus = "input"
+		return vxfw.FocusWidgetCmd(m.input), nil
 	case vaxis.Key:
-		switch msg.String() {
-		case "Ctrl+c":
-			// m.ui.vx.PostEvent(Quit{})
-		case "Escape":
-			// m.ui.vx.PostEvent(Navigate{To: "pubkeys"})
-		case "q":
-			if m.focus != "input" {
-				// m.ui.vx.PostEvent(Navigate{To: "pubkeys"})
-			}
-		case "Tab":
+		if msg.Matches(vaxis.KeyTab) {
 			if m.focus == "input" {
 				m.focus = "button"
+				btnStyle := vaxis.Style{Background: fuschia}
+				m.btn = richtext.New([]vaxis.Segment{
+					vaxis.Segment{Text: " ADD ", Style: btnStyle},
+				})
+				return vxfw.FocusWidgetCmd(m.btn), nil
 			} else {
 				m.focus = "input"
+				btnStyle := vaxis.Style{Background: grey}
+				m.btn = richtext.New([]vaxis.Segment{
+					vaxis.Segment{Text: " ADD ", Style: btnStyle},
+				})
+				return vxfw.FocusWidgetCmd(m.input), nil
 			}
-		case "Enter":
+		}
+		if msg.Matches(vaxis.KeyEnter) {
 			if m.focus == "button" {
-				err := m.addPubkey(m.input.String())
+				err := m.addPubkey(m.input.Value)
 				m.err = err
 				if err == nil {
-					// m.ui.vx.PostEvent(Navigate{To: "pubkeys"})
+					m.shared.App.PostEvent(Navigate{To: "pubkeys"})
 				}
 			}
 		}
-	} */
+	}
 
 	return nil, nil
 }
@@ -586,25 +593,41 @@ func (m *AddKeyPage) addPubkey(pubkey string) error {
 	)
 }
 
-func (m *AddKeyPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
-	/* w, h := win.Size()
-	intro := win.New(0, 0, w, 3)
-	intro.Print(
-		vaxis.Segment{Text: "Enter a new public key\n\n"},
-	)
-	form := win.New(0, 3, w, h-3)
-	m.input.Draw(form)
-	btnStyle := vaxis.Style{Background: grey}
-	if m.focus == "button" {
-		btnStyle = vaxis.Style{Background: fuschia}
+func createDrawCtx(ctx vxfw.DrawContext, h uint16) vxfw.DrawContext {
+	return vxfw.DrawContext{
+		Characters: ctx.Characters,
+		Max: vxfw.Size{
+			Width:  ctx.Max.Width,
+			Height: h,
+		},
 	}
-	form.Println(1, vaxis.Segment{Text: " ADD ", Style: btnStyle})
+}
+
+func (m *AddKeyPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
+	w := ctx.Max.Width
+	h := ctx.Max.Height
+	root := vxfw.NewSurface(w, h, m)
+
+	header := text.New("Enter a new public key")
+	headerSurf, _ := header.Draw(createDrawCtx(ctx, 2))
+	root.AddChild(0, 0, headerSurf)
+
+	inputSurf, _ := m.input.Draw(createDrawCtx(ctx, 1))
+	root.AddChild(0, 3, inputSurf)
+
+	btnSurf, _ := m.btn.Draw(createDrawCtx(ctx, 1))
+	root.AddChild(0, 5, btnSurf)
+
 	if m.err != nil {
-		form.Println(2, vaxis.Segment{
-			Text:  m.err.Error(),
-			Style: vaxis.Style{Foreground: red},
+		e := richtext.New([]vaxis.Segment{
+			{
+				Text:  m.err.Error(),
+				Style: vaxis.Style{Foreground: red},
+			},
 		})
-	} */
+		errSurf, _ := e.Draw(createDrawCtx(ctx, 1))
+		root.AddChild(0, 6, errSurf)
+	}
 
 	return vxfw.Surface{}, nil
 }
@@ -640,10 +663,11 @@ func NewTui(opts vaxis.Options, shrd *common.SharedModel) {
 
 	shrd.App = app
 	root := &App{
-		shared:  shrd,
-		page:    page,
-		menu:    NewMenuPage(shrd),
-		pubkeys: NewPubkeysPage(shrd),
+		shared:    shrd,
+		page:      page,
+		menu:      NewMenuPage(shrd),
+		pubkeys:   NewPubkeysPage(shrd),
+		addPubkey: NewAddPubkeyPage(shrd),
 	}
 
 	err = app.Run(root)
