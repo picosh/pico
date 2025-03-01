@@ -87,7 +87,7 @@ func (m *SettingsPage) CaptureEvent(ev vaxis.Event) (vxfw.Command, error) {
 
 func (m *SettingsPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
 	switch ev.(type) {
-	case vaxis.FocusIn:
+	case PageIn:
 		m.err = m.fetchFeatures()
 	}
 	return nil, nil

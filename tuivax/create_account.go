@@ -44,7 +44,7 @@ func (m *CreateAccountPage) createAccount(name string) (*db.User, error) {
 
 func (m *CreateAccountPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
 	switch msg := ev.(type) {
-	case vaxis.FocusIn:
+	case PageIn:
 		return vxfw.FocusWidgetCmd(m.input), nil
 	case vaxis.Key:
 		if msg.Matches(vaxis.KeyTab) {

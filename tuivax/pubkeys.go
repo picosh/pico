@@ -48,7 +48,7 @@ func (m *PubkeysPage) fetchKeys() error {
 
 func (m *PubkeysPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
 	switch msg := ev.(type) {
-	case vaxis.FocusIn:
+	case PageIn:
 		m.err = m.fetchKeys()
 		return vxfw.FocusWidgetCmd(&m.list), nil
 	case vaxis.Key:
@@ -188,7 +188,7 @@ func NewAddPubkeyPage(shrd *common.SharedModel) *AddKeyPage {
 
 func (m *AddKeyPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
 	switch msg := ev.(type) {
-	case vaxis.FocusIn:
+	case PageIn:
 		m.focus = "input"
 		m.input.Reset()
 		return vxfw.FocusWidgetCmd(m.input), nil

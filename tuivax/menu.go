@@ -50,7 +50,7 @@ func NewMenuPage(shrd *common.SharedModel) *MenuPage {
 
 func (m *MenuPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
 	switch msg := ev.(type) {
-	case vaxis.FocusIn:
+	case PageIn:
 		return vxfw.FocusWidgetCmd(&m.list), nil
 	case vaxis.Key:
 		if msg.Matches(vaxis.KeyEnter) {

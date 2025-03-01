@@ -10,6 +10,8 @@ import (
 )
 
 type Navigate struct{ To string }
+type PageIn struct{}
+type PageOut struct{}
 
 var fuschia = vaxis.HexColor(0xEE6FF8)
 var cream = vaxis.HexColor(0xFFFDF5)
@@ -60,16 +62,41 @@ func (app *App) focus() vxfw.Command {
 func (app *App) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
 	switch msg := ev.(type) {
 	case vxfw.Init:
-		return vxfw.BatchCmd([]vxfw.Command{
-			app.focus(),
-			vxfw.RedrawCmd{},
-		}), nil
+		page := "menu"
+		// no user? kick them to the create account page
+		if app.shared.User == nil {
+			page = "create-account"
+		}
+		app.shared.App.PostEvent(Navigate{To: page})
+		return nil, nil
 	case Navigate:
+		cmds := []vxfw.Command{}
+		cur := app.GetCurPage()
+		if cur != nil {
+			// send event to page notifying that we are leaving
+			cmd, _ := cur.HandleEvent(PageOut{}, vxfw.TargetPhase)
+			if cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+		}
+
+		// switch the page
 		app.page = msg.To
-		return vxfw.BatchCmd([]vxfw.Command{
-			app.focus(),
+
+		cur = app.GetCurPage()
+		if cur != nil {
+			// send event to page notifying that we are entering
+			cmd, _ := app.GetCurPage().HandleEvent(PageIn{}, vxfw.TargetPhase)
+			if cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+		}
+
+		cmds = append(
+			cmds,
 			vxfw.RedrawCmd{},
-		}), nil
+		)
+		return vxfw.BatchCmd(cmds), nil
 	}
 	return nil, nil
 }
@@ -87,8 +114,11 @@ func (app *App) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	root.AddChild(1, 1, headerSurf)
 
 	pageCtx := createDrawCtx(ctx, h-2)
-	surface, _ := app.GetCurPage().Draw(pageCtx)
-	root.AddChild(1, 3, surface)
+	cur := app.GetCurPage()
+	if cur != nil {
+		surface, _ := app.GetCurPage().Draw(pageCtx)
+		root.AddChild(1, 3, surface)
+	}
 
 	return root, nil
 }
@@ -145,10 +175,6 @@ func initData(shrd *common.SharedModel) {
 
 func NewTui(opts vaxis.Options, shrd *common.SharedModel) {
 	initData(shrd)
-	page := "menu"
-	if shrd.User == nil {
-		page = "create-account"
-	}
 	app, err := vxfw.NewApp(opts)
 	if err != nil {
 		panic(err)
@@ -164,11 +190,11 @@ func NewTui(opts vaxis.Options, shrd *common.SharedModel) {
 		"create-account": NewCreateAccountPage(shrd),
 		"settings":       NewSettingsPage(shrd),
 		"pico+":          NewPlusPage(shrd),
+		"logs":           NewLogsPage(shrd),
 	}
 	root := &App{
 		shared: shrd,
 		pages:  pages,
-		page:   page,
 	}
 
 	err = app.Run(root)

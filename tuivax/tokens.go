@@ -46,7 +46,7 @@ func (m *TokensPage) fetchTokens() error {
 
 func (m *TokensPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
 	switch msg := ev.(type) {
-	case vaxis.FocusIn:
+	case PageIn:
 		m.err = m.fetchTokens()
 		return vxfw.FocusWidgetCmd(&m.list), nil
 	case vaxis.Key:
@@ -174,7 +174,7 @@ func NewAddTokenPage(shrd *common.SharedModel) *AddTokenPage {
 
 func (m *AddTokenPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
 	switch msg := ev.(type) {
-	case vaxis.FocusIn:
+	case PageIn:
 		m.focus = "input"
 		m.input.Reset()
 		return vxfw.FocusWidgetCmd(m.input), nil
