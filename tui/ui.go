@@ -56,7 +56,7 @@ func (m *UI) updateActivePage(msg tea.Msg) tea.Cmd {
 }
 
 func (m *UI) setupUser() error {
-	user, err := findUser(m.shared)
+	user, err := FindUser(m.shared)
 	if err != nil {
 		m.shared.Logger.Error("cannot find user", "err", err)
 		wish.Errorf(m.shared.Session, "\nERROR: %s\n\n", err)
@@ -64,7 +64,7 @@ func (m *UI) setupUser() error {
 	}
 
 	m.shared.User = user
-	ff, _ := findPlusFeatureFlag(m.shared)
+	ff, _ := FindPlusFeatureFlag(m.shared)
 	m.shared.PlusFeatureFlag = ff
 
 	return nil
