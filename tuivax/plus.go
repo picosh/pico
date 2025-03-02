@@ -21,6 +21,10 @@ func NewPlusPage(shrd *common.SharedModel) *PlusPage {
 }
 
 func (m *PlusPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
+	switch ev.(type) {
+	case PageIn:
+		return vxfw.FocusWidgetCmd(m), nil
+	}
 	return nil, nil
 }
 

@@ -89,6 +89,7 @@ func (m *SettingsPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.
 	switch ev.(type) {
 	case PageIn:
 		m.err = m.fetchFeatures()
+		return vxfw.FocusWidgetCmd(m), nil
 	}
 	return nil, nil
 }
