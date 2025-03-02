@@ -45,6 +45,9 @@ func (app *App) CaptureEvent(ev vaxis.Event) (vxfw.Command, error) {
 			return vxfw.QuitCmd{}, nil
 		}
 		if msg.Matches(vaxis.KeyEsc) {
+			if app.page == "create-account" {
+				return vxfw.QuitCmd{}, nil
+			}
 			app.shared.App.PostEvent(Navigate{To: "menu"})
 		}
 	}
@@ -191,6 +194,7 @@ func NewTui(opts vaxis.Options, shrd *common.SharedModel) {
 		"settings":       NewSettingsPage(shrd),
 		"pico+":          NewPlusPage(shrd),
 		"logs":           NewLogsPage(shrd),
+		"analytics":      NewAnalyticsPage(shrd),
 	}
 	root := &App{
 		shared: shrd,

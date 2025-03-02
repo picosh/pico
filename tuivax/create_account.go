@@ -82,7 +82,6 @@ func (m *CreateAccountPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 
 	root := vxfw.NewSurface(w, h, m)
 
-	// intro := win.New(0, 0, w, h-4)
 	logo := ""
 	if ctx.Max.Height > 25 {
 		logo = common.LogoView() + "\n\n"
@@ -95,19 +94,27 @@ func (m *CreateAccountPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 		},
 		{Text: fmt.Sprintf("pubkey: %s\n\n", fp)},
 	})
-	introSurf, _ := intro.Draw(createDrawCtx(ctx, h-4))
-	root.AddChild(0, 0, introSurf)
+	intro.Softwrap = false
+	introSurf, _ := intro.Draw(ctx)
+	ah := 0
+	root.AddChild(0, ah, introSurf)
+	ah += int(introSurf.Size.Height)
 
-	inpSurf, _ := m.input.Draw(createDrawCtx(ctx, 1))
-	root.AddChild(0, int(h)-5, inpSurf)
+	inpSurf, _ := m.input.Draw(ctx)
+	root.AddChild(0, ah, inpSurf)
+	ah += int(inpSurf.Size.Height)
 
-	btnSurf, _ := m.btn.Draw(createDrawCtx(ctx, 1))
-	root.AddChild(0, int(h)-3, btnSurf)
+	btnSurf, _ := m.btn.Draw(vxfw.DrawContext{
+		Characters: ctx.Characters,
+		Max:        vxfw.Size{Width: 10, Height: 1},
+	})
+	root.AddChild(0, ah+1, btnSurf)
+	ah += int(btnSurf.Size.Height) + 1
 
 	if m.err != nil {
 		errTxt := text.New(m.err.Error())
-		errSurf, _ := errTxt.Draw(createDrawCtx(ctx, 1))
-		root.AddChild(0, int(h)-2, errSurf)
+		errSurf, _ := errTxt.Draw(ctx)
+		root.AddChild(0, ah, errSurf)
 	}
 
 	return root, nil
