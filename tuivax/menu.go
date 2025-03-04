@@ -95,14 +95,15 @@ func (m *MenuPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	root.AddChild(0, 0, infoSurf)
 
 	offset := brdH + 1
-	listSurf, _ := m.list.Draw(vxfw.DrawContext{
+	brd := NewBorder(&m.list)
+	surf, _ := brd.Draw(vxfw.DrawContext{
 		Characters: ctx.Characters,
 		Max: vxfw.Size{
-			Width:  ctx.Max.Width,
+			Width:  ctx.Max.Width / 2,
 			Height: ctx.Max.Height - uint16(offset),
 		},
 	})
-	root.AddChild(0, offset, listSurf)
+	root.AddChild(0, offset, surf)
 	// menuWin := win.New(0, offset, win.Width, win.Height-offset)
 	return root, nil
 }
