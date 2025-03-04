@@ -53,9 +53,9 @@ require (
 	github.com/muesli/reflow v0.3.0
 	github.com/muesli/termenv v0.16.0
 	github.com/neurosnap/go-exif-remove v0.0.0-20221010134343-50d1e3c35577
-	github.com/picosh/pobj v0.0.0-20250302184551-eff287259af6
+	github.com/picosh/pobj v0.0.0-20250304201248-a9c7179aa49b
 	github.com/picosh/pubsub v0.0.0-20241114191831-ec8f16c0eb88
-	github.com/picosh/send v0.0.0-20250302184451-fd5b2d4ad9a0
+	github.com/picosh/send v0.0.0-20250304201154-e36cd3bbbb35
 	github.com/picosh/tunkit v0.0.0-20240905223921-532404cef9d9
 	github.com/picosh/utils v0.0.0-20241120033529-8ca070c09bf4
 	github.com/pkg/sftp v1.13.7
@@ -259,7 +259,7 @@ require (
 	github.com/nutsdb/nutsdb v1.0.4 // indirect
 	github.com/onsi/ginkgo/v2 v2.15.0 // indirect
 	github.com/philhofer/fwd v1.1.3-0.20240916144458-20a13a1f6b7c // indirect
-	github.com/picosh/go-rsync-receiver v0.0.0-20250302184209-cbf8532bc383 // indirect
+	github.com/picosh/go-rsync-receiver v0.0.0-20250304201040-fcc11dd22d79 // indirect
 	github.com/pierrec/lz4/v4 v4.1.21 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect

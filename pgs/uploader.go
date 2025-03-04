@@ -528,7 +528,7 @@ func (h *UploadAssetHandler) validateAsset(data *FileData) (bool, error) {
 	fpath := strings.Replace(data.Filepath, "/"+projectName, "", 1)
 	if shouldIgnoreFile(fpath, data.DenyList) {
 		err := fmt.Errorf(
-			"ERROR: (%s) file rejected, https://pico.sh/pgs#file-denylist",
+			"ERROR: (%s) file rejected, https://pico.sh/pgs#-pgs-ignore",
 			data.Filepath,
 		)
 		return false, err
