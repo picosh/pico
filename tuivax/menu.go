@@ -96,6 +96,7 @@ func (m *MenuPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 
 	offset := brdH + 1
 	brd := NewBorder(&m.list)
+	brd.Style = vaxis.Style{Foreground: purp}
 	surf, _ := brd.Draw(vxfw.DrawContext{
 		Characters: ctx.Characters,
 		Max: vxfw.Size{

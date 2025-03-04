@@ -21,6 +21,7 @@ var grey = vaxis.HexColor(0x5C5C5C)
 var red = vaxis.HexColor(0xED567A)
 var white = vaxis.HexColor(0xFFFFFF)
 var oj = vaxis.HexColor(0xFFCA80)
+var purp = vaxis.HexColor(0xBD93F9)
 
 func createDrawCtx(ctx vxfw.DrawContext, h uint16) vxfw.DrawContext {
 	return vxfw.DrawContext{
