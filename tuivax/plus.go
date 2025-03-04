@@ -6,29 +6,34 @@ import (
 
 	"git.sr.ht/~rockorager/vaxis"
 	"git.sr.ht/~rockorager/vaxis/vxfw"
+	"git.sr.ht/~rockorager/vaxis/vxfw/list"
 	"git.sr.ht/~rockorager/vaxis/vxfw/richtext"
 	"github.com/picosh/pico/tui/common"
 )
 
 type PlusPage struct {
 	shared *common.SharedModel
+
+	pager list.Dynamic
 }
 
 func NewPlusPage(shrd *common.SharedModel) *PlusPage {
-	return &PlusPage{
+	page := &PlusPage{
 		shared: shrd,
 	}
+	page.pager = list.Dynamic{DrawCursor: false, Builder: page.getWidget}
+	return page
 }
 
 func (m *PlusPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
 	switch ev.(type) {
 	case PageIn:
-		return vxfw.FocusWidgetCmd(m), nil
+		return vxfw.FocusWidgetCmd(&m.pager), nil
 	}
 	return nil, nil
 }
 
-func (m *PlusPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
+func (m *PlusPage) getWidget(i uint, cursor uint) vxfw.Widget {
 	paymentLink := "https://auth.pico.sh/checkout"
 	link := fmt.Sprintf("%s/%s", paymentLink, url.QueryEscape(m.shared.User.Name))
 	header := vaxis.Style{UnderlineColor: fuschia, UnderlineStyle: vaxis.UnderlineDashed}
@@ -78,6 +83,14 @@ func (m *PlusPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 
 		{Text: "Every year you must pay again. We do not take monthly payments, you must pay for a year up-front. Pricing is subject to change because we plan on continuing to include more services as we build them."},
 	}
-	rt, _ := richtext.New(segs).Draw(ctx)
-	return rt, nil
+
+	if int(i) >= len(segs) {
+		return nil
+	}
+
+	return richtext.New([]vaxis.Segment{segs[i]})
+}
+
+func (m *PlusPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
+	return m.pager.Draw(ctx)
 }
