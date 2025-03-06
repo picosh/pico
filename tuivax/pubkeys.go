@@ -12,13 +12,12 @@ import (
 	"git.sr.ht/~rockorager/vaxis/vxfw/text"
 	"git.sr.ht/~rockorager/vaxis/vxfw/textfield"
 	"github.com/picosh/pico/db"
-	"github.com/picosh/pico/tui/common"
 	"github.com/picosh/utils"
 	"golang.org/x/crypto/ssh"
 )
 
 type PubkeysPage struct {
-	shared *common.SharedModel
+	shared *SharedModel
 	list   list.Dynamic
 
 	keys    []*db.PublicKey
@@ -26,7 +25,7 @@ type PubkeysPage struct {
 	confirm bool
 }
 
-func NewPubkeysPage(shrd *common.SharedModel) *PubkeysPage {
+func NewPubkeysPage(shrd *SharedModel) *PubkeysPage {
 	m := &PubkeysPage{
 		shared: shrd,
 	}
@@ -167,7 +166,7 @@ func (m *PubkeysPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 }
 
 type AddKeyPage struct {
-	shared *common.SharedModel
+	shared *SharedModel
 
 	err   error
 	focus string
@@ -175,7 +174,7 @@ type AddKeyPage struct {
 	btn   *button.Button
 }
 
-func NewAddPubkeyPage(shrd *common.SharedModel) *AddKeyPage {
+func NewAddPubkeyPage(shrd *SharedModel) *AddKeyPage {
 	btn := button.New("ADD", func() (vxfw.Command, error) { return nil, nil })
 	btn.Style = button.StyleSet{
 		Default: vaxis.Style{Background: grey},

@@ -1,13 +1,30 @@
 package tuivax
 
 import (
+	"errors"
+	"fmt"
+	"log/slog"
+	"strings"
+
 	"git.sr.ht/~rockorager/vaxis"
 	"git.sr.ht/~rockorager/vaxis/vxfw"
 	"git.sr.ht/~rockorager/vaxis/vxfw/richtext"
-	"github.com/picosh/pico/tui"
-	"github.com/picosh/pico/tui/chat"
-	"github.com/picosh/pico/tui/common"
+	"github.com/charmbracelet/ssh"
+	"github.com/picosh/pico/db"
+	"github.com/picosh/pico/shared"
+	"github.com/picosh/utils"
 )
+
+type SharedModel struct {
+	Logger          *slog.Logger
+	Session         ssh.Session
+	Cfg             *shared.ConfigSite
+	Dbpool          db.DB
+	User            *db.User
+	PlusFeatureFlag *db.FeatureFlag
+	Impersonated    bool
+	App             *vxfw.App
+}
 
 type Navigate struct{ To string }
 type PageIn struct{}
@@ -34,7 +51,7 @@ func createDrawCtx(ctx vxfw.DrawContext, h uint16) vxfw.DrawContext {
 }
 
 type App struct {
-	shared *common.SharedModel
+	shared *SharedModel
 	pages  map[string]vxfw.Widget
 	page   string
 }
@@ -150,12 +167,12 @@ func (app *App) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 }
 
 type HeaderWdgt struct {
-	shared *common.SharedModel
+	shared *SharedModel
 
 	page string
 }
 
-func NewHeaderWdt(shrd *common.SharedModel, page string) *HeaderWdgt {
+func NewHeaderWdt(shrd *SharedModel, page string) *HeaderWdgt {
 	return &HeaderWdgt{
 		shared: shrd,
 		page:   page,
@@ -197,12 +214,12 @@ type Shortcut struct {
 }
 
 type FooterWdgt struct {
-	shared *common.SharedModel
+	shared *SharedModel
 
 	cmds []Shortcut
 }
 
-func NewFooterWdt(shrd *common.SharedModel, cmds []Shortcut) *FooterWdgt {
+func NewFooterWdt(shrd *SharedModel, cmds []Shortcut) *FooterWdgt {
 	return &FooterWdgt{
 		shared: shrd,
 		cmds:   cmds,
@@ -229,25 +246,78 @@ func (m *FooterWdgt) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	return wdgt.Draw(ctx)
 }
 
-func loadChat(shrd *common.SharedModel) {
-	sp := &chat.SenpaiCmd{
+func loadChat(shrd *SharedModel) {
+	sp := &SenpaiCmd{
 		Shared: shrd,
 	}
 	sp.Run()
 }
 
-func initData(shrd *common.SharedModel) {
-	user, err := tui.FindUser(shrd)
+func initData(shrd *SharedModel) {
+	user, err := FindUser(shrd)
 	if err != nil {
 		panic(err)
 	}
 	shrd.User = user
 
-	ff, _ := tui.FindPlusFeatureFlag(shrd)
+	ff, _ := FindPlusFeatureFlag(shrd)
 	shrd.PlusFeatureFlag = ff
 }
 
-func NewTui(opts vaxis.Options, shrd *common.SharedModel) {
+func FindUser(shrd *SharedModel) (*db.User, error) {
+	logger := shrd.Cfg.Logger
+	var user *db.User
+	usr := shrd.Session.User()
+
+	if shrd.Session.PublicKey() == nil {
+		return nil, fmt.Errorf("unable to find public key")
+	}
+
+	key := utils.KeyForKeyText(shrd.Session.PublicKey())
+
+	user, err := shrd.Dbpool.FindUserForKey(usr, key)
+	if err != nil {
+		logger.Error("no user found for public key", "err", err.Error())
+		// we only want to throw an error for specific cases
+		if errors.Is(err, &db.ErrMultiplePublicKeys{}) {
+			return nil, err
+		}
+		// no user and not error indicates we need to create an account
+		return nil, nil
+	}
+
+	// impersonation
+	adminPrefix := "admin__"
+	if strings.HasPrefix(usr, adminPrefix) {
+		hasFeature := shrd.Dbpool.HasFeatureForUser(user.ID, "admin")
+		if !hasFeature {
+			return nil, fmt.Errorf("only admins can impersonate a user")
+		}
+		impersonate := strings.Replace(usr, adminPrefix, "", 1)
+		user, err = shrd.Dbpool.FindUserForName(impersonate)
+		if err != nil {
+			return nil, err
+		}
+		shrd.Impersonated = true
+	}
+
+	return user, nil
+}
+
+func FindPlusFeatureFlag(shrd *SharedModel) (*db.FeatureFlag, error) {
+	if shrd.User == nil {
+		return nil, nil
+	}
+
+	ff, err := shrd.Dbpool.FindFeatureForUser(shrd.User.ID, "plus")
+	if err != nil {
+		return nil, err
+	}
+
+	return ff, nil
+}
+
+func NewTui(opts vaxis.Options, shrd *SharedModel) {
 	initData(shrd)
 	app, err := vxfw.NewApp(opts)
 	if err != nil {

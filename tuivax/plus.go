@@ -8,16 +8,15 @@ import (
 	"git.sr.ht/~rockorager/vaxis/vxfw"
 	"git.sr.ht/~rockorager/vaxis/vxfw/list"
 	"git.sr.ht/~rockorager/vaxis/vxfw/richtext"
-	"github.com/picosh/pico/tui/common"
 )
 
 type PlusPage struct {
-	shared *common.SharedModel
+	shared *SharedModel
 
 	pager list.Dynamic
 }
 
-func NewPlusPage(shrd *common.SharedModel) *PlusPage {
+func NewPlusPage(shrd *SharedModel) *PlusPage {
 	page := &PlusPage{
 		shared: shrd,
 	}

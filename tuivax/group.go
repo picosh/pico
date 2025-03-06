@@ -6,13 +6,13 @@ import (
 )
 
 type GroupStack struct {
-	w   []vxfw.Widget
+	s   []vxfw.Surface
 	Gap int
 }
 
-func NewGroupStack(widgets []vxfw.Widget) *GroupStack {
+func NewGroupStack(widgets []vxfw.Surface) *GroupStack {
 	return &GroupStack{
-		w:   widgets,
+		s:   widgets,
 		Gap: 0,
 	}
 }
@@ -24,8 +24,7 @@ func (m *GroupStack) HandleEvent(vaxis.Event, vxfw.EventPhase) (vxfw.Command, er
 func (m *GroupStack) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	root := vxfw.NewSurface(ctx.Max.Width, ctx.Max.Height, m)
 	ah := 0
-	for _, wdgt := range m.w {
-		surf, _ := wdgt.Draw(ctx)
+	for _, surf := range m.s {
 		root.AddChild(0, ah, surf)
 		ah += int(surf.Size.Height) + m.Gap
 	}

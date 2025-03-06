@@ -10,7 +10,6 @@ import (
 	"git.sr.ht/~rockorager/vaxis/vxfw/richtext"
 	"git.sr.ht/~rockorager/vaxis/vxfw/text"
 	"github.com/picosh/pico/db"
-	"github.com/picosh/pico/tui/common"
 	"github.com/picosh/utils"
 )
 
@@ -18,7 +17,7 @@ type SitesLoaded struct{}
 type SiteStatsLoaded struct{}
 
 type AnalyticsPage struct {
-	shared *common.SharedModel
+	shared *SharedModel
 
 	sites    []*db.VisitUrl
 	list     list.Dynamic
@@ -37,7 +36,7 @@ var focusWdgt = []string{
 	"visits",
 }
 
-func NewAnalyticsPage(shrd *common.SharedModel) *AnalyticsPage {
+func NewAnalyticsPage(shrd *SharedModel) *AnalyticsPage {
 	page := &AnalyticsPage{
 		shared:   shrd,
 		stats:    map[string]*db.SummaryVisits{},

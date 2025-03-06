@@ -8,7 +8,6 @@ import (
 	"git.sr.ht/~rockorager/vaxis/vxfw/list"
 	"git.sr.ht/~rockorager/vaxis/vxfw/richtext"
 	"git.sr.ht/~rockorager/vaxis/vxfw/text"
-	"github.com/picosh/pico/tui/common"
 )
 
 var menuChoices = []string{
@@ -22,7 +21,7 @@ var menuChoices = []string{
 }
 
 type MenuPage struct {
-	shared *common.SharedModel
+	shared *SharedModel
 
 	list list.Dynamic
 }
@@ -42,7 +41,7 @@ func getMenuWidget(i uint, cursor uint) vxfw.Widget {
 	}
 }
 
-func NewMenuPage(shrd *common.SharedModel) *MenuPage {
+func NewMenuPage(shrd *SharedModel) *MenuPage {
 	m := &MenuPage{shared: shrd}
 	m.list = list.Dynamic{Builder: getMenuWidget, DrawCursor: true}
 	return m

@@ -8,20 +8,27 @@ import (
 	"git.sr.ht/~rockorager/vaxis/vxfw/button"
 	"git.sr.ht/~rockorager/vaxis/vxfw/text"
 	"github.com/picosh/pico/db"
-	"github.com/picosh/pico/tui/common"
 )
 
 type SettingsPage struct {
-	shared *common.SharedModel
+	shared *SharedModel
 
 	focus    string
 	err      error
 	features []*db.FeatureFlag
+	btn      *button.Button
 }
 
-func NewSettingsPage(shrd *common.SharedModel) *SettingsPage {
+func NewSettingsPage(shrd *SharedModel) *SettingsPage {
+	btn := button.New("OK", func() (vxfw.Command, error) { return nil, nil })
+	btn.Style = button.StyleSet{
+		Default: vaxis.Style{Background: grey},
+		Hover:   vaxis.Style{Background: fuschia},
+		Focus:   vaxis.Style{Background: fuschia},
+	}
 	return &SettingsPage{
 		shared: shrd,
+		btn:    btn,
 	}
 }
 
@@ -140,62 +147,16 @@ func (m *SettingsPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 		yPos += 1
 	}
 
-	brd = NewBorder(NewAnalyticsSummary(m.shared, m.features))
-	brd.Label = "analytics"
-	brd.Style = vaxis.Style{Foreground: purp}
-	anaSurf, _ := brd.Draw(vxfw.DrawContext{
-		Characters: ctx.Characters,
-		Max: vxfw.Size{
-			Width:  30,
-			Height: ctx.Max.Height,
-		},
-	})
-	root.AddChild(0, yPos, anaSurf)
-
-	return root, nil
-}
-
-type AnalyticsSummary struct {
-	shared   *common.SharedModel
-	features []*db.FeatureFlag
-	btn      *button.Button
-}
-
-func NewAnalyticsSummary(shrd *common.SharedModel, features []*db.FeatureFlag) *AnalyticsSummary {
-	btn := button.New("OK", func() (vxfw.Command, error) { return nil, nil })
-	btn.Style = button.StyleSet{
-		Default: vaxis.Style{Background: grey},
-		Hover:   vaxis.Style{Background: fuschia},
-		Focus:   vaxis.Style{Background: fuschia},
-	}
-	return &AnalyticsSummary{
-		shared:   shrd,
-		features: features,
-		btn:      btn,
-	}
-}
-
-func (m *AnalyticsSummary) HandleEvent(ev vaxis.Event, ph vxfw.EventPhase) (vxfw.Command, error) {
-	return nil, nil
-}
-
-func (m *AnalyticsSummary) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
-	root := vxfw.NewSurface(ctx.Max.Width, ctx.Max.Height, m)
-	hasPlus := m.shared.PlusFeatureFlag != nil
 	analytics := text.New(`Get usage statistics on your blog, blog posts, and pages sites. For example, see unique visitors, most popular URLs, and top referers.
 
 We do not collect usage statistic unless analytics is enabled. Further, when analytics are disabled we do not purge usage statistics.
 
 We will only store usage statistics for 1 year from when the event was created.`)
-	analyticsSurf, _ := analytics.Draw(ctx)
-	yPos := 0
-	root.AddChild(0, yPos, analyticsSurf)
-	yPos += int(analyticsSurf.Size.Height)
 
 	str := "Analytics is only available to pico+ users."
 	style := vaxis.Style{Foreground: red}
 	if hasPlus {
-		style = vaxis.Style{Foreground: white}
+		style = vaxis.Style{Foreground: fuschia}
 		ff := findAnalyticsFeature(m.features)
 		if ff == nil {
 			str = "Enable analytics"
@@ -205,16 +166,34 @@ We will only store usage statistics for 1 year from when the event was created.`
 	}
 	t := text.New(str)
 	t.Style = style
-	a, _ := t.Draw(ctx)
-	root.AddChild(0, yPos+1, a)
+	tt, _ := t.Draw(ctx)
+
+	stack := []vxfw.Surface{}
+	ana, _ := analytics.Draw(ctx)
+	stack = append(stack, ana, tt)
 
 	if hasPlus {
 		btnSurf, _ := m.btn.Draw(vxfw.DrawContext{
 			Characters: ctx.Characters,
 			Max:        vxfw.Size{Width: 10, Height: 1},
 		})
-		root.AddChild(20, yPos+1, btnSurf)
+		stack = append(stack, btnSurf)
 	}
+
+	gstack := NewGroupStack(stack)
+	gstack.Gap = 1
+	brd = NewBorder(gstack)
+	brd.Label = "analytics"
+	brd.Style = vaxis.Style{Foreground: purp}
+	anaSurf, _ := brd.Draw(vxfw.DrawContext{
+		Characters: ctx.Characters,
+		Max: vxfw.Size{
+			Width:  40,
+			Height: ctx.Max.Height,
+		},
+	})
+	root.AddChild(0, yPos, anaSurf)
+
 	return root, nil
 }
 

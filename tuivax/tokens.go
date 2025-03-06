@@ -12,11 +12,10 @@ import (
 	"git.sr.ht/~rockorager/vaxis/vxfw/text"
 	"git.sr.ht/~rockorager/vaxis/vxfw/textfield"
 	"github.com/picosh/pico/db"
-	"github.com/picosh/pico/tui/common"
 )
 
 type TokensPage struct {
-	shared *common.SharedModel
+	shared *SharedModel
 	list   list.Dynamic
 
 	tokens  []*db.Token
@@ -24,7 +23,7 @@ type TokensPage struct {
 	confirm bool
 }
 
-func NewTokensPage(shrd *common.SharedModel) *TokensPage {
+func NewTokensPage(shrd *SharedModel) *TokensPage {
 	m := &TokensPage{
 		shared: shrd,
 	}
@@ -152,7 +151,7 @@ func (m *TokensPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 }
 
 type AddTokenPage struct {
-	shared *common.SharedModel
+	shared *SharedModel
 
 	token string
 	err   error
@@ -161,7 +160,7 @@ type AddTokenPage struct {
 	btn   *button.Button
 }
 
-func NewAddTokenPage(shrd *common.SharedModel) *AddTokenPage {
+func NewAddTokenPage(shrd *SharedModel) *AddTokenPage {
 	btn := button.New("OK", func() (vxfw.Command, error) { return nil, nil })
 	btn.Style = button.StyleSet{
 		Default: vaxis.Style{Background: grey},

@@ -15,7 +15,6 @@ import (
 	"git.sr.ht/~rockorager/vaxis/vxfw/text"
 	"git.sr.ht/~rockorager/vaxis/vxfw/textfield"
 	"github.com/picosh/pico/shared"
-	"github.com/picosh/pico/tui/common"
 	"github.com/picosh/utils"
 	pipeLogger "github.com/picosh/utils/pipe/log"
 )
@@ -25,7 +24,7 @@ type LogLineLoaded struct {
 }
 
 type LogsPage struct {
-	shared *common.SharedModel
+	shared *SharedModel
 
 	input    *textfield.TextField
 	list     *list.Dynamic
@@ -36,7 +35,7 @@ type LogsPage struct {
 	done     context.CancelFunc
 }
 
-func NewLogsPage(shrd *common.SharedModel) *LogsPage {
+func NewLogsPage(shrd *SharedModel) *LogsPage {
 	ctx, cancel := context.WithCancel(shrd.Session.Context())
 	page := &LogsPage{
 		shared: shrd,

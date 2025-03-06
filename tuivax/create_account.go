@@ -16,7 +16,7 @@ import (
 )
 
 type CreateAccountPage struct {
-	shared *common.SharedModel
+	shared *SharedModel
 	focus  string
 	err    error
 
@@ -24,7 +24,7 @@ type CreateAccountPage struct {
 	btn   *button.Button
 }
 
-func NewCreateAccountPage(shrd *common.SharedModel) *CreateAccountPage {
+func NewCreateAccountPage(shrd *SharedModel) *CreateAccountPage {
 	btn := button.New("CREATE", func() (vxfw.Command, error) { return nil, nil })
 	btn.Style = button.StyleSet{
 		Default: vaxis.Style{Background: grey},
