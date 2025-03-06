@@ -1,4 +1,4 @@
-package tuivax
+package tui
 
 import (
 	"fmt"
@@ -12,28 +12,30 @@ import (
 	"git.sr.ht/~rockorager/vaxis/vxfw/text"
 	"git.sr.ht/~rockorager/vaxis/vxfw/textfield"
 	"github.com/picosh/pico/db"
+	"github.com/picosh/utils"
+	"golang.org/x/crypto/ssh"
 )
 
-type TokensPage struct {
+type PubkeysPage struct {
 	shared *SharedModel
 	list   list.Dynamic
 
-	tokens  []*db.Token
+	keys    []*db.PublicKey
 	err     error
 	confirm bool
 }
 
-func NewTokensPage(shrd *SharedModel) *TokensPage {
-	m := &TokensPage{
+func NewPubkeysPage(shrd *SharedModel) *PubkeysPage {
+	m := &PubkeysPage{
 		shared: shrd,
 	}
 	m.list = list.Dynamic{DrawCursor: true, Builder: m.getWidget}
 	return m
 }
 
-type FetchTokens struct{}
+type FetchPubkeys struct{}
 
-func (m *TokensPage) Footer() []Shortcut {
+func (m *PubkeysPage) Footer() []Shortcut {
 	return []Shortcut{
 		{Shortcut: "j/k", Text: "choose"},
 		{Shortcut: "x", Text: "delete"},
@@ -41,38 +43,42 @@ func (m *TokensPage) Footer() []Shortcut {
 	}
 }
 
-func (m *TokensPage) fetchTokens() error {
-	tokens, err := m.shared.Dbpool.FindTokensForUser(m.shared.User.ID)
+func (m *PubkeysPage) fetchKeys() error {
+	keys, err := m.shared.Dbpool.FindKeysForUser(m.shared.User)
 	if err != nil {
 		return err
 
 	}
-	m.tokens = tokens
+	m.keys = keys
 	return nil
 }
 
-func (m *TokensPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
+func (m *PubkeysPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
 	switch msg := ev.(type) {
 	case PageIn:
-		m.err = m.fetchTokens()
+		m.err = m.fetchKeys()
 		return vxfw.FocusWidgetCmd(&m.list), nil
 	case vaxis.Key:
 		if msg.Matches('c') {
-			m.shared.App.PostEvent(Navigate{To: "add-token"})
+			m.shared.App.PostEvent(Navigate{To: "add-pubkey"})
 		}
 		if msg.Matches('x') {
-			m.confirm = true
+			if len(m.keys) < 2 {
+				m.err = fmt.Errorf("cannot delete last key")
+			} else {
+				m.confirm = true
+			}
 			return vxfw.RedrawCmd{}, nil
 		}
 		if msg.Matches('y') {
 			if m.confirm {
 				m.confirm = false
-				err := m.shared.Dbpool.RemoveToken(m.tokens[m.list.Cursor()].ID)
+				err := m.shared.Dbpool.RemoveKeys([]string{m.keys[m.list.Cursor()].ID})
 				if err != nil {
 					m.err = err
 					return nil, nil
 				}
-				m.err = m.fetchTokens()
+				m.err = m.fetchKeys()
 				return vxfw.RedrawCmd{}, nil
 			}
 		}
@@ -85,8 +91,8 @@ func (m *TokensPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Co
 	return nil, nil
 }
 
-func (m *TokensPage) getWidget(i uint, cursor uint) vxfw.Widget {
-	if int(i) >= len(m.tokens) {
+func (m *PubkeysPage) getWidget(i uint, cursor uint) vxfw.Widget {
+	if int(i) >= len(m.keys) {
 		return nil
 	}
 
@@ -96,20 +102,29 @@ func (m *TokensPage) getWidget(i uint, cursor uint) vxfw.Widget {
 		style = vaxis.Style{Foreground: fuschia}
 	}
 
-	token := m.tokens[i]
+	pubkey := m.keys[i]
+	key, _, _, _, err := ssh.ParseAuthorizedKey([]byte(pubkey.Key))
+	if err != nil {
+		m.shared.Logger.Error("parse pubkey", "err", err)
+		return nil
+	}
+
 	txt := richtext.New([]vaxis.Segment{
 		{Text: "Name: ", Style: style},
-		{Text: token.Name + "\n"},
+		{Text: pubkey.Name + "\n"},
+
+		{Text: "Key: ", Style: style},
+		{Text: ssh.FingerprintSHA256(key) + "\n"},
 
 		{Text: "Created: ", Style: style},
-		{Text: token.CreatedAt.Format(time.DateOnly)},
+		{Text: pubkey.CreatedAt.Format(time.DateOnly)},
 	})
 	txt.Softwrap = false
 
 	return txt
 }
 
-func (m *TokensPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
+func (m *PubkeysPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	w := ctx.Max.Width
 	h := ctx.Max.Height
 	root := vxfw.NewSurface(w, h, m)
@@ -117,8 +132,8 @@ func (m *TokensPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	header := richtext.New([]vaxis.Segment{
 		{
 			Text: fmt.Sprintf(
-				"%d tokens\n",
-				len(m.tokens),
+				"%d pubkeys\n",
+				len(m.keys),
 			),
 		},
 	})
@@ -150,23 +165,22 @@ func (m *TokensPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	return root, nil
 }
 
-type AddTokenPage struct {
+type AddKeyPage struct {
 	shared *SharedModel
 
-	token string
 	err   error
 	focus string
 	input *textfield.TextField
 	btn   *button.Button
 }
 
-func NewAddTokenPage(shrd *SharedModel) *AddTokenPage {
-	btn := button.New("OK", func() (vxfw.Command, error) { return nil, nil })
+func NewAddPubkeyPage(shrd *SharedModel) *AddKeyPage {
+	btn := button.New("ADD", func() (vxfw.Command, error) { return nil, nil })
 	btn.Style = button.StyleSet{
 		Default: vaxis.Style{Background: grey},
 		Focus:   vaxis.Style{Background: fuschia},
 	}
-	return &AddTokenPage{
+	return &AddKeyPage{
 		shared: shrd,
 
 		input: textfield.New(),
@@ -174,7 +188,7 @@ func NewAddTokenPage(shrd *SharedModel) *AddTokenPage {
 	}
 }
 
-func (m *AddTokenPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
+func (m *AddKeyPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
 	switch msg := ev.(type) {
 	case PageIn:
 		m.focus = "input"
@@ -182,9 +196,6 @@ func (m *AddTokenPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.
 		return vxfw.FocusWidgetCmd(m.input), nil
 	case vaxis.Key:
 		if msg.Matches(vaxis.KeyTab) {
-			if m.token != "" {
-				return nil, nil
-			}
 			fcs := vxfw.FocusWidgetCmd(m.input)
 			if m.focus == "input" {
 				m.focus = "button"
@@ -199,16 +210,13 @@ func (m *AddTokenPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.
 		}
 		if msg.Matches(vaxis.KeyEnter) {
 			if m.focus == "button" {
-				if m.token != "" {
-					m.token = ""
-					m.err = nil
-					m.input.Value = ""
-					m.shared.App.PostEvent(Navigate{To: "tokens"})
-					return vxfw.RedrawCmd{}, nil
-				}
-				token, err := m.addToken(m.input.Value)
-				m.token = token
+				err := m.addPubkey(m.input.Value)
 				m.err = err
+				if err == nil {
+					m.input.Value = ""
+					m.shared.App.PostEvent(Navigate{To: "pubkeys"})
+					return nil, nil
+				}
 				return vxfw.RedrawCmd{}, nil
 			}
 		}
@@ -217,50 +225,43 @@ func (m *AddTokenPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.
 	return nil, nil
 }
 
-func (m *AddTokenPage) addToken(name string) (string, error) {
-	return m.shared.Dbpool.InsertToken(m.shared.User.ID, name)
+func (m *AddKeyPage) addPubkey(pubkey string) error {
+	pk, comment, _, _, err := ssh.ParseAuthorizedKey([]byte(pubkey))
+	if err != nil {
+		return err
+	}
+
+	key := utils.KeyForKeyText(pk)
+
+	return m.shared.Dbpool.InsertPublicKey(
+		m.shared.User.ID, key, comment, nil,
+	)
 }
 
-func (m *AddTokenPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
+func (m *AddKeyPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	w := ctx.Max.Width
 	h := ctx.Max.Height
 	root := vxfw.NewSurface(w, h, m)
 
-	if m.token == "" {
-		header := text.New("Enter a name for the token")
-		headerSurf, _ := header.Draw(ctx)
-		root.AddChild(0, 0, headerSurf)
+	header := text.New("Enter a new public key")
+	headerSurf, _ := header.Draw(createDrawCtx(ctx, 2))
+	root.AddChild(0, 0, headerSurf)
 
-		inputSurf, _ := m.input.Draw(ctx)
-		root.AddChild(0, 3, inputSurf)
+	inputSurf, _ := m.input.Draw(createDrawCtx(ctx, 1))
+	root.AddChild(0, 3, inputSurf)
 
-		btnSurf, _ := m.btn.Draw(vxfw.DrawContext{
-			Characters: ctx.Characters,
-			Max:        vxfw.Size{Width: 5, Height: 1},
-		})
-		root.AddChild(0, 5, btnSurf)
-	} else {
-		header := text.New(
-			fmt.Sprintf(
-				"Save this token: %s\n\nAfter you exit this screen you will *not* be able to see it again.",
-				m.token,
-			),
-		)
-		headerSurf, _ := header.Draw(ctx)
-		root.AddChild(0, 0, headerSurf)
-
-		btnSurf, _ := m.btn.Draw(vxfw.DrawContext{
-			Characters: ctx.Characters,
-			Max:        vxfw.Size{Width: 5, Height: 1},
-		})
-		root.AddChild(0, 7, btnSurf)
-	}
+	btnSurf, _ := m.btn.Draw(createDrawCtx(ctx, 1))
+	root.AddChild(0, 5, btnSurf)
 
 	if m.err != nil {
-		e := text.New(m.err.Error())
-		e.Style = vaxis.Style{Foreground: red}
-		errSurf, _ := e.Draw(ctx)
-		root.AddChild(0, 9, errSurf)
+		e := richtext.New([]vaxis.Segment{
+			{
+				Text:  m.err.Error(),
+				Style: vaxis.Style{Foreground: red},
+			},
+		})
+		errSurf, _ := e.Draw(createDrawCtx(ctx, 1))
+		root.AddChild(0, 6, errSurf)
 	}
 
 	return root, nil

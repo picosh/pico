@@ -1,4 +1,4 @@
-package tuivax
+package tui
 
 import (
 	"fmt"
@@ -10,7 +10,6 @@ import (
 	"git.sr.ht/~rockorager/vaxis/vxfw/text"
 	"git.sr.ht/~rockorager/vaxis/vxfw/textfield"
 	"github.com/picosh/pico/db"
-	"github.com/picosh/pico/tui/common"
 	"github.com/picosh/utils"
 	"golang.org/x/crypto/ssh"
 )
@@ -82,13 +81,8 @@ func (m *CreateAccountPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 
 	root := vxfw.NewSurface(w, h, m)
 
-	logo := ""
-	if ctx.Max.Height > 25 {
-		logo = common.LogoView() + "\n\n"
-	}
 	fp := ssh.FingerprintSHA256(m.shared.Session.PublicKey())
 	intro := richtext.New([]vaxis.Segment{
-		{Text: logo},
 		{
 			Text: "Welcome to pico.sh's management TUI!\n\nBy creating an account you get access to our pico services.  We have free and paid services.  After you create an account, you can go to the Settings page to see which services you can access.\n\n",
 		},

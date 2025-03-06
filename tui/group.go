@@ -1,4 +1,4 @@
-package tuivax
+package tui
 
 import (
 	"git.sr.ht/~rockorager/vaxis"

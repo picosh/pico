@@ -1,4 +1,4 @@
-package tuivax
+package tui
 
 import (
 	"time"

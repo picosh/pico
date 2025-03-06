@@ -1,14 +1,13 @@
-package chat
+package tui
 
 import (
 	"io"
 
 	"github.com/picosh/pico/shared"
-	"github.com/picosh/pico/tuivax"
 )
 
 type SenpaiCmd struct {
-	Shared *tuivax.SharedModel
+	Shared *SharedModel
 }
 
 func (m *SenpaiCmd) Run() error {
