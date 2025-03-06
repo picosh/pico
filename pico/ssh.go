@@ -8,11 +8,10 @@ import (
 	"syscall"
 	"time"
 
+	"git.sr.ht/~rockorager/vaxis"
 	"github.com/charmbracelet/promwish"
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
-	bm "github.com/charmbracelet/wish/bubbletea"
-	"github.com/muesli/termenv"
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/tui"
@@ -27,39 +26,50 @@ import (
 	"github.com/picosh/utils"
 )
 
-func createRouter(cfg *shared.ConfigSite, handler *UploadHandler, cliHandler *CliHandler) proxy.Router {
-	return func(sh ssh.Handler, s ssh.Session) []wish.Middleware {
+func createRouterVaxis(cfg *shared.ConfigSite, handler *UploadHandler, cliHandler *CliHandler) proxy.Router {
+	return func(sh ssh.Handler, sesh ssh.Session) []wish.Middleware {
+		shrd := &tui.SharedModel{
+			Session: sesh,
+			Cfg:     cfg,
+			Dbpool:  handler.DBPool,
+			Logger:  cfg.Logger,
+		}
 		return []wish.Middleware{
 			pipe.Middleware(handler, ""),
 			list.Middleware(handler),
 			scp.Middleware(handler),
 			wishrsync.Middleware(handler),
 			auth.Middleware(handler),
-			wsh.PtyMdw(bm.MiddlewareWithColorProfile(tui.CmsMiddleware(cfg), termenv.TrueColor)),
+			wsh.PtyMdw(createTui(shrd)),
 			WishMiddleware(cliHandler),
-			wsh.LogMiddleware(handler.GetLogger(s), handler.DBPool),
+			wsh.LogMiddleware(handler.GetLogger(sesh), handler.DBPool),
 		}
 	}
 }
 
-func withProxy(cfg *shared.ConfigSite, handler *UploadHandler, cliHandler *CliHandler, otherMiddleware ...wish.Middleware) ssh.Option {
+func withProxyVaxis(cfg *shared.ConfigSite, handler *UploadHandler, cliHandler *CliHandler, otherMiddleware ...wish.Middleware) ssh.Option {
 	return func(server *ssh.Server) error {
 		err := sftp.SSHOption(handler)(server)
 		if err != nil {
 			return err
 		}
 
-		newSubsystemHandlers := map[string]ssh.SubsystemHandler{}
+		return proxy.WithProxy(createRouterVaxis(cfg, handler, cliHandler), otherMiddleware...)(server)
+	}
+}
 
-		for name, subsystemHandler := range server.SubsystemHandlers {
-			newSubsystemHandlers[name] = func(s ssh.Session) {
-				wsh.LogMiddleware(handler.GetLogger(s), handler.DBPool)(ssh.Handler(subsystemHandler))(s)
+func createTui(shrd *tui.SharedModel) wish.Middleware {
+	return func(next ssh.Handler) ssh.Handler {
+		return func(sesh ssh.Session) {
+			vty, err := shared.NewVConsole(sesh)
+			if err != nil {
+				panic(err)
 			}
+			opts := vaxis.Options{
+				WithConsole: vty,
+			}
+			tui.NewTui(opts, shrd)
 		}
-
-		server.SubsystemHandlers = newSubsystemHandlers
-
-		return proxy.WithProxy(createRouter(cfg, handler, cliHandler), otherMiddleware...)(server)
 	}
 }
 
@@ -89,7 +99,7 @@ func StartSshServer() {
 			sshAuth.PubkeyAuthHandler(ctx, key)
 			return true
 		}),
-		withProxy(
+		withProxyVaxis(
 			cfg,
 			handler,
 			cliHandler,
