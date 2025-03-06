@@ -152,12 +152,6 @@ const (
 	sqlSelectTokensForUser      = `SELECT id, user_id, name, created_at, expires_at FROM tokens WHERE user_id = $1`
 	sqlSelectTokenByNameForUser = `SELECT token FROM tokens WHERE user_id = $1 AND name = $2`
 
-	sqlSelectTotalUsers          = `SELECT count(id) FROM app_users`
-	sqlSelectUsersAfterDate      = `SELECT count(id) FROM app_users WHERE created_at >= $1`
-	sqlSelectTotalPosts          = `SELECT count(id) FROM posts WHERE cur_space = $1`
-	sqlSelectTotalPostsAfterDate = `SELECT count(id) FROM posts WHERE created_at >= $1 AND cur_space = $2`
-	sqlSelectUsersWithPost       = `SELECT count(app_users.id) FROM app_users WHERE EXISTS (SELECT 1 FROM posts WHERE user_id = app_users.id AND cur_space = $1);`
-
 	sqlSelectFeatureForUser = `SELECT id, user_id, payment_history_id, name, data, created_at, expires_at FROM feature_flags WHERE user_id = $1 AND name = $2 ORDER BY expires_at DESC LIMIT 1`
 	sqlSelectSizeForUser    = `SELECT COALESCE(sum(file_size), 0) FROM posts WHERE user_id = $1`
 

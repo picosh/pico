@@ -103,7 +103,9 @@ func (m *LogsPage) filterLogs() {
 func (m *LogsPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
 	switch msg := ev.(type) {
 	case PageIn:
-		go m.connectToLogs()
+		go func() {
+			_ = m.connectToLogs()
+		}()
 		return vxfw.FocusWidgetCmd(m.input), nil
 	case PageOut:
 		m.done()

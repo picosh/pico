@@ -50,7 +50,7 @@ func (m *KvData) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 
 func (m *KvData) findKeyMaxLen() int {
 	mx := 0
-	for k, _ := range m.data {
+	for k := range m.data {
 		if len(k) > mx {
 			mx = len(k)
 		}

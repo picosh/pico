@@ -35,7 +35,8 @@ var cream = vaxis.HexColor(0xFFFDF5)
 var green = vaxis.HexColor(0x04B575)
 var grey = vaxis.HexColor(0x5C5C5C)
 var red = vaxis.HexColor(0xED567A)
-var white = vaxis.HexColor(0xFFFFFF)
+
+// var white = vaxis.HexColor(0xFFFFFF).
 var oj = vaxis.HexColor(0xFFCA80)
 var purp = vaxis.HexColor(0xBD93F9)
 var black = vaxis.HexColor(0x282A36)
@@ -78,10 +79,6 @@ type WidgetFooter interface {
 
 func (app *App) GetCurPage() vxfw.Widget {
 	return app.pages[app.page]
-}
-
-func (app *App) focus() vxfw.Command {
-	return vxfw.FocusWidgetCmd(app.GetCurPage())
 }
 
 func (app *App) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
@@ -145,7 +142,6 @@ func (app *App) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 		pageCtx := createDrawCtx(ctx, h-2-uint16(ah))
 		surface, _ := app.GetCurPage().Draw(pageCtx)
 		root.AddChild(1, ah, surface)
-		ah += int(surface.Size.Height)
 	}
 
 	wdgt, ok := cur.(WidgetFooter)
@@ -246,12 +242,12 @@ func (m *FooterWdgt) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	return wdgt.Draw(ctx)
 }
 
-func loadChat(shrd *SharedModel) {
+/* func loadChat(shrd *SharedModel) {
 	sp := &SenpaiCmd{
 		Shared: shrd,
 	}
 	sp.Run()
-}
+} */
 
 func initData(shrd *SharedModel) {
 	user, err := FindUser(shrd)

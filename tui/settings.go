@@ -13,7 +13,6 @@ import (
 type SettingsPage struct {
 	shared *SharedModel
 
-	focus    string
 	err      error
 	features []*db.FeatureFlag
 	btn      *button.Button
