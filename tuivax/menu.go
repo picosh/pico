@@ -68,15 +68,11 @@ func (m *MenuPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	segs = append(
 		segs,
 		vaxis.Segment{Text: "│", Style: pink},
-		vaxis.Segment{Text: " Username: "},
-		vaxis.Segment{Text: m.shared.User.Name, Style: pink},
-		vaxis.Segment{Text: "\n"},
-		vaxis.Segment{Text: "│", Style: pink},
 		vaxis.Segment{Text: " Joined: "},
 		vaxis.Segment{Text: createdAt, Style: pink},
 	)
 
-	brdH := 2
+	brdH := 1
 	if m.shared.PlusFeatureFlag != nil {
 		expiresAt := m.shared.PlusFeatureFlag.ExpiresAt.Format(time.DateOnly)
 		segs = append(segs,
@@ -96,12 +92,13 @@ func (m *MenuPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 
 	offset := brdH + 1
 	brd := NewBorder(&m.list)
+	brd.Label = "menu"
 	brd.Style = vaxis.Style{Foreground: purp}
 	surf, _ := brd.Draw(vxfw.DrawContext{
 		Characters: ctx.Characters,
 		Max: vxfw.Size{
-			Width:  ctx.Max.Width / 2,
-			Height: ctx.Max.Height - uint16(offset),
+			Width:  20,
+			Height: uint16(len(menuChoices)) + 3,
 		},
 	})
 	root.AddChild(0, offset, surf)

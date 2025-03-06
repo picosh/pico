@@ -48,6 +48,12 @@ func NewLogsPage(shrd *common.SharedModel) *LogsPage {
 	return page
 }
 
+func (m *LogsPage) Footer() []Shortcut {
+	return []Shortcut{
+		{Shortcut: "tab", Text: "focus"},
+	}
+}
+
 func (m *LogsPage) CaptureEvent(ev vaxis.Event) (vxfw.Command, error) {
 	switch msg := ev.(type) {
 	case vaxis.Key:

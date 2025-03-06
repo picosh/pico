@@ -17,7 +17,7 @@ var (
 )
 
 func border(label string, surf vxfw.Surface, style vaxis.Style) vxfw.Surface {
-	label = fmt.Sprintf(" %s ", label)
+	finlabel := fmt.Sprintf(" %s ", label)
 	w := surf.Size.Width
 	h := surf.Size.Height
 	surf.WriteCell(0, 0, vaxis.Cell{
@@ -41,8 +41,8 @@ func border(label string, surf vxfw.Surface, style vaxis.Style) vxfw.Surface {
 		i := uint16(j)
 		// apply label
 		char := horizontal
-		if j >= 2 && len(label)+1 >= j {
-			char = vaxis.Character{Grapheme: string(label[idx]), Width: 1}
+		if label != "" && j >= 2 && len(finlabel)+1 >= j {
+			char = vaxis.Character{Grapheme: string(finlabel[idx]), Width: 1}
 			idx += 1
 		}
 		surf.WriteCell(i, 0, vaxis.Cell{
@@ -72,12 +72,14 @@ func border(label string, surf vxfw.Surface, style vaxis.Style) vxfw.Surface {
 type Border struct {
 	w     vxfw.Widget
 	Style vaxis.Style
+	Label string
 }
 
 func NewBorder(w vxfw.Widget) *Border {
 	return &Border{
 		w:     w,
 		Style: vaxis.Style{},
+		Label: "",
 	}
 }
 
@@ -94,7 +96,7 @@ func (b *Border) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 		},
 	})
 	root := border(
-		"menu",
+		b.Label,
 		vxfw.NewSurface(ctx.Max.Width-1, ctx.Max.Height-1, b),
 		b.Style,
 	)

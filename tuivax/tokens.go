@@ -34,6 +34,14 @@ func NewTokensPage(shrd *common.SharedModel) *TokensPage {
 
 type FetchTokens struct{}
 
+func (m *TokensPage) Footer() []Shortcut {
+	return []Shortcut{
+		{Shortcut: "j/k", Text: "choose"},
+		{Shortcut: "x", Text: "delete"},
+		{Shortcut: "c", Text: "create"},
+	}
+}
+
 func (m *TokensPage) fetchTokens() error {
 	tokens, err := m.shared.Dbpool.FindTokensForUser(m.shared.User.ID)
 	if err != nil {
@@ -121,12 +129,7 @@ func (m *TokensPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	listSurf, _ := m.list.Draw(createDrawCtx(ctx, h-5))
 	root.AddChild(0, 3, listSurf)
 
-	segs := []vaxis.Segment{
-		{
-			Text:  "j/k, ↑/↓: choose, x: delete, c: create, esc: exit\n",
-			Style: vaxis.Style{Foreground: grey},
-		},
-	}
+	segs := []vaxis.Segment{}
 	if m.confirm {
 		segs = append(segs, vaxis.Segment{
 			Text:  "are you sure? y/n\n",

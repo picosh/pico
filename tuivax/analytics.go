@@ -26,6 +26,15 @@ type AnalyticsPage struct {
 	stats    map[string]*db.SummaryVisits
 	selected string
 	interval string
+	focus    int
+}
+
+var focusWdgt = []string{
+	"sites",
+	"urls",
+	"not found",
+	"referers",
+	"visits",
 }
 
 func NewAnalyticsPage(shrd *common.SharedModel) *AnalyticsPage {
@@ -37,6 +46,13 @@ func NewAnalyticsPage(shrd *common.SharedModel) *AnalyticsPage {
 
 	page.list = list.Dynamic{DrawCursor: true, Builder: page.getWidget}
 	return page
+}
+
+func (m *AnalyticsPage) Footer() []Shortcut {
+	return []Shortcut{
+		{Shortcut: "j/k", Text: "choose"},
+		{Shortcut: "tab", Text: "focus"},
+	}
 }
 
 func (m *AnalyticsPage) getWidget(i uint, cursor uint) vxfw.Widget {
@@ -67,51 +83,115 @@ func (m *AnalyticsPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw
 			go m.fetchSiteStats(m.selected, m.interval)
 			return vxfw.RedrawCmd{}, nil
 		}
+		if msg.Matches(vaxis.KeyTab) {
+			if m.focus == len(focusWdgt)-1 {
+				m.focus = 0
+			} else {
+				m.focus += 1
+			}
+			return vxfw.RedrawCmd{}, nil
+		}
 	}
 	return nil, nil
+}
+
+func (m *AnalyticsPage) focusBorder(brd *Border) {
+	focus := focusWdgt[m.focus]
+	fmt.Println(focus, brd.Label)
+	if focus == brd.Label {
+		fmt.Println("fufufufu")
+		brd.Style = vaxis.Style{Foreground: oj}
+	} else {
+		brd.Style = vaxis.Style{Foreground: purp}
+	}
 }
 
 func (m *AnalyticsPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	root := vxfw.NewSurface(ctx.Max.Width, ctx.Max.Height, m)
 	leftPaneW := float32(ctx.Max.Width) * 0.35
-	leftPane := vxfw.NewSurface(uint16(leftPaneW), ctx.Max.Height, m)
 
-	if len(m.sites) == 0 {
-		txt := text.New("No sites found")
-		surf, _ := txt.Draw(ctx)
-		leftPane.AddChild(0, 0, surf)
-	} else {
-		leftSurf, _ := m.list.Draw(ctx)
-		leftPane.AddChild(0, 0, leftSurf)
+	var wdgt vxfw.Widget = text.New("No sites found")
+	if len(m.sites) > 0 {
+		wdgt = &m.list
 	}
-	root.AddChild(0, 0, leftPane)
+
+	leftPane := NewBorder(wdgt)
+	leftPane.Label = "sites"
+	m.focusBorder(leftPane)
+	leftSurf, _ := leftPane.Draw(vxfw.DrawContext{
+		Characters: ctx.Characters,
+		Max: vxfw.Size{
+			Width:  uint16(leftPaneW),
+			Height: ctx.Max.Height,
+		},
+	})
+
+	root.AddChild(0, 0, leftSurf)
 
 	rightPaneW := float32(ctx.Max.Width) * 0.65
-	rightPane := vxfw.NewSurface(uint16(rightPaneW), ctx.Max.Height, m)
-
 	if m.selected == "" {
-		rightTxt := text.New("Select a site on the left to view its stats")
-		rightSurf, _ := rightTxt.Draw(ctx)
-		rightPane.AddChild(0, 0, rightSurf)
+		rightWdgt := text.New("Select a site on the left to view its stats")
+		rightSurf, _ := rightWdgt.Draw(vxfw.DrawContext{
+			Characters: ctx.Characters,
+			Max: vxfw.Size{
+				Width:  uint16(rightPaneW),
+				Height: ctx.Max.Height,
+			},
+		})
+		root.AddChild(int(leftPaneW), 0, rightSurf)
 	} else {
+		rightSurf := vxfw.NewSurface(uint16(rightPaneW), ctx.Max.Height, m)
 		ah := 0
-		urlSurf, _ := m.topUrls().Draw(ctx)
-		rightPane.AddChild(0, ah, urlSurf)
+
+		data, err := m.getSiteData()
+		if err != nil {
+			txt, _ := text.New("No data found").Draw(ctx)
+			rightSurf.AddChild(0, 0, txt)
+			root.AddChild(int(leftPaneW), 0, rightSurf)
+			return root, nil
+		}
+
+		urlSurf, _ := m.urls(data.TopUrls, "urls").Draw(vxfw.DrawContext{
+			Characters: vaxis.Characters,
+			Max: vxfw.Size{
+				Width:  uint16(rightPaneW),
+				Height: uint16(len(data.TopUrls) + 3),
+			},
+		})
+		rightSurf.AddChild(0, ah, urlSurf)
 		ah += int(urlSurf.Size.Height)
 
-		refSurf, _ := m.topRefs().Draw(ctx)
-		rightPane.AddChild(0, ah, refSurf)
-		ah += int(refSurf.Size.Height)
+		urlSurf, _ = m.urls(data.NotFoundUrls, "not found").Draw(vxfw.DrawContext{
+			Characters: vaxis.Characters,
+			Max: vxfw.Size{
+				Width:  uint16(rightPaneW),
+				Height: uint16(len(data.NotFoundUrls) + 3),
+			},
+		})
+		rightSurf.AddChild(0, ah, urlSurf)
+		ah += int(urlSurf.Size.Height)
 
-		notFoundSurf, _ := m.topNotFound().Draw(ctx)
-		rightPane.AddChild(0, ah, notFoundSurf)
-		ah += int(notFoundSurf.Size.Height)
+		urlSurf, _ = m.urls(data.TopReferers, "referers").Draw(vxfw.DrawContext{
+			Characters: vaxis.Characters,
+			Max: vxfw.Size{
+				Width:  uint16(rightPaneW),
+				Height: uint16(len(data.TopReferers) + 3),
+			},
+		})
+		rightSurf.AddChild(0, ah, urlSurf)
+		ah += int(urlSurf.Size.Height)
 
-		visitsSurf, _ := m.visits().Draw(ctx)
-		rightPane.AddChild(0, ah, visitsSurf)
-		ah += int(visitsSurf.Size.Height)
+		surf, _ := m.visits(data.Intervals).Draw(vxfw.DrawContext{
+			Characters: vaxis.Characters,
+			Max: vxfw.Size{
+				Width:  uint16(rightPaneW),
+				Height: uint16(len(data.Intervals) + 3),
+			},
+		})
+		rightSurf.AddChild(0, ah, surf)
+
+		root.AddChild(int(leftPaneW), 0, rightSurf)
 	}
-	root.AddChild(int(leftPaneW), 0, rightPane)
 
 	return root, nil
 }
@@ -124,49 +204,21 @@ func (m *AnalyticsPage) getSiteData() (*db.SummaryVisits, error) {
 	return val, nil
 }
 
-func (m *AnalyticsPage) topUrls() vxfw.Widget {
-	data, err := m.getSiteData()
-	if err != nil {
-		return text.New("No urls found")
-	}
+func (m *AnalyticsPage) urls(urls []*db.VisitUrl, label string) vxfw.Widget {
 	segs := []vaxis.Segment{}
-	for _, url := range data.TopUrls {
+	for _, url := range urls {
 		segs = append(segs, vaxis.Segment{Text: fmt.Sprintf("%s: %d\n", url.Url, url.Count)})
 	}
-	return richtext.New(segs)
+	wdgt := richtext.New(segs)
+	rightPane := NewBorder(wdgt)
+	rightPane.Label = label
+	m.focusBorder(rightPane)
+	return rightPane
 }
 
-func (m *AnalyticsPage) topRefs() vxfw.Widget {
-	data, err := m.getSiteData()
-	if err != nil {
-		return text.New("No refs found")
-	}
+func (m *AnalyticsPage) visits(intervals []*db.VisitInterval) vxfw.Widget {
 	segs := []vaxis.Segment{}
-	for _, url := range data.TopReferers {
-		segs = append(segs, vaxis.Segment{Text: fmt.Sprintf("%s: %d\n", url.Url, url.Count)})
-	}
-	return richtext.New(segs)
-}
-
-func (m *AnalyticsPage) topNotFound() vxfw.Widget {
-	data, err := m.getSiteData()
-	if err != nil {
-		return text.New("No not found urls")
-	}
-	segs := []vaxis.Segment{}
-	for _, url := range data.NotFoundUrls {
-		segs = append(segs, vaxis.Segment{Text: fmt.Sprintf("%s: %d\n", url.Url, url.Count)})
-	}
-	return richtext.New(segs)
-}
-
-func (m *AnalyticsPage) visits() vxfw.Widget {
-	data, err := m.getSiteData()
-	if err != nil {
-		return text.New("No visits found")
-	}
-	segs := []vaxis.Segment{}
-	for _, visit := range data.Intervals {
+	for _, visit := range intervals {
 		segs = append(
 			segs,
 			vaxis.Segment{
@@ -174,7 +226,11 @@ func (m *AnalyticsPage) visits() vxfw.Widget {
 			},
 		)
 	}
-	return richtext.New(segs)
+	wdgt := richtext.New(segs)
+	rightPane := NewBorder(wdgt)
+	rightPane.Label = "visits"
+	m.focusBorder(rightPane)
+	return rightPane
 }
 
 func (m *AnalyticsPage) fetchSites() {

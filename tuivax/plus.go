@@ -78,7 +78,7 @@ func (m *PlusPage) getWidget(i uint, cursor uint) vxfw.Widget {
 		{Text: ".\n\n"},
 
 		{Text: "We do not maintain active subscriptions for "},
-		{Text: "pico+", Style: vaxis.Style{Foreground: indigo}},
+		{Text: "pico+", Style: vaxis.Style{Foreground: purp}},
 		{Text: ". "},
 
 		{Text: "Every year you must pay again. We do not take monthly payments, you must pay for a year up-front. Pricing is subject to change because we plan on continuing to include more services as we build them."},

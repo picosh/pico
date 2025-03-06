@@ -36,6 +36,14 @@ func NewPubkeysPage(shrd *common.SharedModel) *PubkeysPage {
 
 type FetchPubkeys struct{}
 
+func (m *PubkeysPage) Footer() []Shortcut {
+	return []Shortcut{
+		{Shortcut: "j/k", Text: "choose"},
+		{Shortcut: "x", Text: "delete"},
+		{Shortcut: "c", Text: "create"},
+	}
+}
+
 func (m *PubkeysPage) fetchKeys() error {
 	keys, err := m.shared.Dbpool.FindKeysForUser(m.shared.User)
 	if err != nil {
@@ -136,12 +144,7 @@ func (m *PubkeysPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	listSurf, _ := m.list.Draw(createDrawCtx(ctx, h-5))
 	root.AddChild(0, 3, listSurf)
 
-	segs := []vaxis.Segment{
-		{
-			Text:  "j/k, ↑/↓: choose, x: delete, c: create, esc: exit\n",
-			Style: vaxis.Style{Foreground: grey},
-		},
-	}
+	segs := []vaxis.Segment{}
 	if m.confirm {
 		segs = append(segs, vaxis.Segment{
 			Text:  "are you sure? y/n\n",

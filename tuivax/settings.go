@@ -6,7 +6,6 @@ import (
 	"git.sr.ht/~rockorager/vaxis"
 	"git.sr.ht/~rockorager/vaxis/vxfw"
 	"git.sr.ht/~rockorager/vaxis/vxfw/button"
-	"git.sr.ht/~rockorager/vaxis/vxfw/richtext"
 	"git.sr.ht/~rockorager/vaxis/vxfw/text"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/tui/common"
@@ -18,19 +17,17 @@ type SettingsPage struct {
 	focus    string
 	err      error
 	features []*db.FeatureFlag
-	btn      *button.Button
 }
 
 func NewSettingsPage(shrd *common.SharedModel) *SettingsPage {
-	btn := button.New("OK", func() (vxfw.Command, error) { return nil, nil })
-	btn.Style = button.StyleSet{
-		Default: vaxis.Style{Background: grey},
-		Hover:   vaxis.Style{Background: fuschia},
-		Focus:   vaxis.Style{Background: fuschia},
-	}
 	return &SettingsPage{
 		shared: shrd,
-		btn:    btn,
+	}
+}
+
+func (m *SettingsPage) Footer() []Shortcut {
+	return []Shortcut{
+		{Shortcut: "enter", Text: "toggle analytics"},
 	}
 }
 
@@ -41,7 +38,7 @@ func (m *SettingsPage) fetchFeatures() error {
 }
 
 func (m *SettingsPage) toggleAnalytics() error {
-	if m.findAnalyticsFeature() == nil {
+	if findAnalyticsFeature(m.features) == nil {
 		now := time.Now()
 		expiresAt := now.AddDate(100, 0, 0)
 		_, err := m.shared.Dbpool.InsertFeature(m.shared.User.ID, "analytics", expiresAt)
@@ -61,25 +58,9 @@ func (m *SettingsPage) toggleAnalytics() error {
 func (m *SettingsPage) CaptureEvent(ev vaxis.Event) (vxfw.Command, error) {
 	switch msg := ev.(type) {
 	case vaxis.Key:
-		if msg.Matches(vaxis.KeyTab) {
-			fcs := vxfw.FocusWidgetCmd(m)
-			if m.focus == "" {
-				m.focus = "button"
-				fcs = vxfw.FocusWidgetCmd(m.btn)
-			} else {
-				m.focus = ""
-			}
-			return vxfw.BatchCmd([]vxfw.Command{
-				fcs,
-				vxfw.RedrawCmd{},
-			}), nil
-		}
-
 		if msg.Matches(vaxis.KeyEnter) {
-			if m.focus == "button" {
-				m.err = m.toggleAnalytics()
-				return vxfw.RedrawCmd{}, nil
-			}
+			m.err = m.toggleAnalytics()
+			return vxfw.RedrawCmd{}, nil
 		}
 	}
 	return nil, nil
@@ -94,79 +75,120 @@ func (m *SettingsPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.
 	return nil, nil
 }
 
-func (m *SettingsPage) findAnalyticsFeature() *db.FeatureFlag {
-	for _, feature := range m.features {
-		if feature.Name == "analytics" {
-			return feature
-		}
-	}
-	return nil
-}
-
 func (m *SettingsPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	w := ctx.Max.Width
 	h := ctx.Max.Height
 	root := vxfw.NewSurface(w, h, m)
 
 	hasPlus := m.shared.PlusFeatureFlag != nil
-	active := vaxis.Style{Foreground: green}
-	inactive := vaxis.Style{Foreground: red}
-	segs := []vaxis.Segment{
-		{Text: "Name "}, {Text: "Status\n"},
-		{Text: "prose "}, {Text: "active\n", Style: active},
-		{Text: "pipe "}, {Text: "active\n", Style: active},
-		{Text: "pastes "}, {Text: "active\n", Style: active},
-		{Text: "rss-to-email "}, {Text: "active\n", Style: active},
+	// active := vaxis.Style{Foreground: green}
+	// inactive := vaxis.Style{Foreground: red}
+	kv := map[string]string{
+		"Name":         "Status",
+		"prose":        "active",
+		"pipe":         "active",
+		"pastes":       "active",
+		"rss-to-email": "active",
+		"pages":        "free tier",
+		"tuns":         "requires pico+",
+		"irc bouncer":  "requires pico+",
 	}
 
 	if hasPlus {
-		segs = append(
-			segs,
-			vaxis.Segment{Text: "pages "}, vaxis.Segment{Text: "active\n", Style: active},
-			vaxis.Segment{Text: "tuns "}, vaxis.Segment{Text: "active\n", Style: active},
-			vaxis.Segment{Text: "irc bouncer "}, vaxis.Segment{Text: "active\n", Style: active},
-		)
-	} else {
-		segs = append(
-			segs,
-			vaxis.Segment{Text: "pages "}, vaxis.Segment{Text: "free tier\n", Style: active},
-			vaxis.Segment{Text: "tuns "}, vaxis.Segment{Text: "requires pico+\n", Style: inactive},
-			vaxis.Segment{Text: "irc bouncer "}, vaxis.Segment{Text: "requires pico+", Style: inactive},
-		)
+		kv["pages"] = "active"
+		kv["tuns"] = "active"
+		kv["irc bouncer"] = "active"
 	}
 
 	yPos := 0
-	txt := richtext.New(segs)
-	txt.Softwrap = false
-	txtSurf, _ := txt.Draw(ctx)
-	root.AddChild(0, yPos, txtSurf)
-	yPos += int(txtSurf.Size.Height)
+	services := NewKv(kv)
+	brd := NewBorder(services)
+	brd.Label = "services"
+	brd.Style = vaxis.Style{Foreground: purp}
+	servicesSurf, _ := brd.Draw(vxfw.DrawContext{
+		Characters: ctx.Characters,
+		Max: vxfw.Size{
+			Width:  30,
+			Height: uint16(len(kv)) + 3,
+		},
+	})
+	root.AddChild(0, yPos, servicesSurf)
+	yPos += len(kv) + 3
 
-	features := []vaxis.Segment{
-		{Text: "Name "}, {Text: "Expires At\n"},
+	kv = map[string]string{
+		"Name": "Expires At",
 	}
 	for _, feature := range m.features {
-		features = append(
-			features,
-			vaxis.Segment{Text: feature.Name + " "},
-			vaxis.Segment{Text: feature.ExpiresAt.Format(time.DateOnly) + "\n"},
-		)
+		kv[feature.Name] = feature.ExpiresAt.Format(time.DateOnly)
 	}
 
+	features := NewKv(kv)
 	if len(m.features) > 0 {
-		ft, _ := richtext.New(features).Draw(ctx)
-		root.AddChild(0, yPos+1, ft)
-		yPos += int(ft.Size.Height) + 1
+		brd := NewBorder(features)
+		brd.Label = "features"
+		brd.Style = vaxis.Style{Foreground: purp}
+		featSurf, _ := brd.Draw(vxfw.DrawContext{
+			Characters: ctx.Characters,
+			Max: vxfw.Size{
+				Width:  30,
+				Height: uint16(len(kv)) + 3,
+			},
+		})
+		root.AddChild(0, yPos, featSurf)
+		yPos += len(kv) + 3
 	} else {
 		yPos += 1
 	}
 
+	brd = NewBorder(NewAnalyticsSummary(m.shared, m.features))
+	brd.Label = "analytics"
+	brd.Style = vaxis.Style{Foreground: purp}
+	anaSurf, _ := brd.Draw(vxfw.DrawContext{
+		Characters: ctx.Characters,
+		Max: vxfw.Size{
+			Width:  30,
+			Height: ctx.Max.Height,
+		},
+	})
+	root.AddChild(0, yPos, anaSurf)
+
+	return root, nil
+}
+
+type AnalyticsSummary struct {
+	shared   *common.SharedModel
+	features []*db.FeatureFlag
+	btn      *button.Button
+}
+
+func NewAnalyticsSummary(shrd *common.SharedModel, features []*db.FeatureFlag) *AnalyticsSummary {
+	btn := button.New("OK", func() (vxfw.Command, error) { return nil, nil })
+	btn.Style = button.StyleSet{
+		Default: vaxis.Style{Background: grey},
+		Hover:   vaxis.Style{Background: fuschia},
+		Focus:   vaxis.Style{Background: fuschia},
+	}
+	return &AnalyticsSummary{
+		shared:   shrd,
+		features: features,
+		btn:      btn,
+	}
+}
+
+func (m *AnalyticsSummary) HandleEvent(ev vaxis.Event, ph vxfw.EventPhase) (vxfw.Command, error) {
+	return nil, nil
+}
+
+func (m *AnalyticsSummary) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
+	root := vxfw.NewSurface(ctx.Max.Width, ctx.Max.Height, m)
+	hasPlus := m.shared.PlusFeatureFlag != nil
 	analytics := text.New(`Get usage statistics on your blog, blog posts, and pages sites. For example, see unique visitors, most popular URLs, and top referers.
 
 We do not collect usage statistic unless analytics is enabled. Further, when analytics are disabled we do not purge usage statistics.
 
 We will only store usage statistics for 1 year from when the event was created.`)
 	analyticsSurf, _ := analytics.Draw(ctx)
+	yPos := 0
 	root.AddChild(0, yPos, analyticsSurf)
 	yPos += int(analyticsSurf.Size.Height)
 
@@ -174,7 +196,7 @@ We will only store usage statistics for 1 year from when the event was created.`
 	style := vaxis.Style{Foreground: red}
 	if hasPlus {
 		style = vaxis.Style{Foreground: white}
-		ff := m.findAnalyticsFeature()
+		ff := findAnalyticsFeature(m.features)
 		if ff == nil {
 			str = "Enable analytics"
 		} else {
@@ -193,6 +215,14 @@ We will only store usage statistics for 1 year from when the event was created.`
 		})
 		root.AddChild(20, yPos+1, btnSurf)
 	}
-
 	return root, nil
+}
+
+func findAnalyticsFeature(features []*db.FeatureFlag) *db.FeatureFlag {
+	for _, feature := range features {
+		if feature.Name == "analytics" {
+			return feature
+		}
+	}
+	return nil
 }

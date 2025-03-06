@@ -15,13 +15,13 @@ type PageOut struct{}
 
 var fuschia = vaxis.HexColor(0xEE6FF8)
 var cream = vaxis.HexColor(0xFFFDF5)
-var indigo = vaxis.HexColor(0x7571F9)
 var green = vaxis.HexColor(0x04B575)
 var grey = vaxis.HexColor(0x5C5C5C)
 var red = vaxis.HexColor(0xED567A)
 var white = vaxis.HexColor(0xFFFFFF)
 var oj = vaxis.HexColor(0xFFCA80)
 var purp = vaxis.HexColor(0xBD93F9)
+var black = vaxis.HexColor(0x282A36)
 
 func createDrawCtx(ctx vxfw.DrawContext, h uint16) vxfw.DrawContext {
 	return vxfw.DrawContext{
@@ -53,6 +53,10 @@ func (app *App) CaptureEvent(ev vaxis.Event) (vxfw.Command, error) {
 		}
 	}
 	return nil, nil
+}
+
+type WidgetFooter interface {
+	Footer() []Shortcut
 }
 
 func (app *App) GetCurPage() vxfw.Widget {
@@ -110,19 +114,37 @@ func (app *App) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	h := ctx.Max.Height
 	root := vxfw.NewSurface(w, ctx.Min.Height, app)
 
+	ah := 1
 	header := NewHeaderWdt(app.shared, app.page)
 	headerSurf, _ := header.Draw(vxfw.DrawContext{
 		Max:        vxfw.Size{Width: w, Height: 2},
 		Characters: ctx.Characters,
 	})
-	root.AddChild(1, 1, headerSurf)
+	root.AddChild(1, ah, headerSurf)
+	ah += int(headerSurf.Size.Height)
 
-	pageCtx := createDrawCtx(ctx, h-2)
 	cur := app.GetCurPage()
 	if cur != nil {
+		pageCtx := createDrawCtx(ctx, h-2-uint16(ah))
 		surface, _ := app.GetCurPage().Draw(pageCtx)
-		root.AddChild(1, 3, surface)
+		root.AddChild(1, ah, surface)
+		ah += int(surface.Size.Height)
 	}
+
+	wdgt, ok := cur.(WidgetFooter)
+	segs := []Shortcut{
+		{Shortcut: "^c", Text: "quit"},
+		{Shortcut: "esc", Text: "prev page"},
+	}
+	if ok {
+		segs = append(segs, wdgt.Footer()...)
+	}
+	footer := NewFooterWdt(app.shared, segs)
+	footerSurf, _ := footer.Draw(vxfw.DrawContext{
+		Max:        vxfw.Size{Width: w, Height: 2},
+		Characters: ctx.Characters,
+	})
+	root.AddChild(1, int(ctx.Max.Height)-2, footerSurf)
 
 	return root, nil
 }
@@ -151,11 +173,59 @@ func (m *HeaderWdgt) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 		logoTxt = "pico+"
 	}
 
+	root := vxfw.NewSurface(ctx.Max.Width, ctx.Max.Height, m)
 	// header
 	wdgt := richtext.New([]vaxis.Segment{
-		vaxis.Segment{Text: " " + logoTxt + " ", Style: vaxis.Style{Background: indigo}},
+		vaxis.Segment{Text: " " + logoTxt + " ", Style: vaxis.Style{Background: purp, Foreground: black}},
 		vaxis.Segment{Text: " • " + m.page, Style: vaxis.Style{Foreground: green}},
 	})
+	surf, _ := wdgt.Draw(ctx)
+	root.AddChild(0, 0, surf)
+
+	user := richtext.New([]vaxis.Segment{
+		vaxis.Segment{Text: "~" + m.shared.User.Name, Style: vaxis.Style{Foreground: cream}},
+	})
+	surf, _ = user.Draw(ctx)
+	root.AddChild(int(ctx.Max.Width)-int(surf.Size.Width)-1, 0, surf)
+
+	return root, nil
+}
+
+type Shortcut struct {
+	Text     string
+	Shortcut string
+}
+
+type FooterWdgt struct {
+	shared *common.SharedModel
+
+	cmds []Shortcut
+}
+
+func NewFooterWdt(shrd *common.SharedModel, cmds []Shortcut) *FooterWdgt {
+	return &FooterWdgt{
+		shared: shrd,
+		cmds:   cmds,
+	}
+}
+
+func (m *FooterWdgt) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
+	return nil, nil
+}
+
+func (m *FooterWdgt) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
+	segs := []vaxis.Segment{}
+	for idx, shortcut := range m.cmds {
+		segs = append(
+			segs,
+			vaxis.Segment{Text: shortcut.Shortcut, Style: vaxis.Style{Foreground: fuschia}},
+			vaxis.Segment{Text: " " + shortcut.Text},
+		)
+		if idx < len(m.cmds)-1 {
+			segs = append(segs, vaxis.Segment{Text: " • "})
+		}
+	}
+	wdgt := richtext.New(segs)
 	return wdgt.Draw(ctx)
 }
 
