@@ -21,10 +21,16 @@ type Model struct {
 }
 
 func NewModel(shrd *common.SharedModel) Model {
-	return Model{
+	m := Model{
 		shared: shrd,
 		focus:  focusChat,
 	}
+
+	if m.shared.PlusFeatureFlag == nil && m.shared.BouncerFeatureFlag == nil {
+		m.focus = focusNone
+	}
+
+	return m
 }
 
 func (m Model) Init() tea.Cmd {
@@ -38,7 +44,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q", "esc":
 			return m, pages.Navigate(pages.MenuPage)
 		case "tab":
-			if m.focus == focusNone {
+			if m.focus == focusNone && (m.shared.PlusFeatureFlag != nil || m.shared.BouncerFeatureFlag != nil) {
 				m.focus = focusChat
 			} else {
 				m.focus = focusNone
@@ -69,11 +75,11 @@ If you want to quickly chat with us on IRC without pico+, go to the web chat:
 
 	str := ""
 	hasPlus := m.shared.PlusFeatureFlag != nil
-	if hasPlus {
+	if hasPlus || m.shared.BouncerFeatureFlag != nil {
 		hasFocus := m.focus == focusChat
 		str += banner + "\n\nLet's Chat!  " + common.OKButtonView(m.shared.Styles, hasFocus, true)
 	} else {
-		str += banner + "\n\n" + m.shared.Styles.Error.SetString("Our IRC Bouncer is only available to pico+ users.").String()
+		str += banner + "\n\n" + m.shared.Styles.Error.SetString("Our IRC Bouncer is only available to pico+ users.\n\nHit Esc or q to return.").String()
 	}
 
 	return m.shared.Styles.RoundedBorder.Width(maxWidth).SetString(str).String()

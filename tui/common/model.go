@@ -9,15 +9,16 @@ import (
 )
 
 type SharedModel struct {
-	Logger          *slog.Logger
-	Session         ssh.Session
-	Cfg             *shared.ConfigSite
-	Dbpool          db.DB
-	User            *db.User
-	PlusFeatureFlag *db.FeatureFlag
-	Width           int
-	Height          int
-	HeaderHeight    int
-	Styles          Styles
-	Impersonated    bool
+	Logger             *slog.Logger
+	Session            ssh.Session
+	Cfg                *shared.ConfigSite
+	Dbpool             db.DB
+	User               *db.User
+	PlusFeatureFlag    *db.FeatureFlag
+	BouncerFeatureFlag *db.FeatureFlag
+	Width              int
+	Height             int
+	HeaderHeight       int
+	Styles             Styles
+	Impersonated       bool
 }

@@ -22,10 +22,8 @@ toolchain go1.24.0
 
 // replace github.com/charmbracelet/wish => ../../wish
 
-replace git.sr.ht/~delthas/senpai => github.com/antoniomika/senpai v0.0.0-20250222151844-ab59937d60cc
-
 require (
-	git.sr.ht/~delthas/senpai v0.3.1-0.20240425235039-206be659439e
+	git.sr.ht/~delthas/senpai v0.3.1-0.20250307120855-1e7e8219bd23
 	github.com/alecthomas/chroma/v2 v2.14.0
 	github.com/antoniomika/syncmap v1.0.0
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
@@ -70,7 +68,7 @@ require (
 	go.abhg.dev/goldmark/anchor v0.1.1
 	go.abhg.dev/goldmark/hashtag v0.3.1
 	go.abhg.dev/goldmark/toc v0.10.0
-	golang.org/x/crypto v0.35.0
+	golang.org/x/crypto v0.36.0
 	google.golang.org/protobuf v1.36.5
 	gopkg.in/yaml.v2 v2.4.0
 )
@@ -79,7 +77,7 @@ require (
 	codeberg.org/emersion/go-scfg v0.1.0 // indirect
 	dario.cat/mergo v1.0.0 // indirect
 	filippo.io/edwards25519 v1.1.0 // indirect
-	git.sr.ht/~rockorager/vaxis v0.12.1-0.20250218200016-0e88f197413a // indirect
+	git.sr.ht/~rockorager/vaxis v0.12.1-0.20250303214113-6cc9a0be8874 // indirect
 	github.com/AndreasBriese/bbloom v0.0.0-20190825152654-46b345b51c96 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver/v3 v3.2.0 // indirect
@@ -329,14 +327,14 @@ require (
 	go.uber.org/zap/exp v0.2.0 // indirect
 	golang.org/x/crypto/x509roots/fallback v0.0.0-20240507223354-67b13616a595 // indirect
 	golang.org/x/exp v0.0.0-20250218142911-aa4b98e5adaa // indirect
-	golang.org/x/image v0.24.0 // indirect
+	golang.org/x/image v0.25.0 // indirect
 	golang.org/x/mod v0.23.0 // indirect
-	golang.org/x/net v0.35.0 // indirect
-	golang.org/x/sync v0.11.0 // indirect
-	golang.org/x/sys v0.30.0 // indirect
-	golang.org/x/term v0.29.0 // indirect
-	golang.org/x/text v0.22.0 // indirect
-	golang.org/x/time v0.10.0 // indirect
+	golang.org/x/net v0.37.0 // indirect
+	golang.org/x/sync v0.12.0 // indirect
+	golang.org/x/sys v0.31.0 // indirect
+	golang.org/x/term v0.30.0 // indirect
+	golang.org/x/text v0.23.0 // indirect
+	golang.org/x/time v0.11.0 // indirect
 	golang.org/x/tools v0.30.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250115164207-1a7da9e5054f // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250115164207-1a7da9e5054f // indirect

@@ -51,11 +51,15 @@ func findUser(shrd *common.SharedModel) (*db.User, error) {
 }
 
 func findPlusFeatureFlag(shrd *common.SharedModel) (*db.FeatureFlag, error) {
+	return findFeatureFlag(shrd, "plus")
+}
+
+func findFeatureFlag(shrd *common.SharedModel, feature string) (*db.FeatureFlag, error) {
 	if shrd.User == nil {
 		return nil, nil
 	}
 
-	ff, err := shrd.Dbpool.FindFeatureForUser(shrd.User.ID, "plus")
+	ff, err := shrd.Dbpool.FindFeatureForUser(shrd.User.ID, feature)
 	if err != nil {
 		return nil, err
 	}

@@ -64,8 +64,12 @@ func (m *UI) setupUser() error {
 	}
 
 	m.shared.User = user
+
 	ff, _ := findPlusFeatureFlag(m.shared)
 	m.shared.PlusFeatureFlag = ff
+
+	bff, _ := findFeatureFlag(m.shared, "bouncer")
+	m.shared.BouncerFeatureFlag = bff
 
 	return nil
 }

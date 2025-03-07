@@ -133,6 +133,22 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					return
 				}
 
+				ff, err := dbpool.FindFeatureForUser(user.ID, "plus")
+				if err != nil {
+					handler.Logger.Error("Unable to find plus feature flag", "err", err, "user", user, "command", args)
+					ff, err = dbpool.FindFeatureForUser(user.ID, "bouncer")
+					if err != nil {
+						handler.Logger.Error("Unable to find bouncer feature flag", "err", err, "user", user, "command", args)
+						wish.Fatalln(sesh, "Unable to find plus or bouncer feature flag")
+						return
+					}
+				}
+
+				if ff == nil {
+					wish.Fatalln(sesh, "Unable to find plus or bouncer feature flag")
+					return
+				}
+
 				pass, err := dbpool.UpsertToken(user.ID, "pico-chat")
 				if err != nil {
 					wish.Fatalln(sesh, err)
