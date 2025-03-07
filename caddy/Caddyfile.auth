@@ -24,11 +24,22 @@
 	respond @options 204
 
 	@caddymetrics {
+		host auth.pico.sh
 		path /_caddy/metrics
 	}
 
 	metrics @caddymetrics {
 		disable_openmetrics
+	}
+
+	@webmetrics {
+		host auth.pico.sh
+		path /_web/metrics
+	}
+
+	handle @webmetrics {
+		rewrite * /_metrics
+		reverse_proxy auth-web:3000
 	}
 
 	reverse_proxy @auth auth-web:3000

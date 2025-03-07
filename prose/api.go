@@ -20,6 +20,7 @@ import (
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
 	"github.com/picosh/utils"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 type PageData struct {
@@ -836,6 +837,7 @@ func createMainRoutes(staticRoutes []shared.Route) []shared.Route {
 		shared.NewRoute("GET", "/read", readHandler),
 		shared.NewRoute("GET", "/check", shared.CheckHandler),
 		shared.NewRoute("GET", "/rss", rssHandler),
+		shared.NewRoute("GET", "/_metrics", promhttp.Handler().ServeHTTP),
 	}
 
 	routes = append(

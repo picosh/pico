@@ -21,6 +21,7 @@ import (
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/utils"
 	"github.com/picosh/utils/pipe/metrics"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 //go:embed html/* public/*
@@ -750,6 +751,7 @@ func authMux(apiConfig *shared.ApiConfig) *http.ServeMux {
 	mux.HandleFunc("GET /apple-touch-icon.png", fileServer.ServeHTTP)
 	mux.HandleFunc("GET /favicon.ico", fileServer.ServeHTTP)
 	mux.HandleFunc("GET /robots.txt", fileServer.ServeHTTP)
+	mux.HandleFunc("GET /_metrics", promhttp.Handler().ServeHTTP)
 
 	if apiConfig.Cfg.Debug {
 		shared.CreatePProfRoutesMux(mux)

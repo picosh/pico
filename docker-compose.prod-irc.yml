@@ -17,6 +17,10 @@ services:
       - "${AUTH_V4:-0.0.0.0}:80:80"
       - "[${AUTH_V6:-::1}]:443:443"
       - "[${AUTH_V6:-::1}]:80:80"
+      - "${BOUNCER_V4:-0.0.0.0}:443:443"
+      - "${BOUNCER_V4:-0.0.0.0}:80:80"
+      - "[${BOUNCER_V6:-::1}]:443:443"
+      - "[${BOUNCER_V6:-::1}]:80:80"
   auth-web:
     volumes:
       - ./data/auth-web/data:/app/ssh_data
@@ -39,10 +43,10 @@ services:
     env_file:
       - .env.prod
     ports:
-      - "${AUTH_IRCS_V4:-6697}:6697"
-      - "${AUTH_IRCS_V6:-[::1]:6697}:6697"
-      - "${AUTH_IDENTD_V4:-113}:113"
-      - "${AUTH_IDENTD_V6:-[::1]:113}:113"
+      - "${BOUNCER_IRCS_V4:-6697}:6697"
+      - "${BOUNCER_IRCS_V6:-[::1]:6697}:6697"
+      - "${BOUNCER_IDENTD_V4:-113}:113"
+      - "${BOUNCER_IDENTD_V6:-[::1]:113}:113"
     volumes:
       - ./data/run:/run/soju
       - ./data/bouncer:/app/db
