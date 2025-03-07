@@ -50,14 +50,24 @@
 		disable_openmetrics
 	}
 
-	@appmetrics {
+	@sshmetrics {
 		host {$APP_DOMAIN}
-		path /_app/metrics
+		path /_ssh/metrics
 	}
 
-	handle @appmetrics {
+	handle @sshmetrics {
 		rewrite * /metrics
 		reverse_proxy ssh:9222
+	}
+
+	@webmetrics {
+		host {$APP_DOMAIN}
+		path /_web/metrics
+	}
+
+	handle @webmetrics {
+		rewrite * /_metrics
+		reverse_proxy web:3000
 	}
 }
 

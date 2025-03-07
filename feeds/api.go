@@ -8,6 +8,7 @@ import (
 
 	"github.com/picosh/pico/db/postgres"
 	"github.com/picosh/pico/shared"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func keepAliveHandler(w http.ResponseWriter, r *http.Request) {
@@ -100,6 +101,7 @@ func createMainRoutes(staticRoutes []shared.Route) []shared.Route {
 		shared.NewRoute("GET", "/", shared.CreatePageHandler("html/marketing.page.tmpl")),
 		shared.NewRoute("GET", "/keep-alive/(.+)", keepAliveHandler),
 		shared.NewRoute("GET", "/unsub/(.+)", unsubHandler),
+		shared.NewRoute("GET", "/_metrics", promhttp.Handler().ServeHTTP),
 	}
 
 	routes = append(

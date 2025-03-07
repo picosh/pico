@@ -24,6 +24,7 @@ import (
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
 	sst "github.com/picosh/pobj/storage"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -58,7 +59,7 @@ func StartApiServer(cfg *PgsConfig) {
 				Configuration: map[string]interface{}{},
 			},
 			Regex: configurationtypes.Regex{
-				Exclude: "/check",
+				Exclude: "/check|/_metrics",
 			},
 			MaxBodyBytes:        uint64(cfg.MaxAssetSize),
 			DefaultCacheControl: cfg.CacheControl,
@@ -111,6 +112,7 @@ func (web *WebRouter) initRouters() {
 	// root domain
 	rootRouter := http.NewServeMux()
 	rootRouter.HandleFunc("GET /check", web.checkHandler)
+	rootRouter.HandleFunc("GET /_metrics", promhttp.Handler().ServeHTTP)
 	rootRouter.Handle("GET /main.css", web.serveFile("main.css", "text/css"))
 	rootRouter.Handle("GET /favicon-16x16.png", web.serveFile("favicon-16x16.png", "image/png"))
 	rootRouter.Handle("GET /favicon.ico", web.serveFile("favicon.ico", "image/x-icon"))

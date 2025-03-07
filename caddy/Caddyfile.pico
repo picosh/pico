@@ -1,10 +1,35 @@
-{$APP_DOMAIN} {
-  reverse_proxy https://pico-docs-prod.pgs.sh {
-    header_up Host pico.sh
-  }
+{
+	servers {
+		metrics
+	}
+}
 
-  tls {$APP_EMAIL} {
+{$APP_DOMAIN} {
+	reverse_proxy https://pico-docs-prod.pgs.sh {
+		header_up Host pico.sh
+	}
+
+	tls {$APP_EMAIL} {
 		dns cloudflare {$CF_API_TOKEN}
 		resolvers 1.1.1.1
+	}
+
+	@caddymetrics {
+		host {$APP_DOMAIN}
+		path /_caddy/metrics
+	}
+
+	metrics @caddymetrics {
+		disable_openmetrics
+	}
+
+	@sshmetrics {
+		host {$APP_DOMAIN}
+		path /_ssh/metrics
+	}
+
+	handle @sshmetrics {
+		rewrite * /metrics
+		reverse_proxy ssh:9222
 	}
 }
