@@ -24,7 +24,7 @@
 	respond @options 204
 
 	@caddymetrics {
-		host {$APP_DOMAIN}
+		host auth.pico.sh
 		path /_caddy/metrics
 	}
 
@@ -33,7 +33,7 @@
 	}
 
 	@webmetrics {
-		host {$APP_DOMAIN}
+		host auth.pico.sh
 		path /_web/metrics
 	}
 
