@@ -54,8 +54,10 @@ services:
       - ${AUTH_REAL_CERT_MOUNT}
 networks:
   auth:
+    enable_ipv6: true
     driver_opts:
       com.docker.network.bridge.name: auth
     ipam:
       config:
         - subnet: 172.24.0.0/16
+        - subnet: fd00:dead:beef:24::/112

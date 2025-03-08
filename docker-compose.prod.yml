@@ -325,43 +325,57 @@ services:
 
 networks:
   default:
+    enable_ipv6: true
     ipam:
       driver: default
       config:
         - subnet: "172.101.0.0/24"
+        - subnet: fd00:dead:beef:101::/112
   prose:
+    enable_ipv6: true
     driver_opts:
       com.docker.network.bridge.name: prose
     ipam:
       config:
         - subnet: 172.18.0.0/16
+        - subnet: fd00:dead:beef:18::/112
   pastes:
+    enable_ipv6: true
     driver_opts:
       com.docker.network.bridge.name: pastes
     ipam:
       config:
         - subnet: 172.19.0.0/16
+        - subnet: fd00:dead:beef:19::/112
   feeds:
+    enable_ipv6: true
     driver_opts:
       com.docker.network.bridge.name: feeds
     ipam:
       config:
         - subnet: 172.22.0.0/16
+        - subnet: fd00:dead:beef:22::/112
   pgs:
+    enable_ipv6: true
     driver_opts:
       com.docker.network.bridge.name: pgs
     ipam:
       config:
         - subnet: 172.23.0.0/16
+        - subnet: fd00:dead:beef:23::/112
   pico:
+    enable_ipv6: true
     driver_opts:
       com.docker.network.bridge.name: pico
     ipam:
       config:
         - subnet: 172.25.0.0/16
+        - subnet: fd00:dead:beef:25::/112
   pipe:
+    enable_ipv6: true
     driver_opts:
       com.docker.network.bridge.name: pipe
     ipam:
       config:
         - subnet: 172.27.0.0/16
+        - subnet: fd00:dead:beef:27::/112
