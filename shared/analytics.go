@@ -21,6 +21,17 @@ import (
 	"github.com/x-way/crawlerdetect"
 )
 
+var internalCrawlers *crawlerdetect.CrawlerDetect
+
+func init() {
+	internalCrawlers = crawlerdetect.New()
+	internalCrawlers.SetCrawlers([]string{
+		`^Azure Traffic Manager Endpoint Monitor$`,
+		`^Blackbox Exporter\/`,
+		`^Prometheus\/`,
+	})
+}
+
 func HmacString(secret, data string) string {
 	hmacer := hmac.New(sha256.New, []byte(secret))
 	hmacer.Write([]byte(data))
@@ -30,7 +41,7 @@ func HmacString(secret, data string) string {
 
 func trackableUserAgent(agent string) error {
 	// dont store requests from bots
-	if crawlerdetect.IsCrawler(agent) {
+	if crawlerdetect.IsCrawler(agent) || internalCrawlers.IsCrawler(agent) {
 		return fmt.Errorf(
 			"request is likely from a bot (User-Agent: %s)",
 			CleanUserAgent(agent),
