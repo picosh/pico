@@ -5,6 +5,8 @@ import (
 	"errors"
 	"log/slog"
 	"net"
+	"sync"
+	"time"
 
 	"github.com/antoniomika/syncmap"
 	"golang.org/x/crypto/ssh"
@@ -16,6 +18,8 @@ type SSHServerConn struct {
 	Logger     *slog.Logger
 	Conn       *ssh.ServerConn
 	SSHServer  *SSHServer
+
+	mu sync.Mutex
 }
 
 func (sc *SSHServerConn) Close() error {
@@ -23,15 +27,94 @@ func (sc *SSHServerConn) Close() error {
 	return nil
 }
 
+type SSHServerConnSession struct {
+	ssh.Channel
+	*SSHServerConn
+}
+
+// Deadline implements context.Context.
+func (s *SSHServerConn) Deadline() (deadline time.Time, ok bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return s.Ctx.Deadline()
+}
+
+// Done implements context.Context.
+func (s *SSHServerConn) Done() <-chan struct{} {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return s.Ctx.Done()
+}
+
+// Err implements context.Context.
+func (s *SSHServerConn) Err() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return s.Ctx.Err()
+}
+
+// Value implements context.Context.
+func (s *SSHServerConn) Value(key any) any {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return s.Ctx.Value(key)
+}
+
+// SetValue implements context.Context.
+func (s *SSHServerConn) SetValue(key any, data any) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.Ctx = context.WithValue(s.Ctx, key, data)
+}
+
+var _ context.Context = &SSHServerConn{}
+
 func (sc *SSHServerConn) Handle(chans <-chan ssh.NewChannel, reqs <-chan *ssh.Request) error {
 	defer sc.Close()
 
 	for {
 		select {
-		case <-sc.Ctx.Done():
+		case <-sc.Done():
 			return nil
 		case newChan := <-chans:
 			sc.Logger.Info("new channel", "type", newChan.ChannelType(), "extraData", newChan.ExtraData())
+			switch newChan.ChannelType() {
+			case "session":
+				channel, requests, err := newChan.Accept()
+				if err != nil {
+					sc.Logger.Error("accept session channel", "err", err)
+					return err
+				}
+
+				go func() {
+					for {
+						select {
+						case <-sc.Done():
+							return
+						case req := <-requests:
+							if req == nil {
+								continue
+							}
+							sc.Logger.Info("new session request", "type", req.Type, "wantReply", req.WantReply, "payload", req.Payload)
+						}
+					}
+				}()
+
+				h := func(*SSHServerConnSession) error { return nil }
+				for _, m := range sc.SSHServer.Config.Middleware {
+					h = m(h)
+				}
+
+				return h(&SSHServerConnSession{
+					Channel:       channel,
+					SSHServerConn: sc,
+				})
+			}
 		case req := <-reqs:
 			sc.Logger.Info("new request", "type", req.Type, "wantReply", req.WantReply, "payload", req.Payload)
 		}
@@ -63,13 +146,12 @@ func NewSSHServerConn(
 	}
 }
 
-type SSHServerMiddleware func(func(ssh.Session) error) func(ssh.Session) error
+type SSHServerMiddleware func(func(*SSHServerConnSession) error) func(*SSHServerConnSession) error
 
 type SSHServerConfig struct {
 	*ssh.ServerConfig
-	ListenAddr          string
-	SessionMiddleware   []SSHServerMiddleware
-	SubsystemMiddleware []SSHServerMiddleware
+	ListenAddr string
+	Middleware []SSHServerMiddleware
 }
 
 type SSHServer struct {

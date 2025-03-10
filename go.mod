@@ -4,13 +4,13 @@ go 1.24
 
 toolchain go1.24.0
 
-// replace github.com/picosh/tunkit => ../tunkit
+replace github.com/picosh/tunkit => ../tunkit
 
-// replace github.com/picosh/send => ../send
+replace github.com/picosh/send => ../send
 
 // replace github.com/picosh/go-rsync-receiver => ../go-rsync-receiver
 
-// replace github.com/picosh/pobj => ../pobj
+replace github.com/picosh/pobj => ../pobj
 
 // replace github.com/picosh/pubsub => ../pubsub
 
