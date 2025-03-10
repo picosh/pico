@@ -11,7 +11,6 @@ import (
 	"github.com/charmbracelet/promwish"
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
-	"github.com/picosh/pico/shared"
 	wsh "github.com/picosh/pico/wish"
 	"github.com/picosh/send/auth"
 	"github.com/picosh/send/list"
@@ -81,11 +80,11 @@ func StartSshServer(cfg *PgsConfig, killCh chan error) {
 		HttpHandler: createHttpHandler(cfg),
 	}
 
-	sshAuth := shared.NewSshAuthHandler(cfg.DB, logger)
+	// sshAuth := shared.NewSshAuthHandler(cfg.DB, logger)
 	s, err := wish.NewServer(
-		wish.WithAddress(fmt.Sprintf("%s:%s", host, port)),
-		wish.WithHostKeyPath("ssh_data/term_info_ed25519"),
-		wish.WithPublicKeyAuth(sshAuth.PubkeyAuthHandler),
+		// wish.WithAddress(fmt.Sprintf("%s:%s", host, port)),
+		// wish.WithHostKeyPath("ssh_data/term_info_ed25519"),
+		// wish.WithPublicKeyAuth(sshAuth.PubkeyAuthHandler),
 		tunkit.WithWebTunnel(webTunnel),
 		withProxy(
 			handler,

@@ -4,8 +4,23 @@ go 1.24
 
 toolchain go1.24.0
 
-// replace github.com/picosh/send => ../send
-// replace git.sr.ht/~rockorager/vaxis => ../../../src/vaxis
+replace github.com/picosh/tunkit => ../tunkit
+
+replace github.com/picosh/send => ../send
+
+// replace github.com/picosh/go-rsync-receiver => ../go-rsync-receiver
+
+replace github.com/picosh/pobj => ../pobj
+
+// replace github.com/picosh/pubsub => ../pubsub
+
+// replace github.com/picosh/utils => ../utils
+
+// replace git.sr.ht/~delthas/senpai => ../../senpai
+
+// replace git.sr.ht/~rockorager/vaxis => ../../vaxis
+
+// replace github.com/charmbracelet/wish => ../../wish
 
 require (
 	git.sr.ht/~delthas/senpai v0.3.1-0.20250311003540-18f699aaf9b0

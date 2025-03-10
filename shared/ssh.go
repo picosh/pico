@@ -1,11 +1,12 @@
 package shared
 
 import (
+	"fmt"
 	"log/slog"
 
-	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/utils"
+	"golang.org/x/crypto/ssh"
 )
 
 type SshAuthHandler struct {
@@ -24,7 +25,7 @@ func NewSshAuthHandler(dbh AuthFindUser, logger *slog.Logger) *SshAuthHandler {
 	}
 }
 
-func (r *SshAuthHandler) PubkeyAuthHandler(ctx ssh.Context, key ssh.PublicKey) bool {
+func (r *SshAuthHandler) PubkeyAuthHandler(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
 	pubkey := utils.KeyForKeyText(key)
 	user, err := r.DB.FindUserByPubkey(pubkey)
 	if err != nil {
@@ -34,20 +35,20 @@ func (r *SshAuthHandler) PubkeyAuthHandler(ctx ssh.Context, key ssh.PublicKey) b
 			"key", string(key.Marshal()),
 			"err", err,
 		)
-		return false
+		return nil, err
 	}
 
 	if user.Name == "" {
 		r.Logger.Error("username is not set")
-		return false
+		return nil, fmt.Errorf("username is not set")
 	}
 
-	if ctx.Permissions().Extensions == nil {
-		ctx.Permissions().Extensions = map[string]string{}
-	}
-	ctx.Permissions().Extensions["user_id"] = user.ID
-	ctx.Permissions().Extensions["pubkey"] = pubkey
-	return true
+	return &ssh.Permissions{
+		Extensions: map[string]string{
+			"user_id": user.ID,
+			"pubkey":  pubkey,
+		},
+	}, nil
 }
 
 func FindPlusFF(dbpool db.DB, cfg *ConfigSite, userID string) *db.FeatureFlag {
