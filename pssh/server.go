@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -141,7 +142,10 @@ func (sc *SSHServerConn) Handle(chans <-chan ssh.NewChannel, reqs <-chan *ssh.Re
 		select {
 		case <-sc.Done():
 			return nil
-		case newChan := <-chans:
+		case newChan, ok := <-chans:
+			if !ok {
+				return nil
+			}
 			sc.Logger.Info("new channel", "type", newChan.ChannelType(), "extraData", newChan.ExtraData())
 			switch newChan.ChannelType() {
 			case "session":
@@ -156,26 +160,65 @@ func (sc *SSHServerConn) Handle(chans <-chan ssh.NewChannel, reqs <-chan *ssh.Re
 						select {
 						case <-sc.Done():
 							return
-						case req := <-requests:
-							if req == nil {
-								continue
+						case req, ok := <-requests:
+							if !ok {
+								return
 							}
+
 							sc.Logger.Info("new session request", "type", req.Type, "wantReply", req.WantReply, "payload", req.Payload)
+							if req.Type == "subsystem" {
+								if len(sc.SSHServer.Config.SubsystemMiddleware) == 0 {
+									req.Reply(false, nil)
+									continue
+								}
+
+								h := func(*SSHServerConnSession) error { return nil }
+								for _, m := range sc.SSHServer.Config.SubsystemMiddleware {
+									h = m(h)
+								}
+
+								if err := h(&SSHServerConnSession{
+									Channel:       channel,
+									SSHServerConn: sc,
+								}); err != nil {
+									req.Reply(false, nil)
+									continue
+								}
+
+								req.Reply(true, nil)
+							} else if req.Type == "exec" {
+								if len(sc.SSHServer.Config.Middleware) == 0 {
+									req.Reply(false, nil)
+									continue
+								}
+
+								sesh := &SSHServerConnSession{
+									Channel:       channel,
+									SSHServerConn: sc,
+								}
+
+								sesh.SetValue("command", strings.Fields(string(req.Payload[4:])))
+
+								h := func(*SSHServerConnSession) error { return nil }
+								for _, m := range sc.SSHServer.Config.Middleware {
+									h = m(h)
+								}
+
+								if err := h(sesh); err != nil {
+									req.Reply(false, nil)
+									continue
+								}
+
+								req.Reply(true, nil)
+							}
 						}
 					}
 				}()
-
-				h := func(*SSHServerConnSession) error { return nil }
-				for _, m := range sc.SSHServer.Config.Middleware {
-					h = m(h)
-				}
-
-				return h(&SSHServerConnSession{
-					Channel:       channel,
-					SSHServerConn: sc,
-				})
 			}
-		case req := <-reqs:
+		case req, ok := <-reqs:
+			if !ok {
+				return nil
+			}
 			sc.Logger.Info("new request", "type", req.Type, "wantReply", req.WantReply, "payload", req.Payload)
 		}
 	}
@@ -211,8 +254,9 @@ type SSHServerMiddleware func(SSHServerHandler) SSHServerHandler
 
 type SSHServerConfig struct {
 	*ssh.ServerConfig
-	ListenAddr string
-	Middleware []SSHServerMiddleware
+	ListenAddr          string
+	Middleware          []SSHServerMiddleware
+	SubsystemMiddleware []SSHServerMiddleware
 }
 
 type SSHServer struct {
