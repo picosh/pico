@@ -23,7 +23,7 @@ toolchain go1.24.0
 // replace github.com/charmbracelet/wish => ../../wish
 
 require (
-	git.sr.ht/~delthas/senpai v0.3.1-0.20250307120855-1e7e8219bd23
+	git.sr.ht/~delthas/senpai v0.3.1-0.20250311003540-18f699aaf9b0
 	github.com/alecthomas/chroma/v2 v2.14.0
 	github.com/antoniomika/syncmap v1.0.0
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
