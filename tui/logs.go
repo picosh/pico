@@ -167,11 +167,11 @@ func (m *LogsPage) connectToLogs() error {
 			continue
 		}
 
-		// user := utils.AnyToStr(parsedData, "user")
-		// userId := utils.AnyToStr(parsedData, "userId")
-		// if user == m.shared.User.Name || userId == m.shared.User.ID {
-		m.shared.App.PostEvent(LogLineLoaded{parsedData})
-		// }
+		user := utils.AnyToStr(parsedData, "user")
+		userId := utils.AnyToStr(parsedData, "userId")
+		if user == m.shared.User.Name || userId == m.shared.User.ID {
+			m.shared.App.PostEvent(LogLineLoaded{parsedData})
+		}
 	}
 
 	return nil
