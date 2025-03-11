@@ -10,10 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
+	"github.com/picosh/pico/pssh"
 	"github.com/picosh/pico/shared"
-	"github.com/picosh/pico/wish"
 	sendutils "github.com/picosh/send/utils"
 	"github.com/picosh/utils"
 )
@@ -28,8 +27,8 @@ type PostMetaData struct {
 }
 
 type ScpFileHooks interface {
-	FileValidate(s ssh.Session, data *PostMetaData) (bool, error)
-	FileMeta(s ssh.Session, data *PostMetaData) error
+	FileValidate(s *pssh.SSHServerConnSession, data *PostMetaData) (bool, error)
+	FileMeta(s *pssh.SSHServerConnSession, data *PostMetaData) error
 }
 
 type ScpUploadHandler struct {
@@ -46,13 +45,13 @@ func NewScpPostHandler(dbpool db.DB, cfg *shared.ConfigSite, hooks ScpFileHooks)
 	}
 }
 
-func (r *ScpUploadHandler) List(s ssh.Session, fpath string, isDir bool, recursive bool) ([]os.FileInfo, error) {
+func (r *ScpUploadHandler) List(s *pssh.SSHServerConnSession, fpath string, isDir bool, recursive bool) ([]os.FileInfo, error) {
 	return BaseList(s, fpath, isDir, recursive, []string{r.Cfg.Space}, r.DBPool)
 }
 
-func (h *ScpUploadHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os.FileInfo, sendutils.ReadAndReaderAtCloser, error) {
-	logger := wish.GetLogger(s)
-	user := wish.GetUser(s)
+func (h *ScpUploadHandler) Read(s *pssh.SSHServerConnSession, entry *sendutils.FileEntry) (os.FileInfo, sendutils.ReadAndReaderAtCloser, error) {
+	logger := pssh.GetLogger(s)
+	user := pssh.GetUser(s)
 
 	if user == nil {
 		err := fmt.Errorf("could not get user from ctx")
@@ -83,9 +82,9 @@ func (h *ScpUploadHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os.F
 	return fileInfo, reader, nil
 }
 
-func (h *ScpUploadHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (string, error) {
-	logger := wish.GetLogger(s)
-	user := wish.GetUser(s)
+func (h *ScpUploadHandler) Write(s *pssh.SSHServerConnSession, entry *sendutils.FileEntry) (string, error) {
+	logger := pssh.GetLogger(s)
+	user := pssh.GetUser(s)
 
 	if user == nil {
 		err := fmt.Errorf("could not get user from ctx")
@@ -271,9 +270,9 @@ func (h *ScpUploadHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (str
 	return h.Cfg.FullPostURL(curl, user.Name, metadata.Slug), nil
 }
 
-func (h *ScpUploadHandler) Delete(s ssh.Session, entry *sendutils.FileEntry) error {
-	logger := wish.GetLogger(s)
-	user := wish.GetUser(s)
+func (h *ScpUploadHandler) Delete(s *pssh.SSHServerConnSession, entry *sendutils.FileEntry) error {
+	logger := pssh.GetLogger(s)
+	user := pssh.GetUser(s)
 
 	if user == nil {
 		err := fmt.Errorf("could not get user from ctx")

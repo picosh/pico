@@ -11,12 +11,11 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/charmbracelet/ssh"
 	exifremove "github.com/neurosnap/go-exif-remove"
 	"github.com/picosh/pico/db"
+	"github.com/picosh/pico/pssh"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/pico/shared/storage"
-	"github.com/picosh/pico/wish"
 	"github.com/picosh/pobj"
 	sst "github.com/picosh/pobj/storage"
 	sendutils "github.com/picosh/send/utils"
@@ -53,11 +52,11 @@ func (h *UploadImgHandler) getObjectPath(fpath string) string {
 	return filepath.Join("prose", fpath)
 }
 
-func (h *UploadImgHandler) List(s ssh.Session, fpath string, isDir bool, recursive bool) ([]os.FileInfo, error) {
+func (h *UploadImgHandler) List(s *pssh.SSHServerConnSession, fpath string, isDir bool, recursive bool) ([]os.FileInfo, error) {
 	var fileList []os.FileInfo
 
-	logger := wish.GetLogger(s)
-	user := wish.GetUser(s)
+	logger := pssh.GetLogger(s)
+	user := pssh.GetUser(s)
 
 	if user == nil {
 		err := fmt.Errorf("could not get user from ctx")
@@ -102,9 +101,9 @@ func (h *UploadImgHandler) List(s ssh.Session, fpath string, isDir bool, recursi
 	return fileList, nil
 }
 
-func (h *UploadImgHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os.FileInfo, sendutils.ReadAndReaderAtCloser, error) {
-	logger := wish.GetLogger(s)
-	user := wish.GetUser(s)
+func (h *UploadImgHandler) Read(s *pssh.SSHServerConnSession, entry *sendutils.FileEntry) (os.FileInfo, sendutils.ReadAndReaderAtCloser, error) {
+	logger := pssh.GetLogger(s)
+	user := pssh.GetUser(s)
 
 	if user == nil {
 		err := fmt.Errorf("could not get user from ctx")
@@ -139,9 +138,9 @@ func (h *UploadImgHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os.F
 	return fileInfo, reader, nil
 }
 
-func (h *UploadImgHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (string, error) {
-	logger := wish.GetLogger(s)
-	user := wish.GetUser(s)
+func (h *UploadImgHandler) Write(s *pssh.SSHServerConnSession, entry *sendutils.FileEntry) (string, error) {
+	logger := pssh.GetLogger(s)
+	user := pssh.GetUser(s)
 
 	if user == nil {
 		err := fmt.Errorf("could not get user from ctx")
@@ -222,9 +221,9 @@ func (h *UploadImgHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (str
 	return str, nil
 }
 
-func (h *UploadImgHandler) Delete(s ssh.Session, entry *sendutils.FileEntry) error {
-	logger := wish.GetLogger(s)
-	user := wish.GetUser(s)
+func (h *UploadImgHandler) Delete(s *pssh.SSHServerConnSession, entry *sendutils.FileEntry) error {
+	logger := pssh.GetLogger(s)
+	user := pssh.GetUser(s)
 
 	if user == nil {
 		err := fmt.Errorf("could not get user from ctx")
@@ -309,13 +308,13 @@ func (h *UploadImgHandler) metaImg(data *PostMetaData) error {
 	return nil
 }
 
-func (h *UploadImgHandler) writeImg(s ssh.Session, data *PostMetaData) error {
+func (h *UploadImgHandler) writeImg(s *pssh.SSHServerConnSession, data *PostMetaData) error {
 	valid, err := h.validateImg(data)
 	if !valid {
 		return err
 	}
 
-	logger := wish.GetLogger(s)
+	logger := pssh.GetLogger(s)
 	logger = logger.With(
 		"filename", data.Filename,
 	)

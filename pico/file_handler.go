@@ -12,10 +12,9 @@ import (
 	"time"
 
 	"github.com/charmbracelet/ssh"
-	"github.com/charmbracelet/wish"
 	"github.com/picosh/pico/db"
+	"github.com/picosh/pico/pssh"
 	"github.com/picosh/pico/shared"
-	wsh "github.com/picosh/pico/wish"
 	sendutils "github.com/picosh/send/utils"
 	"github.com/picosh/utils"
 )
@@ -52,13 +51,13 @@ func (h *UploadHandler) getAuthorizedKeyFile(user *db.User) (*sendutils.VirtualF
 	return fileInfo, text, nil
 }
 
-func (h *UploadHandler) Delete(s ssh.Session, entry *sendutils.FileEntry) error {
+func (h *UploadHandler) Delete(s *pssh.SSHServerConnSession, entry *sendutils.FileEntry) error {
 	return errors.New("unsupported")
 }
 
-func (h *UploadHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os.FileInfo, sendutils.ReadAndReaderAtCloser, error) {
-	logger := wsh.GetLogger(s)
-	user := wsh.GetUser(s)
+func (h *UploadHandler) Read(s *pssh.SSHServerConnSession, entry *sendutils.FileEntry) (os.FileInfo, sendutils.ReadAndReaderAtCloser, error) {
+	logger := pssh.GetLogger(s)
+	user := pssh.GetUser(s)
 
 	if user == nil {
 		err := fmt.Errorf("could not get user from ctx")
@@ -84,11 +83,11 @@ func (h *UploadHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os.File
 	return nil, nil, os.ErrNotExist
 }
 
-func (h *UploadHandler) List(s ssh.Session, fpath string, isDir bool, recursive bool) ([]os.FileInfo, error) {
+func (h *UploadHandler) List(s *pssh.SSHServerConnSession, fpath string, isDir bool, recursive bool) ([]os.FileInfo, error) {
 	var fileList []os.FileInfo
 
-	logger := wsh.GetLogger(s)
-	user := wsh.GetUser(s)
+	logger := pssh.GetLogger(s)
+	user := pssh.GetUser(s)
 
 	if user == nil {
 		err := fmt.Errorf("could not get user from ctx")
@@ -127,11 +126,11 @@ func (h *UploadHandler) List(s ssh.Session, fpath string, isDir bool, recursive 
 	return fileList, nil
 }
 
-func (h *UploadHandler) GetLogger(s ssh.Session) *slog.Logger {
-	return wsh.GetLogger(s)
+func (h *UploadHandler) GetLogger(s *pssh.SSHServerConnSession) *slog.Logger {
+	return pssh.GetLogger(s)
 }
 
-func (h *UploadHandler) Validate(s ssh.Session) error {
+func (h *UploadHandler) Validate(s *pssh.SSHServerConnSession) error {
 	var err error
 	key, err := sendutils.KeyText(s)
 	if err != nil {
@@ -212,7 +211,7 @@ func authorizedKeysDiff(keyInUse ssh.PublicKey, curKeys []KeyWithId, nextKeys []
 	}
 }
 
-func (h *UploadHandler) ProcessAuthorizedKeys(text []byte, logger *slog.Logger, user *db.User, s ssh.Session) error {
+func (h *UploadHandler) ProcessAuthorizedKeys(text []byte, logger *slog.Logger, user *db.User, s *pssh.SSHServerConnSession) error {
 	logger.Info("processing new authorized_keys")
 	dbpool := h.DBPool
 
@@ -245,12 +244,12 @@ func (h *UploadHandler) ProcessAuthorizedKeys(text []byte, logger *slog.Logger, 
 	for _, pk := range diff.Add {
 		key := utils.KeyForKeyText(pk.Pk)
 
-		wish.Errorf(s, "adding pubkey (%s)\n", key)
+		fmt.Fprintf(s.Stderr(), "adding pubkey (%s)\n", key)
 		logger.Info("adding pubkey", "pubkey", key)
 
 		err = dbpool.InsertPublicKey(user.ID, key, pk.Comment, nil)
 		if err != nil {
-			wish.Errorf(s, "error: could not insert pubkey: %s (%s)\n", err.Error(), key)
+			fmt.Fprintf(s.Stderr(), "error: could not insert pubkey: %s (%s)\n", err.Error(), key)
 			logger.Error("could not insert pubkey", "err", err.Error())
 		}
 	}
@@ -258,7 +257,7 @@ func (h *UploadHandler) ProcessAuthorizedKeys(text []byte, logger *slog.Logger, 
 	for _, pk := range diff.Update {
 		key := utils.KeyForKeyText(pk.Pk)
 
-		wish.Errorf(s, "updating pubkey with comment: %s (%s)\n", pk.Comment, key)
+		fmt.Fprintf(s.Stderr(), "updating pubkey with comment: %s (%s)\n", pk.Comment, key)
 		logger.Info(
 			"updating pubkey with comment",
 			"pubkey", key,
@@ -267,18 +266,18 @@ func (h *UploadHandler) ProcessAuthorizedKeys(text []byte, logger *slog.Logger, 
 
 		_, err = dbpool.UpdatePublicKey(pk.ID, pk.Comment)
 		if err != nil {
-			wish.Errorf(s, "error: could not update pubkey: %s (%s)\n", err.Error(), key)
+			fmt.Fprintf(s.Stderr(), "error: could not update pubkey: %s (%s)\n", err.Error(), key)
 			logger.Error("could not update pubkey", "err", err.Error(), "key", key)
 		}
 	}
 
 	if len(diff.Rm) > 0 {
-		wish.Errorf(s, "removing pubkeys: %s\n", diff.Rm)
+		fmt.Fprintf(s.Stderr(), "removing pubkeys: %s\n", diff.Rm)
 		logger.Info("removing pubkeys", "pubkeys", diff.Rm)
 
 		err = dbpool.RemoveKeys(diff.Rm)
 		if err != nil {
-			wish.Errorf(s, "error: could not rm pubkeys: %s\n", err.Error())
+			fmt.Fprintf(s.Stderr(), "error: could not rm pubkeys: %s\n", err.Error())
 			logger.Error("could not remove pubkey", "err", err.Error())
 		}
 	}
@@ -286,9 +285,9 @@ func (h *UploadHandler) ProcessAuthorizedKeys(text []byte, logger *slog.Logger, 
 	return nil
 }
 
-func (h *UploadHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (string, error) {
-	logger := wsh.GetLogger(s)
-	user := wsh.GetUser(s)
+func (h *UploadHandler) Write(s *pssh.SSHServerConnSession, entry *sendutils.FileEntry) (string, error) {
+	logger := pssh.GetLogger(s)
+	user := pssh.GetUser(s)
 
 	if user == nil {
 		err := fmt.Errorf("could not get user from ctx")

@@ -6,17 +6,14 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/charmbracelet/ssh"
-	"github.com/charmbracelet/wish"
-	bm "github.com/charmbracelet/wish/bubbletea"
-	"github.com/muesli/termenv"
 	"github.com/picosh/pico/db"
 	pgsdb "github.com/picosh/pico/pgs/db"
+	"github.com/picosh/pico/pssh"
 	sendutils "github.com/picosh/send/utils"
 	"github.com/picosh/utils"
 )
 
-func getUser(s ssh.Session, dbpool pgsdb.PgsDB) (*db.User, error) {
+func getUser(s *pssh.SSHServerConnSession, dbpool pgsdb.PgsDB) (*db.User, error) {
 	if s.PublicKey() == nil {
 		return nil, fmt.Errorf("key not found")
 	}
@@ -46,7 +43,7 @@ func (i *arrayFlags) Set(value string) error {
 	return nil
 }
 
-func flagSet(cmdName string, sesh ssh.Session) (*flag.FlagSet, *bool) {
+func flagSet(cmdName string, sesh *pssh.SSHServerConnSession) (*flag.FlagSet, *bool) {
 	cmd := flag.NewFlagSet(cmdName, flag.ContinueOnError)
 	cmd.SetOutput(sesh)
 	write := cmd.Bool("write", false, "apply changes")
@@ -63,18 +60,17 @@ func flagCheck(cmd *flag.FlagSet, posArg string, cmdArgs []string) bool {
 	return true
 }
 
-func WishMiddleware(handler *UploadAssetHandler) wish.Middleware {
+func Middleware(handler *UploadAssetHandler) pssh.SSHServerMiddleware {
 	dbpool := handler.Cfg.DB
 	log := handler.Cfg.Logger
 	cfg := handler.Cfg
 	store := handler.Cfg.Storage
 
-	return func(next ssh.Handler) ssh.Handler {
-		return func(sesh ssh.Session) {
+	return func(next pssh.SSHServerHandler) pssh.SSHServerHandler {
+		return func(sesh *pssh.SSHServerConnSession) error {
 			args := sesh.Command()
 			if len(args) == 0 {
-				next(sesh)
-				return
+				return next(sesh)
 			}
 
 			// default width and height when no pty
@@ -89,11 +85,12 @@ func WishMiddleware(handler *UploadAssetHandler) wish.Middleware {
 			user, err := getUser(sesh, dbpool)
 			if err != nil {
 				sendutils.ErrorHandler(sesh, err)
-				return
+				return err
 			}
 
-			renderer := bm.MakeRenderer(sesh)
-			renderer.SetColorProfile(termenv.TrueColor)
+			// renderer := bm.MakeRenderer(sesh)
+			// renderer.SetColorProfile(termenv.TrueColor)
+			// styles := common.DefaultStyles(renderer)
 
 			opts := Cmd{
 				Session: sesh,
@@ -102,33 +99,33 @@ func WishMiddleware(handler *UploadAssetHandler) wish.Middleware {
 				Log:     log,
 				Dbpool:  dbpool,
 				Write:   false,
-				Width:   width,
-				Height:  height,
-				Cfg:     handler.Cfg,
+				// Styles:  styles,
+				Width:  width,
+				Height: height,
+				Cfg:    handler.Cfg,
 			}
 
 			cmd := strings.TrimSpace(args[0])
 			if len(args) == 1 {
 				if cmd == "help" {
 					opts.help()
-					return
+					return nil
 				} else if cmd == "stats" {
 					err := opts.stats(cfg.MaxSize)
 					opts.bail(err)
-					return
+					return err
 				} else if cmd == "ls" {
 					err := opts.ls()
 					opts.bail(err)
-					return
+					return err
 				} else if cmd == "cache-all" {
 					opts.Write = true
 					err := opts.cacheAll()
 					opts.notice()
 					opts.bail(err)
-					return
+					return err
 				} else {
-					next(sesh)
-					return
+					return next(sesh)
 				}
 			}
 
@@ -145,12 +142,12 @@ func WishMiddleware(handler *UploadAssetHandler) wish.Middleware {
 			if cmd == "fzf" {
 				err := opts.fzf(projectName)
 				opts.bail(err)
-				return
+				return err
 			} else if cmd == "link" {
 				linkCmd, write := flagSet("link", sesh)
 				linkTo := linkCmd.String("to", "", "symbolic link to this project")
 				if !flagCheck(linkCmd, projectName, cmdArgs) {
-					return
+					return nil
 				}
 				opts.Write = *write
 
@@ -159,7 +156,7 @@ func WishMiddleware(handler *UploadAssetHandler) wish.Middleware {
 						"must provide `--to` flag",
 					)
 					opts.bail(err)
-					return
+					return err
 				}
 
 				err := opts.link(projectName, *linkTo)
@@ -167,67 +164,67 @@ func WishMiddleware(handler *UploadAssetHandler) wish.Middleware {
 				if err != nil {
 					opts.bail(err)
 				}
-				return
+				return err
 			} else if cmd == "unlink" {
 				unlinkCmd, write := flagSet("unlink", sesh)
 				if !flagCheck(unlinkCmd, projectName, cmdArgs) {
-					return
+					return nil
 				}
 				opts.Write = *write
 
 				err := opts.unlink(projectName)
 				opts.notice()
 				opts.bail(err)
-				return
+				return err
 			} else if cmd == "depends" {
 				err := opts.depends(projectName)
 				opts.bail(err)
-				return
+				return err
 			} else if cmd == "retain" {
 				retainCmd, write := flagSet("retain", sesh)
 				retainNum := retainCmd.Int("n", 3, "latest number of projects to keep")
 				if !flagCheck(retainCmd, projectName, cmdArgs) {
-					return
+					return nil
 				}
 				opts.Write = *write
 
 				err := opts.prune(projectName, *retainNum)
 				opts.notice()
 				opts.bail(err)
-				return
+				return err
 			} else if cmd == "prune" {
 				pruneCmd, write := flagSet("prune", sesh)
 				if !flagCheck(pruneCmd, projectName, cmdArgs) {
-					return
+					return nil
 				}
 				opts.Write = *write
 
 				err := opts.prune(projectName, 0)
 				opts.notice()
 				opts.bail(err)
-				return
+				return err
 			} else if cmd == "rm" {
 				rmCmd, write := flagSet("rm", sesh)
 				if !flagCheck(rmCmd, projectName, cmdArgs) {
-					return
+					return nil
 				}
 				opts.Write = *write
 
 				err := opts.rm(projectName)
 				opts.notice()
 				opts.bail(err)
-				return
+				return err
 			} else if cmd == "cache" {
 				cacheCmd, write := flagSet("cache", sesh)
 				if !flagCheck(cacheCmd, projectName, cmdArgs) {
-					return
+					return nil
 				}
 				opts.Write = *write
 
 				err := opts.cache(projectName)
 				opts.notice()
 				opts.bail(err)
-				return
+				return err
 			} else if cmd == "acl" {
 				aclCmd, write := flagSet("acl", sesh)
 				aclType := aclCmd.String("type", "", "access type: public, pico, pubkeys")
@@ -238,7 +235,7 @@ func WishMiddleware(handler *UploadAssetHandler) wish.Middleware {
 					"list of pico usernames or sha256 public keys, delimited by commas",
 				)
 				if !flagCheck(aclCmd, projectName, cmdArgs) {
-					return
+					return nil
 				}
 				opts.Write = *write
 
@@ -248,15 +245,15 @@ func WishMiddleware(handler *UploadAssetHandler) wish.Middleware {
 						*aclType,
 					)
 					opts.bail(err)
-					return
+					return err
 				}
 
 				err := opts.acl(projectName, *aclType, acls)
 				opts.notice()
 				opts.bail(err)
+				return err
 			} else {
-				next(sesh)
-				return
+				return next(sesh)
 			}
 		}
 	}

@@ -8,18 +8,17 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
+	"github.com/picosh/pico/pssh"
 	"github.com/picosh/pico/shared"
-	"github.com/picosh/pico/wish"
 	"github.com/picosh/send/utils"
 )
 
 type ReadWriteHandler interface {
-	List(s ssh.Session, fpath string, isDir bool, recursive bool) ([]os.FileInfo, error)
-	Write(ssh.Session, *utils.FileEntry) (string, error)
-	Read(ssh.Session, *utils.FileEntry) (os.FileInfo, utils.ReadAndReaderAtCloser, error)
-	Delete(ssh.Session, *utils.FileEntry) error
+	List(s *pssh.SSHServerConnSession, fpath string, isDir bool, recursive bool) ([]os.FileInfo, error)
+	Write(*pssh.SSHServerConnSession, *utils.FileEntry) (string, error)
+	Read(*pssh.SSHServerConnSession, *utils.FileEntry) (os.FileInfo, utils.ReadAndReaderAtCloser, error)
+	Delete(*pssh.SSHServerConnSession, *utils.FileEntry) error
 }
 
 type FileHandlerRouter struct {
@@ -54,7 +53,7 @@ func (r *FileHandlerRouter) findHandler(fp string) (ReadWriteHandler, error) {
 	return handler, nil
 }
 
-func (r *FileHandlerRouter) Write(s ssh.Session, entry *utils.FileEntry) (string, error) {
+func (r *FileHandlerRouter) Write(s *pssh.SSHServerConnSession, entry *utils.FileEntry) (string, error) {
 	if entry.Mode.IsDir() {
 		return "", os.ErrInvalid
 	}
@@ -66,7 +65,7 @@ func (r *FileHandlerRouter) Write(s ssh.Session, entry *utils.FileEntry) (string
 	return handler.Write(s, entry)
 }
 
-func (r *FileHandlerRouter) Delete(s ssh.Session, entry *utils.FileEntry) error {
+func (r *FileHandlerRouter) Delete(s *pssh.SSHServerConnSession, entry *utils.FileEntry) error {
 	handler, err := r.findHandler(entry.Filepath)
 	if err != nil {
 		return err
@@ -74,7 +73,7 @@ func (r *FileHandlerRouter) Delete(s ssh.Session, entry *utils.FileEntry) error 
 	return handler.Delete(s, entry)
 }
 
-func (r *FileHandlerRouter) Read(s ssh.Session, entry *utils.FileEntry) (os.FileInfo, utils.ReadAndReaderAtCloser, error) {
+func (r *FileHandlerRouter) Read(s *pssh.SSHServerConnSession, entry *utils.FileEntry) (os.FileInfo, utils.ReadAndReaderAtCloser, error) {
 	handler, err := r.findHandler(entry.Filepath)
 	if err != nil {
 		return nil, nil, err
@@ -82,7 +81,7 @@ func (r *FileHandlerRouter) Read(s ssh.Session, entry *utils.FileEntry) (os.File
 	return handler.Read(s, entry)
 }
 
-func (r *FileHandlerRouter) List(s ssh.Session, fpath string, isDir bool, recursive bool) ([]os.FileInfo, error) {
+func (r *FileHandlerRouter) List(s *pssh.SSHServerConnSession, fpath string, isDir bool, recursive bool) ([]os.FileInfo, error) {
 	files := []os.FileInfo{}
 	for key, handler := range r.FileMap {
 		// TODO: hack because we have duplicate keys for .md and .css
@@ -100,13 +99,13 @@ func (r *FileHandlerRouter) List(s ssh.Session, fpath string, isDir bool, recurs
 	return files, nil
 }
 
-func (r *FileHandlerRouter) GetLogger(s ssh.Session) *slog.Logger {
-	return wish.GetLogger(s)
+func (r *FileHandlerRouter) GetLogger(s *pssh.SSHServerConnSession) *slog.Logger {
+	return pssh.GetLogger(s)
 }
 
-func (r *FileHandlerRouter) Validate(s ssh.Session) error {
-	logger := wish.GetLogger(s)
-	user := wish.GetUser(s)
+func (r *FileHandlerRouter) Validate(s *pssh.SSHServerConnSession) error {
+	logger := pssh.GetLogger(s)
+	user := pssh.GetUser(s)
 
 	if user == nil {
 		err := fmt.Errorf("could not get user from ctx")
@@ -122,10 +121,10 @@ func (r *FileHandlerRouter) Validate(s ssh.Session) error {
 	return nil
 }
 
-func BaseList(s ssh.Session, fpath string, isDir bool, recursive bool, spaces []string, dbpool db.DB) ([]os.FileInfo, error) {
+func BaseList(s *pssh.SSHServerConnSession, fpath string, isDir bool, recursive bool, spaces []string, dbpool db.DB) ([]os.FileInfo, error) {
 	var fileList []os.FileInfo
-	logger := wish.GetLogger(s)
-	user := wish.GetUser(s)
+	logger := pssh.GetLogger(s)
+	user := pssh.GetUser(s)
 
 	var err error
 

@@ -17,8 +17,8 @@ import (
 	"github.com/charmbracelet/wish"
 	"github.com/google/uuid"
 	"github.com/picosh/pico/db"
+	"github.com/picosh/pico/pssh"
 	"github.com/picosh/pico/shared"
-	wsh "github.com/picosh/pico/wish"
 	psub "github.com/picosh/pubsub"
 	gossh "golang.org/x/crypto/ssh"
 )
@@ -134,21 +134,20 @@ func checkAccess(accessList []string, userName string, sesh ssh.Session) bool {
 	return false
 }
 
-func WishMiddleware(handler *CliHandler) wish.Middleware {
+func WishMiddleware(handler *CliHandler) pssh.SSHServerMiddleware {
 	pubsub := handler.PubSub
 
-	return func(next ssh.Handler) ssh.Handler {
-		return func(sesh ssh.Session) {
+	return func(next pssh.SSHServerHandler) pssh.SSHServerHandler {
+		return func(sesh *pssh.SSHServerConnSession) error {
 			ctx := sesh.Context()
-			logger := wsh.GetLogger(sesh)
-			user := wsh.GetUser(sesh)
+			logger := pssh.GetLogger(sesh)
+			user := pssh.GetUser(sesh)
 
 			args := sesh.Command()
 
 			if len(args) == 0 {
-				wish.Println(sesh, helpStr(toSshCmd(handler.Cfg)))
-				next(sesh)
-				return
+				fmt.Fprintln(sesh, helpStr(toSshCmd(handler.Cfg)))
+				return next(sesh)
 			}
 
 			userName := "public"
@@ -188,13 +187,16 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 
 			cmd := strings.TrimSpace(args[0])
 			if cmd == "help" {
-				wish.Println(sesh, helpStr(toSshCmd(handler.Cfg)))
-				next(sesh)
-				return
+				fmt.Fprintln(sesh, helpStr(toSshCmd(handler.Cfg)))
+				return next(sesh)
 			} else if cmd == "ls" {
 				if userName == "public" {
-					wish.Fatalln(sesh, "access denied")
-					return
+					err := fmt.Errorf("access denied")
+					fmt.Fprintln(sesh.Stderr(), err)
+					fmt.Fprintf(sesh.Stderr(), "\r")
+					_ = sesh.Exit(1)
+					_ = sesh.Close()
+					return err
 				}
 
 				topicFilter := fmt.Sprintf("%s/", userName)
@@ -221,7 +223,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				}
 
 				if len(channels) == 0 && len(waitingChannels) == 0 {
-					wish.Println(sesh, "no pubsub channels found")
+					fmt.Fprintln(sesh, "no pubsub channels found")
 				} else {
 					var outputData string
 					if len(channels) > 0 || len(waitingChannels) > 0 {
@@ -415,7 +417,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 						}
 
 						if !*clean {
-							wish.Println(sesh, termMsg)
+							fmt.Fprintln(sesh, termMsg)
 						}
 
 						ready := make(chan struct{})
@@ -486,7 +488,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				}
 
 				if !*clean {
-					wish.Println(sesh, "sending msg ...")
+					fmt.Fprintln(sesh, "sending msg ...")
 				}
 
 				err = pubsub.Pub(
@@ -500,7 +502,7 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 				)
 
 				if !*clean {
-					wish.Println(sesh, "msg sent!")
+					fmt.Fprintln(sesh, "msg sent!")
 				}
 
 				if err != nil && !*clean {

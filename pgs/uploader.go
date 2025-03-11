@@ -15,12 +15,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/charmbracelet/ssh"
-	"github.com/charmbracelet/wish"
 	"github.com/picosh/pico/db"
 	pgsdb "github.com/picosh/pico/pgs/db"
+	"github.com/picosh/pico/pssh"
 	"github.com/picosh/pico/shared"
-	wsh "github.com/picosh/pico/wish"
 	"github.com/picosh/pobj"
 	sst "github.com/picosh/pobj/storage"
 	sendutils "github.com/picosh/send/utils"
@@ -37,7 +35,7 @@ type DenyList struct {
 	Denylist string
 }
 
-func getDenylist(s ssh.Session) *DenyList {
+func getDenylist(s *pssh.SSHServerConnSession) *DenyList {
 	v := s.Context().Value(ctxDenylistKey{})
 	if v == nil {
 		return nil
@@ -46,11 +44,11 @@ func getDenylist(s ssh.Session) *DenyList {
 	return denylist
 }
 
-func setDenylist(s ssh.Session, denylist string) {
-	s.Context().SetValue(ctxDenylistKey{}, &DenyList{Denylist: denylist})
+func setDenylist(s *pssh.SSHServerConnSession, denylist string) {
+	s.SetValue(ctxDenylistKey{}, &DenyList{Denylist: denylist})
 }
 
-func getProject(s ssh.Session) *db.Project {
+func getProject(s *pssh.SSHServerConnSession) *db.Project {
 	v := s.Context().Value(ctxProjectKey{})
 	if v == nil {
 		return nil
@@ -59,11 +57,11 @@ func getProject(s ssh.Session) *db.Project {
 	return project
 }
 
-func setProject(s ssh.Session, project *db.Project) {
-	s.Context().SetValue(ctxProjectKey{}, project)
+func setProject(s *pssh.SSHServerConnSession, project *db.Project) {
+	s.SetValue(ctxProjectKey{}, project)
 }
 
-func getBucket(s ssh.Session) (sst.Bucket, error) {
+func getBucket(s *pssh.SSHServerConnSession) (sst.Bucket, error) {
 	bucket := s.Context().Value(ctxBucketKey{}).(sst.Bucket)
 	if bucket.Name == "" {
 		return bucket, fmt.Errorf("bucket not set on `ssh.Context()` for connection")
@@ -71,11 +69,11 @@ func getBucket(s ssh.Session) (sst.Bucket, error) {
 	return bucket, nil
 }
 
-func getStorageSize(s ssh.Session) uint64 {
+func getStorageSize(s *pssh.SSHServerConnSession) uint64 {
 	return s.Context().Value(ctxStorageSizeKey{}).(uint64)
 }
 
-func incrementStorageSize(s ssh.Session, fileSize int64) uint64 {
+func incrementStorageSize(s *pssh.SSHServerConnSession, fileSize int64) uint64 {
 	curSize := getStorageSize(s)
 	var nextStorageSize uint64
 	if fileSize < 0 {
@@ -83,7 +81,7 @@ func incrementStorageSize(s ssh.Session, fileSize int64) uint64 {
 	} else {
 		nextStorageSize = curSize + uint64(fileSize)
 	}
-	s.Context().SetValue(ctxStorageSizeKey{}, nextStorageSize)
+	s.SetValue(ctxStorageSizeKey{}, nextStorageSize)
 	return nextStorageSize
 }
 
@@ -113,13 +111,13 @@ func NewUploadAssetHandler(cfg *PgsConfig, ch chan string, ctx context.Context) 
 	}
 }
 
-func (h *UploadAssetHandler) GetLogger(s ssh.Session) *slog.Logger {
-	return wsh.GetLogger(s)
+func (h *UploadAssetHandler) GetLogger(s *pssh.SSHServerConnSession) *slog.Logger {
+	return pssh.GetLogger(s)
 }
 
-func (h *UploadAssetHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os.FileInfo, sendutils.ReadAndReaderAtCloser, error) {
-	logger := wsh.GetLogger(s)
-	user := wsh.GetUser(s)
+func (h *UploadAssetHandler) Read(s *pssh.SSHServerConnSession, entry *sendutils.FileEntry) (os.FileInfo, sendutils.ReadAndReaderAtCloser, error) {
+	logger := pssh.GetLogger(s)
+	user := pssh.GetUser(s)
 
 	if user == nil {
 		err := fmt.Errorf("could not get user from ctx")
@@ -153,11 +151,11 @@ func (h *UploadAssetHandler) Read(s ssh.Session, entry *sendutils.FileEntry) (os
 	return fileInfo, reader, nil
 }
 
-func (h *UploadAssetHandler) List(s ssh.Session, fpath string, isDir bool, recursive bool) ([]os.FileInfo, error) {
+func (h *UploadAssetHandler) List(s *pssh.SSHServerConnSession, fpath string, isDir bool, recursive bool) ([]os.FileInfo, error) {
 	var fileList []os.FileInfo
 
-	logger := wsh.GetLogger(s)
-	user := wsh.GetUser(s)
+	logger := pssh.GetLogger(s)
+	user := pssh.GetUser(s)
 
 	if user == nil {
 		err := fmt.Errorf("could not get user from ctx")
@@ -201,9 +199,9 @@ func (h *UploadAssetHandler) List(s ssh.Session, fpath string, isDir bool, recur
 	return fileList, nil
 }
 
-func (h *UploadAssetHandler) Validate(s ssh.Session) error {
-	logger := wsh.GetLogger(s)
-	user := wsh.GetUser(s)
+func (h *UploadAssetHandler) Validate(s *pssh.SSHServerConnSession) error {
+	logger := pssh.GetLogger(s)
+	user := pssh.GetUser(s)
 
 	if user == nil {
 		err := fmt.Errorf("could not get user from ctx")
@@ -217,14 +215,14 @@ func (h *UploadAssetHandler) Validate(s ssh.Session) error {
 		return err
 	}
 
-	s.Context().SetValue(ctxBucketKey{}, bucket)
+	s.SetValue(ctxBucketKey{}, bucket)
 
 	totalStorageSize, err := h.Cfg.Storage.GetBucketQuota(bucket)
 	if err != nil {
 		return err
 	}
 
-	s.Context().SetValue(ctxStorageSizeKey{}, totalStorageSize)
+	s.SetValue(ctxStorageSizeKey{}, totalStorageSize)
 
 	logger.Info(
 		"bucket size",
@@ -279,9 +277,9 @@ func findPlusFF(dbpool pgsdb.PgsDB, cfg *PgsConfig, userID string) *db.FeatureFl
 	return ff
 }
 
-func (h *UploadAssetHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (string, error) {
-	logger := wsh.GetLogger(s)
-	user := wsh.GetUser(s)
+func (h *UploadAssetHandler) Write(s *pssh.SSHServerConnSession, entry *sendutils.FileEntry) (string, error) {
+	logger := pssh.GetLogger(s)
+	user := pssh.GetUser(s)
 
 	if user == nil {
 		err := fmt.Errorf("could not get user from ctx")
@@ -380,7 +378,10 @@ func (h *UploadAssetHandler) Write(s ssh.Session, entry *sendutils.FileEntry) (s
 	remaining := int64(storageMax) - int64(curStorageSize)
 	sizeRemaining := min(remaining+curFileSize, fileMax)
 	if sizeRemaining <= 0 {
-		wish.Fatalln(s, "storage quota reached")
+		fmt.Fprintln(s.Stderr(), "storage quota reached")
+		fmt.Fprintf(s.Stderr(), "\r")
+		_ = s.Exit(1)
+		_ = s.Close()
 		return "", fmt.Errorf("storage quota reached")
 	}
 	logger = logger.With(
@@ -442,9 +443,9 @@ func isSpecialFile(entry *sendutils.FileEntry) bool {
 	return fname == "_headers" || fname == "_redirects"
 }
 
-func (h *UploadAssetHandler) Delete(s ssh.Session, entry *sendutils.FileEntry) error {
-	logger := wsh.GetLogger(s)
-	user := wsh.GetUser(s)
+func (h *UploadAssetHandler) Delete(s *pssh.SSHServerConnSession, entry *sendutils.FileEntry) error {
+	logger := pssh.GetLogger(s)
+	user := pssh.GetUser(s)
 
 	if user == nil {
 		err := fmt.Errorf("could not get user from ctx")
@@ -537,7 +538,7 @@ func (h *UploadAssetHandler) validateAsset(data *FileData) (bool, error) {
 	return true, nil
 }
 
-func (h *UploadAssetHandler) writeAsset(s ssh.Session, reader io.Reader, data *FileData) (int64, error) {
+func (h *UploadAssetHandler) writeAsset(s *pssh.SSHServerConnSession, reader io.Reader, data *FileData) (int64, error) {
 	assetFilepath := shared.GetAssetFileName(data.FileEntry)
 
 	logger := h.GetLogger(s)

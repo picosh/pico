@@ -1,4 +1,4 @@
-package shared_test
+package pssh_test
 
 import (
 	"context"
@@ -8,14 +8,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/picosh/pico/shared"
+	"github.com/picosh/pico/pssh"
 	"golang.org/x/crypto/ssh"
 )
 
 func TestNewSSHServer(t *testing.T) {
 	ctx := context.Background()
 	logger := slog.Default()
-	server := shared.NewSSHServer(ctx, logger, &shared.SSHServerConfig{})
+	server := pssh.NewSSHServer(ctx, logger, &pssh.SSHServerConfig{})
 
 	if server == nil {
 		t.Fatal("expected non-nil server")
@@ -41,10 +41,10 @@ func TestNewSSHServer(t *testing.T) {
 func TestNewSSHServerConn(t *testing.T) {
 	ctx := context.Background()
 	logger := slog.Default()
-	server := shared.NewSSHServer(ctx, logger, &shared.SSHServerConfig{})
+	server := pssh.NewSSHServer(ctx, logger, &pssh.SSHServerConfig{})
 	conn := &ssh.ServerConn{}
 
-	serverConn := shared.NewSSHServerConn(ctx, logger, conn, server)
+	serverConn := pssh.NewSSHServerConn(ctx, logger, conn, server)
 
 	if serverConn == nil {
 		t.Fatal("expected non-nil server connection")
@@ -70,10 +70,10 @@ func TestNewSSHServerConn(t *testing.T) {
 func TestSSHServerConnClose(t *testing.T) {
 	ctx := context.Background()
 	logger := slog.Default()
-	server := shared.NewSSHServer(ctx, logger, &shared.SSHServerConfig{})
+	server := pssh.NewSSHServer(ctx, logger, &pssh.SSHServerConfig{})
 	conn := &ssh.ServerConn{}
 
-	serverConn := shared.NewSSHServerConn(ctx, logger, conn, server)
+	serverConn := pssh.NewSSHServerConn(ctx, logger, conn, server)
 	err := serverConn.Close()
 
 	if err != nil {
@@ -92,7 +92,7 @@ func TestSSHServerConnClose(t *testing.T) {
 func TestSSHServerClose(t *testing.T) {
 	ctx := context.Background()
 	logger := slog.Default()
-	server := shared.NewSSHServer(ctx, logger, &shared.SSHServerConfig{})
+	server := pssh.NewSSHServer(ctx, logger, &pssh.SSHServerConfig{})
 
 	// Create a mock listener to test Close()
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
@@ -120,7 +120,7 @@ func TestSSHServerNilParams(t *testing.T) {
 	// Test with nil context and logger
 	//nolint:staticcheck // SA1012 ignores nil check
 	//lint:ignore SA1012 ignores nil check
-	server := shared.NewSSHServer(nil, nil, nil)
+	server := pssh.NewSSHServer(nil, nil, nil)
 
 	if server == nil {
 		t.Fatal("expected non-nil server")
@@ -137,7 +137,7 @@ func TestSSHServerNilParams(t *testing.T) {
 	// Test with nil context and logger for connection
 	//nolint:staticcheck // SA1012 ignores nil check
 	//lint:ignore SA1012 ignores nil check
-	conn := shared.NewSSHServerConn(nil, nil, &ssh.ServerConn{}, server)
+	conn := pssh.NewSSHServerConn(nil, nil, &ssh.ServerConn{}, server)
 
 	if conn == nil {
 		t.Fatal("expected non-nil server connection")
@@ -156,7 +156,7 @@ func TestSSHServerHandleConn(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	logger := slog.Default()
-	server := shared.NewSSHServer(ctx, logger, &shared.SSHServerConfig{})
+	server := pssh.NewSSHServer(ctx, logger, &pssh.SSHServerConfig{})
 
 	// Setup a basic SSH server config
 	config := &ssh.ServerConfig{
@@ -206,7 +206,7 @@ func TestSSHServerListenAndServe(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	logger := slog.Default()
-	server := shared.NewSSHServer(ctx, logger, &shared.SSHServerConfig{})
+	server := pssh.NewSSHServer(ctx, logger, &pssh.SSHServerConfig{})
 
 	config := &ssh.ServerConfig{
 		NoClientAuth: true,
@@ -245,10 +245,10 @@ func TestSSHServerConnHandle(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	logger := slog.Default()
-	server := shared.NewSSHServer(ctx, logger, &shared.SSHServerConfig{})
+	server := pssh.NewSSHServer(ctx, logger, &pssh.SSHServerConfig{})
 	conn := &ssh.ServerConn{}
 
-	serverConn := shared.NewSSHServerConn(ctx, logger, conn, server)
+	serverConn := pssh.NewSSHServerConn(ctx, logger, conn, server)
 
 	// Create channels for testing
 	chans := make(chan ssh.NewChannel)

@@ -5,34 +5,32 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
 	"github.com/picosh/pico/db"
+	"github.com/picosh/pico/pssh"
 	"github.com/picosh/pico/shared"
-
-	wsh "github.com/picosh/pico/wish"
 )
 
-func WishMiddleware(dbpool db.DB, cfg *shared.ConfigSite) wish.Middleware {
-	return func(next ssh.Handler) ssh.Handler {
-		return func(sesh ssh.Session) {
+func WishMiddleware(dbpool db.DB, cfg *shared.ConfigSite) pssh.SSHServerMiddleware {
+	return func(next pssh.SSHServerHandler) pssh.SSHServerHandler {
+		return func(sesh *pssh.SSHServerConnSession) error {
 			args := sesh.Command()
 			if len(args) == 0 {
-				next(sesh)
-				return
+				return next(sesh)
 			}
 
-			logger := wsh.GetLogger(sesh)
-			user := wsh.GetUser(sesh)
+			logger := pssh.GetLogger(sesh)
+			user := pssh.GetUser(sesh)
 
 			if user == nil {
-				wish.Errorln(sesh, fmt.Errorf("user not found"))
-				return
+				err := fmt.Errorf("user not found")
+				fmt.Fprintln(sesh.Stderr(), err)
+				return err
 			}
 
 			cmd := args[0]
 			if cmd == "help" {
-				wish.Printf(sesh, "Commands: [help, ls, rm, run]\n\n")
+				fmt.Fprintf(sesh, "Commands: [help, ls, rm, run]\n\n")
 				writer := tabwriter.NewWriter(sesh, 0, 0, 1, ' ', tabwriter.TabIndent)
 				fmt.Fprintln(writer, "Cmd\tDesc")
 				fmt.Fprintf(
@@ -55,17 +53,16 @@ func WishMiddleware(dbpool db.DB, cfg *shared.ConfigSite) wish.Middleware {
 					"%s\t%s\n",
 					"run {filename}", "runs the feed digest post immediately, ignoring last digest time validation",
 				)
-				writer.Flush()
-				return
+				return writer.Flush()
 			} else if cmd == "ls" {
 				posts, err := dbpool.FindPostsForUser(&db.Pager{Page: 0, Num: 1000}, user.ID, "feeds")
 				if err != nil {
-					wish.Errorln(sesh, err)
-					return
+					fmt.Fprintln(sesh.Stderr(), err)
+					return err
 				}
 
 				if len(posts.Data) == 0 {
-					wish.Println(sesh, "no posts found")
+					fmt.Fprintln(sesh, "no posts found")
 				}
 
 				writer := tabwriter.NewWriter(sesh, 0, 0, 1, ' ', tabwriter.TabIndent)

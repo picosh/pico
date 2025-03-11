@@ -1,4 +1,4 @@
-package shared
+package pssh
 
 import (
 	"context"
@@ -72,7 +72,67 @@ func (s *SSHServerConn) SetValue(key any, data any) {
 	s.Ctx = context.WithValue(s.Ctx, key, data)
 }
 
-var _ context.Context = &SSHServerConn{}
+func (s *SSHServerConn) Context() context.Context {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return s.Ctx
+}
+
+func (s *SSHServerConnSession) Permissions() *ssh.Permissions {
+	return s.Conn.Permissions
+}
+
+func (s *SSHServerConnSession) User() string {
+	return s.Conn.User()
+}
+
+func (s *SSHServerConnSession) PublicKey() ssh.PublicKey {
+	key, ok := s.Conn.Permissions.Extensions["pubkey"]
+	if !ok {
+		return nil
+	}
+
+	pk, _, _, _, err := ssh.ParseAuthorizedKey([]byte(key))
+	if err != nil {
+		return nil
+	}
+	return pk
+}
+
+func (s *SSHServerConnSession) RemoteAddr() net.Addr {
+	return s.Conn.RemoteAddr()
+}
+
+func (s *SSHServerConnSession) Command() []string {
+	cmd, _ := s.Value("command").([]string)
+	return cmd
+}
+
+func (s *SSHServerConnSession) Close() error {
+	return s.Channel.Close()
+}
+
+func (s *SSHServerConnSession) Exit(code int) error {
+	_, err := s.Channel.SendRequest("exit-status", false, ssh.Marshal(struct{ C int }{code}))
+	return err
+}
+
+type Window struct {
+	Width  int
+	Height int
+}
+
+type Pty struct {
+	Term   string
+	Window Window
+}
+
+func (s *SSHServerConnSession) Pty() (Pty, <-chan Window, bool) {
+	return Pty{}, nil, false
+}
+
+var _ context.Context = &SSHServerConnSession{}
 
 func (sc *SSHServerConn) Handle(chans <-chan ssh.NewChannel, reqs <-chan *ssh.Request) error {
 	defer sc.Close()
@@ -146,7 +206,8 @@ func NewSSHServerConn(
 	}
 }
 
-type SSHServerMiddleware func(func(*SSHServerConnSession) error) func(*SSHServerConnSession) error
+type SSHServerHandler func(*SSHServerConnSession) error
+type SSHServerMiddleware func(SSHServerHandler) SSHServerHandler
 
 type SSHServerConfig struct {
 	*ssh.ServerConfig
