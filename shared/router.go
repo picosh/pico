@@ -10,8 +10,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
+	"github.com/picosh/pico/pssh"
 	"github.com/picosh/pico/shared/storage"
 )
 
@@ -173,12 +173,12 @@ type ctxCfg struct{}
 
 type CtxSubdomainKey struct{}
 type ctxKey struct{}
-type CtxSshKey struct{}
+type CtxSessionKey struct{}
 
-func GetSshCtx(r *http.Request) (ssh.Context, error) {
-	payload, ok := r.Context().Value(CtxSshKey{}).(ssh.Context)
+func GetSshCtx(r *http.Request) (*pssh.SSHServerConnSession, error) {
+	payload, ok := r.Context().Value(CtxSessionKey{}).(*pssh.SSHServerConnSession)
 	if payload == nil || !ok {
-		return payload, fmt.Errorf("sshCtx not set on `r.Context()` for connection")
+		return payload, fmt.Errorf("ssh session not set on `r.Context()` for connection")
 	}
 	return payload, nil
 }

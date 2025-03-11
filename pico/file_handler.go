@@ -11,12 +11,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/pssh"
 	"github.com/picosh/pico/shared"
 	sendutils "github.com/picosh/send/utils"
 	"github.com/picosh/utils"
+	"golang.org/x/crypto/ssh"
 )
 
 type UploadHandler struct {
@@ -168,7 +168,7 @@ func authorizedKeysDiff(keyInUse ssh.PublicKey, curKeys []KeyWithId, nextKeys []
 	for _, nk := range nextKeys {
 		found := false
 		for _, ck := range curKeys {
-			if ssh.KeysEqual(nk.Pk, ck.Pk) {
+			if pssh.KeysEqual(nk.Pk, ck.Pk) {
 				found = true
 
 				// update the comment field
@@ -188,13 +188,13 @@ func authorizedKeysDiff(keyInUse ssh.PublicKey, curKeys []KeyWithId, nextKeys []
 	for _, ck := range curKeys {
 		// we never want to remove the key that's in the current ssh session
 		// in an effort to avoid mistakenly removing their current key
-		if ssh.KeysEqual(ck.Pk, keyInUse) {
+		if pssh.KeysEqual(ck.Pk, keyInUse) {
 			continue
 		}
 
 		found := false
 		for _, nk := range nextKeys {
-			if ssh.KeysEqual(ck.Pk, nk.Pk) {
+			if pssh.KeysEqual(ck.Pk, nk.Pk) {
 				found = true
 				break
 			}

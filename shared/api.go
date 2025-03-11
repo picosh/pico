@@ -8,9 +8,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/utils"
+	"golang.org/x/crypto/ssh"
 )
 
 type SubdomainProps struct {

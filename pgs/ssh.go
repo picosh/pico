@@ -14,6 +14,7 @@ import (
 	"github.com/picosh/send/protocols/rsync"
 	"github.com/picosh/send/protocols/scp"
 	"github.com/picosh/send/protocols/sftp"
+	"github.com/picosh/tunkit"
 	"github.com/picosh/utils"
 	"golang.org/x/crypto/ssh"
 )
@@ -36,10 +37,10 @@ func StartSshServer(cfg *PgsConfig, killCh chan error) {
 
 	sshAuth := shared.NewSshAuthHandler(cfg.DB, logger)
 
-	// webTunnel := &tunkit.WebTunnelHandler{
-	// 	Logger:      logger,
-	// 	HttpHandler: createHttpHandler(cfg),
-	// }
+	webTunnel := &tunkit.WebTunnelHandler{
+		Logger:      logger,
+		HttpHandler: createHttpHandler(cfg),
+	}
 
 	// Create a new SSH server
 	server := pssh.NewSSHServer(ctx, logger, &pssh.SSHServerConfig{
@@ -60,6 +61,9 @@ func StartSshServer(cfg *PgsConfig, killCh chan error) {
 		SubsystemMiddleware: []pssh.SSHServerMiddleware{
 			sftp.Middleware(handler),
 			pssh.LogMiddleware(handler, handler.Cfg.DB),
+		},
+		ChannelMiddleware: map[string]pssh.SSHServerChannelMiddleware{
+			"direct-tcpip": tunkit.LocalForwardHandler(webTunnel),
 		},
 	})
 

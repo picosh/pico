@@ -2,6 +2,7 @@ package pssh
 
 import (
 	"context"
+	"crypto/subtle"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -166,75 +167,15 @@ func (sc *SSHServerConn) Handle(chans <-chan ssh.NewChannel, reqs <-chan *ssh.Re
 			if !ok {
 				return nil
 			}
+
 			sc.Logger.Info("new channel", "type", newChan.ChannelType(), "extraData", newChan.ExtraData())
-			switch newChan.ChannelType() {
-			case "session":
-				channel, requests, err := newChan.Accept()
-				if err != nil {
-					sc.Logger.Error("accept session channel", "err", err)
-					return err
-				}
-
-				go func() {
-					for {
-						select {
-						case <-sc.Done():
-							return
-						case req, ok := <-requests:
-							if !ok {
-								return
-							}
-
-							sc.Logger.Info("new session request", "type", req.Type, "wantReply", req.WantReply, "payload", req.Payload)
-							if req.Type == "subsystem" {
-								if len(sc.SSHServer.Config.SubsystemMiddleware) == 0 {
-									req.Reply(false, nil)
-									continue
-								}
-
-								h := func(*SSHServerConnSession) error { return nil }
-								for _, m := range sc.SSHServer.Config.SubsystemMiddleware {
-									h = m(h)
-								}
-
-								if err := h(&SSHServerConnSession{
-									Channel:       channel,
-									SSHServerConn: sc,
-								}); err != nil {
-									req.Reply(false, nil)
-									continue
-								}
-
-								req.Reply(true, nil)
-							} else if req.Type == "exec" {
-								if len(sc.SSHServer.Config.Middleware) == 0 {
-									req.Reply(false, nil)
-									continue
-								}
-
-								sesh := &SSHServerConnSession{
-									Channel:       channel,
-									SSHServerConn: sc,
-								}
-
-								sesh.SetValue("command", strings.Fields(string(req.Payload[4:])))
-
-								h := func(*SSHServerConnSession) error { return nil }
-								for _, m := range sc.SSHServer.Config.Middleware {
-									h = m(h)
-								}
-
-								if err := h(sesh); err != nil {
-									req.Reply(false, nil)
-									continue
-								}
-
-								req.Reply(true, nil)
-							}
-						}
-					}
-				}()
+			chanFunc, ok := sc.SSHServer.Config.ChannelMiddleware[newChan.ChannelType()]
+			if !ok {
+				sc.Logger.Info("no channel middleware for type", "type", newChan.ChannelType())
+				continue
 			}
+
+			go chanFunc(newChan, sc)
 		case req, ok := <-reqs:
 			if !ok {
 				return nil
@@ -271,12 +212,14 @@ func NewSSHServerConn(
 
 type SSHServerHandler func(*SSHServerConnSession) error
 type SSHServerMiddleware func(SSHServerHandler) SSHServerHandler
+type SSHServerChannelMiddleware func(ssh.NewChannel, *SSHServerConn) error
 
 type SSHServerConfig struct {
 	*ssh.ServerConfig
 	ListenAddr          string
 	Middleware          []SSHServerMiddleware
 	SubsystemMiddleware []SSHServerMiddleware
+	ChannelMiddleware   map[string]SSHServerChannelMiddleware
 }
 
 type SSHServer struct {
@@ -375,6 +318,84 @@ func NewSSHServer(ctx context.Context, logger *slog.Logger, config *SSHServerCon
 		config = &SSHServerConfig{}
 	}
 
+	if config.ChannelMiddleware == nil {
+		config.ChannelMiddleware = map[string]SSHServerChannelMiddleware{}
+	}
+
+	if _, ok := config.ChannelMiddleware["session"]; !ok {
+		config.ChannelMiddleware["session"] = func(newChan ssh.NewChannel, sc *SSHServerConn) error {
+			channel, requests, err := newChan.Accept()
+			if err != nil {
+				sc.Logger.Error("accept session channel", "err", err)
+				return err
+			}
+
+			for {
+				select {
+				case <-sc.Done():
+					return nil
+				case req, ok := <-requests:
+					if !ok {
+						return nil
+					}
+
+					go func() {
+						sc.Logger.Info("new session request", "type", req.Type, "wantReply", req.WantReply, "payload", req.Payload)
+						if req.Type == "subsystem" {
+							if len(sc.SSHServer.Config.SubsystemMiddleware) == 0 {
+								req.Reply(false, nil)
+								sc.Close()
+								return
+							}
+
+							h := func(*SSHServerConnSession) error { return nil }
+							for _, m := range sc.SSHServer.Config.SubsystemMiddleware {
+								h = m(h)
+							}
+
+							sesh := &SSHServerConnSession{
+								Channel:       channel,
+								SSHServerConn: sc,
+							}
+
+							if err := h(sesh); err != nil {
+								req.Reply(false, nil)
+								sesh.Close()
+							}
+
+							req.Reply(true, nil)
+							sesh.Close()
+						} else if req.Type == "exec" {
+							if len(sc.SSHServer.Config.Middleware) == 0 {
+								req.Reply(false, nil)
+							}
+
+							sesh := &SSHServerConnSession{
+								Channel:       channel,
+								SSHServerConn: sc,
+							}
+
+							sesh.SetValue("command", strings.Fields(string(req.Payload[4:])))
+
+							h := func(*SSHServerConnSession) error { return nil }
+							for _, m := range sc.SSHServer.Config.Middleware {
+								h = m(h)
+							}
+
+							if err := h(sesh); err != nil {
+								req.Reply(false, nil)
+								sesh.Close()
+							}
+
+							req.Reply(true, nil)
+							sesh.Close()
+						}
+					}()
+				}
+			}
+		}
+	}
+
 	server := &SSHServer{
 		Ctx:        cancelCtx,
 		CancelFunc: cancelFunc,
@@ -384,4 +405,14 @@ func NewSSHServer(ctx context.Context, logger *slog.Logger, config *SSHServerCon
 	}
 
 	return server
+}
+
+func KeysEqual(a, b ssh.PublicKey) bool {
+	if a == nil || b == nil {
+		return false
+	}
+
+	am := a.Marshal()
+	bm := b.Marshal()
+	return (len(am) == len(bm) && subtle.ConstantTimeCompare(am, bm) == 1)
 }

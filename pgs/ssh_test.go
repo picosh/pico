@@ -408,7 +408,8 @@ func WriteFileWithSftp(cfg *PgsConfig, conn *ssh.Client) (*os.FileInfo, error) {
 		cfg.Logger.Error("could not write to file", "err", err)
 		return nil, err
 	}
-	f.Close()
+
+	cfg.Logger.Info("closing", "err", f.Close())
 
 	// check it's there
 	fi, err := client.Lstat("test/hello.txt")

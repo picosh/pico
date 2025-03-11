@@ -101,6 +101,7 @@ type CliHandler struct {
 }
 
 func (h *CliHandler) GetLogger(s *pssh.SSHServerConnSession) *slog.Logger {
+	return h.Logger
 }
 
 func toSshCmd(cfg *shared.ConfigSite) string {
@@ -453,7 +454,7 @@ func WishMiddleware(handler *CliHandler) pssh.SSHServerMiddleware {
 							cancel()
 
 							if !*clean {
-								sesh.Fatal(fmt.Errorf("timeout reached, exiting ..."))
+								sesh.Fatal(fmt.Errorf("timeout reached, exiting"))
 							} else {
 								err = sesh.Exit(1)
 								if err != nil {

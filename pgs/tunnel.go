@@ -6,9 +6,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
+	"github.com/picosh/pico/pssh"
 	"github.com/picosh/pico/shared"
+	"golang.org/x/crypto/ssh"
 )
 
 type TunnelWebRouter struct {
@@ -33,7 +34,7 @@ func (web *TunnelWebRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	web.UserRouter.ServeHTTP(w, r.WithContext(ctx))
 }
 
-type CtxHttpBridge = func(ssh.Context) http.Handler
+type CtxHttpBridge = func(*pssh.SSHServerConnSession) http.Handler
 
 func getInfoFromUser(user string) (string, string) {
 	if strings.Contains(user, "__") {
@@ -45,7 +46,7 @@ func getInfoFromUser(user string) (string, string) {
 }
 
 func createHttpHandler(cfg *PgsConfig) CtxHttpBridge {
-	return func(ctx ssh.Context) http.Handler {
+	return func(ctx *pssh.SSHServerConnSession) http.Handler {
 		logger := cfg.Logger
 		asUser, subdomain := getInfoFromUser(ctx.User())
 		log := logger.With(

@@ -29,8 +29,6 @@ require (
 	github.com/antoniomika/syncmap v1.0.0
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
 	github.com/charmbracelet/lipgloss v1.0.0
-	github.com/charmbracelet/ssh v0.0.0-20250213143314-8712ec3ff3ef
-	github.com/charmbracelet/wish v1.4.6
 	github.com/containerd/console v1.0.4
 	github.com/darkweak/souin v1.7.5
 	github.com/darkweak/souin/plugins/souin/storages v1.7.5
@@ -49,6 +47,7 @@ require (
 	github.com/picosh/pobj v0.0.0-20250304201248-a9c7179aa49b
 	github.com/picosh/pubsub v0.0.0-20241114191831-ec8f16c0eb88
 	github.com/picosh/send v0.0.0-20250304201154-e36cd3bbbb35
+	github.com/picosh/tunkit v0.0.0-00010101000000-000000000000
 	github.com/picosh/utils v0.0.0-20241120033529-8ca070c09bf4
 	github.com/pkg/sftp v1.13.7
 	github.com/prometheus/client_golang v1.21.0-rc.0
@@ -79,7 +78,6 @@ require (
 	github.com/PuerkitoBio/goquery v1.10.0 // indirect
 	github.com/RoaringBitmap/roaring v1.2.3 // indirect
 	github.com/andybalholm/cascadia v1.3.2 // indirect
-	github.com/anmitsu/go-shlex v0.0.0-20200514113438-38f4b401e2be // indirect
 	github.com/antlabs/stl v0.0.1 // indirect
 	github.com/antlabs/timer v0.0.11 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
@@ -116,20 +114,12 @@ require (
 	github.com/caddyserver/zerossl v0.1.3 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/charmbracelet/bubbletea v1.3.4 // indirect
-	github.com/charmbracelet/keygen v0.5.1 // indirect
-	github.com/charmbracelet/log v0.4.0 // indirect
 	github.com/charmbracelet/x/ansi v0.8.0 // indirect
-	github.com/charmbracelet/x/conpty v0.1.0 // indirect
-	github.com/charmbracelet/x/errors v0.0.0-20250226164017-59292a315e58 // indirect
 	github.com/charmbracelet/x/exp/golden v0.0.0-20240815200342-61de596daa2b // indirect
-	github.com/charmbracelet/x/term v0.2.1 // indirect
-	github.com/charmbracelet/x/termios v0.1.1 // indirect
 	github.com/chzyer/readline v1.5.1 // indirect
 	github.com/coreos/go-semver v0.3.1 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.3 // indirect
-	github.com/creack/pty v1.1.24 // indirect
 	github.com/darkweak/go-esi v0.0.5 // indirect
 	github.com/darkweak/storages/badger v0.0.8 // indirect
 	github.com/darkweak/storages/etcd v0.0.8 // indirect
@@ -157,7 +147,6 @@ require (
 	github.com/dsoprea/go-png-image-structure v0.0.0-20210512210324-29b889a6093d // indirect
 	github.com/dsoprea/go-utility v0.0.0-20221003172846-a3e1774ef349 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
 	github.com/forPelevin/gomoji v1.2.0 // indirect
 	github.com/gammazero/deque v0.2.1 // indirect
 	github.com/gkampitakis/ciinfo v0.3.0 // indirect
@@ -220,7 +209,6 @@ require (
 	github.com/maruel/natural v1.1.1 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/mattn/go-localereader v0.0.1 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/mattn/go-sixel v0.0.5 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
@@ -239,8 +227,6 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/mschoch/smat v0.2.0 // indirect
-	github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6 // indirect
-	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/nats-io/nats.go v1.36.0 // indirect
