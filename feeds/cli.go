@@ -5,7 +5,6 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/charmbracelet/wish"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/pssh"
 	"github.com/picosh/pico/shared"
@@ -80,11 +79,10 @@ func WishMiddleware(dbpool db.DB, cfg *shared.ConfigSite) pssh.SSHServerMiddlewa
 						post.Data.Attempts,
 					)
 				}
-				writer.Flush()
-				return
+				return writer.Flush()
 			} else if cmd == "rm" {
 				filename := args[1]
-				wish.Printf(sesh, "removing digest post %s\n", filename)
+				fmt.Fprintf(sesh, "removing digest post %s\n", filename)
 				write := false
 				if len(args) > 2 {
 					writeRaw := args[2]
@@ -95,41 +93,42 @@ func WishMiddleware(dbpool db.DB, cfg *shared.ConfigSite) pssh.SSHServerMiddlewa
 
 				post, err := dbpool.FindPostWithFilename(filename, user.ID, "feeds")
 				if err != nil {
-					wish.Errorln(sesh, err)
-					return
+					fmt.Fprintln(sesh.Stderr(), err)
+					return err
 				}
 				if write {
 					err = dbpool.RemovePosts([]string{post.ID})
 					if err != nil {
-						wish.Errorln(sesh, err)
+						fmt.Fprintln(sesh.Stderr(), err)
 					}
 				}
-				wish.Printf(sesh, "digest post removed %s\n", filename)
+				fmt.Fprintf(sesh, "digest post removed %s\n", filename)
 				if !write {
-					wish.Println(sesh, "WARNING: *must* append with `--write` for the changes to persist.")
+					fmt.Fprintln(sesh, "WARNING: *must* append with `--write` for the changes to persist.")
 				}
-				return
+				return err
 			} else if cmd == "run" {
 				if len(args) < 2 {
-					wish.Errorln(sesh, "must provide filename of post to run")
-					return
+					err := fmt.Errorf("must provide filename of post to run")
+					fmt.Fprintln(sesh.Stderr(), err)
+					return err
 				}
 				filename := args[1]
 				post, err := dbpool.FindPostWithFilename(filename, user.ID, "feeds")
 				if err != nil {
-					wish.Errorln(sesh, err)
-					return
+					fmt.Fprintln(sesh.Stderr(), err)
+					return err
 				}
-				wish.Printf(sesh, "running feed post: %s\n", filename)
+				fmt.Fprintf(sesh, "running feed post: %s\n", filename)
 				fetcher := NewFetcher(dbpool, cfg)
 				err = fetcher.RunPost(logger, user, post, true)
 				if err != nil {
-					wish.Errorln(sesh, err)
+					fmt.Fprintln(sesh.Stderr(), err)
 				}
-				return
+				return err
 			}
 
-			next(sesh)
+			return next(sesh)
 		}
 	}
 }

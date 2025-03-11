@@ -48,7 +48,6 @@ func StartSshServer(cfg *PgsConfig, killCh chan error) {
 			PublicKeyCallback: sshAuth.PubkeyAuthHandler,
 		},
 		Middleware: []pssh.SSHServerMiddleware{
-			sftp.Middleware(handler),
 			pipe.Middleware(handler, ""),
 			list.Middleware(handler),
 			scp.Middleware(handler),

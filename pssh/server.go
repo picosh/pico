@@ -3,8 +3,10 @@ package pssh
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -119,18 +121,36 @@ func (s *SSHServerConnSession) Exit(code int) error {
 	return err
 }
 
+func (s *SSHServerConnSession) Fatal(err error) {
+	fmt.Fprintln(s.Stderr(), err)
+	fmt.Fprintf(s.Stderr(), "\r")
+	_ = s.Exit(1)
+	_ = s.Close()
+}
+
 type Window struct {
-	Width  int
-	Height int
+	Width        int
+	Height       int
+	HeightPixels int
+	WidthPixels  int
 }
 
 type Pty struct {
 	Term   string
 	Window Window
+	Slave  os.File
 }
 
 func (s *SSHServerConnSession) Pty() (Pty, <-chan Window, bool) {
 	return Pty{}, nil, false
+}
+
+func (p Pty) Resize(width, height int) error {
+	return nil
+}
+
+func (p Pty) Name() string {
+	return ""
 }
 
 var _ context.Context = &SSHServerConnSession{}

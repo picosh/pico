@@ -29,7 +29,6 @@ require (
 	github.com/antoniomika/syncmap v1.0.0
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
 	github.com/charmbracelet/lipgloss v1.0.0
-	github.com/charmbracelet/promwish v0.7.0
 	github.com/charmbracelet/ssh v0.0.0-20250213143314-8712ec3ff3ef
 	github.com/charmbracelet/wish v1.4.6
 	github.com/containerd/console v1.0.4

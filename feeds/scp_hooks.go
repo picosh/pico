@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/filehandlers"
+	"github.com/picosh/pico/pssh"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/utils"
 )
@@ -20,7 +20,7 @@ type FeedHooks struct {
 	Db  db.DB
 }
 
-func (p *FeedHooks) FileValidate(s ssh.Session, data *filehandlers.PostMetaData) (bool, error) {
+func (p *FeedHooks) FileValidate(s *pssh.SSHServerConnSession, data *filehandlers.PostMetaData) (bool, error) {
 	if !utils.IsTextFile(string(data.Text)) {
 		err := fmt.Errorf(
 			"WARNING: (%s) invalid file must be plain text (utf-8), skipping",
@@ -73,7 +73,7 @@ func (p *FeedHooks) FileValidate(s ssh.Session, data *filehandlers.PostMetaData)
 	return true, nil
 }
 
-func (p *FeedHooks) FileMeta(s ssh.Session, data *filehandlers.PostMetaData) error {
+func (p *FeedHooks) FileMeta(s *pssh.SSHServerConnSession, data *filehandlers.PostMetaData) error {
 	if data.Data.LastDigest == nil {
 		now := time.Now()
 		// let it run on the next loop

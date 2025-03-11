@@ -13,8 +13,6 @@ import (
 	"time"
 
 	"github.com/antoniomika/syncmap"
-	"github.com/charmbracelet/ssh"
-	"github.com/charmbracelet/wish"
 	"github.com/google/uuid"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/pssh"
@@ -23,7 +21,7 @@ import (
 	gossh "golang.org/x/crypto/ssh"
 )
 
-func flagSet(cmdName string, sesh ssh.Session) *flag.FlagSet {
+func flagSet(cmdName string, sesh *pssh.SSHServerConnSession) *flag.FlagSet {
 	cmd := flag.NewFlagSet(cmdName, flag.ContinueOnError)
 	cmd.SetOutput(sesh)
 	cmd.Usage = func() {
@@ -102,6 +100,9 @@ type CliHandler struct {
 	Access  *syncmap.Map[string, []string]
 }
 
+func (h *CliHandler) GetLogger(s *pssh.SSHServerConnSession) *slog.Logger {
+}
+
 func toSshCmd(cfg *shared.ConfigSite) string {
 	port := ""
 	if cfg.PortOverride != "22" {
@@ -120,7 +121,7 @@ func parseArgList(arg string) []string {
 }
 
 // checkAccess checks if the user has access to a topic based on an access list.
-func checkAccess(accessList []string, userName string, sesh ssh.Session) bool {
+func checkAccess(accessList []string, userName string, sesh *pssh.SSHServerConnSession) bool {
 	for _, acc := range accessList {
 		if acc == userName {
 			return true
@@ -192,10 +193,7 @@ func WishMiddleware(handler *CliHandler) pssh.SSHServerMiddleware {
 			} else if cmd == "ls" {
 				if userName == "public" {
 					err := fmt.Errorf("access denied")
-					fmt.Fprintln(sesh.Stderr(), err)
-					fmt.Fprintf(sesh.Stderr(), "\r")
-					_ = sesh.Exit(1)
-					_ = sesh.Close()
+					sesh.Fatal(err)
 					return err
 				}
 
@@ -275,8 +273,7 @@ func WishMiddleware(handler *CliHandler) pssh.SSHServerMiddleware {
 					_, _ = sesh.Write([]byte(outputData))
 				}
 
-				next(sesh)
-				return
+				return next(sesh)
 			}
 
 			topic := ""
@@ -308,7 +305,7 @@ func WishMiddleware(handler *CliHandler) pssh.SSHServerMiddleware {
 				clean := pubCmd.Bool("c", false, "Don't send status messages")
 
 				if !flagCheck(pubCmd, topic, cmdArgs) {
-					return
+					return err
 				}
 
 				if pubCmd.NArg() == 1 && topic == "" {
@@ -384,7 +381,7 @@ func WishMiddleware(handler *CliHandler) pssh.SSHServerMiddleware {
 				}
 
 				if !*clean {
-					wish.Printf(
+					fmt.Fprintf(
 						sesh,
 						"subscribe to this channel:\n  ssh %s sub %s%s\n",
 						toSshCmd(handler.Cfg),
@@ -456,7 +453,7 @@ func WishMiddleware(handler *CliHandler) pssh.SSHServerMiddleware {
 							cancel()
 
 							if !*clean {
-								wish.Fatalln(sesh, "timeout reached, exiting ...")
+								sesh.Fatal(fmt.Errorf("timeout reached, exiting ..."))
 							} else {
 								err = sesh.Exit(1)
 								if err != nil {
@@ -506,7 +503,7 @@ func WishMiddleware(handler *CliHandler) pssh.SSHServerMiddleware {
 				}
 
 				if err != nil && !*clean {
-					wish.Errorln(sesh, err)
+					fmt.Fprintln(sesh.Stderr(), err)
 				}
 			} else if cmd == "sub" {
 				subCmd := flagSet("sub", sesh)
@@ -516,7 +513,7 @@ func WishMiddleware(handler *CliHandler) pssh.SSHServerMiddleware {
 				clean := subCmd.Bool("c", false, "Don't send status messages")
 
 				if !flagCheck(subCmd, topic, cmdArgs) {
-					return
+					return err
 				}
 
 				if subCmd.NArg() == 1 && topic == "" {
@@ -571,8 +568,8 @@ func WishMiddleware(handler *CliHandler) pssh.SSHServerMiddleware {
 					} else if !*public {
 						name = toTopic(userName, withoutUser)
 					} else {
-						wish.Errorln(sesh, "access denied")
-						return
+						fmt.Fprintln(sesh.Stderr(), "access denied")
+						return err
 					}
 				}
 
@@ -587,7 +584,7 @@ func WishMiddleware(handler *CliHandler) pssh.SSHServerMiddleware {
 				)
 
 				if err != nil && !*clean {
-					wish.Errorln(sesh, err)
+					fmt.Fprintln(sesh.Stderr(), err)
 				}
 			} else if cmd == "pipe" {
 				pipeCmd := flagSet("pipe", sesh)
@@ -597,7 +594,7 @@ func WishMiddleware(handler *CliHandler) pssh.SSHServerMiddleware {
 				clean := pipeCmd.Bool("c", false, "Don't send status messages")
 
 				if !flagCheck(pipeCmd, topic, cmdArgs) {
-					return
+					return err
 				}
 
 				if pipeCmd.NArg() == 1 && topic == "" {
@@ -665,7 +662,7 @@ func WishMiddleware(handler *CliHandler) pssh.SSHServerMiddleware {
 				}
 
 				if isCreator && !*clean {
-					wish.Printf(
+					fmt.Fprintf(
 						sesh,
 						"subscribe to this topic:\n  ssh %s sub %s%s\n",
 						toSshCmd(handler.Cfg),
@@ -685,15 +682,15 @@ func WishMiddleware(handler *CliHandler) pssh.SSHServerMiddleware {
 				)
 
 				if readErr != nil && !*clean {
-					wish.Errorln(sesh, "error reading from pipe", readErr)
+					fmt.Fprintln(sesh.Stderr(), "error reading from pipe", readErr)
 				}
 
 				if writeErr != nil && !*clean {
-					wish.Errorln(sesh, "error writing to pipe", writeErr)
+					fmt.Fprintln(sesh.Stderr(), "error writing to pipe", writeErr)
 				}
 			}
 
-			next(sesh)
+			return next(sesh)
 		}
 	}
 }

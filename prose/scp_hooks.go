@@ -6,9 +6,9 @@ import (
 
 	"slices"
 
-	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/filehandlers"
+	"github.com/picosh/pico/pssh"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/utils"
 	pipeUtil "github.com/picosh/utils/pipe"
@@ -20,7 +20,7 @@ type MarkdownHooks struct {
 	Pipe *pipeUtil.ReconnectReadWriteCloser
 }
 
-func (p *MarkdownHooks) FileValidate(s ssh.Session, data *filehandlers.PostMetaData) (bool, error) {
+func (p *MarkdownHooks) FileValidate(s *pssh.SSHServerConnSession, data *filehandlers.PostMetaData) (bool, error) {
 	if !utils.IsTextFile(data.Text) {
 		err := fmt.Errorf(
 			"ERROR: (%s) invalid file must be plain text (utf-8), skipping",
@@ -57,7 +57,7 @@ func (p *MarkdownHooks) FileValidate(s ssh.Session, data *filehandlers.PostMetaD
 	return true, nil
 }
 
-func (p *MarkdownHooks) FileMeta(s ssh.Session, data *filehandlers.PostMetaData) error {
+func (p *MarkdownHooks) FileMeta(s *pssh.SSHServerConnSession, data *filehandlers.PostMetaData) error {
 	parsedText, err := shared.ParseText(data.Text)
 	if err != nil {
 		return fmt.Errorf("%s: %w", data.Filename, err)

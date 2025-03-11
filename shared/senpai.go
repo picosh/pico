@@ -6,8 +6,8 @@ import (
 	"sync"
 
 	"git.sr.ht/~delthas/senpai"
-	"github.com/charmbracelet/ssh"
 	"github.com/containerd/console"
+	"github.com/picosh/pico/pssh"
 )
 
 type consoleData struct {
@@ -16,13 +16,13 @@ type consoleData struct {
 }
 
 type VConsole struct {
-	ssh.Session
-	pty ssh.Pty
+	Session *pssh.SSHServerConnSession
+	pty     pssh.Pty
 
 	sizeEnableOnce sync.Once
 
 	windowMu      sync.Mutex
-	currentWindow ssh.Window
+	currentWindow pssh.Window
 
 	readReq  chan []byte
 	dataChan chan consoleData
@@ -94,7 +94,7 @@ func (v *VConsole) DisableEcho() error {
 }
 
 func (v *VConsole) Reset() error {
-	_, err := v.Write([]byte("\033[?25h\033[0 q\033[34h\033[?25h\033[39;49m\033[m^O\033[H\033[J\033[?1049l\033[?1l\033>\033[?1000l\033[?1002l\033[?1003l\033[?1006l\033[?2004l"))
+	_, err := v.Session.Write([]byte("\033[?25h\033[0 q\033[34h\033[?25h\033[39;49m\033[m^O\033[H\033[J\033[?1049l\033[?1l\033>\033[?1000l\033[?1002l\033[?1003l\033[?1006l\033[?2004l"))
 	return err
 }
 
@@ -123,7 +123,11 @@ func (v *VConsole) Close() error {
 	return err
 }
 
-func NewVConsole(sesh ssh.Session) (*VConsole, error) {
+func (v *VConsole) Write(p []byte) (int, error) {
+	return v.Session.Write(p)
+}
+
+func NewVConsole(sesh *pssh.SSHServerConnSession) (*VConsole, error) {
 	pty, win, ok := sesh.Pty()
 	if !ok {
 		return nil, fmt.Errorf("PTY not found")
@@ -178,7 +182,7 @@ func NewVConsole(sesh ssh.Session) (*VConsole, error) {
 	return vty, nil
 }
 
-func NewSenpaiApp(sesh ssh.Session, username, pass string) (*senpai.App, error) {
+func NewSenpaiApp(sesh *pssh.SSHServerConnSession, username, pass string) (*senpai.App, error) {
 	vty, err := NewVConsole(sesh)
 	if err != nil {
 		slog.Error("PTY not found")

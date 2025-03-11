@@ -9,8 +9,8 @@ import (
 	"git.sr.ht/~rockorager/vaxis"
 	"git.sr.ht/~rockorager/vaxis/vxfw"
 	"git.sr.ht/~rockorager/vaxis/vxfw/richtext"
-	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
+	"github.com/picosh/pico/pssh"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/utils"
 )
@@ -19,7 +19,7 @@ var HOME = "dash"
 
 type SharedModel struct {
 	Logger             *slog.Logger
-	Session            ssh.Session
+	Session            *pssh.SSHServerConnSession
 	Cfg                *shared.ConfigSite
 	Dbpool             db.DB
 	User               *db.User

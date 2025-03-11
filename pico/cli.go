@@ -8,16 +8,15 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/charmbracelet/ssh"
-	"github.com/charmbracelet/wish"
 	"github.com/picosh/pico/db"
+	"github.com/picosh/pico/pssh"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/utils"
 
 	pipeLogger "github.com/picosh/utils/pipe/log"
 )
 
-func getUser(s ssh.Session, dbpool db.DB) (*db.User, error) {
+func getUser(s *pssh.SSHServerConnSession, dbpool db.DB) (*db.User, error) {
 	if s.PublicKey() == nil {
 		return nil, fmt.Errorf("key not found")
 	}
@@ -38,7 +37,7 @@ func getUser(s ssh.Session, dbpool db.DB) (*db.User, error) {
 
 type Cmd struct {
 	User       *db.User
-	SshSession ssh.Session
+	SshSession *pssh.SSHServerConnSession
 	Session    utils.CmdSession
 	Log        *slog.Logger
 	Dbpool     db.DB
@@ -77,7 +76,7 @@ func (c *Cmd) logs(ctx context.Context) error {
 		user := utils.AnyToStr(parsedData, "user")
 		userId := utils.AnyToStr(parsedData, "userId")
 		if user == c.User.Name || userId == c.User.ID {
-			wish.Println(c.SshSession, line)
+			fmt.Fprintln(c.SshSession, line)
 		}
 	}
 	return scanner.Err()
@@ -88,34 +87,34 @@ type CliHandler struct {
 	Logger *slog.Logger
 }
 
-func WishMiddleware(handler *CliHandler) wish.Middleware {
+func WishMiddleware(handler *CliHandler) pssh.SSHServerMiddleware {
 	dbpool := handler.DBPool
 	log := handler.Logger
 
-	return func(next ssh.Handler) ssh.Handler {
-		return func(sesh ssh.Session) {
+	return func(next pssh.SSHServerHandler) pssh.SSHServerHandler {
+		return func(sesh *pssh.SSHServerConnSession) error {
 			args := sesh.Command()
 			if len(args) == 0 {
-				next(sesh)
-				return
+				return next(sesh)
 			}
 
 			user, err := getUser(sesh, dbpool)
 			if err != nil {
-				wish.Errorf(sesh, "detected ssh command: %s\n", args)
+				fmt.Fprintf(sesh.Stderr(), "detected ssh command: %s\n", args)
 				s := fmt.Errorf("error: you need to create an account before using the remote cli: %w", err)
-				wish.Fatalln(sesh, s)
-				return
+				sesh.Fatal(s)
+				return s
 			}
 
 			if len(args) > 0 && args[0] == "chat" {
 				_, _, hasPty := sesh.Pty()
 				if !hasPty {
-					wish.Fatalln(
-						sesh,
-						"In order to render chat you need to enable PTY with the `ssh -t` flag",
+					err := fmt.Errorf(
+						"in order to render chat you need to enable PTY with the `ssh -t` flag",
 					)
-					return
+
+					sesh.Fatal(err)
+					return err
 				}
 
 				ff, err := dbpool.FindFeatureForUser(user.ID, "plus")
@@ -124,29 +123,30 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 					ff, err = dbpool.FindFeatureForUser(user.ID, "bouncer")
 					if err != nil {
 						handler.Logger.Error("Unable to find bouncer feature flag", "err", err, "user", user, "command", args)
-						wish.Fatalln(sesh, "Unable to find plus or bouncer feature flag")
-						return
+						sesh.Fatal(err)
+						return err
 					}
 				}
 
 				if ff == nil {
-					wish.Fatalln(sesh, "Unable to find plus or bouncer feature flag")
-					return
+					err = fmt.Errorf("unable to find plus or bouncer feature flag")
+					sesh.Fatal(err)
+					return err
 				}
 
 				pass, err := dbpool.UpsertToken(user.ID, "pico-chat")
 				if err != nil {
-					wish.Fatalln(sesh, err)
-					return
+					sesh.Fatal(err)
+					return err
 				}
 				app, err := shared.NewSenpaiApp(sesh, user.Name, pass)
 				if err != nil {
-					wish.Fatalln(sesh, err)
-					return
+					sesh.Fatal(err)
+					return err
 				}
 				app.Run()
 				app.Close()
-				return
+				return err
 			}
 
 			opts := Cmd{
@@ -162,20 +162,20 @@ func WishMiddleware(handler *CliHandler) wish.Middleware {
 			if len(args) == 1 {
 				if cmd == "help" {
 					opts.help()
-					return
+					return nil
 				} else if cmd == "logs" {
 					err = opts.logs(sesh.Context())
 					if err != nil {
-						wish.Fatalln(sesh, err)
+						sesh.Fatal(err)
 					}
-					return
+					return nil
 				} else {
 					next(sesh)
-					return
+					return nil
 				}
 			}
 
-			next(sesh)
+			return next(sesh)
 		}
 	}
 }

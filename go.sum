@@ -160,8 +160,6 @@ github.com/charmbracelet/lipgloss v1.0.0 h1:O7VkGDvqEdGi93X+DeqsQ7PKHDgtQfF8j8/O
 github.com/charmbracelet/lipgloss v1.0.0/go.mod h1:U5fy9Z+C38obMs+T+tJqst9VGzlOYGj4ri9reL3qUlo=
 github.com/charmbracelet/log v0.4.0 h1:G9bQAcx8rWA2T3pWvx7YtPTPwgqpk7D68BX21IRW8ZM=
 github.com/charmbracelet/log v0.4.0/go.mod h1:63bXt/djrizTec0l11H20t8FDSvA4CRZJ1KH22MdptM=
-github.com/charmbracelet/promwish v0.7.0 h1:oaMH+ey6W4DDIv1xucS8jL1ik/Q46qxjNXlh6XxEm+s=
-github.com/charmbracelet/promwish v0.7.0/go.mod h1:WbRJN9irg8LmsBU8G2rFF8md9O3rSg63qrnqquP/+cs=
 github.com/charmbracelet/ssh v0.0.0-20250213143314-8712ec3ff3ef h1:dNZwn4is5svUd+sQEGsrXtp7VwD2ipYaCkKMzcpAEIE=
 github.com/charmbracelet/ssh v0.0.0-20250213143314-8712ec3ff3ef/go.mod h1:hg+I6gvlMl16nS9ZzQNgBIrrCasGwEw0QiLsDcP01Ko=
 github.com/charmbracelet/wish v1.4.6 h1:27WRqMTUmyFoZASoaAaEe78Je7LTU4VqyoBxnl4d9XA=

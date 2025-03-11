@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/araddon/dateparse"
-	"github.com/charmbracelet/ssh"
 	"github.com/picosh/pico/db"
 	"github.com/picosh/pico/filehandlers"
+	"github.com/picosh/pico/pssh"
 	"github.com/picosh/pico/shared"
 	"github.com/picosh/utils"
 )
@@ -21,7 +21,7 @@ type FileHooks struct {
 	Db  db.DB
 }
 
-func (p *FileHooks) FileValidate(s ssh.Session, data *filehandlers.PostMetaData) (bool, error) {
+func (p *FileHooks) FileValidate(s *pssh.SSHServerConnSession, data *filehandlers.PostMetaData) (bool, error) {
 	if !utils.IsTextFile(string(data.Text)) {
 		err := fmt.Errorf(
 			"ERROR: (%s) invalid file must be plain text (utf-8), skipping",
@@ -42,7 +42,7 @@ func (p *FileHooks) FileValidate(s ssh.Session, data *filehandlers.PostMetaData)
 	return true, nil
 }
 
-func (p *FileHooks) FileMeta(s ssh.Session, data *filehandlers.PostMetaData) error {
+func (p *FileHooks) FileMeta(s *pssh.SSHServerConnSession, data *filehandlers.PostMetaData) error {
 	data.Title = utils.ToUpper(data.Slug)
 	// we want the slug to be the filename for pastes
 	data.Slug = data.Filename
