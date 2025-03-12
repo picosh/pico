@@ -2,16 +2,24 @@ package pssh
 
 import (
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
 	"crypto/subtle"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net"
+	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/antoniomika/syncmap"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -21,6 +29,7 @@ type SSHServerConn struct {
 	Logger     *slog.Logger
 	Conn       *ssh.ServerConn
 	SSHServer  *SSHServer
+	Start      time.Time
 
 	mu sync.Mutex
 }
@@ -203,6 +212,7 @@ func NewSSHServerConn(
 		Logger:     logger,
 		Conn:       conn,
 		SSHServer:  server,
+		Start:      time.Now(),
 	}
 }
 
@@ -212,7 +222,9 @@ type SSHServerChannelMiddleware func(ssh.NewChannel, *SSHServerConn) error
 
 type SSHServerConfig struct {
 	*ssh.ServerConfig
+	App                 string
 	ListenAddr          string
+	PromListenAddr      string
 	Middleware          []SSHServerMiddleware
 	SubsystemMiddleware []SSHServerMiddleware
 	ChannelMiddleware   map[string]SSHServerChannelMiddleware
@@ -225,9 +237,48 @@ type SSHServer struct {
 	Config     *SSHServerConfig
 	Listener   net.Listener
 	Conns      *syncmap.Map[string, *SSHServerConn]
+
+	SessionsCreated  *prometheus.CounterVec
+	SessionsFinished *prometheus.CounterVec
+	SessionsDuration *prometheus.CounterVec
 }
 
 func (s *SSHServer) ListenAndServe() error {
+	if s.Config.PromListenAddr != "" {
+		s.SessionsCreated = promauto.With(prometheus.DefaultRegisterer).NewCounterVec(prometheus.CounterOpts{
+			Name: "wish_sessions_created_total",
+			Help: "The total number of sessions created",
+			ConstLabels: prometheus.Labels{
+				"app": s.Config.App,
+			},
+		}, []string{"command"})
+
+		s.SessionsFinished = promauto.With(prometheus.DefaultRegisterer).NewCounterVec(prometheus.CounterOpts{
+			Name: "wish_sessions_finished_total",
+			Help: "The total number of sessions created",
+			ConstLabels: prometheus.Labels{
+				"app": s.Config.App,
+			},
+		}, []string{"command"})
+
+		s.SessionsDuration = promauto.With(prometheus.DefaultRegisterer).NewCounterVec(prometheus.CounterOpts{
+			Name: "wish_sessions_duration_seconds",
+			Help: "The total sessions duration in seconds",
+			ConstLabels: prometheus.Labels{
+				"app": s.Config.App,
+			},
+		}, []string{"command"})
+
+		go func() {
+			http.Handle("/metrics", promhttp.Handler())
+			err := http.ListenAndServe(s.Config.PromListenAddr, nil)
+			if err != nil {
+				s.Logger.Error("prometheus", "err", err)
+				panic(err)
+			}
+		}()
+	}
+
 	listen, err := net.Listen("tcp", s.Config.ListenAddr)
 	if err != nil {
 		return err
@@ -408,6 +459,14 @@ func NewSSHServer(ctx context.Context, logger *slog.Logger, config *SSHServerCon
 								return
 							}
 
+							if sc.SSHServer.Config.PromListenAddr != "" {
+								sc.SSHServer.SessionsCreated.WithLabelValues(payload.Value).Inc()
+								defer func() {
+									sc.SSHServer.SessionsFinished.WithLabelValues(payload.Value).Inc()
+									sc.SSHServer.SessionsDuration.WithLabelValues(payload.Value).Add(time.Since(sc.Start).Seconds())
+								}()
+							}
+
 							sesh.SetValue("command", strings.Fields(payload.Value))
 
 							h := func(*SSHServerConnSession) error { return nil }
@@ -509,6 +568,91 @@ func NewSSHServer(ctx context.Context, logger *slog.Logger, config *SSHServerCon
 	}
 
 	return server
+}
+
+type PubKeyAuthHandler func(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error)
+
+func NewSSHServerWithConfig(
+	ctx context.Context,
+	logger *slog.Logger,
+	host, port, promPort string,
+	pubKeyAuthHandler PubKeyAuthHandler,
+	middleware, subsystemMiddleware []SSHServerMiddleware,
+	channelMiddleware map[string]SSHServerChannelMiddleware) (*SSHServer, error) {
+	server := NewSSHServer(ctx, logger, &SSHServerConfig{
+		ListenAddr: fmt.Sprintf("%s:%s", host, port),
+		ServerConfig: &ssh.ServerConfig{
+			PublicKeyCallback: pubKeyAuthHandler,
+		},
+		Middleware:          middleware,
+		SubsystemMiddleware: subsystemMiddleware,
+		ChannelMiddleware:   channelMiddleware,
+	})
+
+	if promPort != "" {
+		server.Config.PromListenAddr = fmt.Sprintf("%s:%s", host, promPort)
+	}
+
+	pemBytes, err := os.ReadFile("ssh_data/term_info_ed25519")
+	if err != nil {
+		logger.Error("failed to read private key file", "error", err)
+		if !os.IsNotExist(err) {
+			return nil, err
+		}
+
+		logger.Info("generating new private key")
+
+		pubKey, privKey, err := ed25519.GenerateKey(rand.Reader)
+		if err != nil {
+			logger.Error("failed to generate private key", "error", err)
+			return nil, err
+		}
+
+		privb, err := ssh.MarshalPrivateKey(privKey, "")
+		if err != nil {
+			logger.Error("failed to marshal private key", "error", err)
+			return nil, err
+		}
+
+		block := &pem.Block{
+			Type:  "OPENSSH PRIVATE KEY",
+			Bytes: privb.Bytes,
+		}
+
+		if err = os.MkdirAll("ssh_data", 0700); err != nil {
+			logger.Error("failed to create ssh_data directory", "error", err)
+			return nil, err
+		}
+
+		pemBytes = pem.EncodeToMemory(block)
+
+		if err = os.WriteFile("ssh_data/term_info_ed25519", pemBytes, 0600); err != nil {
+			logger.Error("failed to write private key", "error", err)
+			return nil, err
+		}
+
+		sshPubKey, err := ssh.NewPublicKey(pubKey)
+		if err != nil {
+			logger.Error("failed to create public key", "error", err)
+			return nil, err
+		}
+
+		pubb := ssh.MarshalAuthorizedKey(sshPubKey)
+		if err = os.WriteFile("ssh_data/term_info_ed25519.pub", pubb, 0600); err != nil {
+			logger.Error("failed to write public key", "error", err)
+			return nil, err
+		}
+	}
+
+	signer, err := ssh.ParsePrivateKey(pemBytes)
+	if err != nil {
+		logger.Error("failed to parse private key", "error", err)
+		return nil, err
+	}
+
+	server.Config.AddHostKey(signer)
+
+	return server, nil
 }
 
 func KeysEqual(a, b ssh.PublicKey) bool {

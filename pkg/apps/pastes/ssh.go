@@ -17,13 +17,12 @@ import (
 	"github.com/picosh/pico/pkg/send/protocols/sftp"
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/utils"
-	"golang.org/x/crypto/ssh"
 )
 
 func StartSshServer() {
 	host := utils.GetEnv("PASTES_HOST", "0.0.0.0")
 	port := utils.GetEnv("PASTES_SSH_PORT", "2222")
-	// promPort := utils.GetEnv("PASTES_PROM_PORT", "9222")
+	promPort := utils.GetEnv("PASTES_PROM_PORT", "9222")
 	cfg := NewConfigSite("pastes-ssh")
 	logger := cfg.Logger
 
@@ -42,12 +41,16 @@ func StartSshServer() {
 	}
 	handler := filehandlers.NewFileHandlerRouter(cfg, dbh, fileMap)
 	sshAuth := shared.NewSshAuthHandler(dbh, logger)
-	server := pssh.NewSSHServer(ctx, logger, &pssh.SSHServerConfig{
-		ListenAddr: "localhost:2222",
-		ServerConfig: &ssh.ServerConfig{
-			PublicKeyCallback: sshAuth.PubkeyAuthHandler,
-		},
-		Middleware: []pssh.SSHServerMiddleware{
+
+	// Create a new SSH server
+	server, err := pssh.NewSSHServerWithConfig(
+		ctx,
+		logger,
+		host,
+		port,
+		promPort,
+		sshAuth.PubkeyAuthHandler,
+		[]pssh.SSHServerMiddleware{
 			pipe.Middleware(handler, ""),
 			list.Middleware(handler),
 			scp.Middleware(handler),
@@ -56,25 +59,17 @@ func StartSshServer() {
 			pssh.PtyMdw(pssh.DeprecatedNotice()),
 			pssh.LogMiddleware(handler, dbh),
 		},
-		SubsystemMiddleware: []pssh.SSHServerMiddleware{
+		[]pssh.SSHServerMiddleware{
 			sftp.Middleware(handler),
 			pssh.LogMiddleware(handler, dbh),
 		},
-	})
+		nil,
+	)
 
-	pemBytes, err := os.ReadFile("ssh_data/term_info_ed25519")
 	if err != nil {
-		logger.Error("failed to read private key file", "error", err)
-		return
+		logger.Error("failed to create ssh server", "err", err.Error())
+		os.Exit(1)
 	}
-
-	signer, err := ssh.ParsePrivateKey(pemBytes)
-	if err != nil {
-		logger.Error("failed to parse private key", "error", err)
-		return
-	}
-
-	server.Config.AddHostKey(signer)
 
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
