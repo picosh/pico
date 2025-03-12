@@ -4,13 +4,13 @@ go 1.24
 
 toolchain go1.24.0
 
-replace github.com/picosh/tunkit => ../tunkit
+// replace github.com/picosh/tunkit => ../tunkit
 
-replace github.com/picosh/send => ../send
+// replace github.com/picosh/send => ../send
 
 // replace github.com/picosh/go-rsync-receiver => ../go-rsync-receiver
 
-replace github.com/picosh/pobj => ../pobj
+// replace github.com/picosh/pobj => ../pobj
 
 // replace github.com/picosh/pubsub => ../pubsub
 
@@ -26,6 +26,12 @@ require (
 	github.com/alecthomas/chroma/v2 v2.14.0
 	github.com/antoniomika/syncmap v1.0.0
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
+	github.com/aws/aws-sdk-go-v2 v1.36.2
+	github.com/aws/aws-sdk-go-v2/config v1.29.7
+	github.com/aws/aws-sdk-go-v2/credentials v1.17.60
+	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.17.63
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.77.1
+	github.com/aws/smithy-go v1.22.3
 	github.com/containerd/console v1.0.4
 	github.com/darkweak/souin v1.7.5
 	github.com/darkweak/souin/plugins/souin/storages v1.7.5
@@ -37,14 +43,14 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/lib/pq v1.10.9
+	github.com/matryer/is v1.4.1
 	github.com/microcosm-cc/bluemonday v1.0.27
+	github.com/minio/madmin-go/v3 v3.0.94
 	github.com/minio/minio-go/v7 v7.0.87
 	github.com/mmcdole/gofeed v1.3.0
 	github.com/neurosnap/go-exif-remove v0.0.0-20221010134343-50d1e3c35577
-	github.com/picosh/pobj v0.0.0-20250304201248-a9c7179aa49b
+	github.com/picosh/go-rsync-receiver v0.0.0-20250304201040-fcc11dd22d79
 	github.com/picosh/pubsub v0.0.0-20241114191831-ec8f16c0eb88
-	github.com/picosh/send v0.0.0-20250304201154-e36cd3bbbb35
-	github.com/picosh/tunkit v0.0.0-00010101000000-000000000000
 	github.com/picosh/utils v0.0.0-20241120033529-8ca070c09bf4
 	github.com/pkg/sftp v1.13.7
 	github.com/prometheus/client_golang v1.21.0-rc.0
@@ -80,12 +86,8 @@ require (
 	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
 	github.com/armon/go-metrics v0.4.1 // indirect
 	github.com/aryann/difflib v0.0.0-20210328193216-ff5ff6dc229b // indirect
-	github.com/aws/aws-sdk-go-v2 v1.36.2 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.10 // indirect
-	github.com/aws/aws-sdk-go-v2/config v1.29.7 // indirect
-	github.com/aws/aws-sdk-go-v2/credentials v1.17.60 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.16.29 // indirect
-	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.17.63 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.3.33 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.6.33 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/ini v1.8.3 // indirect
@@ -94,11 +96,9 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.6.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.12.14 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.18.14 // indirect
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.77.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.24.16 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.28.15 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.33.15 // indirect
-	github.com/aws/smithy-go v1.22.3 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.5.0 // indirect
@@ -210,7 +210,6 @@ require (
 	github.com/mholt/acmez/v2 v2.0.1 // indirect
 	github.com/miekg/dns v1.1.63 // indirect
 	github.com/minio/crc64nvme v1.0.1 // indirect
-	github.com/minio/madmin-go/v3 v3.0.94 // indirect
 	github.com/minio/md5-simd v1.1.2 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/go-ps v1.0.0 // indirect
@@ -228,7 +227,6 @@ require (
 	github.com/nutsdb/nutsdb v1.0.4 // indirect
 	github.com/onsi/ginkgo/v2 v2.15.0 // indirect
 	github.com/philhofer/fwd v1.1.3-0.20240916144458-20a13a1f6b7c // indirect
-	github.com/picosh/go-rsync-receiver v0.0.0-20250304201040-fcc11dd22d79 // indirect
 	github.com/pierrec/lz4/v4 v4.1.21 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect

@@ -4,8 +4,8 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/picosh/pico/db"
-	"github.com/picosh/pico/db/postgres"
+	"github.com/picosh/pico/pkg/db"
+	"github.com/picosh/pico/pkg/db/postgres"
 	"github.com/picosh/utils"
 )
 

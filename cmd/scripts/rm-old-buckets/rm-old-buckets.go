@@ -6,9 +6,9 @@ import (
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
-	"github.com/picosh/pico/db/postgres"
-	"github.com/picosh/pico/prose"
-	"github.com/picosh/pico/shared"
+	"github.com/picosh/pico/pkg/apps/prose"
+	"github.com/picosh/pico/pkg/db/postgres"
+	"github.com/picosh/pico/pkg/shared"
 )
 
 func bail(err error) {

@@ -1,10 +1,10 @@
 package main
 
 import (
-	"github.com/picosh/pico/pgs"
-	pgsdb "github.com/picosh/pico/pgs/db"
-	"github.com/picosh/pico/shared"
-	"github.com/picosh/pico/shared/storage"
+	"github.com/picosh/pico/pkg/apps/pgs"
+	pgsdb "github.com/picosh/pico/pkg/apps/pgs/db"
+	"github.com/picosh/pico/pkg/shared"
+	"github.com/picosh/pico/pkg/shared/storage"
 	"github.com/picosh/utils"
 )
 
