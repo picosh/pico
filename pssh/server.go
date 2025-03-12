@@ -118,7 +118,8 @@ func (s *SSHServerConnSession) Close() error {
 }
 
 func (s *SSHServerConnSession) Exit(code int) error {
-	_, err := s.Channel.SendRequest("exit-status", false, ssh.Marshal(struct{ C int }{code}))
+	status := struct{ Status uint32 }{uint32(code)}
+	_, err := s.Channel.SendRequest("exit-status", false, ssh.Marshal(&status))
 	return err
 }
 
@@ -265,6 +266,10 @@ func (s *SSHServer) ListenAndServe() error {
 		}()
 	}
 
+	if errors.Is(retErr, net.ErrClosed) {
+		return nil
+	}
+
 	return retErr
 }
 
@@ -358,13 +363,17 @@ func NewSSHServer(ctx context.Context, logger *slog.Logger, config *SSHServerCon
 								SSHServerConn: sc,
 							}
 
+							req.Reply(true, nil)
+
 							if err := h(sesh); err != nil {
-								req.Reply(false, nil)
-								sesh.Close()
+								sc.Logger.Error("subsystem middleware", "err", err)
+								sesh.Fatal(err)
+								return
 							}
 
-							req.Reply(true, nil)
+							sesh.Exit(0)
 							sesh.Close()
+							return
 						} else if req.Type == "exec" {
 							if len(sc.SSHServer.Config.Middleware) == 0 {
 								req.Reply(false, nil)
@@ -382,13 +391,17 @@ func NewSSHServer(ctx context.Context, logger *slog.Logger, config *SSHServerCon
 								h = m(h)
 							}
 
+							req.Reply(true, nil)
+
 							if err := h(sesh); err != nil {
-								req.Reply(false, nil)
-								sesh.Close()
+								sc.Logger.Error("exec middleware", "err", err)
+								sesh.Fatal(err)
+								return
 							}
 
-							req.Reply(true, nil)
+							sesh.Exit(0)
 							sesh.Close()
+							return
 						}
 					}()
 				}

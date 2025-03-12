@@ -4,13 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"path/filepath"
 	"strings"
+	"text/tabwriter"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/lipgloss/table"
 	"github.com/picosh/pico/db"
 	pgsdb "github.com/picosh/pico/pgs/db"
 	"github.com/picosh/pico/shared"
@@ -18,106 +18,31 @@ import (
 	"github.com/picosh/utils"
 )
 
-func projectTable(projects []*db.Project, width int) *table.Table {
-	headers := []string{
-		"Name",
-		"Last Updated",
-		"Links To",
-		"ACL Type",
-		"ACL",
-		"Blocked",
-	}
-	data := [][]string{}
+func NewTabWriter(out io.Writer) *tabwriter.Writer {
+	return tabwriter.NewWriter(out, 0, 0, 1, ' ', tabwriter.TabIndent)
+}
+
+func projectTable(sesh io.Writer, projects []*db.Project) {
+	writer := NewTabWriter(sesh)
+	fmt.Fprintln(writer, "Name\tLast Updated\tLinks To\tACL Type\tACL\tBlocked")
+
 	for _, project := range projects {
-		row := []string{
-			project.Name,
-			project.UpdatedAt.Format("2006-01-02 15:04:05"),
-		}
 		links := ""
 		if project.ProjectDir != project.Name {
 			links = project.ProjectDir
 		}
-		row = append(row, links)
-		row = append(row,
+		fmt.Fprintf(
+			writer,
+			"%s\t%s\t%s\t%s\t%s\t%s\n",
+			project.Name,
+			project.UpdatedAt.Format("2006-01-02 15:04:05"),
+			links,
 			project.Acl.Type,
 			strings.Join(project.Acl.Data, " "),
+			project.Blocked,
 		)
-		row = append(row, project.Blocked)
-		data = append(data, row)
 	}
-
-	t := table.New().
-		Width(width).
-		Headers(headers...).
-		Rows(data...)
-	return t
-}
-
-func getHelpText(width int) string {
-	helpStr := "Commands: [help, stats, ls, fzf, rm, link, unlink, prune, retain, depends, acl, cache]\n"
-	helpStr += "NOTICE:" + " *must* append with `--write` for the changes to persist.\n"
-
-	projectName := "projA"
-	headers := []string{"Cmd", "Description"}
-	data := [][]string{
-		{
-			"help",
-			"prints this screen",
-		},
-		{
-			"stats",
-			"usage statistics",
-		},
-		{
-			"ls",
-			"lists projects",
-		},
-		{
-			fmt.Sprintf("fzf %s", projectName),
-			fmt.Sprintf("lists urls of all assets in %s", projectName),
-		},
-		{
-			fmt.Sprintf("rm %s", projectName),
-			fmt.Sprintf("delete %s", projectName),
-		},
-		{
-			fmt.Sprintf("link %s --to projB", projectName),
-			fmt.Sprintf("symbolic link `%s` to `projB`", projectName),
-		},
-		{
-			fmt.Sprintf("unlink %s", projectName),
-			fmt.Sprintf("removes symbolic link for `%s`", projectName),
-		},
-		{
-			fmt.Sprintf("prune %s", projectName),
-			fmt.Sprintf("removes projects that match prefix `%s`", projectName),
-		},
-		{
-			fmt.Sprintf("retain %s", projectName),
-			"alias to `prune` but keeps last N projects",
-		},
-		{
-			fmt.Sprintf("depends %s", projectName),
-			fmt.Sprintf("lists all projects linked to `%s`", projectName),
-		},
-		{
-			fmt.Sprintf("acl %s", projectName),
-			fmt.Sprintf("access control for `%s`", projectName),
-		},
-		{
-			fmt.Sprintf("cache %s", projectName),
-			fmt.Sprintf("clear http cache for `%s`", projectName),
-		},
-	}
-
-	t := table.New().
-		Width(width).
-		Border(lipgloss.RoundedBorder()).
-		Headers(headers...).
-		Rows(data...)
-
-	helpStr += t.String()
-	return helpStr
+	writer.Flush()
 }
 
 type Cmd struct {
@@ -201,7 +126,68 @@ func (c *Cmd) RmProjectAssets(projectName string) error {
 }
 
 func (c *Cmd) help() {
-	c.output(getHelpText(c.Width))
+	helpStr := "Commands: [help, stats, ls, fzf, rm, link, unlink, prune, retain, depends, acl, cache]\n"
+	helpStr += "NOTICE:" + " *must* append with `--write` for the changes to persist.\n"
+	c.output(helpStr)
+	projectName := "projA"
+
+	data := [][]string{
+		{
+			"help",
+			"prints this screen",
+		},
+		{
+			"stats",
+			"usage statistics",
+		},
+		{
+			"ls",
+			"lists projects",
+		},
+		{
+			fmt.Sprintf("fzf %s", projectName),
+			fmt.Sprintf("lists urls of all assets in %s", projectName),
+		},
+		{
+			fmt.Sprintf("rm %s", projectName),
+			fmt.Sprintf("delete %s", projectName),
+		},
+		{
+			fmt.Sprintf("link %s --to projB", projectName),
+			fmt.Sprintf("symbolic link `%s` to `projB`", projectName),
+		},
+		{
+			fmt.Sprintf("unlink %s", projectName),
+			fmt.Sprintf("removes symbolic link for `%s`", projectName),
+		},
+		{
+			fmt.Sprintf("prune %s", projectName),
+			fmt.Sprintf("removes projects that match prefix `%s`", projectName),
+		},
+		{
+			fmt.Sprintf("retain %s", projectName),
+			"alias to `prune` but keeps last N projects",
+		},
+		{
+			fmt.Sprintf("depends %s", projectName),
+			fmt.Sprintf("lists all projects linked to `%s`", projectName),
+		},
+		{
+			fmt.Sprintf("acl %s", projectName),
+			fmt.Sprintf("access control for `%s`", projectName),
+		},
+		{
+			fmt.Sprintf("cache %s", projectName),
+			fmt.Sprintf("clear http cache for `%s`", projectName),
+		},
+	}
+
+	writer := NewTabWriter(c.Session)
+	fmt.Fprintln(writer, "Cmd\tDescription")
+	for _, dat := range data {
+		fmt.Fprintf(writer, "%s\t%s\n", dat[0], dat[1])
+	}
+	writer.Flush()
 }
 
 func (c *Cmd) stats(cfgMaxSize uint64) error {
@@ -229,20 +215,17 @@ func (c *Cmd) stats(cfgMaxSize uint64) error {
 		return err
 	}
 
-	headers := []string{"Used (GB)", "Quota (GB)", "Used (%)", "Projects (#)"}
-	data := []string{
-		fmt.Sprintf("%.4f", utils.BytesToGB(int(totalFileSize))),
-		fmt.Sprintf("%.4f", utils.BytesToGB(int(storageMax))),
-		fmt.Sprintf("%.4f", (float32(totalFileSize)/float32(storageMax))*100),
-		fmt.Sprintf("%d", len(projects)),
-	}
-
-	t := table.New().
-		Width(c.Width).
-		Border(lipgloss.RoundedBorder()).
-		Headers(headers...).
-		Rows(data)
-	c.output(t.String())
+	writer := NewTabWriter(c.Session)
+	fmt.Fprintln(writer, "Used (GB)\tQuota (GB)\tUsed (%)\tProjects (#)")
+	fmt.Fprintf(
+		writer,
+		"%.4f\t%.4f\t%.4f\t%d\n",
+		utils.BytesToGB(int(totalFileSize)),
+		utils.BytesToGB(int(storageMax)),
+		(float32(totalFileSize)/float32(storageMax))*100,
+		len(projects),
+	)
+	writer.Flush()
 
 	return nil
 }
@@ -257,8 +240,7 @@ func (c *Cmd) ls() error {
 		c.output("no projects found")
 	}
 
-	t := projectTable(projects, c.Width)
-	c.output(t.String())
+	projectTable(c.Session, projects)
 
 	return nil
 }
@@ -374,9 +356,7 @@ func (c *Cmd) depends(projectName string) error {
 		return nil
 	}
 
-	t := projectTable(projects, c.Width)
-	c.output(t.String())
-
+	projectTable(c.Session, projects)
 	return nil
 }
 
