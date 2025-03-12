@@ -270,9 +270,22 @@ func (s *SSHServer) ListenAndServe() error {
 		}, []string{"command"})
 
 		go func() {
-			http.Handle("/metrics", promhttp.Handler())
-			err := http.ListenAndServe(s.Config.PromListenAddr, nil)
+			mux := http.NewServeMux()
+			mux.Handle("/metrics", promhttp.Handler())
+
+			srv := &http.Server{Addr: s.Config.PromListenAddr, Handler: mux}
+
+			go func() {
+				<-s.Ctx.Done()
+				srv.Close()
+			}()
+
+			err := srv.ListenAndServe()
 			if err != nil {
+				if errors.Is(err, http.ErrServerClosed) {
+					return
+				}
+
 				s.Logger.Error("prometheus", "err", err)
 				panic(err)
 			}
