@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -34,6 +33,11 @@ func (sc *SSHServerConn) Close() error {
 type SSHServerConnSession struct {
 	ssh.Channel
 	*SSHServerConn
+
+	pty   *Pty
+	winch chan Window
+
+	mu sync.Mutex
 }
 
 // Deadline implements context.Context.
@@ -130,29 +134,15 @@ func (s *SSHServerConnSession) Fatal(err error) {
 	_ = s.Close()
 }
 
-type Window struct {
-	Width        int
-	Height       int
-	HeightPixels int
-	WidthPixels  int
-}
+func (s *SSHServerConnSession) Pty() (*Pty, <-chan Window, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-type Pty struct {
-	Term   string
-	Window Window
-	Slave  os.File
-}
+	if s.pty == nil {
+		return nil, nil, false
+	}
 
-func (s *SSHServerConnSession) Pty() (Pty, <-chan Window, bool) {
-	return Pty{}, nil, false
-}
-
-func (p Pty) Resize(width, height int) error {
-	return nil
-}
-
-func (p Pty) Name() string {
-	return ""
+	return s.pty, s.winch, true
 }
 
 var _ context.Context = &SSHServerConnSession{}
@@ -335,6 +325,11 @@ func NewSSHServer(ctx context.Context, logger *slog.Logger, config *SSHServerCon
 				return err
 			}
 
+			sesh := &SSHServerConnSession{
+				Channel:       channel,
+				SSHServerConn: sc,
+			}
+
 			for {
 				select {
 				case <-sc.Done():
@@ -346,7 +341,8 @@ func NewSSHServer(ctx context.Context, logger *slog.Logger, config *SSHServerCon
 
 					go func() {
 						sc.Logger.Info("new session request", "type", req.Type, "wantReply", req.WantReply, "payload", req.Payload)
-						if req.Type == "subsystem" {
+						switch req.Type {
+						case "subsystem":
 							if len(sc.SSHServer.Config.SubsystemMiddleware) == 0 {
 								req.Reply(false, nil)
 								sc.Close()
@@ -356,11 +352,6 @@ func NewSSHServer(ctx context.Context, logger *slog.Logger, config *SSHServerCon
 							h := func(*SSHServerConnSession) error { return nil }
 							for _, m := range sc.SSHServer.Config.SubsystemMiddleware {
 								h = m(h)
-							}
-
-							sesh := &SSHServerConnSession{
-								Channel:       channel,
-								SSHServerConn: sc,
 							}
 
 							req.Reply(true, nil)
@@ -373,18 +364,15 @@ func NewSSHServer(ctx context.Context, logger *slog.Logger, config *SSHServerCon
 
 							sesh.Exit(0)
 							sesh.Close()
-							return
-						} else if req.Type == "exec" {
+						case "shell", "exec":
 							if len(sc.SSHServer.Config.Middleware) == 0 {
 								req.Reply(false, nil)
 							}
 
-							sesh := &SSHServerConnSession{
-								Channel:       channel,
-								SSHServerConn: sc,
-							}
+							var payload = struct{ Value string }{}
+							ssh.Unmarshal(req.Payload, &payload)
 
-							sesh.SetValue("command", strings.Fields(string(req.Payload[4:])))
+							sesh.SetValue("command", strings.Fields(payload.Value))
 
 							h := func(*SSHServerConnSession) error { return nil }
 							for _, m := range sc.SSHServer.Config.Middleware {
@@ -401,7 +389,38 @@ func NewSSHServer(ctx context.Context, logger *slog.Logger, config *SSHServerCon
 
 							sesh.Exit(0)
 							sesh.Close()
-							return
+						case "pty-req":
+							if sesh.pty != nil {
+								req.Reply(false, nil)
+								return
+							}
+
+							ptyReq, ok := parsePtyRequest(req.Payload)
+							if !ok {
+								req.Reply(false, nil)
+								return
+							}
+
+							sesh.mu.Lock()
+							sesh.pty = &ptyReq
+							sesh.winch = make(chan Window, 1)
+							sesh.mu.Unlock()
+
+							sesh.winch <- ptyReq.Window
+							req.Reply(ok, nil)
+						case "window-change":
+							if sesh.pty == nil {
+								req.Reply(false, nil)
+								return
+							}
+							win, ok := parseWinchRequest(req.Payload)
+							if ok {
+								sesh.mu.Lock()
+								sesh.pty.Window = win
+								sesh.winch <- win
+								sesh.mu.Unlock()
+							}
+							req.Reply(ok, nil)
 						}
 					}()
 				}

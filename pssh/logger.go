@@ -45,24 +45,38 @@ func LogMiddleware(getLogger GetLoggerInterface, db FindUserInterface) SSHServer
 
 			pty, _, ok := s.Pty()
 
+			width, height := 0, 0
+			term := ""
+			if pty != nil {
+				term = pty.Term
+				width = pty.Window.Width
+				height = pty.Window.Height
+			}
+
 			logger.Info(
 				"connect",
 				"sshUser", s.User(),
 				"pty", ok,
-				"term", pty.Term,
-				"windowWidth", pty.Window.Width,
-				"windowHeight", pty.Window.Height,
+				"term", term,
+				"windowWidth", width,
+				"windowHeight", height,
 			)
 
 			sshHandler(s)
+
+			if pty != nil {
+				term = pty.Term
+				width = pty.Window.Width
+				height = pty.Window.Height
+			}
 
 			logger.Info(
 				"disconnect",
 				"sshUser", s.User(),
 				"pty", ok,
-				"term", pty.Term,
-				"windowWidth", pty.Window.Width,
-				"windowHeight", pty.Window.Height,
+				"term", term,
+				"windowWidth", width,
+				"windowHeight", height,
 				"duration", time.Since(ct),
 			)
 

@@ -17,7 +17,7 @@ type consoleData struct {
 
 type VConsole struct {
 	Session *pssh.SSHServerConnSession
-	pty     pssh.Pty
+	pty     *pssh.Pty
 
 	sizeEnableOnce sync.Once
 
@@ -108,7 +108,7 @@ func (v *VConsole) Size() (console.WinSize, error) {
 }
 
 func (v *VConsole) Fd() uintptr {
-	return v.pty.Slave.Fd()
+	return 0
 }
 
 func (v *VConsole) Name() string {
