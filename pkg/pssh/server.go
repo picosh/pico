@@ -277,12 +277,14 @@ func (s *SSHServer) ListenAndServe() error {
 
 			go func() {
 				<-s.Ctx.Done()
+				s.Logger.Info("prometheus server shutting down")
 				srv.Close()
 			}()
 
 			err := srv.ListenAndServe()
 			if err != nil {
 				if errors.Is(err, http.ErrServerClosed) {
+					s.Logger.Info("prometheus server shut down")
 					return
 				}
 
