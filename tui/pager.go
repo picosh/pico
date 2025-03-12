@@ -17,14 +17,14 @@ func NewPager() *Pager {
 func (m *Pager) HandleEvent(ev vaxis.Event, ph vxfw.EventPhase) (vxfw.Command, error) {
 	switch msg := ev.(type) {
 	case vaxis.Key:
-		if msg.Matches('j') {
+		if msg.Matches('j') || msg.Matches(vaxis.KeyDown) {
 			if m.pos == -1*int(m.Surface.Size.Height) {
 				return nil, nil
 			}
 			m.pos -= 1
 			return vxfw.RedrawCmd{}, nil
 		}
-		if msg.Matches('k') {
+		if msg.Matches('k') || msg.Matches(vaxis.KeyUp) {
 			if m.pos == 0 {
 				return nil, nil
 			}

@@ -22,6 +22,8 @@ git.sr.ht/~delthas/senpai v0.3.1-0.20250311003540-18f699aaf9b0 h1:Knm2mHQwLsh1sv
 git.sr.ht/~delthas/senpai v0.3.1-0.20250311003540-18f699aaf9b0/go.mod h1:RzVz1R7QRHGcRDnJTcr7AN/cD3rj9scdgvupkXTJLYk=
 git.sr.ht/~rockorager/vaxis v0.12.1-0.20250309233058-d6d466f8f9b1 h1:o8opVUAysn+cQAnSadL1BVMhr2YcdjynRzPBz4fa9q0=
 git.sr.ht/~rockorager/vaxis v0.12.1-0.20250309233058-d6d466f8f9b1/go.mod h1:RSNtZnMeIwpyQzgIEYo9EHJb8Wcl/RhFSxypLpD/ajg=
+git.sr.ht/~rockorager/vaxis v0.12.1-0.20250312161844-81636f76af83 h1:9eVqJxJzMdnpfqfKKjvEvNDpVg6sIBvbI4FdTjhHqx8=
+git.sr.ht/~rockorager/vaxis v0.12.1-0.20250312161844-81636f76af83/go.mod h1:h94aKek3frIV1hJbdXjqnBqaLkbWXvV+UxAsQHg9bns=
 github.com/AndreasBriese/bbloom v0.0.0-20190825152654-46b345b51c96 h1:cTp8I5+VIoKjsnZuH8vjyaysT/ses3EvZeaV/1UkF2M=
 github.com/AndreasBriese/bbloom v0.0.0-20190825152654-46b345b51c96/go.mod h1:bOvUY6CB00SOBii9/FifXqc0awNKxLFCL/+pkDPuyl8=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
