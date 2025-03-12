@@ -166,7 +166,12 @@ func (sc *SSHServerConn) Handle(chans <-chan ssh.NewChannel, reqs <-chan *ssh.Re
 				continue
 			}
 
-			go chanFunc(newChan, sc)
+			go func() {
+				err := chanFunc(newChan, sc)
+				if err != nil {
+					sc.Logger.Error("channel middleware", "err", err)
+				}
+			}()
 		case req, ok := <-reqs:
 			if !ok {
 				return nil
@@ -344,8 +349,17 @@ func NewSSHServer(ctx context.Context, logger *slog.Logger, config *SSHServerCon
 						switch req.Type {
 						case "subsystem":
 							if len(sc.SSHServer.Config.SubsystemMiddleware) == 0 {
-								req.Reply(false, nil)
-								sc.Close()
+								err := req.Reply(false, nil)
+								if err != nil {
+									sc.Logger.Error("subsystem reply", "err", err)
+								}
+
+								err = sc.Close()
+								if err != nil {
+									sc.Logger.Error("subsystem close", "err", err)
+								}
+
+								sesh.Fatal(err)
 								return
 							}
 
@@ -354,7 +368,12 @@ func NewSSHServer(ctx context.Context, logger *slog.Logger, config *SSHServerCon
 								h = m(h)
 							}
 
-							req.Reply(true, nil)
+							err := req.Reply(true, nil)
+							if err != nil {
+								sc.Logger.Error("subsystem reply", "err", err)
+								sesh.Fatal(err)
+								return
+							}
 
 							if err := h(sesh); err != nil {
 								sc.Logger.Error("subsystem middleware", "err", err)
@@ -362,15 +381,32 @@ func NewSSHServer(ctx context.Context, logger *slog.Logger, config *SSHServerCon
 								return
 							}
 
-							sesh.Exit(0)
-							sesh.Close()
+							err = sesh.Exit(0)
+							if err != nil {
+								sc.Logger.Error("subsystem exit", "err", err)
+							}
+
+							err = sesh.Close()
+							if err != nil {
+								sc.Logger.Error("subsystem close", "err", err)
+							}
 						case "shell", "exec":
 							if len(sc.SSHServer.Config.Middleware) == 0 {
-								req.Reply(false, nil)
+								err := req.Reply(false, nil)
+								if err != nil {
+									sc.Logger.Error("shell/exec reply", "err", err)
+								}
+								sesh.Fatal(err)
+								return
 							}
 
 							var payload = struct{ Value string }{}
-							ssh.Unmarshal(req.Payload, &payload)
+							err := ssh.Unmarshal(req.Payload, &payload)
+							if err != nil {
+								sc.Logger.Error("shell/exec unmarshal", "err", err)
+								sesh.Fatal(err)
+								return
+							}
 
 							sesh.SetValue("command", strings.Fields(payload.Value))
 
@@ -379,7 +415,12 @@ func NewSSHServer(ctx context.Context, logger *slog.Logger, config *SSHServerCon
 								h = m(h)
 							}
 
-							req.Reply(true, nil)
+							err = req.Reply(true, nil)
+							if err != nil {
+								sc.Logger.Error("shell/exec reply", "err", err)
+								sesh.Fatal(err)
+								return
+							}
 
 							if err := h(sesh); err != nil {
 								sc.Logger.Error("exec middleware", "err", err)
@@ -387,17 +428,33 @@ func NewSSHServer(ctx context.Context, logger *slog.Logger, config *SSHServerCon
 								return
 							}
 
-							sesh.Exit(0)
-							sesh.Close()
+							err = sesh.Exit(0)
+							if err != nil {
+								sc.Logger.Error("subsystem exit", "err", err)
+							}
+
+							err = sesh.Close()
+							if err != nil {
+								sc.Logger.Error("subsystem close", "err", err)
+							}
 						case "pty-req":
-							if sesh.pty != nil {
-								req.Reply(false, nil)
+							sesh.mu.Lock()
+							found := sesh.pty != nil
+							sesh.mu.Unlock()
+							if found {
+								err := req.Reply(false, nil)
+								if err != nil {
+									sc.Logger.Error("pty-req reply", "err", err)
+								}
 								return
 							}
 
 							ptyReq, ok := parsePtyRequest(req.Payload)
 							if !ok {
-								req.Reply(false, nil)
+								err := req.Reply(false, nil)
+								if err != nil {
+									sc.Logger.Error("pty-req reply", "err", err)
+								}
 								return
 							}
 
@@ -407,12 +464,23 @@ func NewSSHServer(ctx context.Context, logger *slog.Logger, config *SSHServerCon
 							sesh.mu.Unlock()
 
 							sesh.winch <- ptyReq.Window
-							req.Reply(ok, nil)
+							err := req.Reply(ok, nil)
+							if err != nil {
+								sc.Logger.Error("pty-req reply", "err", err)
+							}
 						case "window-change":
-							if sesh.pty == nil {
-								req.Reply(false, nil)
+							sesh.mu.Lock()
+							found := sesh.pty != nil
+							sesh.mu.Unlock()
+
+							if !found {
+								err := req.Reply(false, nil)
+								if err != nil {
+									sc.Logger.Error("pty-req reply", "err", err)
+								}
 								return
 							}
+
 							win, ok := parseWinchRequest(req.Payload)
 							if ok {
 								sesh.mu.Lock()
@@ -420,7 +488,11 @@ func NewSSHServer(ctx context.Context, logger *slog.Logger, config *SSHServerCon
 								sesh.winch <- win
 								sesh.mu.Unlock()
 							}
-							req.Reply(ok, nil)
+
+							err := req.Reply(ok, nil)
+							if err != nil {
+								sc.Logger.Error("window-change reply", "err", err)
+							}
 						}
 					}()
 				}

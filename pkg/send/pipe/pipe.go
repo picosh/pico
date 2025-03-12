@@ -16,8 +16,8 @@ func Middleware(writeHandler utils.CopyFromClientHandler, ext string) pssh.SSHSe
 		return func(session *pssh.SSHServerConnSession) error {
 			_, _, activePty := session.Pty()
 			if activePty {
-				err := session.Exit(0)
-				err = session.Close()
+				_ = session.Exit(0)
+				err := session.Close()
 				return err
 			}
 

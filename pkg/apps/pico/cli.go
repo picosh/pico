@@ -170,8 +170,7 @@ func WishMiddleware(handler *CliHandler) pssh.SSHServerMiddleware {
 					}
 					return nil
 				} else {
-					next(sesh)
-					return nil
+					return next(sesh)
 				}
 			}
 

@@ -40,11 +40,12 @@ func NewStorageMinio(address, user, pass string) (*StorageMinio, error) {
 		return nil, err
 	}
 
-	aClient, err := madmin.New(
+	aClient, err := madmin.NewWithOptions(
 		endpoint.Host,
-		user,
-		pass,
-		ssl,
+		&madmin.Options{
+			Creds:  credentials.NewStaticV4(user, pass, ""),
+			Secure: ssl,
+		},
 	)
 	if err != nil {
 		return nil, err

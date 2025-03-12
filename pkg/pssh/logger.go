@@ -62,7 +62,10 @@ func LogMiddleware(getLogger GetLoggerInterface, db FindUserInterface) SSHServer
 				"windowHeight", height,
 			)
 
-			sshHandler(s)
+			err := sshHandler(s)
+			if err != nil {
+				logger.Error("error", "err", err)
+			}
 
 			if pty != nil {
 				term = pty.Term
@@ -78,9 +81,10 @@ func LogMiddleware(getLogger GetLoggerInterface, db FindUserInterface) SSHServer
 				"windowWidth", width,
 				"windowHeight", height,
 				"duration", time.Since(ct),
+				"err", err,
 			)
 
-			return nil
+			return err
 		}
 	}
 }

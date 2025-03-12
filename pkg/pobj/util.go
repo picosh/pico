@@ -30,11 +30,6 @@ func EnvDriverDetector(logger *slog.Logger) (storage.ObjectStorage, error) {
 			"user", user,
 		)
 		return storage.NewStorageMinio(url, user, pass)
-	} else if driver == "s3" {
-		region := GetEnv("AWS_REGION", "us-east-1")
-		key := GetEnv("AWS_ACCESS_KEY_ID", "")
-		secret := GetEnv("AWS_SECRET_ACCESS_KEY", "")
-		return storage.NewStorageS3(region, key, secret)
 	}
 
 	// implied driver == "fs"
