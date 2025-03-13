@@ -12,14 +12,17 @@ import (
 	"github.com/picosh/pico/pkg/shared"
 	psub "github.com/picosh/pubsub"
 	"github.com/picosh/utils"
+	"golang.org/x/crypto/ssh"
 )
 
 func StartSshServer() {
+	appName := "pipe-ssh"
+
 	host := utils.GetEnv("PIPE_HOST", "0.0.0.0")
 	port := utils.GetEnv("PIPE_SSH_PORT", "2222")
 	portOverride := utils.GetEnv("PIPE_SSH_PORT_OVERRIDE", port)
 	promPort := utils.GetEnv("PIPE_PROM_PORT", "9222")
-	cfg := NewConfigSite("pipe-ssh")
+	cfg := NewConfigSite(appName)
 	logger := cfg.Logger
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -47,10 +50,22 @@ func StartSshServer() {
 	server, err := pssh.NewSSHServerWithConfig(
 		ctx,
 		logger,
+		appName,
 		host,
 		port,
 		promPort,
-		sshAuth.PubkeyAuthHandler,
+		func(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
+			perms, _ := sshAuth.PubkeyAuthHandler(conn, key)
+			if perms == nil {
+				perms = &ssh.Permissions{
+					Extensions: map[string]string{
+						"pubkey": utils.KeyForKeyText(key),
+					},
+				}
+			}
+
+			return perms, nil
+		},
 		[]pssh.SSHServerMiddleware{
 			WishMiddleware(handler),
 			pssh.LogMiddleware(handler, dbh),
@@ -66,7 +81,7 @@ func StartSshServer() {
 
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-	logger.Info("Starting SSH server", "host", host, "port", port)
+	logger.Info("Starting SSH server", "addr", server.Config.ListenAddr)
 	go func() {
 		if err = server.ListenAndServe(); err != nil {
 			logger.Error("serve", "err", err.Error())

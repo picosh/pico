@@ -18,6 +18,7 @@ import (
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/pico/pkg/tui"
 	"github.com/picosh/utils"
+	"golang.org/x/crypto/ssh"
 )
 
 func createTui(shrd *tui.SharedModel) pssh.SSHServerMiddleware {
@@ -37,10 +38,12 @@ func createTui(shrd *tui.SharedModel) pssh.SSHServerMiddleware {
 }
 
 func StartSshServer() {
+	appName := "pico-ssh"
+
 	host := utils.GetEnv("PICO_HOST", "0.0.0.0")
 	port := utils.GetEnv("PICO_SSH_PORT", "2222")
 	promPort := utils.GetEnv("PICO_PROM_PORT", "9222")
-	cfg := NewConfigSite("pico-ssh")
+	cfg := NewConfigSite(appName)
 	logger := cfg.Logger
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -65,10 +68,22 @@ func StartSshServer() {
 	server, err := pssh.NewSSHServerWithConfig(
 		ctx,
 		logger,
+		appName,
 		host,
 		port,
 		promPort,
-		sshAuth.PubkeyAuthHandler,
+		func(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
+			perms, _ := sshAuth.PubkeyAuthHandler(conn, key)
+			if perms == nil {
+				perms = &ssh.Permissions{
+					Extensions: map[string]string{
+						"pubkey": utils.KeyForKeyText(key),
+					},
+				}
+			}
+
+			return perms, nil
+		},
 		[]pssh.SSHServerMiddleware{
 			pipe.Middleware(handler, ""),
 			list.Middleware(handler),
@@ -103,7 +118,7 @@ func StartSshServer() {
 
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-	logger.Info("starting SSH server on", "host", host, "port", port)
+	logger.Info("Starting SSH server", "addr", server.Config.ListenAddr)
 	go func() {
 		if err = server.ListenAndServe(); err != nil {
 			logger.Error("serve", "err", err.Error())

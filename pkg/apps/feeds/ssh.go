@@ -20,10 +20,12 @@ import (
 )
 
 func StartSshServer() {
+	appName := "feeds-ssh"
+
 	host := utils.GetEnv("FEEDS_HOST", "0.0.0.0")
 	port := utils.GetEnv("FEEDS_SSH_PORT", "2222")
 	promPort := utils.GetEnv("FEEDS_PROM_PORT", "9222")
-	cfg := NewConfigSite("feeds-ssh")
+	cfg := NewConfigSite(appName)
 	logger := cfg.Logger
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -48,6 +50,7 @@ func StartSshServer() {
 	server, err := pssh.NewSSHServerWithConfig(
 		ctx,
 		logger,
+		appName,
 		host,
 		port,
 		promPort,
@@ -76,7 +79,7 @@ func StartSshServer() {
 	done := make(chan os.Signal, 1)
 
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-	logger.Info("Starting SSH server", "host", host, "port", port)
+	logger.Info("Starting SSH server", "addr", server.Config.ListenAddr)
 	go func() {
 		if err = server.ListenAndServe(); err != nil {
 			logger.Error("serve", "err", err.Error())

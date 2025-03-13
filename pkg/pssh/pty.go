@@ -13,7 +13,7 @@ func DeprecatedNotice() SSHServerMiddleware {
 	return func(next SSHServerHandler) SSHServerHandler {
 		return func(sesh *SSHServerConnSession) error {
 			msg := fmt.Sprintf(
-				"%s\n\nRun %s to access pico's TUI",
+				"%s\r\n\r\nRun %s to access pico's TUI",
 				"DEPRECATED",
 				"ssh pico.sh",
 			)

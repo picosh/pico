@@ -45,6 +45,7 @@ func StartSshServer(cfg *PgsConfig, killCh chan error) {
 	server, err := pssh.NewSSHServerWithConfig(
 		ctx,
 		logger,
+		"pgs-ssh",
 		host,
 		port,
 		promPort,
@@ -75,8 +76,7 @@ func StartSshServer(cfg *PgsConfig, killCh chan error) {
 
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-	logger.Info("starting SSH server on", "host", host, "port", port)
-
+	logger.Info("Starting SSH server", "addr", server.Config.ListenAddr)
 	go func() {
 		if err = server.ListenAndServe(); err != nil {
 			logger.Error("serve", "err", err.Error())

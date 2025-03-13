@@ -277,18 +277,20 @@ func (s *SSHServer) ListenAndServe() error {
 
 			go func() {
 				<-s.Ctx.Done()
-				s.Logger.Info("prometheus server shutting down")
+				s.Logger.Info("Prometheus server shutting down")
 				srv.Close()
 			}()
+
+			s.Logger.Info("Starting Prometheus server", "addr", s.Config.PromListenAddr)
 
 			err := srv.ListenAndServe()
 			if err != nil {
 				if errors.Is(err, http.ErrServerClosed) {
-					s.Logger.Info("prometheus server shut down")
+					s.Logger.Info("Prometheus server shut down")
 					return
 				}
 
-				s.Logger.Error("prometheus", "err", err)
+				s.Logger.Error("Prometheus serve error", "err", err)
 				panic(err)
 			}
 		}()
@@ -466,23 +468,25 @@ func NewSSHServer(ctx context.Context, logger *slog.Logger, config *SSHServerCon
 								return
 							}
 
-							var payload = struct{ Value string }{}
-							err := ssh.Unmarshal(req.Payload, &payload)
-							if err != nil {
-								sc.Logger.Error("shell/exec unmarshal", "err", err)
-								sesh.Fatal(err)
-								return
-							}
+							if len(req.Payload) > 0 {
+								var payload = struct{ Value string }{}
+								err := ssh.Unmarshal(req.Payload, &payload)
+								if err != nil {
+									sc.Logger.Error("shell/exec unmarshal", "err", err)
+									sesh.Fatal(err)
+									return
+								}
 
-							if sc.SSHServer.Config.PromListenAddr != "" {
-								sc.SSHServer.SessionsCreated.WithLabelValues(payload.Value).Inc()
-								defer func() {
-									sc.SSHServer.SessionsFinished.WithLabelValues(payload.Value).Inc()
-									sc.SSHServer.SessionsDuration.WithLabelValues(payload.Value).Add(time.Since(sc.Start).Seconds())
-								}()
-							}
+								if sc.SSHServer.Config.PromListenAddr != "" {
+									sc.SSHServer.SessionsCreated.WithLabelValues(payload.Value).Inc()
+									defer func() {
+										sc.SSHServer.SessionsFinished.WithLabelValues(payload.Value).Inc()
+										sc.SSHServer.SessionsDuration.WithLabelValues(payload.Value).Add(time.Since(sc.Start).Seconds())
+									}()
+								}
 
-							sesh.SetValue("command", strings.Fields(payload.Value))
+								sesh.SetValue("command", strings.Fields(payload.Value))
+							}
 
 							h := func(*SSHServerConnSession) error { return nil }
 							for _, m := range sc.SSHServer.Config.Middleware {
@@ -590,11 +594,12 @@ type PubKeyAuthHandler func(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Perm
 func NewSSHServerWithConfig(
 	ctx context.Context,
 	logger *slog.Logger,
-	host, port, promPort string,
+	app, host, port, promPort string,
 	pubKeyAuthHandler PubKeyAuthHandler,
 	middleware, subsystemMiddleware []SSHServerMiddleware,
 	channelMiddleware map[string]SSHServerChannelMiddleware) (*SSHServer, error) {
 	server := NewSSHServer(ctx, logger, &SSHServerConfig{
+		App:        app,
 		ListenAddr: fmt.Sprintf("%s:%s", host, port),
 		ServerConfig: &ssh.ServerConfig{
 			PublicKeyCallback: pubKeyAuthHandler,
