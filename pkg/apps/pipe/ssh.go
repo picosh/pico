@@ -67,7 +67,7 @@ func StartSshServer() {
 			return perms, nil
 		},
 		[]pssh.SSHServerMiddleware{
-			WishMiddleware(handler),
+			Middleware(handler),
 			pssh.LogMiddleware(handler, dbh),
 		},
 		nil,

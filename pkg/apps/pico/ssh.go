@@ -101,7 +101,7 @@ func StartSshServer() {
 					return pssh.PtyMdw(createTui(shrd))(next)(sesh)
 				}
 			},
-			WishMiddleware(cliHandler),
+			Middleware(cliHandler),
 			pssh.LogMiddleware(handler, dbpool),
 		},
 		[]pssh.SSHServerMiddleware{

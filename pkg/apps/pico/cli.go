@@ -87,7 +87,7 @@ type CliHandler struct {
 	Logger *slog.Logger
 }
 
-func WishMiddleware(handler *CliHandler) pssh.SSHServerMiddleware {
+func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 	dbpool := handler.DBPool
 	log := handler.Logger
 

@@ -10,7 +10,7 @@ import (
 	"github.com/picosh/pico/pkg/shared"
 )
 
-func WishMiddleware(dbpool db.DB, cfg *shared.ConfigSite) pssh.SSHServerMiddleware {
+func Middleware(dbpool db.DB, cfg *shared.ConfigSite) pssh.SSHServerMiddleware {
 	return func(next pssh.SSHServerHandler) pssh.SSHServerHandler {
 		return func(sesh *pssh.SSHServerConnSession) error {
 			args := sesh.Command()

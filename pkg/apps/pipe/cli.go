@@ -71,7 +71,7 @@ func clientInfo(clients []*psub.Client, clientType string) string {
 }
 
 var helpStr = func(sshCmd string) string {
-	return fmt.Sprintf(`Command: ssh %s <help | ls | pub | sub | pipe> <topic> [-h | args...]
+	data := fmt.Sprintf(`Command: ssh %s <help | ls | pub | sub | pipe> <topic> [-h | args...]
 
 The simplest authenticated pubsub system.  Send messages through
 user-defined topics.  Topics are private to the authenticated
@@ -89,6 +89,10 @@ data is being sent:
 - sub => reads from client
 - pipe => read and write between clients
 `, sshCmd)
+
+	data = strings.ReplaceAll(data, "\n", "\r\n")
+
+	return data
 }
 
 type CliHandler struct {
@@ -136,7 +140,7 @@ func checkAccess(accessList []string, userName string, sesh *pssh.SSHServerConnS
 	return false
 }
 
-func WishMiddleware(handler *CliHandler) pssh.SSHServerMiddleware {
+func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 	pubsub := handler.PubSub
 
 	return func(next pssh.SSHServerHandler) pssh.SSHServerHandler {

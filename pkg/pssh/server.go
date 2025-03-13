@@ -246,7 +246,7 @@ type SSHServer struct {
 func (s *SSHServer) ListenAndServe() error {
 	if s.Config.PromListenAddr != "" {
 		s.SessionsCreated = promauto.With(prometheus.DefaultRegisterer).NewCounterVec(prometheus.CounterOpts{
-			Name: "wish_sessions_created_total",
+			Name: "pssh_sessions_created_total",
 			Help: "The total number of sessions created",
 			ConstLabels: prometheus.Labels{
 				"app": s.Config.App,
@@ -254,7 +254,7 @@ func (s *SSHServer) ListenAndServe() error {
 		}, []string{"command"})
 
 		s.SessionsFinished = promauto.With(prometheus.DefaultRegisterer).NewCounterVec(prometheus.CounterOpts{
-			Name: "wish_sessions_finished_total",
+			Name: "pssh_sessions_finished_total",
 			Help: "The total number of sessions created",
 			ConstLabels: prometheus.Labels{
 				"app": s.Config.App,
@@ -262,7 +262,7 @@ func (s *SSHServer) ListenAndServe() error {
 		}, []string{"command"})
 
 		s.SessionsDuration = promauto.With(prometheus.DefaultRegisterer).NewCounterVec(prometheus.CounterOpts{
-			Name: "wish_sessions_duration_seconds",
+			Name: "pssh_sessions_duration_seconds",
 			Help: "The total sessions duration in seconds",
 			ConstLabels: prometheus.Labels{
 				"app": s.Config.App,
