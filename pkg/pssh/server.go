@@ -8,6 +8,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -323,7 +324,7 @@ func (s *SSHServer) ListenAndServe() error {
 		}
 
 		go func() {
-			if err := s.HandleConn(conn); err != nil {
+			if err := s.HandleConn(conn); err != nil && !errors.Is(err, io.EOF) {
 				s.Logger.Error("Error handling connection", "err", err, "remoteAddr", conn.RemoteAddr().String())
 			}
 		}()
@@ -443,7 +444,7 @@ func NewSSHServer(ctx context.Context, logger *slog.Logger, config *SSHServerCon
 								return
 							}
 
-							if err := h(sesh); err != nil {
+							if err := h(sesh); err != nil && !errors.Is(err, io.EOF) {
 								sc.Logger.Error("subsystem middleware", "err", err)
 								sesh.Fatal(err)
 								return
@@ -500,7 +501,7 @@ func NewSSHServer(ctx context.Context, logger *slog.Logger, config *SSHServerCon
 								return
 							}
 
-							if err := h(sesh); err != nil {
+							if err := h(sesh); err != nil && !errors.Is(err, io.EOF) {
 								sc.Logger.Error("exec middleware", "err", err)
 								sesh.Fatal(err)
 								return
