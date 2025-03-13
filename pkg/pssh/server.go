@@ -35,6 +35,13 @@ type SSHServerConn struct {
 	mu sync.Mutex
 }
 
+func (s *SSHServerConn) Context() context.Context {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return s.Ctx
+}
+
 func (sc *SSHServerConn) Close() error {
 	sc.CancelFunc()
 	return nil
@@ -44,6 +51,9 @@ type SSHServerConnSession struct {
 	ssh.Channel
 	*SSHServerConn
 
+	Ctx        context.Context
+	CancelFunc context.CancelFunc
+
 	pty   *Pty
 	winch chan Window
 
@@ -51,7 +61,7 @@ type SSHServerConnSession struct {
 }
 
 // Deadline implements context.Context.
-func (s *SSHServerConn) Deadline() (deadline time.Time, ok bool) {
+func (s *SSHServerConnSession) Deadline() (deadline time.Time, ok bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -59,7 +69,7 @@ func (s *SSHServerConn) Deadline() (deadline time.Time, ok bool) {
 }
 
 // Done implements context.Context.
-func (s *SSHServerConn) Done() <-chan struct{} {
+func (s *SSHServerConnSession) Done() <-chan struct{} {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -67,7 +77,7 @@ func (s *SSHServerConn) Done() <-chan struct{} {
 }
 
 // Err implements context.Context.
-func (s *SSHServerConn) Err() error {
+func (s *SSHServerConnSession) Err() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -75,7 +85,7 @@ func (s *SSHServerConn) Err() error {
 }
 
 // Value implements context.Context.
-func (s *SSHServerConn) Value(key any) any {
+func (s *SSHServerConnSession) Value(key any) any {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -83,14 +93,14 @@ func (s *SSHServerConn) Value(key any) any {
 }
 
 // SetValue implements context.Context.
-func (s *SSHServerConn) SetValue(key any, data any) {
+func (s *SSHServerConnSession) SetValue(key any, data any) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	s.Ctx = context.WithValue(s.Ctx, key, data)
 }
 
-func (s *SSHServerConn) Context() context.Context {
+func (s *SSHServerConnSession) Context() context.Context {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -128,6 +138,7 @@ func (s *SSHServerConnSession) Command() []string {
 }
 
 func (s *SSHServerConnSession) Close() error {
+	s.CancelFunc()
 	return s.Channel.Close()
 }
 
@@ -162,7 +173,7 @@ func (sc *SSHServerConn) Handle(chans <-chan ssh.NewChannel, reqs <-chan *ssh.Re
 
 	for {
 		select {
-		case <-sc.Done():
+		case <-sc.Context().Done():
 			return nil
 		case newChan, ok := <-chans:
 			if !ok {
@@ -399,14 +410,18 @@ func NewSSHServer(ctx context.Context, logger *slog.Logger, config *SSHServerCon
 				return err
 			}
 
+			ctx, cancelFunc := context.WithCancel(sc.Ctx)
+
 			sesh := &SSHServerConnSession{
 				Channel:       channel,
 				SSHServerConn: sc,
+				Ctx:           ctx,
+				CancelFunc:    cancelFunc,
 			}
 
 			for {
 				select {
-				case <-sc.Done():
+				case <-sesh.Done():
 					return nil
 				case req, ok := <-requests:
 					if !ok {
