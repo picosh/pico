@@ -324,7 +324,7 @@ func (s *SSHServer) ListenAndServe() error {
 
 		go func() {
 			if err := s.HandleConn(conn); err != nil {
-				s.Logger.Error("handle conn", "err", err)
+				s.Logger.Error("Error handling connection", "err", err, "remoteAddr", conn.RemoteAddr().String())
 			}
 		}()
 	}
