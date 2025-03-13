@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/mmcdole/gofeed"
-	"github.com/picosh/pico/db/postgres"
-	"github.com/picosh/pico/feeds"
+	"github.com/picosh/pico/pkg/apps/feeds"
+	"github.com/picosh/pico/pkg/db/postgres"
 )
 
 func main() {

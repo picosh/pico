@@ -1,6 +1,6 @@
 package main
 
-import "github.com/picosh/pico/auth"
+import "github.com/picosh/pico/pkg/apps/auth"
 
 func main() {
 	auth.StartApiServer()

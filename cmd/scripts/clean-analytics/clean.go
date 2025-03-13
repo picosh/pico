@@ -5,8 +5,8 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/picosh/pico/db/postgres"
-	"github.com/picosh/pico/shared"
+	"github.com/picosh/pico/pkg/db/postgres"
+	"github.com/picosh/pico/pkg/shared"
 )
 
 func main() {

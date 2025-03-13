@@ -7,13 +7,13 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/picosh/pico/db"
-	"github.com/picosh/pico/db/postgres"
-	"github.com/picosh/pico/prose"
-	"github.com/picosh/pico/shared"
-	"github.com/picosh/pico/shared/storage"
-	sst "github.com/picosh/pobj/storage"
-	sendUtils "github.com/picosh/send/utils"
+	"github.com/picosh/pico/pkg/apps/prose"
+	"github.com/picosh/pico/pkg/db"
+	"github.com/picosh/pico/pkg/db/postgres"
+	sst "github.com/picosh/pico/pkg/pobj/storage"
+	sendUtils "github.com/picosh/pico/pkg/send/utils"
+	"github.com/picosh/pico/pkg/shared"
+	"github.com/picosh/pico/pkg/shared/storage"
 )
 
 func bail(err error) {

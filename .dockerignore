@@ -9,3 +9,4 @@ build/*
 data/*
 !data/.gitkeep
 Dockerfile
+ssh_data
