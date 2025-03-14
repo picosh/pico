@@ -340,7 +340,7 @@ func rssHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 			return
 		}
 
-		feed, err := shared.UserFeed(apiConfig.Dbpool, user.ID, apiToken)
+		feed, err := shared.UserFeed(apiConfig.Dbpool, user, apiToken)
 		if err != nil {
 			return
 		}

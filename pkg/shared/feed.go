@@ -8,10 +8,71 @@ import (
 	"github.com/picosh/pico/pkg/db"
 )
 
-func UserFeed(me db.DB, userID, token string) (*feeds.Feed, error) {
+func genUserFeedTmpl(title, msg string) string {
+	return fmt.Sprintf(`
+<html>
+	<head>
+		<title>%s</title>
+		<style>
+			code {
+				background-color: #ddd;
+				border-radius: 5px;
+				padding: 1px 3px;
+			}
+		</style>
+	</head>
+	<body>
+		%s
+	</body>
+</html>
+`, title, msg)
+}
+
+func PicoPlusFeed(expiration time.Time) string {
+	msg := fmt.Sprintf(`<h1>Thanks for joining <code>pico+</code>!</h1>
+<p>
+	You now have access to all our premium services until <strong>%s</strong>.
+</p>
+<p>
+	We will send you <code>pico+</code> expiration notifications through this RSS feed.
+	Go to <a href="https://pico.sh/getting-started#next-steps">pico.sh/getting-started#next-steps</a>
+	to start using our services.
+</p>
+<p>
+	If you have any questions, please do not hesitate to <a href="https://pico.sh/contact">contact us</a>.
+</p>`, expiration.Format(time.DateOnly))
+	return genUserFeedTmpl("pico+ activated", msg)
+}
+
+func PicoPlusExpirationFeed(expiration time.Time, txt string, plusLink string) string {
+	title := fmt.Sprintf("pico+ %s expiration notification!", txt)
+	msg := fmt.Sprintf(`<h1>%s</h1>
+<p>
+	Your <code>pico+</code> membership will expire on <strong>%s</strong>.
+</p>
+<p>
+	If your pico+ membership expires then we will:
+
+	<ul>
+		<li>revoke access to <a href="https">https://tuns.sh</a></li>
+		<li>reject new sites being created for <a href="https://pgs.sh">pgs.sh</a></li>
+		<li>revoke access to our IRC bouncer</li>
+	</ul>
+</p>
+<p>
+	In order to continue using our premium services, you need to purchase another year:
+	<a href="%s">purchase pico+</a>
+</p>
+<p>
+	If you have any questions, please do not hesitate to <a href="https://pico.sh/contact">contact us</a>.
+</p>`, title, expiration.Format(time.DateOnly), plusLink)
+	return genUserFeedTmpl(title, msg)
+}
+
+func UserFeed(me db.DB, user *db.User, token string) (*feeds.Feed, error) {
 	var err error
 	if token == "" {
-		token, err = me.UpsertToken(userID, "pico-rss")
+		token, err = me.UpsertToken(user.ID, "pico-rss")
 		if err != nil {
 			return nil, err
 		}
@@ -28,14 +89,14 @@ func UserFeed(me db.DB, userID, token string) (*feeds.Feed, error) {
 	var feedItems []*feeds.Item
 
 	now := time.Now()
-	ff, err := me.FindFeatureForUser(userID, "plus")
+	ff, err := me.FindFeatureForUser(user.ID, "plus")
 	if err != nil {
 		// still want to send an empty feed
 	} else {
 		createdAt := ff.CreatedAt
-		createdAtStr := createdAt.Format("2006-01-02 15:04:05")
+		createdAtStr := createdAt.Format(time.RFC3339)
 		id := fmt.Sprintf("pico-plus-activated-%d", createdAt.Unix())
-		content := `Thanks for joining pico+! You now have access to all our premium services for exactly one year.  We will send you pico+ expiration notifications through this RSS feed.  Go to <a href="https://pico.sh/getting-started#next-steps">pico.sh/getting-started#next-steps</a> to start using our services.`
+		content := PicoPlusFeed(*ff.ExpiresAt)
 		plus := &feeds.Item{
 			Id:          id,
 			Title:       fmt.Sprintf("pico+ membership activated on %s", createdAtStr),
@@ -49,19 +110,19 @@ func UserFeed(me db.DB, userID, token string) (*feeds.Feed, error) {
 		feedItems = append(feedItems, plus)
 
 		oneMonthWarning := ff.ExpiresAt.AddDate(0, -1, 0)
-		mo := genFeedItem(now, *ff.ExpiresAt, oneMonthWarning, "1-month")
+		mo := genFeedItem(user.Name, now, *ff.ExpiresAt, oneMonthWarning, "1-month")
 		if mo != nil {
 			feedItems = append(feedItems, mo)
 		}
 
 		oneWeekWarning := ff.ExpiresAt.AddDate(0, 0, -7)
-		wk := genFeedItem(now, *ff.ExpiresAt, oneWeekWarning, "1-week")
+		wk := genFeedItem(user.Name, now, *ff.ExpiresAt, oneWeekWarning, "1-week")
 		if wk != nil {
 			feedItems = append(feedItems, wk)
 		}
 
 		oneDayWarning := ff.ExpiresAt.AddDate(0, 0, -2)
-		day := genFeedItem(now, *ff.ExpiresAt, oneDayWarning, "1-day")
+		day := genFeedItem(user.Name, now, *ff.ExpiresAt, oneDayWarning, "1-day")
 		if day != nil {
 			feedItems = append(feedItems, day)
 		}
@@ -71,11 +132,12 @@ func UserFeed(me db.DB, userID, token string) (*feeds.Feed, error) {
 	return feed, nil
 }
 
-func genFeedItem(now time.Time, expiresAt time.Time, warning time.Time, txt string) *feeds.Item {
+func genFeedItem(userName string, now time.Time, expiresAt time.Time, warning time.Time, txt string) *feeds.Item {
 	if now.After(warning) {
-		content := fmt.Sprintf(
-			"Your pico+ membership is going to expire on %s",
-			expiresAt.Format("2006-01-02 15:04:05"),
+		content := PicoPlusExpirationFeed(
+			expiresAt,
+			txt,
+			"https://auth.pico.sh/checkout/"+userName,
 		)
 		return &feeds.Item{
 			Id:          fmt.Sprintf("%d", warning.Unix()),

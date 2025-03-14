@@ -19,7 +19,7 @@ import (
 )
 
 func NewTabWriter(out io.Writer) *tabwriter.Writer {
-	return tabwriter.NewWriter(out, 0, 0, 1, ' ', tabwriter.TabIndent)
+	return tabwriter.NewWriter(out, 0, 0, 2, ' ', tabwriter.TabIndent)
 }
 
 func projectTable(sesh io.Writer, projects []*db.Project) {
