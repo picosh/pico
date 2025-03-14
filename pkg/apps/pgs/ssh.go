@@ -56,7 +56,6 @@ func StartSshServer(cfg *PgsConfig, killCh chan error) {
 			scp.Middleware(handler),
 			rsync.Middleware(handler),
 			auth.Middleware(handler),
-			pssh.PtyMdw(pssh.DeprecatedNotice()),
 			Middleware(handler),
 			pssh.LogMiddleware(handler, handler.Cfg.DB),
 		},

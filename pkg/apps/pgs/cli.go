@@ -33,7 +33,7 @@ func projectTable(sesh io.Writer, projects []*db.Project) {
 		}
 		fmt.Fprintf(
 			writer,
-			"%s\t%s\t%s\t%s\t%s\t%s\n",
+			"%s\t%s\t%s\t%s\t%s\t%s\r\n",
 			project.Name,
 			project.UpdatedAt.Format("2006-01-02 15:04:05"),
 			links,
@@ -126,8 +126,8 @@ func (c *Cmd) RmProjectAssets(projectName string) error {
 }
 
 func (c *Cmd) help() {
-	helpStr := "Commands: [help, stats, ls, fzf, rm, link, unlink, prune, retain, depends, acl, cache]\n"
-	helpStr += "NOTICE:" + " *must* append with `--write` for the changes to persist.\n"
+	helpStr := "Commands: [help, stats, ls, fzf, rm, link, unlink, prune, retain, depends, acl, cache]\r\n"
+	helpStr += "NOTICE:" + " *must* append with `--write` for the changes to persist.\r\n"
 	c.output(helpStr)
 	projectName := "projA"
 
@@ -185,7 +185,7 @@ func (c *Cmd) help() {
 	writer := NewTabWriter(c.Session)
 	fmt.Fprintln(writer, "Cmd\tDescription")
 	for _, dat := range data {
-		fmt.Fprintf(writer, "%s\t%s\n", dat[0], dat[1])
+		fmt.Fprintf(writer, "%s\t%s\r\n", dat[0], dat[1])
 	}
 	writer.Flush()
 }
@@ -219,7 +219,7 @@ func (c *Cmd) stats(cfgMaxSize uint64) error {
 	fmt.Fprintln(writer, "Used (GB)\tQuota (GB)\tUsed (%)\tProjects (#)")
 	fmt.Fprintf(
 		writer,
-		"%.4f\t%.4f\t%.4f\t%d\n",
+		"%.4f\t%.4f\t%.4f\t%d\r\n",
 		utils.BytesToGB(int(totalFileSize)),
 		utils.BytesToGB(int(storageMax)),
 		(float32(totalFileSize)/float32(storageMax))*100,
@@ -435,7 +435,7 @@ func (c *Cmd) prune(prefix string, keepNumLatest int) error {
 		}
 	}
 
-	c.output("\nsummary")
+	c.output("\r\nsummary")
 	c.output("=======")
 	for _, project := range goodbye {
 		c.output(fmt.Sprintf("project (%s) removed", project.Name))

@@ -14,9 +14,6 @@ func Middleware(dbpool db.DB, cfg *shared.ConfigSite) pssh.SSHServerMiddleware {
 	return func(next pssh.SSHServerHandler) pssh.SSHServerHandler {
 		return func(sesh *pssh.SSHServerConnSession) error {
 			args := sesh.Command()
-			if len(args) == 0 {
-				return next(sesh)
-			}
 
 			logger := pssh.GetLogger(sesh)
 			user := pssh.GetUser(sesh)
@@ -27,29 +24,33 @@ func Middleware(dbpool db.DB, cfg *shared.ConfigSite) pssh.SSHServerMiddleware {
 				return err
 			}
 
-			cmd := args[0]
+			cmd := "help"
+			if len(args) > 0 {
+				cmd = args[0]
+			}
+
 			if cmd == "help" {
-				fmt.Fprintf(sesh, "Commands: [help, ls, rm, run]\n\n")
+				fmt.Fprintf(sesh, "Commands: [help, ls, rm, run]\r\n\r\n")
 				writer := tabwriter.NewWriter(sesh, 0, 0, 1, ' ', tabwriter.TabIndent)
 				fmt.Fprintln(writer, "Cmd\tDesc")
 				fmt.Fprintf(
 					writer,
-					"%s\t%s\n",
+					"%s\t%s\r\n",
 					"help", "this help text",
 				)
 				fmt.Fprintf(
 					writer,
-					"%s\t%s\n",
+					"%s\t%s\r\n",
 					"ls", "list feed digest posts with metadata",
 				)
 				fmt.Fprintf(
 					writer,
-					"%s\t%s\n",
+					"%s\t%s\r\n",
 					"rm {filename}", "removes feed digest post",
 				)
 				fmt.Fprintf(
 					writer,
-					"%s\t%s\n",
+					"%s\t%s\r\n",
 					"run {filename}", "runs the feed digest post immediately, ignoring last digest time validation",
 				)
 				return writer.Flush()
@@ -71,7 +72,7 @@ func Middleware(dbpool db.DB, cfg *shared.ConfigSite) pssh.SSHServerMiddleware {
 					digestOption := DigestOptionToTime(*post.Data.LastDigest, parsed.DigestInterval)
 					fmt.Fprintf(
 						writer,
-						"%s\t%s\t%s\t%s\t%d/10\n",
+						"%s\t%s\t%s\t%s\t%d/10\r\n",
 						post.Filename,
 						post.Data.LastDigest.Format(time.RFC3339),
 						digestOption.Format(time.RFC3339),
@@ -82,7 +83,7 @@ func Middleware(dbpool db.DB, cfg *shared.ConfigSite) pssh.SSHServerMiddleware {
 				return writer.Flush()
 			} else if cmd == "rm" {
 				filename := args[1]
-				fmt.Fprintf(sesh, "removing digest post %s\n", filename)
+				fmt.Fprintf(sesh, "removing digest post %s\r\n", filename)
 				write := false
 				if len(args) > 2 {
 					writeRaw := args[2]
@@ -102,7 +103,7 @@ func Middleware(dbpool db.DB, cfg *shared.ConfigSite) pssh.SSHServerMiddleware {
 						fmt.Fprintln(sesh.Stderr(), err)
 					}
 				}
-				fmt.Fprintf(sesh, "digest post removed %s\n", filename)
+				fmt.Fprintf(sesh, "digest post removed %s\r\n", filename)
 				if !write {
 					fmt.Fprintln(sesh, "WARNING: *must* append with `--write` for the changes to persist.")
 				}
@@ -119,7 +120,7 @@ func Middleware(dbpool db.DB, cfg *shared.ConfigSite) pssh.SSHServerMiddleware {
 					fmt.Fprintln(sesh.Stderr(), err)
 					return err
 				}
-				fmt.Fprintf(sesh, "running feed post: %s\n", filename)
+				fmt.Fprintf(sesh, "running feed post: %s\r\n", filename)
 				fetcher := NewFetcher(dbpool, cfg)
 				err = fetcher.RunPost(logger, user, post, true)
 				if err != nil {

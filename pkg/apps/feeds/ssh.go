@@ -61,7 +61,7 @@ func StartSshServer() {
 			scp.Middleware(handler),
 			rsync.Middleware(handler),
 			auth.Middleware(handler),
-			pssh.PtyMdw(pssh.DeprecatedNotice()),
+			Middleware(dbh, cfg),
 			pssh.LogMiddleware(handler, dbh),
 		},
 		[]pssh.SSHServerMiddleware{

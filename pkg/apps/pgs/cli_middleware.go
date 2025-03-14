@@ -69,9 +69,6 @@ func Middleware(handler *UploadAssetHandler) pssh.SSHServerMiddleware {
 	return func(next pssh.SSHServerHandler) pssh.SSHServerHandler {
 		return func(sesh *pssh.SSHServerConnSession) error {
 			args := sesh.Command()
-			if len(args) == 0 {
-				return next(sesh)
-			}
 
 			// default width and height when no pty
 			width := 100
@@ -103,6 +100,11 @@ func Middleware(handler *UploadAssetHandler) pssh.SSHServerMiddleware {
 				Width:  width,
 				Height: height,
 				Cfg:    handler.Cfg,
+			}
+
+			if len(args) == 0 {
+				opts.help()
+				return nil
 			}
 
 			cmd := strings.TrimSpace(args[0])
