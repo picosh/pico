@@ -47,30 +47,7 @@ func NewLogsPage(shrd *SharedModel) *LogsPage {
 }
 
 func (m *LogsPage) Footer() []Shortcut {
-	return []Shortcut{
-		{Shortcut: "tab", Text: "focus"},
-	}
-}
-
-func (m *LogsPage) CaptureEvent(ev vaxis.Event) (vxfw.Command, error) {
-	switch msg := ev.(type) {
-	case vaxis.Key:
-		if msg.Matches(vaxis.KeyTab) {
-			if m.focus == "list" {
-				m.focus = "input"
-				return m.input.FocusIn()
-			}
-			m.focus = "list"
-			cmd, _ := m.input.FocusOut()
-			return vxfw.BatchCmd([]vxfw.Command{cmd, vxfw.FocusWidgetCmd(m.list)}), nil
-		}
-
-		if m.focus == "input" {
-			m.filterLogs()
-			return vxfw.RedrawCmd{}, nil
-		}
-	}
-	return nil, nil
+	return []Shortcut{}
 }
 
 func (m *LogsPage) filterLogs() {
