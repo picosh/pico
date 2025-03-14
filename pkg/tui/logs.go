@@ -27,7 +27,6 @@ type LogsPage struct {
 
 	input    *TextInput
 	list     *list.Dynamic
-	focus    string
 	logs     []*LogLine
 	filtered []int
 	ctx      context.Context
