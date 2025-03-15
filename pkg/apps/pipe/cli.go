@@ -56,7 +56,7 @@ func toPublicTopic(topic string) string {
 	return fmt.Sprintf("public/%s", topic)
 }
 
-func clientInfo(clients []*psub.Client, clientType string) string {
+func clientInfo(clients []*psub.Client, isAdmin bool, clientType string) string {
 	if len(clients) == 0 {
 		return ""
 	}
@@ -64,6 +64,10 @@ func clientInfo(clients []*psub.Client, clientType string) string {
 	outputData := fmt.Sprintf("    %s:\r\n", clientType)
 
 	for _, client := range clients {
+		if strings.HasPrefix(client.ID, "admin-") && !isAdmin {
+			continue
+		}
+
 		outputData += fmt.Sprintf("    - %s\r\n", client.ID)
 	}
 
@@ -161,8 +165,12 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 			userNameAddition := ""
 
 			isAdmin := false
+			impersonate := false
 			if user != nil {
 				isAdmin = handler.DBPool.HasFeatureForUser(user.ID, "admin")
+				if isAdmin && strings.HasPrefix(sesh.User(), "admin__") {
+					impersonate = true
+				}
 
 				userName = user.Name
 				if user.PublicKey != nil && user.PublicKey.Name != "" {
@@ -254,9 +262,9 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 									pipes = append(pipes, client)
 								}
 							}
-							outputData += clientInfo(pubs, "Pubs")
-							outputData += clientInfo(subs, "Subs")
-							outputData += clientInfo(pipes, "Pipes")
+							outputData += clientInfo(pubs, isAdmin, "Pubs")
+							outputData += clientInfo(subs, isAdmin, "Subs")
+							outputData += clientInfo(pipes, isAdmin, "Pipes")
 						}
 
 						for waitingChannel, channelPubs := range waitingChannels {
@@ -270,6 +278,9 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 							outputData += "  Clients:\r\n"
 							outputData += fmt.Sprintf("    %s:\r\n", "Waiting Pubs")
 							for _, client := range channelPubs {
+								if strings.HasPrefix(client, "admin-") && !isAdmin {
+									continue
+								}
 								outputData += fmt.Sprintf("    - %s\r\n", client)
 							}
 						}
@@ -296,7 +307,12 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 				"cmdArgs", cmdArgs,
 			)
 
-			clientID := fmt.Sprintf("%s (%s%s@%s)", uuid.NewString(), userName, userNameAddition, sesh.RemoteAddr().String())
+			uuidStr := uuid.NewString()
+			if impersonate {
+				uuidStr = fmt.Sprintf("admin-%s", uuidStr)
+			}
+
+			clientID := fmt.Sprintf("%s (%s%s@%s)", uuidStr, userName, userNameAddition, sesh.RemoteAddr().String())
 
 			var err error
 
