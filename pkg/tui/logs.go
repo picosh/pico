@@ -27,19 +27,16 @@ type LogsPage struct {
 
 	input    *TextInput
 	list     *list.Dynamic
-	logs     []*LogLine
 	filtered []int
+	logs     []*LogLine
 	ctx      context.Context
 	done     context.CancelFunc
 }
 
 func NewLogsPage(shrd *SharedModel) *LogsPage {
-	ctx, cancel := context.WithCancel(shrd.Session.Context())
 	page := &LogsPage{
 		shared: shrd,
 		input:  NewTextInput("filter logs"),
-		ctx:    ctx,
-		done:   cancel,
 	}
 	page.list = &list.Dynamic{Builder: page.getWidget, DisableEventHandlers: true}
 	return page
@@ -71,6 +68,7 @@ func (m *LogsPage) filterLogs() {
 		m.filtered = append(m.filtered, idx)
 	}
 
+	// scroll to bottom
 	if len(m.filtered) > 0 {
 		m.list.SetCursor(uint(len(m.filtered) - 1))
 	}
@@ -125,6 +123,9 @@ func (m *LogsPage) getWidget(i uint, cursor uint) vxfw.Widget {
 }
 
 func (m *LogsPage) connectToLogs() error {
+	ctx, cancel := context.WithCancel(m.shared.Session.Context())
+	m.ctx = ctx
+	m.done = cancel
 	conn := shared.NewPicoPipeClient()
 	drain, err := pipeLogger.ReadLogs(m.ctx, m.shared.Logger, conn)
 	if err != nil {

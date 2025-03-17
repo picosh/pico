@@ -13,6 +13,7 @@ var menuChoices = []string{
 	"tokens",
 	"logs",
 	"analytics",
+	"tuns",
 	"pico+",
 	"chat",
 }

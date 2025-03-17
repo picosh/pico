@@ -7,10 +7,12 @@ import (
 
 func NewConfigSite(service string) *shared.ConfigSite {
 	dbURL := utils.GetEnv("DATABASE_URL", "")
+	tuns := utils.GetEnv("TUNS_CONSOLE_SECRET", "")
 
 	return &shared.ConfigSite{
-		DbURL:  dbURL,
-		Space:  "pico",
-		Logger: shared.CreateLogger(service),
+		DbURL:      dbURL,
+		Space:      "pico",
+		Logger:     shared.CreateLogger(service),
+		TunsSecret: tuns,
 	}
 }

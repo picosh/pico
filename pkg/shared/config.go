@@ -51,6 +51,7 @@ type ConfigSite struct {
 	MaxAssetSize       int64
 	MaxSpecialFileSize int64
 	Logger             *slog.Logger
+	TunsSecret         string
 }
 
 func NewConfigSite() *ConfigSite {

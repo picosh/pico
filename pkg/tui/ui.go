@@ -337,6 +337,7 @@ func NewTui(opts vaxis.Options, shrd *SharedModel) {
 		"logs":       NewLogsPage(shrd),
 		"analytics":  NewAnalyticsPage(shrd),
 		"chat":       NewChatPage(shrd),
+		"tuns":       NewTunsPage(shrd),
 	}
 	root := &App{
 		shared: shrd,

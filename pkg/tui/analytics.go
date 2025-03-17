@@ -22,12 +22,12 @@ type AnalyticsPage struct {
 
 	sites     []*db.VisitUrl
 	features  []*db.FeatureFlag
-	leftPane  list.Dynamic
 	err       error
 	stats     map[string]*db.SummaryVisits
 	selected  string
 	interval  string
 	focus     string
+	leftPane  list.Dynamic
 	rightPane *Pager
 }
 
