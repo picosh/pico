@@ -6,7 +6,6 @@ import (
 
 	"git.sr.ht/~rockorager/vaxis"
 	"git.sr.ht/~rockorager/vaxis/vxfw"
-	"git.sr.ht/~rockorager/vaxis/vxfw/text"
 	"github.com/picosh/pico/pkg/db"
 )
 
@@ -24,7 +23,7 @@ func (m *UsageInfo) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Com
 }
 
 func (m *UsageInfo) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
-	info := NewKv(m.getKv)
+	info := NewKv(m.getKv())
 	brd := NewBorder(info)
 	brd.Label = m.Label
 	brd.Style = vaxis.Style{Foreground: purp}
@@ -37,20 +36,17 @@ func (m *UsageInfo) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	})
 }
 
-func (m *UsageInfo) getKv(idx uint16) (vxfw.Widget, vxfw.Widget) {
-	if int(idx) >= 3 {
-		return nil, nil
-	}
+func (m *UsageInfo) getKv() []Kv {
 	label := "posts"
 	if m.Label == "pages" {
 		label = "sites"
 	}
-	kv := [][]string{
-		{label, fmt.Sprintf("%d", m.stats.Num)},
-		{"oldest", m.stats.FirstCreatedAt.Format(time.DateOnly)},
-		{"newest", m.stats.LastestCreatedAt.Format(time.DateOnly)},
+	kv := []Kv{
+		{Key: label, Value: fmt.Sprintf("%d", m.stats.Num)},
+		{Key: "oldest", Value: m.stats.FirstCreatedAt.Format(time.DateOnly)},
+		{Key: "newest", Value: m.stats.LastestCreatedAt.Format(time.DateOnly)},
 	}
-	return text.New(kv[idx][0]), text.New(kv[idx][1])
+	return kv
 }
 
 type UserInfo struct {
@@ -66,7 +62,7 @@ func (m *UserInfo) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Comm
 }
 
 func (m *UserInfo) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
-	features := NewKv(m.getKv)
+	features := NewKv(m.getKv())
 	brd := NewBorder(features)
 	brd.Label = "info"
 	brd.Style = vaxis.Style{Foreground: purp}
@@ -83,22 +79,18 @@ func (m *UserInfo) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	})
 }
 
-func (m *UserInfo) getKv(idx uint16) (vxfw.Widget, vxfw.Widget) {
-	if int(idx) >= 2 {
-		return nil, nil
-	}
-
+func (m *UserInfo) getKv() []Kv {
 	createdAt := m.shared.User.CreatedAt.Format(time.DateOnly)
-	if idx == 0 {
-		return text.New("joined"), text.New(createdAt)
+	kv := []Kv{
+		{Key: "joined", Value: createdAt},
 	}
 
 	if m.shared.PlusFeatureFlag != nil {
 		expiresAt := m.shared.PlusFeatureFlag.ExpiresAt.Format(time.DateOnly)
-		return text.New("pico+ expires"), text.New(expiresAt)
+		kv = append(kv, Kv{Key: "pico+ expires", Value: expiresAt})
 	}
 
-	return nil, nil
+	return kv
 }
 
 type FeaturesList struct {
@@ -121,7 +113,7 @@ func (m *FeaturesList) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.
 }
 
 func (m *FeaturesList) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
-	features := NewKv(m.getFeaturesKv)
+	features := NewKv(m.getFeaturesKv())
 	brd := NewBorder(features)
 	brd.Label = "features"
 	brd.Style = vaxis.Style{Foreground: purp}
@@ -140,28 +132,24 @@ func (m *FeaturesList) fetchFeatures() error {
 	return err
 }
 
-func (m *FeaturesList) getFeaturesKv(idx uint16) (vxfw.Widget, vxfw.Widget) {
-	kv := [][]string{
-		{"name", "expires at"},
+func (m *FeaturesList) getFeaturesKv() []Kv {
+	kv := []Kv{
+		{
+			Key:   "name",
+			Value: "expires at",
+			Style: vaxis.Style{
+				UnderlineColor: purp,
+				UnderlineStyle: vaxis.UnderlineDashed,
+				Foreground:     purp,
+			},
+		},
 	}
+
 	for _, feature := range m.features {
-		kv = append(kv, []string{feature.Name, feature.ExpiresAt.Format(time.DateOnly)})
+		kv = append(kv, Kv{Key: feature.Name, Value: feature.ExpiresAt.Format(time.DateOnly)})
 	}
 
-	if int(idx) >= len(kv) {
-		return nil, nil
-	}
-
-	key := text.New(kv[idx][0])
-	value := text.New(kv[idx][1])
-
-	if idx == 0 {
-		style := vaxis.Style{UnderlineColor: purp, UnderlineStyle: vaxis.UnderlineDashed, Foreground: purp}
-		key.Style = style
-		value.Style = style
-	}
-
-	return key, value
+	return kv
 }
 
 type ServicesList struct {
@@ -177,7 +165,7 @@ func (m *ServicesList) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.
 }
 
 func (m *ServicesList) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
-	services := NewKv(m.getServiceKv)
+	services := NewKv(m.getServiceKv())
 	brd := NewBorder(services)
 	brd.Label = "services"
 	brd.Style = vaxis.Style{Foreground: purp}
@@ -191,9 +179,9 @@ func (m *ServicesList) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	})
 }
 
-func (m *ServicesList) getServiceKv(idx uint16) (vxfw.Widget, vxfw.Widget) {
+func (m *ServicesList) getServiceKv() []Kv {
 	hasPlus := m.ff != nil
-	kv := [][]string{
+	data := [][]string{
 		{"name", "status"},
 		{"prose", "active"},
 		{"pipe", "active"},
@@ -202,42 +190,46 @@ func (m *ServicesList) getServiceKv(idx uint16) (vxfw.Widget, vxfw.Widget) {
 	}
 
 	if hasPlus {
-		kv = append(
-			kv,
+		data = append(
+			data,
 			[]string{"pages", "active"},
 			[]string{"tuns", "active"},
 			[]string{"irc bouncer", "active"},
 		)
 	} else {
-		kv = append(
-			kv,
+		data = append(
+			data,
 			[]string{"pages", "free tier"},
 			[]string{"tuns", "pico+"},
 			[]string{"irc bouncer", "pico+"},
 		)
 	}
 
-	if int(idx) >= len(kv) {
-		return nil, nil
+	kv := []Kv{}
+	for idx, d := range data {
+		value := d[1]
+		var style vaxis.Style
+		if idx == 0 {
+			style = vaxis.Style{
+				UnderlineColor: purp,
+				UnderlineStyle: vaxis.UnderlineDashed,
+				Foreground:     purp,
+			}
+		} else if value == "active" {
+			style = vaxis.Style{Foreground: green}
+		} else if value == "free tier" {
+			style = vaxis.Style{Foreground: oj}
+		} else {
+			style = vaxis.Style{Foreground: red}
+		}
+
+		kv = append(kv, Kv{
+			Key:   d[0],
+			Value: value,
+			Style: style,
+		})
+
 	}
 
-	key := text.New(kv[idx][0])
-	value := text.New(kv[idx][1])
-	val := kv[idx][1]
-
-	if val == "active" {
-		value.Style = vaxis.Style{Foreground: green}
-	} else if val == "free tier" {
-		value.Style = vaxis.Style{Foreground: oj}
-	} else {
-		value.Style = vaxis.Style{Foreground: red}
-	}
-
-	if idx == 0 {
-		style := vaxis.Style{UnderlineColor: purp, UnderlineStyle: vaxis.UnderlineDashed, Foreground: purp}
-		key.Style = style
-		value.Style = style
-	}
-
-	return key, value
+	return kv
 }

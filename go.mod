@@ -22,7 +22,7 @@ toolchain go1.24.0
 
 require (
 	git.sr.ht/~delthas/senpai v0.3.1-0.20250311003540-18f699aaf9b0
-	git.sr.ht/~rockorager/vaxis v0.12.1-0.20250312161844-81636f76af83
+	git.sr.ht/~rockorager/vaxis v0.13.0
 	github.com/alecthomas/chroma/v2 v2.15.0
 	github.com/antoniomika/syncmap v1.0.0
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de

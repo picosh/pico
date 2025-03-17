@@ -28,7 +28,7 @@ func NewPubkeysPage(shrd *SharedModel) *PubkeysPage {
 	m := &PubkeysPage{
 		shared: shrd,
 	}
-	m.list = list.Dynamic{DrawCursor: true, Builder: m.getWidget}
+	m.list = list.Dynamic{DrawCursor: true, Builder: m.getWidget, Gap: 1}
 	return m
 }
 

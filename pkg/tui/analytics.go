@@ -216,7 +216,7 @@ func (m *AnalyticsPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 			},
 		}
 
-		detailSurf, _ := m.detail(rightCtx).Draw(rightCtx)
+		detailSurf, _ := m.detail(rightCtx, data.Intervals).Draw(rightCtx)
 		rightSurf.AddChild(0, ah, detailSurf)
 		ah += int(detailSurf.Size.Height)
 
@@ -255,18 +255,29 @@ func (m *AnalyticsPage) getSiteData() (*db.SummaryVisits, error) {
 	return val, nil
 }
 
-func (m *AnalyticsPage) detail(ctx vxfw.DrawContext) vxfw.Widget {
-	datestr := "Date range: "
+func (m *AnalyticsPage) detail(ctx vxfw.DrawContext, visits []*db.VisitInterval) vxfw.Widget {
+	datestr := ""
 	now := time.Now()
 	if m.interval == "day" {
-		datestr += now.Format("2006 Jan")
+		datestr += now.Format("2006 Jan") + " by day"
 	} else {
-		datestr += now.Format("2006")
+		datestr += now.Format("2006") + " by month"
 	}
-	txt := richtext.New([]vaxis.Segment{
-		{Text: datestr, Style: vaxis.Style{Foreground: green}},
-	})
-	rightPane := NewBorder(txt)
+	kv := []Kv{
+		{Key: "date range", Value: datestr, Style: vaxis.Style{Foreground: green}},
+	}
+	sum := 0
+	for _, data := range visits {
+		sum += data.Visitors
+	}
+	avg := 0
+	if len(visits) > 0 {
+		avg = sum / len(visits)
+	}
+
+	kv = append(kv, Kv{Key: "avg req/period", Value: fmt.Sprintf("%d", avg)})
+
+	rightPane := NewBorder(NewKv(kv))
 	rightPane.Width = ctx.Max.Width
 	rightPane.Label = m.selected
 	m.focusBorder(rightPane)
@@ -274,11 +285,16 @@ func (m *AnalyticsPage) detail(ctx vxfw.DrawContext) vxfw.Widget {
 }
 
 func (m *AnalyticsPage) urls(ctx vxfw.DrawContext, urls []*db.VisitUrl, label string) vxfw.Widget {
-	segs := []vaxis.Segment{}
+	kv := []Kv{}
+	w := 15
 	for _, url := range urls {
-		segs = append(segs, vaxis.Segment{Text: fmt.Sprintf("%s: %d\n", url.Url, url.Count)})
+		if len(url.Url) > w {
+			w = len(url.Url)
+		}
+		kv = append(kv, Kv{Key: url.Url, Value: fmt.Sprintf("%d", url.Count)})
 	}
-	wdgt := richtext.New(segs)
+	wdgt := NewKv(kv)
+	wdgt.KeyColWidth = w + 1
 	rightPane := NewBorder(wdgt)
 	rightPane.Width = ctx.Max.Width
 	rightPane.Label = label
@@ -287,16 +303,23 @@ func (m *AnalyticsPage) urls(ctx vxfw.DrawContext, urls []*db.VisitUrl, label st
 }
 
 func (m *AnalyticsPage) visits(ctx vxfw.DrawContext, intervals []*db.VisitInterval) vxfw.Widget {
-	segs := []vaxis.Segment{}
+	kv := []Kv{}
+	w := 0
 	for _, visit := range intervals {
-		segs = append(
-			segs,
-			vaxis.Segment{
-				Text: fmt.Sprintf("%s: %d\n", visit.Interval.Format(time.RFC3339), visit.Visitors),
+		key := visit.Interval.Format(time.DateOnly)
+		if len(key) > w {
+			w = len(key)
+		}
+		kv = append(
+			kv,
+			Kv{
+				Key:   key,
+				Value: fmt.Sprintf("%d", visit.Visitors),
 			},
 		)
 	}
-	wdgt := richtext.New(segs)
+	wdgt := NewKv(kv)
+	wdgt.KeyColWidth = w + 1
 	rightPane := NewBorder(wdgt)
 	rightPane.Width = ctx.Max.Width
 	rightPane.Label = "visits"

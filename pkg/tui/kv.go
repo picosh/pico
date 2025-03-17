@@ -3,18 +3,25 @@ package tui
 import (
 	"git.sr.ht/~rockorager/vaxis"
 	"git.sr.ht/~rockorager/vaxis/vxfw"
+	"git.sr.ht/~rockorager/vaxis/vxfw/text"
 )
 
 type KVBuilder func(uint16) (vxfw.Widget, vxfw.Widget)
 
+type Kv struct {
+	Key   string
+	Value string
+	Style vaxis.Style
+}
+
 type KvData struct {
-	Builder     KVBuilder
+	Data        []Kv
 	KeyColWidth int
 }
 
-func NewKv(builder KVBuilder) *KvData {
+func NewKv(data []Kv) *KvData {
 	return &KvData{
-		Builder:     builder,
+		Data:        data,
 		KeyColWidth: 15,
 	}
 }
@@ -31,11 +38,11 @@ func (m *KvData) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 
 	ah := 0
 	var idx uint16 = 0
-	for {
-		key, value := m.Builder(idx)
-		if key == nil {
-			break
-		}
+	for _, data := range m.Data {
+		key := text.New(data.Key)
+		key.Style = data.Style
+		value := text.New(data.Value)
+		value.Style = data.Style
 		lft, _ := key.Draw(ctx)
 		left.AddChild(0, ah, lft)
 		rht, _ := value.Draw(ctx)
@@ -45,6 +52,9 @@ func (m *KvData) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	}
 	root.AddChild(0, 0, left)
 	root.AddChild(lng, 0, right)
+
+	root.Size.Width = left.Size.Width + right.Size.Width - 2
+	root.Size.Height = uint16(ah)
 
 	return root, nil
 }

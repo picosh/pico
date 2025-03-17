@@ -26,7 +26,7 @@ func NewTokensPage(shrd *SharedModel) *TokensPage {
 	m := &TokensPage{
 		shared: shrd,
 	}
-	m.list = list.Dynamic{DrawCursor: true, Builder: m.getWidget}
+	m.list = list.Dynamic{DrawCursor: true, Builder: m.getWidget, Gap: 1}
 	return m
 }
 

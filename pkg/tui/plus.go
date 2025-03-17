@@ -53,22 +53,10 @@ func (m *PlusPage) header(ctx vxfw.DrawContext) vxfw.Surface {
 		{Text: "• prose\n"},
 		{Text: "  • blog analytics\n"},
 		{Text: "• irc bouncer\n"},
-		{Text: "• 10GB total storage\n\n"},
+		{Text: "• 10GB total storage\n"},
 	})
 	brd := NewBorder(intro)
 	brd.Label = "pico+"
-	surf, _ := brd.Draw(ctx)
-	return surf
-}
-
-func (m *PlusPage) contact(ctx vxfw.DrawContext) vxfw.Surface {
-	intro := richtext.New([]vaxis.Segment{
-		{Text: "Have any questions? Feel free to reach out:\n\n"},
-		{Text: "• "}, {Text: "mailto:hello@pico.sh\n", Style: vaxis.Style{Hyperlink: "mailto:hello@pico.sh"}},
-		{Text: "• "}, {Text: "https://pico.sh/irc\n", Style: vaxis.Style{Hyperlink: "https://pico.sh/irc"}},
-	})
-	brd := NewBorder(intro)
-	brd.Label = "contact"
 	surf, _ := brd.Draw(ctx)
 	return surf
 }
@@ -91,11 +79,17 @@ func (m *PlusPage) payment(ctx vxfw.DrawContext) vxfw.Surface {
 		{Text: "Send cash (USD) or check to:\n\n"},
 		{Text: "• pico.sh LLC\n"},
 		{Text: "• 206 E Huron St\n"},
-		{Text: "• Ann Arbor MI 48104\n"},
+		{Text: "• Ann Arbor MI 48104\n\n"},
+		{Text: "Have any questions? Feel free to reach out:\n\n"},
+		{Text: "• "}, {Text: "mailto:hello@pico.sh\n", Style: vaxis.Style{Hyperlink: "mailto:hello@pico.sh"}},
+		{Text: "• "}, {Text: "https://pico.sh/irc\n", Style: vaxis.Style{Hyperlink: "https://pico.sh/irc"}},
 	})
 	brd := NewBorder(pay)
 	brd.Label = "payment"
-	surf, _ := brd.Draw(ctx)
+	surf, _ := brd.Draw(vxfw.DrawContext{
+		Characters: ctx.Characters,
+		Max:        vxfw.Size{Width: 50, Height: math.MaxUint16},
+	})
 	return surf
 }
 
@@ -106,22 +100,18 @@ func (m *PlusPage) notes(ctx vxfw.DrawContext) vxfw.Surface {
 	})
 	brd := NewBorder(wdgt)
 	brd.Label = "notes"
-	surf, _ := brd.Draw(ctx)
+	surf, _ := brd.Draw(vxfw.DrawContext{
+		Characters: ctx.Characters,
+		Max:        vxfw.Size{Width: 50, Height: math.MaxUint16},
+	})
 	return surf
 }
 
 func (m *PlusPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
-	hdr := NewGroupStack([]vxfw.Surface{
-		m.header(ctx),
-		m.contact(ctx),
-	})
-	hdr.Direction = "horizontal"
-	hdr.Gap = 1
-	hdrSurf, _ := hdr.Draw(createDrawCtx(ctx, 14))
 	stack := NewGroupStack([]vxfw.Surface{
-		hdrSurf,
-		m.payment(ctx),
+		m.header(ctx),
 		m.notes(ctx),
+		m.payment(ctx),
 	})
 	stack.Gap = 1
 	surf, _ := stack.Draw(createDrawCtx(ctx, math.MaxUint16))
