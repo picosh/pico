@@ -126,20 +126,22 @@ func (m *PubkeysPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	w := ctx.Max.Width
 	h := ctx.Max.Height
 	root := vxfw.NewSurface(w, h, m)
+	ah := 0
 
-	header := richtext.New([]vaxis.Segment{
-		{
-			Text: fmt.Sprintf(
-				"%d pubkeys\n",
-				len(m.keys),
-			),
-		},
-	})
-	headerSurf, _ := header.Draw(createDrawCtx(ctx, 2))
-	root.AddChild(0, 0, headerSurf)
+	info := text.New("Pubkeys are SSH public keys which grant access to your pico account.  You can have many pubkeys associated with your account and they all have the same level of access. You cannot delete all pubkeys since it will revoke all access to the account.")
+	brd := NewBorder(info)
+	brd.Label = "desc"
+	brdSurf, _ := brd.Draw(ctx)
+	root.AddChild(0, ah, brdSurf)
+	ah += int(brdSurf.Size.Height)
 
-	listSurf, _ := m.list.Draw(createDrawCtx(ctx, h-5))
-	root.AddChild(0, 3, listSurf)
+	header := text.New(fmt.Sprintf("%d pubkeys\n\n", len(m.keys)))
+	headerSurf, _ := header.Draw(ctx)
+	root.AddChild(0, ah, headerSurf)
+	ah += int(headerSurf.Size.Height)
+
+	listSurf, _ := m.list.Draw(ctx)
+	root.AddChild(0, ah, listSurf)
 
 	segs := []vaxis.Segment{}
 	if m.confirm {
@@ -157,7 +159,7 @@ func (m *PubkeysPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	segs = append(segs, vaxis.Segment{Text: "\n"})
 
 	footer := richtext.New(segs)
-	footerSurf, _ := footer.Draw(createDrawCtx(ctx, 3))
+	footerSurf, _ := footer.Draw(ctx)
 	root.AddChild(0, int(h)-3, footerSurf)
 
 	return root, nil
@@ -239,19 +241,22 @@ func (m *AddKeyPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	w := ctx.Max.Width
 	h := ctx.Max.Height
 	root := vxfw.NewSurface(w, h, m)
+	ah := 0
 
-	header := text.New("Enter a new public key")
-	headerSurf, _ := header.Draw(createDrawCtx(ctx, 2))
-	root.AddChild(0, 0, headerSurf)
+	header := text.New("Enter a new public key. You can typically grab an SSH pubkey in the `.ssh` folder: cat ~/.ssh/id_ed25519.pub.  You can include the comment as well.")
+	headerSurf, _ := header.Draw(ctx)
+	root.AddChild(0, ah, headerSurf)
+	ah += int(headerSurf.Size.Height) + 1
 
-	inputSurf, _ := m.input.Draw(createDrawCtx(ctx, 4))
-	root.AddChild(0, 3, inputSurf)
+	inputSurf, _ := m.input.Draw(ctx)
+	root.AddChild(0, ah, inputSurf)
+	ah += int(headerSurf.Size.Height) + 1
 
 	btnSurf, _ := m.btn.Draw(vxfw.DrawContext{
 		Characters: ctx.Characters,
 		Max:        vxfw.Size{Width: 5, Height: 1},
 	})
-	root.AddChild(0, 6, btnSurf)
+	root.AddChild(0, ah, btnSurf)
 
 	if m.err != nil {
 		e := richtext.New([]vaxis.Segment{
@@ -261,7 +266,7 @@ func (m *AddKeyPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 			},
 		})
 		errSurf, _ := e.Draw(createDrawCtx(ctx, 1))
-		root.AddChild(0, 6, errSurf)
+		root.AddChild(0, ah, errSurf)
 	}
 
 	return root, nil

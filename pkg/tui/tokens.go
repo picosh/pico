@@ -111,20 +111,22 @@ func (m *TokensPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	w := ctx.Max.Width
 	h := ctx.Max.Height
 	root := vxfw.NewSurface(w, h, m)
+	ah := 0
 
-	header := richtext.New([]vaxis.Segment{
-		{
-			Text: fmt.Sprintf(
-				"%d tokens\n",
-				len(m.tokens),
-			),
-		},
-	})
-	headerSurf, _ := header.Draw(createDrawCtx(ctx, 2))
-	root.AddChild(0, 0, headerSurf)
+	info := text.New("Tokens allows users to generate a 'password' for use with web services that cannot use SSH keys for authentication. For example, tokens are used to access our IRC bouncer.")
+	brd := NewBorder(info)
+	brd.Label = "desc"
+	brdSurf, _ := brd.Draw(ctx)
+	root.AddChild(0, ah, brdSurf)
+	ah += int(brdSurf.Size.Height)
 
-	listSurf, _ := m.list.Draw(createDrawCtx(ctx, h-5))
-	root.AddChild(0, 3, listSurf)
+	header := text.New(fmt.Sprintf("%d tokens\n\n", len(m.tokens)))
+	headerSurf, _ := header.Draw(ctx)
+	root.AddChild(0, ah, headerSurf)
+	ah += int(headerSurf.Size.Height)
+
+	listSurf, _ := m.list.Draw(ctx)
+	root.AddChild(0, ah, listSurf)
 
 	segs := []vaxis.Segment{}
 	if m.confirm {
