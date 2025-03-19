@@ -91,6 +91,7 @@ type TunsPage struct {
 	logList   list.Dynamic
 	ctx       context.Context
 	done      context.CancelFunc
+	isAdmin   bool
 }
 
 func NewTunsPage(shrd *SharedModel) *TunsPage {
@@ -101,6 +102,10 @@ func NewTunsPage(shrd *SharedModel) *TunsPage {
 	}
 	m.leftPane = list.Dynamic{DrawCursor: true, Builder: m.getLeftWidget}
 	m.logList = list.Dynamic{DrawCursor: true, Builder: m.getLogWidget}
+	ff, _ := shrd.Dbpool.FindFeatureForUser(m.shared.User.ID, "admin")
+	if ff != nil {
+		m.isAdmin = true
+	}
 	return m
 }
 
@@ -163,7 +168,8 @@ func (m *TunsPage) connectToLogs() error {
 
 		user := parsedData.User
 		userId := parsedData.UserId
-		if user == m.shared.User.Name || userId == m.shared.User.ID {
+		isUser := user == m.shared.User.Name || userId == m.shared.User.ID
+		if m.isAdmin || isUser {
 			m.shared.App.PostEvent(ResultLogLineLoaded{parsedData})
 		}
 	}
@@ -376,7 +382,7 @@ func (m *TunsPage) fetchTuns() {
 
 	ls := []TunsClientSimple{}
 	for _, val := range tMap {
-		if val.User != m.shared.User.Name {
+		if !m.isAdmin && val.User != m.shared.User.Name {
 			continue
 		}
 
@@ -412,7 +418,7 @@ func (m *TunsPage) fetchTuns() {
 	}
 
 	for _, val := range nMap {
-		if val.User != m.shared.User.Name {
+		if !m.isAdmin && val.User != m.shared.User.Name {
 			continue
 		}
 
