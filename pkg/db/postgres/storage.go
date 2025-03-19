@@ -12,7 +12,7 @@ import (
 
 	"slices"
 
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/utils"
 )
@@ -1794,6 +1794,77 @@ func (me *PsqlDB) findPagesStats(userID string) (*db.UserServiceStats, error) {
 	}
 
 	return &stats, nil
+}
+
+func (me *PsqlDB) InsertTunsEventLog(log *db.TunsEventLog) error {
+	_, err := me.Db.Exec(
+		`INSERT INTO tuns_event_logs
+			(user_id, server_id, remote_addr, event_type, tunnel_type, connection_type, tunnel_addrs)
+		VALUES
+			($1, $2, $3, $4, $5, $6, $7)`,
+		log.UserId, log.ServerID, log.RemoteAddr, log.EventType, log.TunnelType,
+		log.ConnectionType, pq.Array(log.TunnelAddrs),
+	)
+	return err
+}
+
+func (me *PsqlDB) FindTunsEventLogsByAddr(userID, addr string) ([]*db.TunsEventLog, error) {
+	logs := []*db.TunsEventLog{}
+	fmt.Println(addr)
+	rs, err := me.Db.Query(
+		`SELECT id, user_id, server_id, remote_addr, event_type, tunnel_type, connection_type, tunnel_addrs, created_at
+		FROM tuns_event_logs WHERE user_id=$1 AND tunnel_addrs @> ARRAY[$2] ORDER BY created_at DESC`, userID, addr)
+	if err != nil {
+		return nil, err
+	}
+
+	for rs.Next() {
+		log := db.TunsEventLog{}
+		err := rs.Scan(
+			&log.ID, &log.UserId, &log.ServerID, &log.RemoteAddr,
+			&log.EventType, &log.TunnelType, &log.ConnectionType,
+			(*pq.StringArray)(&log.TunnelAddrs), &log.CreatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		logs = append(logs, &log)
+	}
+
+	if rs.Err() != nil {
+		return nil, rs.Err()
+	}
+
+	return logs, nil
+}
+
+func (me *PsqlDB) FindTunsEventLogs(userID string) ([]*db.TunsEventLog, error) {
+	logs := []*db.TunsEventLog{}
+	rs, err := me.Db.Query(
+		`SELECT id, user_id, server_id, remote_addr, event_type, tunnel_type, connection_type, tunnel_addrs, created_at
+		FROM tuns_event_logs WHERE user_id=$1 ORDER BY created_at DESC`, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	for rs.Next() {
+		log := db.TunsEventLog{}
+		err := rs.Scan(
+			&log.ID, &log.UserId, &log.ServerID, &log.RemoteAddr,
+			&log.EventType, &log.TunnelType, &log.ConnectionType,
+			(*pq.StringArray)(&log.TunnelAddrs), &log.CreatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		logs = append(logs, &log)
+	}
+
+	if rs.Err() != nil {
+		return nil, rs.Err()
+	}
+
+	return logs, nil
 }
 
 func (me *PsqlDB) FindUserStats(userID string) (*db.UserStats, error) {

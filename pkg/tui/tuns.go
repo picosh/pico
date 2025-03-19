@@ -15,6 +15,7 @@ import (
 	"git.sr.ht/~rockorager/vaxis/vxfw/list"
 	"git.sr.ht/~rockorager/vaxis/vxfw/richtext"
 	"git.sr.ht/~rockorager/vaxis/vxfw/text"
+	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/utils/pipe"
 )
@@ -50,16 +51,15 @@ type TunsClientSimple struct {
 }
 
 type ResultLog struct {
-	ServerID        string    `json:"server_id"`
-	User            string    `json:"user"`
-	UserId          string    `json:"user_id"`
-	CurrentTime     string    `json:"current_time"`
-	StartTime       time.Time `json:"start_time"`
-	StartTimePretty string    `json:"start_time_pretty"`
-	RequestTime     string    `json:"request_time"`
-	RequestIP       string    `json:"request_ip"`
-	RequestMethod   string    `json:"request_method"`
-	// RequestURL         string              `json:"request_url"`
+	ServerID           string              `json:"server_id"`
+	User               string              `json:"user"`
+	UserId             string              `json:"user_id"`
+	CurrentTime        string              `json:"current_time"`
+	StartTime          time.Time           `json:"start_time"`
+	StartTimePretty    string              `json:"start_time_pretty"`
+	RequestTime        string              `json:"request_time"`
+	RequestIP          string              `json:"request_ip"`
+	RequestMethod      string              `json:"request_method"`
 	OriginalRequestURI string              `json:"original_request_uri"`
 	RequestHeaders     map[string][]string `json:"request_headers"`
 	RequestBody        string              `json:"request_body"`
@@ -70,6 +70,7 @@ type ResultLog struct {
 	TunnelType         string              `json:"tunnel_type"`
 	ConnectionType     string              `json:"connection_type"`
 	TunnelAddrs        []string            `json:"tunnel_addrs"`
+	// RequestURL         string              `json:"request_url"`
 }
 
 type ResultLogLineLoaded struct {
@@ -78,21 +79,25 @@ type ResultLogLineLoaded struct {
 
 type TunsLoaded struct{}
 
+type EventLogsLoaded struct{}
+
 type TunsPage struct {
 	shared *SharedModel
 
-	loading   bool
-	err       error
-	tuns      []TunsClientSimple
-	selected  string
-	focus     string
-	leftPane  list.Dynamic
-	rightPane *Pager
-	logs      []*ResultLog
-	logList   list.Dynamic
-	ctx       context.Context
-	done      context.CancelFunc
-	isAdmin   bool
+	loading      bool
+	err          error
+	tuns         []TunsClientSimple
+	selected     string
+	focus        string
+	leftPane     list.Dynamic
+	rightPane    *Pager
+	logs         []*ResultLog
+	logList      list.Dynamic
+	ctx          context.Context
+	done         context.CancelFunc
+	isAdmin      bool
+	eventLogs    []*db.TunsEventLog
+	eventLogList list.Dynamic
 }
 
 func NewTunsPage(shrd *SharedModel) *TunsPage {
@@ -103,6 +108,7 @@ func NewTunsPage(shrd *SharedModel) *TunsPage {
 	}
 	m.leftPane = list.Dynamic{DrawCursor: true, Builder: m.getLeftWidget}
 	m.logList = list.Dynamic{DrawCursor: true, Builder: m.getLogWidget}
+	m.eventLogList = list.Dynamic{DrawCursor: true, Builder: m.getEventLogWidget}
 	ff, _ := shrd.Dbpool.FindFeatureForUser(m.shared.User.ID, "admin")
 	if ff != nil {
 		m.isAdmin = true
@@ -140,6 +146,25 @@ func (m *TunsPage) getLogWidget(i uint, cursor uint) vxfw.Widget {
 		{Text: log.RequestIP + " "},
 		{Text: log.RequestMethod + " ", Style: vaxis.Style{Foreground: purp}},
 		{Text: log.OriginalRequestURI},
+	})
+	txt.Softwrap = false
+	return txt
+}
+
+func (m *TunsPage) getEventLogWidget(i uint, cursor uint) vxfw.Widget {
+	if int(i) >= len(m.eventLogs) {
+		return nil
+	}
+
+	log := m.eventLogs[i]
+	style := vaxis.Style{Foreground: green}
+	if log.EventType == "disconnect" {
+		style = vaxis.Style{Foreground: red}
+	}
+	txt := richtext.New([]vaxis.Segment{
+		{Text: log.CreatedAt.Format(time.RFC3339) + " "},
+		{Text: log.EventType + " ", Style: style},
+		{Text: log.RemoteAddr},
 	})
 	txt.Softwrap = false
 	return txt
@@ -208,6 +233,8 @@ func (m *TunsPage) HandleEvent(ev vaxis.Event, ph vxfw.EventPhase) (vxfw.Command
 			m.logList.SetCursor(uint(len(m.logs) - 1))
 		}
 		return vxfw.RedrawCmd{}, nil
+	case EventLogsLoaded:
+		return vxfw.RedrawCmd{}, nil
 	case TunsLoaded:
 		m.focus = "tuns"
 		return vxfw.BatchCmd([]vxfw.Command{
@@ -218,6 +245,8 @@ func (m *TunsPage) HandleEvent(ev vaxis.Event, ph vxfw.EventPhase) (vxfw.Command
 		if msg.Matches(vaxis.KeyEnter) {
 			m.selected = m.tuns[m.leftPane.Cursor()].TunAddress
 			m.logs = []*ResultLog{}
+			m.eventLogs = []*db.TunsEventLog{}
+			go m.fetchEventLogs()
 			return vxfw.RedrawCmd{}, nil
 		}
 		if msg.Matches(vaxis.KeyTab) {
@@ -325,7 +354,20 @@ func (m *TunsPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 			Characters: vaxis.Characters,
 			Max: vxfw.Size{
 				Width:  uint16(rightPaneW) - 4,
-				Height: ctx.Max.Height - uint16(ah) - 3,
+				Height: 15,
+			},
+		})
+		rightSurf.AddChild(0, ah, surf)
+		ah += int(surf.Size.Height)
+
+		brd = NewBorder(&m.eventLogList)
+		brd.Label = "conn events"
+		m.focusBorder(brd)
+		surf, _ = brd.Draw(vxfw.DrawContext{
+			Characters: vaxis.Characters,
+			Max: vxfw.Size{
+				Width:  uint16(rightPaneW) - 4,
+				Height: 15,
 			},
 		})
 		rightSurf.AddChild(0, ah, surf)
@@ -374,6 +416,22 @@ func fetch(fqdn, auth string) (map[string]*TunsClient, error) {
 	}
 
 	return data.Clients, nil
+}
+
+func (m *TunsPage) fetchEventLogs() {
+	site := m.findSelected()
+	addr := m.selected
+	if site.TunType == "http" {
+		addr = "http://" + addr
+	} else if site.TunType == "https" {
+		addr = "https://" + addr
+	}
+	logs, err := m.shared.Dbpool.FindTunsEventLogsByAddr(m.shared.User.ID, addr)
+	if err != nil {
+		m.err = err
+		return
+	}
+	m.eventLogs = logs
 }
 
 func (m *TunsPage) fetchTuns() {

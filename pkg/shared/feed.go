@@ -2,6 +2,8 @@ package shared
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/gorilla/feeds"
@@ -127,6 +129,38 @@ func UserFeed(me db.DB, user *db.User, token string) (*feeds.Feed, error) {
 			feedItems = append(feedItems, day)
 		}
 	}
+
+	tunsLogs, _ := me.FindTunsEventLogs(user.ID)
+	for _, eventLog := range tunsLogs {
+		content := fmt.Sprintf(`Created At: %s
+Event type: %s
+Connection type: %s
+Remote addr: %s
+Tunnel type: %s
+Tunnel addrs: %s
+Server: %s`,
+			eventLog.CreatedAt.Format(time.RFC3339), eventLog.EventType, eventLog.ConnectionType,
+			eventLog.RemoteAddr, eventLog.TunnelType, eventLog.TunnelAddrs, eventLog.ServerID,
+		)
+		logItem := &feeds.Item{
+			Id: fmt.Sprintf("%d", eventLog.CreatedAt.Unix()),
+			Title: fmt.Sprintf(
+				"%s tuns event for %s",
+				eventLog.EventType, strings.Join(eventLog.TunnelAddrs, ", "),
+			),
+			Link:        &feeds.Link{Href: "https://pico.sh"},
+			Content:     content,
+			Created:     *eventLog.CreatedAt,
+			Updated:     *eventLog.CreatedAt,
+			Description: content,
+			Author:      &feeds.Author{Name: "team pico"},
+		}
+		feedItems = append(feedItems, logItem)
+	}
+
+	sort.Slice(feedItems, func(i, j int) bool {
+		return feedItems[i].Created.After(feedItems[j].Created)
+	})
 
 	feed.Items = feedItems
 	return feed, nil

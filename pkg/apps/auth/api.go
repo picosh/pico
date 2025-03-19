@@ -20,6 +20,7 @@ import (
 	"github.com/picosh/pico/pkg/db/postgres"
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/utils"
+	"github.com/picosh/utils/pipe"
 	"github.com/picosh/utils/pipe/metrics"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -723,6 +724,39 @@ func metricDrainSub(ctx context.Context, dbpool db.DB, logger *slog.Logger, secr
 	}
 }
 
+func tunsEventLogDrainSub(ctx context.Context, dbpool db.DB, logger *slog.Logger, secret string) {
+	drain := pipe.NewReconnectReadWriteCloser(
+		ctx,
+		logger,
+		shared.NewPicoPipeClient(),
+		"tuns-event-drain-sub",
+		"sub tuns-event-drain -k",
+		100,
+		10*time.Millisecond,
+	)
+
+	for {
+		scanner := bufio.NewScanner(drain)
+		scanner.Buffer(make([]byte, 32*1024), 32*1024)
+		for scanner.Scan() {
+			line := scanner.Text()
+			clean := strings.TrimSpace(line)
+			var log db.TunsEventLog
+			err := json.Unmarshal([]byte(clean), &log)
+			if err != nil {
+				logger.Error("could not unmarshal line", "err", err)
+				continue
+			}
+
+			logger.Info("inserting tuns event log", "log", log)
+			err = dbpool.InsertTunsEventLog(&log)
+			if err != nil {
+				logger.Error("could not insert tuns event log", "err", err)
+			}
+		}
+	}
+}
+
 func authMux(apiConfig *shared.ApiConfig) *http.ServeMux {
 	serverRoot, err := fs.Sub(embedFS, "public")
 	if err != nil {
@@ -792,6 +826,8 @@ func StartApiServer() {
 
 	// gather metrics in the auth service
 	go metricDrainSub(ctx, db, logger, cfg.Secret)
+	// gather connect/disconnect logs from tuns
+	go tunsEventLogDrainSub(ctx, db, logger, cfg.Secret)
 
 	defer ctx.Done()
 

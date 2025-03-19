@@ -268,3 +268,15 @@ func (me *StubDB) FindTagsForUser(userID string, tag string) ([]string, error) {
 func (me *StubDB) FindUserStats(userID string) (*db.UserStats, error) {
 	return nil, notImpl
 }
+
+func (me *StubDB) InsertTunsEventLog(log *db.TunsEventLog) error {
+	return notImpl
+}
+
+func (me *StubDB) FindTunsEventLogsByAddr(userID, addr string) ([]*db.TunsEventLog, error) {
+	return nil, notImpl
+}
+
+func (me *StubDB) FindTunsEventLogs(userID string) ([]*db.TunsEventLog, error) {
+	return nil, notImpl
+}

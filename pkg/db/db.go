@@ -323,6 +323,20 @@ type UserServiceStats struct {
 	LatestUpdatedAt  time.Time
 }
 
+type TunsEventLog struct {
+	ID             string     `json:"id"`
+	ServerID       string     `json:"server_id"`
+	Time           *time.Time `json:"time"`
+	User           string     `json:"user"`
+	UserId         string     `json:"user_id"`
+	RemoteAddr     string     `json:"remote_addr"`
+	EventType      string     `json:"event_type"`
+	TunnelType     string     `json:"tunnel_type"`
+	ConnectionType string     `json:"connection_type"`
+	TunnelAddrs    []string   `json:"tunnel_addrs"`
+	CreatedAt      *time.Time `json:"created_at"`
+}
+
 var NameValidator = regexp.MustCompile("^[a-zA-Z0-9]{1,50}$")
 var DenyList = []string{
 	"admin",
@@ -414,6 +428,10 @@ type DB interface {
 	FindProjectByName(userID, name string) (*Project, error)
 
 	FindUserStats(userID string) (*UserStats, error)
+
+	InsertTunsEventLog(log *TunsEventLog) error
+	FindTunsEventLogs(userID string) ([]*TunsEventLog, error)
+	FindTunsEventLogsByAddr(userID, addr string) ([]*TunsEventLog, error)
 
 	Close() error
 }
