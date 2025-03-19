@@ -20,15 +20,17 @@ type SiteStatsLoaded struct{}
 type AnalyticsPage struct {
 	shared *SharedModel
 
-	sites     []*db.VisitUrl
-	features  []*db.FeatureFlag
-	err       error
-	stats     map[string]*db.SummaryVisits
-	selected  string
-	interval  string
-	focus     string
-	leftPane  list.Dynamic
-	rightPane *Pager
+	loadingSites   bool
+	loadingDetails bool
+	sites          []*db.VisitUrl
+	features       []*db.FeatureFlag
+	err            error
+	stats          map[string]*db.SummaryVisits
+	selected       string
+	interval       string
+	focus          string
+	leftPane       list.Dynamic
+	rightPane      *Pager
 }
 
 func NewAnalyticsPage(shrd *SharedModel) *AnalyticsPage {
@@ -74,6 +76,7 @@ func (m *AnalyticsPage) getLeftWidget(i uint, cursor uint) vxfw.Widget {
 func (m *AnalyticsPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
 	switch msg := ev.(type) {
 	case PageIn:
+		m.loadingSites = true
 		go m.fetchSites()
 		_ = m.fetchFeatures()
 		m.focus = "page"
@@ -93,6 +96,7 @@ func (m *AnalyticsPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw
 			} else {
 				m.interval = "day"
 			}
+			m.loadingDetails = true
 			go m.fetchSiteStats(m.selected, m.interval)
 			return vxfw.RedrawCmd{}, nil
 		}
@@ -115,6 +119,7 @@ func (m *AnalyticsPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw
 		}
 		if msg.Matches(vaxis.KeyEnter) {
 			m.selected = m.sites[m.leftPane.Cursor()].Url
+			m.loadingDetails = true
 			go m.fetchSiteStats(m.selected, m.interval)
 			return vxfw.RedrawCmd{}, nil
 		}
@@ -164,6 +169,10 @@ func (m *AnalyticsPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 		wdgt = &m.leftPane
 	}
 
+	if m.loadingSites {
+		wdgt = text.New("Loading ...")
+	}
+
 	leftPane := NewBorder(wdgt)
 	leftPane.Label = "sites"
 	m.focusBorder(leftPane)
@@ -192,9 +201,15 @@ func (m *AnalyticsPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 		rightSurf := vxfw.NewSurface(uint16(rightPaneW), math.MaxUint16, m)
 
 		ah := 0
+
 		data, err := m.getSiteData()
 		if err != nil {
-			txt, _ := text.New("No data found").Draw(ctx)
+			var txt vxfw.Surface
+			if m.loadingDetails {
+				txt, _ = text.New("Loading ...").Draw(ctx)
+			} else {
+				txt, _ = text.New("No data found").Draw(ctx)
+			}
 			m.rightPane.Surface = txt
 			rightPane := NewBorder(m.rightPane)
 			rightPane.Label = "details"
@@ -333,9 +348,12 @@ func (m *AnalyticsPage) fetchSites() {
 		Origin: utils.StartOfMonth(),
 	})
 	if err != nil {
+		m.loadingSites = false
 		m.err = err
+		return
 	}
 	m.sites = siteList
+	m.loadingSites = false
 	m.shared.App.PostEvent(SitesLoaded{})
 }
 
@@ -356,9 +374,11 @@ func (m *AnalyticsPage) fetchSiteStats(site string, interval string) {
 	summary, err := m.shared.Dbpool.VisitSummary(opts)
 	if err != nil {
 		m.err = err
+		m.loadingDetails = false
 		return
 	}
 	m.stats[site+":"+interval] = summary
+	m.loadingDetails = false
 	m.shared.App.PostEvent(SiteStatsLoaded{})
 }
 

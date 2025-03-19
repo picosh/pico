@@ -81,6 +81,7 @@ type TunsLoaded struct{}
 type TunsPage struct {
 	shared *SharedModel
 
+	loading   bool
 	err       error
 	tuns      []TunsClientSimple
 	selected  string
@@ -188,6 +189,7 @@ func (m *TunsPage) Footer() []Shortcut {
 func (m *TunsPage) HandleEvent(ev vaxis.Event, ph vxfw.EventPhase) (vxfw.Command, error) {
 	switch msg := ev.(type) {
 	case PageIn:
+		m.loading = true
 		go m.fetchTuns()
 		go func() {
 			_ = m.connectToLogs()
@@ -260,6 +262,10 @@ func (m *TunsPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 		wdgt = &m.leftPane
 	}
 
+	if m.loading {
+		wdgt = text.New("Loading ...")
+	}
+
 	leftPane := NewBorder(wdgt)
 	leftPane.Label = "tuns"
 	m.focusBorder(leftPane)
@@ -319,7 +325,7 @@ func (m *TunsPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 			Characters: vaxis.Characters,
 			Max: vxfw.Size{
 				Width:  uint16(rightPaneW) - 4,
-				Height: 15,
+				Height: ctx.Max.Height - uint16(ah) - 3,
 			},
 		})
 		rightSurf.AddChild(0, ah, surf)
@@ -460,5 +466,6 @@ func (m *TunsPage) fetchTuns() {
 	})
 
 	m.tuns = ls
+	m.loading = false
 	m.shared.App.PostEvent(TunsLoaded{})
 }
