@@ -161,11 +161,11 @@ func (m *TunsPage) connectToLogs() error {
 			continue
 		}
 
-		// user := parsedData.User
-		// userId := parsedData.UserId
-		// if user == m.shared.User.Name || userId == m.shared.User.ID {
-		m.shared.App.PostEvent(ResultLogLineLoaded{parsedData})
-		// }
+		user := parsedData.User
+		userId := parsedData.UserId
+		if user == m.shared.User.Name || userId == m.shared.User.ID {
+			m.shared.App.PostEvent(ResultLogLineLoaded{parsedData})
+		}
 	}
 
 	return nil
@@ -175,7 +175,6 @@ func (m *TunsPage) Footer() []Shortcut {
 	short := []Shortcut{
 		{Shortcut: "j/k", Text: "choose"},
 		{Shortcut: "tab", Text: "focus"},
-		{Shortcut: "r", Text: "reload"},
 	}
 	return short
 }
@@ -210,10 +209,6 @@ func (m *TunsPage) HandleEvent(ev vaxis.Event, ph vxfw.EventPhase) (vxfw.Command
 		if msg.Matches(vaxis.KeyEnter) {
 			m.selected = m.tuns[m.leftPane.Cursor()].TunAddress
 			return vxfw.RedrawCmd{}, nil
-		}
-		if msg.Matches('r') {
-			go m.fetchTuns()
-			return nil, nil
 		}
 		if msg.Matches(vaxis.KeyTab) {
 			var cmd vxfw.Widget
@@ -381,6 +376,10 @@ func (m *TunsPage) fetchTuns() {
 
 	ls := []TunsClientSimple{}
 	for _, val := range tMap {
+		if val.User != m.shared.User.Name {
+			continue
+		}
+
 		for k := range val.RouteListeners.HttpListeners {
 			ls = append(ls, TunsClientSimple{
 				TunType:           "http",
@@ -413,6 +412,10 @@ func (m *TunsPage) fetchTuns() {
 	}
 
 	for _, val := range nMap {
+		if val.User != m.shared.User.Name {
+			continue
+		}
+
 		for k := range val.RouteListeners.HttpListeners {
 			ls = append(ls, TunsClientSimple{
 				TunType:           "http",
