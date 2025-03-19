@@ -196,6 +196,7 @@ func (m *TunsPage) HandleEvent(ev vaxis.Event, ph vxfw.EventPhase) (vxfw.Command
 		return vxfw.FocusWidgetCmd(m), nil
 	case PageOut:
 		m.selected = ""
+		m.logs = []*ResultLog{}
 		m.err = nil
 		m.done()
 	case ResultLogLineLoaded:
@@ -214,6 +215,7 @@ func (m *TunsPage) HandleEvent(ev vaxis.Event, ph vxfw.EventPhase) (vxfw.Command
 	case vaxis.Key:
 		if msg.Matches(vaxis.KeyEnter) {
 			m.selected = m.tuns[m.leftPane.Cursor()].TunAddress
+			m.logs = []*ResultLog{}
 			return vxfw.RedrawCmd{}, nil
 		}
 		if msg.Matches(vaxis.KeyTab) {
