@@ -132,12 +132,12 @@ func UserFeed(me db.DB, user *db.User, token string) (*feeds.Feed, error) {
 
 	tunsLogs, _ := me.FindTunsEventLogs(user.ID)
 	for _, eventLog := range tunsLogs {
-		content := fmt.Sprintf(`Created At: %s
-Event type: %s
-Connection type: %s
-Remote addr: %s
-Tunnel type: %s
-Tunnel addrs: %s
+		content := fmt.Sprintf(`Created At: %s<br />
+Event type: %s<br />
+Connection type: %s<br />
+Remote addr: %s<br />
+Tunnel type: %s<br />
+Tunnel addrs: %s<br />
 Server: %s`,
 			eventLog.CreatedAt.Format(time.RFC3339), eventLog.EventType, eventLog.ConnectionType,
 			eventLog.RemoteAddr, eventLog.TunnelType, eventLog.TunnelAddrs, eventLog.ServerID,
