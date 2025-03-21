@@ -518,7 +518,7 @@ func (m *TunsPage) fetchTuns() {
 		}
 
 		for k := range val.RouteListeners.Listeners {
-			tunAddr, err := shared.ParseTunsTCP(k, "tuns.sh")
+			tunAddr, err := shared.ParseTunsTCP(k, "nue.tuns.sh")
 			if err != nil {
 				m.shared.Session.Logger.Info("parse tun addr", "err", err)
 				tunAddr = k
