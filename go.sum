@@ -29,8 +29,8 @@ dmitri.shuralyov.com/state v0.0.0-20180228185332-28bcc343414c/go.mod h1:0PRwlb0D
 filippo.io/edwards25519 v1.1.0 h1:FNf4tywRC1HmFuKW5xopWpigGjJKiJSV0Cqo0cJWDaA=
 filippo.io/edwards25519 v1.1.0/go.mod h1:BxyFTGdWcka3PhytdK4V28tE5sGfRvvvRV7EaN4VDT4=
 git.apache.org/thrift.git v0.0.0-20180902110319-2566ecd5d999/go.mod h1:fPE2ZNJGynbRyZ4dJvy6G277gSllfV2HJqblrnkyeyg=
-git.sr.ht/~delthas/senpai v0.3.1-0.20250311003540-18f699aaf9b0 h1:Knm2mHQwLsh1svD15lE27Cr6BMV2wH2t0OKUoSCNhuY=
-git.sr.ht/~delthas/senpai v0.3.1-0.20250311003540-18f699aaf9b0/go.mod h1:RzVz1R7QRHGcRDnJTcr7AN/cD3rj9scdgvupkXTJLYk=
+git.sr.ht/~delthas/senpai v0.4.0 h1:G1cycL0ARqYkqOErjEx/7Cneqykq3POfCsMYnpkWhUY=
+git.sr.ht/~delthas/senpai v0.4.0/go.mod h1:mzdu4o3wANA6cYzRnrz3w+uGPHA2z3j02JDrr/M3Myc=
 git.sr.ht/~rockorager/vaxis v0.13.0 h1:+F3ze1t4X5x87QEsyn/b9b9pWXw9MDqoHynoR/PHqKg=
 git.sr.ht/~rockorager/vaxis v0.13.0/go.mod h1:h94aKek3frIV1hJbdXjqnBqaLkbWXvV+UxAsQHg9bns=
 github.com/AndreasBriese/bbloom v0.0.0-20190825152654-46b345b51c96 h1:cTp8I5+VIoKjsnZuH8vjyaysT/ses3EvZeaV/1UkF2M=
@@ -205,10 +205,10 @@ github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSs
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1VwoXQT9A3Wy9MM3WgvqSxFWenqJduM=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/delthas/go-libnp v0.0.0-20250105150050-96674b98150e h1:pIf/gLtiegAZXvmwYZ9Jco0hMk5gqVIBetSilLfj/yk=
-github.com/delthas/go-libnp v0.0.0-20250105150050-96674b98150e/go.mod h1:aGVXnhWpDlt5U4SphG97o1gszctZKvBTXy320E8Buw4=
-github.com/delthas/go-localeinfo v0.0.0-20240813094314-e5413e186769 h1:wlT2rsyVbFCWOPGCIWlUTYERcZNaexWThJICJQLBMkU=
-github.com/delthas/go-localeinfo v0.0.0-20240813094314-e5413e186769/go.mod h1:sG54BxlyQgIskYURLrg7mvhoGBe0Qq12DNtYRALwNa4=
+github.com/delthas/go-libnp v0.1.0 h1:4YmxYd6yBI1gDzSeqCS7+0wrHcYPPo54FrTaFIbEd4U=
+github.com/delthas/go-libnp v0.1.0/go.mod h1:aGVXnhWpDlt5U4SphG97o1gszctZKvBTXy320E8Buw4=
+github.com/delthas/go-localeinfo v0.1.0 h1:2tN27F8QcWVVn218n6raAYa5sL7gDLVGEw5x3oLKnJc=
+github.com/delthas/go-localeinfo v0.1.0/go.mod h1:sG54BxlyQgIskYURLrg7mvhoGBe0Qq12DNtYRALwNa4=
 github.com/dgraph-io/badger v1.6.2 h1:mNw0qs90GVgGGWylh0umH5iag1j6n/PeJtNvL6KY/x8=
 github.com/dgraph-io/badger v1.6.2/go.mod h1:JW2yswe3V058sS0kZ2h/AXeDSqFjxnZcRrVH//y2UQE=
 github.com/dgraph-io/badger/v2 v2.2007.4 h1:TRWBQg8UrlUhaFdco01nO2uXwzKS7zd+HVdwV/GHc4o=

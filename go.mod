@@ -21,7 +21,7 @@ toolchain go1.24.0
 // replace git.sr.ht/~rockorager/vaxis => ../../vaxis
 
 require (
-	git.sr.ht/~delthas/senpai v0.3.1-0.20250311003540-18f699aaf9b0
+	git.sr.ht/~delthas/senpai v0.4.0
 	git.sr.ht/~rockorager/vaxis v0.13.0
 	github.com/alecthomas/chroma/v2 v2.15.0
 	github.com/antoniomika/syncmap v1.0.0
@@ -108,8 +108,8 @@ require (
 	github.com/darkweak/storages/olric v0.0.13 // indirect
 	github.com/darkweak/storages/otter v0.0.13 // indirect
 	github.com/darkweak/storages/redis v0.0.13 // indirect
-	github.com/delthas/go-libnp v0.0.0-20250105150050-96674b98150e // indirect
-	github.com/delthas/go-localeinfo v0.0.0-20240813094314-e5413e186769 // indirect
+	github.com/delthas/go-libnp v0.1.0 // indirect
+	github.com/delthas/go-localeinfo v0.1.0 // indirect
 	github.com/dgraph-io/badger v1.6.2 // indirect
 	github.com/dgraph-io/badger/v2 v2.2007.4 // indirect
 	github.com/dgraph-io/badger/v3 v3.2103.5 // indirect
