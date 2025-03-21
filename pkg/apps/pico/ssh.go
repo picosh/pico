@@ -31,8 +31,7 @@ func createTui(shrd *tui.SharedModel) pssh.SSHServerMiddleware {
 			opts := vaxis.Options{
 				WithConsole: vty,
 			}
-			tui.NewTui(opts, shrd)
-			return nil
+			return tui.NewTui(opts, shrd)
 		}
 	}
 }

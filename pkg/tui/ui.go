@@ -250,10 +250,10 @@ func (m *FooterWdgt) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	return wdgt.Draw(ctx)
 }
 
-func initData(shrd *SharedModel) {
+func initData(shrd *SharedModel) error {
 	user, err := FindUser(shrd)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	shrd.User = user
 
@@ -262,6 +262,7 @@ func initData(shrd *SharedModel) {
 
 	bff, _ := FindFeatureFlag(shrd, "bouncer")
 	shrd.BouncerFeatureFlag = bff
+	return nil
 }
 
 func FindUser(shrd *SharedModel) (*db.User, error) {
@@ -318,11 +319,15 @@ func FindFeatureFlag(shrd *SharedModel, name string) (*db.FeatureFlag, error) {
 	return ff, nil
 }
 
-func NewTui(opts vaxis.Options, shrd *SharedModel) {
-	initData(shrd)
+func NewTui(opts vaxis.Options, shrd *SharedModel) error {
+	err := initData(shrd)
+	if err != nil {
+		return err
+	}
+
 	app, err := vxfw.NewApp(opts)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	shrd.App = app
@@ -344,8 +349,5 @@ func NewTui(opts vaxis.Options, shrd *SharedModel) {
 		pages:  pages,
 	}
 
-	err = app.Run(root)
-	if err != nil {
-		panic(err)
-	}
+	return app.Run(root)
 }

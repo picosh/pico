@@ -109,10 +109,6 @@ func NewTunsPage(shrd *SharedModel) *TunsPage {
 	m.leftPane = list.Dynamic{DrawCursor: true, Builder: m.getLeftWidget}
 	m.logList = list.Dynamic{DrawCursor: true, Builder: m.getLogWidget}
 	m.eventLogList = list.Dynamic{DrawCursor: true, Builder: m.getEventLogWidget}
-	ff, _ := shrd.Dbpool.FindFeatureForUser(m.shared.User.ID, "admin")
-	if ff != nil {
-		m.isAdmin = true
-	}
 	return m
 }
 
@@ -225,6 +221,10 @@ func (m *TunsPage) HandleEvent(ev vaxis.Event, ph vxfw.EventPhase) (vxfw.Command
 	switch msg := ev.(type) {
 	case PageIn:
 		m.loading = true
+		ff, _ := m.shared.Dbpool.FindFeatureForUser(m.shared.User.ID, "admin")
+		if ff != nil {
+			m.isAdmin = true
+		}
 		go m.fetchTuns()
 		go func() {
 			_ = m.connectToLogs()
