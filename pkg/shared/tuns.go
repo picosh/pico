@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// ParseTunsTCP parses the tunnelID and tunsInstance to return a user friendly address
+// ParseTunsTCP parses the tunnelID and tunsInstance to return a user friendly address.
 func ParseTunsTCP(tunnelID string, tunsInstance string) (string, error) {
 	// example string:
 	// tcp://10.0.0.89:33652,tcp6://[2603:c020:400a:d000:bd71:c59f:720c:484b]:33652
