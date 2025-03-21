@@ -189,7 +189,7 @@ func (m *TunsPage) connectToLogs() error {
 			continue
 		}
 
-		if parsedData.TunnelType == "tcp" {
+		if parsedData.TunnelType == "tcp" || parsedData.TunnelType == "sni" {
 			newTunID, err := shared.ParseTunsTCP(parsedData.TunnelID, parsedData.ServerID)
 			if err != nil {
 				m.shared.Logger.Error("parse tun addr", "err", err)
