@@ -67,9 +67,9 @@ type ResultLog struct {
 	ResponseBody       string              `json:"response_body"`
 	ResponseCode       int                 `json:"response_code"`
 	ResponseStatus     string              `json:"response_status"`
+	TunnelID           string              `json:"tunnel_id"`
 	TunnelType         string              `json:"tunnel_type"`
 	ConnectionType     string              `json:"connection_type"`
-	TunnelAddrs        []string            `json:"tunnel_addrs"`
 	// RequestURL         string              `json:"request_url"`
 }
 
@@ -141,6 +141,7 @@ func (m *TunsPage) getLogWidget(i uint, cursor uint) vxfw.Widget {
 		codestyle = vaxis.Style{Foreground: oj}
 	}
 	txt := richtext.New([]vaxis.Segment{
+		{Text: log.CurrentTime + " "},
 		{Text: log.ResponseStatus + " ", Style: codestyle},
 		{Text: log.RequestTime + " "},
 		{Text: log.RequestIP + " "},
@@ -192,10 +193,19 @@ func (m *TunsPage) connectToLogs() error {
 			continue
 		}
 
+		if parsedData.TunnelType == "tcp" {
+			newTunID, err := shared.ParseTunsTCP(parsedData.TunnelID, parsedData.ServerID)
+			if err != nil {
+				m.shared.Logger.Error("parse tun addr", "err", err)
+			} else {
+				parsedData.TunnelID = newTunID
+			}
+		}
+
 		user := parsedData.User
 		userId := parsedData.UserId
 		isUser := user == m.shared.User.Name || userId == m.shared.User.ID
-		if m.isAdmin || isUser {
+		if (m.isAdmin || isUser) && parsedData.TunnelID == m.selected {
 			m.shared.App.PostEvent(ResultLogLineLoaded{parsedData})
 		}
 	}
@@ -419,14 +429,7 @@ func fetch(fqdn, auth string) (map[string]*TunsClient, error) {
 }
 
 func (m *TunsPage) fetchEventLogs() {
-	site := m.findSelected()
-	addr := m.selected
-	if site.TunType == "http" {
-		addr = "http://" + addr
-	} else if site.TunType == "https" {
-		addr = "https://" + addr
-	}
-	logs, err := m.shared.Dbpool.FindTunsEventLogsByAddr(m.shared.User.ID, addr)
+	logs, err := m.shared.Dbpool.FindTunsEventLogsByAddr(m.shared.User.ID, m.selected)
 	if err != nil {
 		m.err = err
 		return
@@ -464,7 +467,7 @@ func (m *TunsPage) fetchTuns() {
 
 		for k := range val.RouteListeners.TcpAliases {
 			ls = append(ls, TunsClientSimple{
-				TunType:           "tcp-alias",
+				TunType:           "alias",
 				TunAddress:        k,
 				RemoteAddr:        val.RemoteAddr,
 				User:              val.User,
@@ -473,9 +476,15 @@ func (m *TunsPage) fetchTuns() {
 		}
 
 		for k := range val.RouteListeners.Listeners {
+			tunAddr, err := shared.ParseTunsTCP(k, "tuns.sh")
+			if err != nil {
+				m.shared.Session.Logger.Info("parse tun addr", "err", err)
+				tunAddr = k
+			}
+
 			ls = append(ls, TunsClientSimple{
 				TunType:           "tcp",
-				TunAddress:        k,
+				TunAddress:        tunAddr,
 				RemoteAddr:        val.RemoteAddr,
 				User:              val.User,
 				PubkeyFingerprint: val.PubkeyFingerprint,
@@ -500,7 +509,7 @@ func (m *TunsPage) fetchTuns() {
 
 		for k := range val.RouteListeners.TcpAliases {
 			ls = append(ls, TunsClientSimple{
-				TunType:           "tcp-alias",
+				TunType:           "alias",
 				TunAddress:        k,
 				RemoteAddr:        val.RemoteAddr,
 				User:              val.User,
@@ -509,9 +518,15 @@ func (m *TunsPage) fetchTuns() {
 		}
 
 		for k := range val.RouteListeners.Listeners {
+			tunAddr, err := shared.ParseTunsTCP(k, "tuns.sh")
+			if err != nil {
+				m.shared.Session.Logger.Info("parse tun addr", "err", err)
+				tunAddr = k
+			}
+
 			ls = append(ls, TunsClientSimple{
 				TunType:           "tcp",
-				TunAddress:        k,
+				TunAddress:        tunAddr,
 				RemoteAddr:        val.RemoteAddr,
 				User:              val.User,
 				PubkeyFingerprint: val.PubkeyFingerprint,

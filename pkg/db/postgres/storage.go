@@ -12,7 +12,7 @@ import (
 
 	"slices"
 
-	"github.com/lib/pq"
+	_ "github.com/lib/pq"
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/utils"
 )
@@ -1799,11 +1799,11 @@ func (me *PsqlDB) findPagesStats(userID string) (*db.UserServiceStats, error) {
 func (me *PsqlDB) InsertTunsEventLog(log *db.TunsEventLog) error {
 	_, err := me.Db.Exec(
 		`INSERT INTO tuns_event_logs
-			(user_id, server_id, remote_addr, event_type, tunnel_type, connection_type, tunnel_addrs)
+			(user_id, server_id, remote_addr, event_type, tunnel_type, connection_type, tunnel_id)
 		VALUES
 			($1, $2, $3, $4, $5, $6, $7)`,
 		log.UserId, log.ServerID, log.RemoteAddr, log.EventType, log.TunnelType,
-		log.ConnectionType, pq.Array(log.TunnelAddrs),
+		log.ConnectionType, log.TunnelID,
 	)
 	return err
 }
@@ -1812,8 +1812,8 @@ func (me *PsqlDB) FindTunsEventLogsByAddr(userID, addr string) ([]*db.TunsEventL
 	logs := []*db.TunsEventLog{}
 	fmt.Println(addr)
 	rs, err := me.Db.Query(
-		`SELECT id, user_id, server_id, remote_addr, event_type, tunnel_type, connection_type, tunnel_addrs, created_at
-		FROM tuns_event_logs WHERE user_id=$1 AND tunnel_addrs @> ARRAY[$2] ORDER BY created_at DESC`, userID, addr)
+		`SELECT id, user_id, server_id, remote_addr, event_type, tunnel_type, connection_type, tunnel_id, created_at
+		FROM tuns_event_logs WHERE user_id=$1 AND tunnel_id=$2 ORDER BY created_at DESC`, userID, addr)
 	if err != nil {
 		return nil, err
 	}
@@ -1823,7 +1823,7 @@ func (me *PsqlDB) FindTunsEventLogsByAddr(userID, addr string) ([]*db.TunsEventL
 		err := rs.Scan(
 			&log.ID, &log.UserId, &log.ServerID, &log.RemoteAddr,
 			&log.EventType, &log.TunnelType, &log.ConnectionType,
-			(*pq.StringArray)(&log.TunnelAddrs), &log.CreatedAt,
+			&log.TunnelID, &log.CreatedAt,
 		)
 		if err != nil {
 			return nil, err
@@ -1841,7 +1841,7 @@ func (me *PsqlDB) FindTunsEventLogsByAddr(userID, addr string) ([]*db.TunsEventL
 func (me *PsqlDB) FindTunsEventLogs(userID string) ([]*db.TunsEventLog, error) {
 	logs := []*db.TunsEventLog{}
 	rs, err := me.Db.Query(
-		`SELECT id, user_id, server_id, remote_addr, event_type, tunnel_type, connection_type, tunnel_addrs, created_at
+		`SELECT id, user_id, server_id, remote_addr, event_type, tunnel_type, connection_type, tunnel_id, created_at
 		FROM tuns_event_logs WHERE user_id=$1 ORDER BY created_at DESC`, userID)
 	if err != nil {
 		return nil, err
@@ -1852,7 +1852,7 @@ func (me *PsqlDB) FindTunsEventLogs(userID string) ([]*db.TunsEventLog, error) {
 		err := rs.Scan(
 			&log.ID, &log.UserId, &log.ServerID, &log.RemoteAddr,
 			&log.EventType, &log.TunnelType, &log.ConnectionType,
-			(*pq.StringArray)(&log.TunnelAddrs), &log.CreatedAt,
+			&log.TunnelID, &log.CreatedAt,
 		)
 		if err != nil {
 			return nil, err

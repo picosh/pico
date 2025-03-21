@@ -748,6 +748,15 @@ func tunsEventLogDrainSub(ctx context.Context, dbpool db.DB, logger *slog.Logger
 				continue
 			}
 
+			if log.TunnelType == "tcp" {
+				newID, err := shared.ParseTunsTCP(log.TunnelID, log.ServerID)
+				if err != nil {
+					logger.Error("could not parse tunnel ID", "err", err)
+				} else {
+					log.TunnelID = newID
+				}
+			}
+
 			logger.Info("inserting tuns event log", "log", log)
 			err = dbpool.InsertTunsEventLog(&log)
 			if err != nil {

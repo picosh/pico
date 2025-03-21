@@ -331,9 +331,9 @@ type TunsEventLog struct {
 	UserId         string     `json:"user_id"`
 	RemoteAddr     string     `json:"remote_addr"`
 	EventType      string     `json:"event_type"`
+	TunnelID       string     `json:"tunnel_id"`
 	TunnelType     string     `json:"tunnel_type"`
 	ConnectionType string     `json:"connection_type"`
-	TunnelAddrs    []string   `json:"tunnel_addrs"`
 	CreatedAt      *time.Time `json:"created_at"`
 }
 

@@ -3,7 +3,6 @@ package shared
 import (
 	"fmt"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/gorilla/feeds"
@@ -137,16 +136,16 @@ Event type: %s<br />
 Connection type: %s<br />
 Remote addr: %s<br />
 Tunnel type: %s<br />
-Tunnel addrs: %s<br />
+Tunnel ID: %s<br />
 Server: %s`,
 			eventLog.CreatedAt.Format(time.RFC3339), eventLog.EventType, eventLog.ConnectionType,
-			eventLog.RemoteAddr, eventLog.TunnelType, eventLog.TunnelAddrs, eventLog.ServerID,
+			eventLog.RemoteAddr, eventLog.TunnelType, eventLog.TunnelID, eventLog.ServerID,
 		)
 		logItem := &feeds.Item{
 			Id: fmt.Sprintf("%d", eventLog.CreatedAt.Unix()),
 			Title: fmt.Sprintf(
 				"%s tuns event for %s",
-				eventLog.EventType, strings.Join(eventLog.TunnelAddrs, ", "),
+				eventLog.EventType, eventLog.TunnelID,
 			),
 			Link:        &feeds.Link{Href: "https://pico.sh"},
 			Content:     content,
