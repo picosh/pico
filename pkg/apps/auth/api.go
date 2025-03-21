@@ -748,7 +748,7 @@ func tunsEventLogDrainSub(ctx context.Context, dbpool db.DB, logger *slog.Logger
 				continue
 			}
 
-			if log.TunnelType == "tcp" {
+			if log.TunnelType == "tcp" || log.TunnelType == "sni" {
 				newID, err := shared.ParseTunsTCP(log.TunnelID, log.ServerID)
 				if err != nil {
 					logger.Error("could not parse tunnel ID", "err", err)
