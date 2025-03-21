@@ -8,6 +8,7 @@ import (
 	"math"
 	"net/http"
 	"sort"
+	"sync"
 	"time"
 
 	"git.sr.ht/~rockorager/vaxis"
@@ -98,6 +99,8 @@ type TunsPage struct {
 	isAdmin      bool
 	eventLogs    []*db.TunsEventLog
 	eventLogList list.Dynamic
+
+	mu sync.RWMutex
 }
 
 func NewTunsPage(shrd *SharedModel) *TunsPage {
@@ -149,6 +152,8 @@ func (m *TunsPage) getLogWidget(i uint, cursor uint) vxfw.Widget {
 }
 
 func (m *TunsPage) getEventLogWidget(i uint, cursor uint) vxfw.Widget {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	if int(i) >= len(m.eventLogs) {
 		return nil
 	}
@@ -201,7 +206,11 @@ func (m *TunsPage) connectToLogs() error {
 		user := parsedData.User
 		userId := parsedData.UserId
 		isUser := user == m.shared.User.Name || userId == m.shared.User.ID
-		if (m.isAdmin || isUser) && parsedData.TunnelID == m.selected {
+
+		m.mu.RLock()
+		selected := m.selected
+		m.mu.RUnlock()
+		if (m.isAdmin || isUser) && parsedData.TunnelID == selected {
 			m.shared.App.PostEvent(ResultLogLineLoaded{parsedData})
 		}
 	}
@@ -232,9 +241,11 @@ func (m *TunsPage) HandleEvent(ev vaxis.Event, ph vxfw.EventPhase) (vxfw.Command
 		m.focus = "page"
 		return vxfw.FocusWidgetCmd(m), nil
 	case PageOut:
+		m.mu.Lock()
 		m.selected = ""
 		m.logs = []*ResultLog{}
 		m.err = nil
+		m.mu.Unlock()
 		m.done()
 	case ResultLogLineLoaded:
 		m.logs = append(m.logs, &msg.Line)
@@ -253,9 +264,11 @@ func (m *TunsPage) HandleEvent(ev vaxis.Event, ph vxfw.EventPhase) (vxfw.Command
 		}), nil
 	case vaxis.Key:
 		if msg.Matches(vaxis.KeyEnter) {
+			m.mu.Lock()
 			m.selected = m.tuns[m.leftPane.Cursor()].TunAddress
 			m.logs = []*ResultLog{}
 			m.eventLogs = []*db.TunsEventLog{}
+			m.mu.Unlock()
 			go m.fetchEventLogs()
 			return vxfw.RedrawCmd{}, nil
 		}
@@ -391,12 +404,14 @@ func (m *TunsPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 		root.AddChild(int(leftPaneW), 0, pagerSurf)
 	}
 
+	m.mu.RLock()
 	if m.err != nil {
 		txt := text.New(m.err.Error())
 		txt.Style = vaxis.Style{Foreground: red}
 		surf, _ := txt.Draw(createDrawCtx(ctx, 1))
 		root.AddChild(0, int(ctx.Max.Height-1), surf)
 	}
+	m.mu.RUnlock()
 
 	return root, nil
 }
@@ -431,9 +446,14 @@ func fetch(fqdn, auth string) (map[string]*TunsClient, error) {
 func (m *TunsPage) fetchEventLogs() {
 	logs, err := m.shared.Dbpool.FindTunsEventLogsByAddr(m.shared.User.ID, m.selected)
 	if err != nil {
+		m.mu.Lock()
+		defer m.mu.Unlock()
 		m.err = err
 		return
 	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.eventLogs = logs
 }
 

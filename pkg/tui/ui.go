@@ -195,15 +195,15 @@ func (m *HeaderWdgt) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	root := vxfw.NewSurface(ctx.Max.Width, ctx.Max.Height, m)
 	// header
 	wdgt := richtext.New([]vaxis.Segment{
-		vaxis.Segment{Text: " " + logoTxt + " ", Style: vaxis.Style{Background: purp, Foreground: black}},
-		vaxis.Segment{Text: " • " + m.page, Style: vaxis.Style{Foreground: green}},
+		{Text: " " + logoTxt + " ", Style: vaxis.Style{Background: purp, Foreground: black}},
+		{Text: " • " + m.page, Style: vaxis.Style{Foreground: green}},
 	})
 	surf, _ := wdgt.Draw(ctx)
 	root.AddChild(0, 0, surf)
 
 	if m.shared.User != nil {
 		user := richtext.New([]vaxis.Segment{
-			vaxis.Segment{Text: "~" + m.shared.User.Name, Style: vaxis.Style{Foreground: cream}},
+			{Text: "~" + m.shared.User.Name, Style: vaxis.Style{Foreground: cream}},
 		})
 		surf, _ = user.Draw(ctx)
 		root.AddChild(int(ctx.Max.Width)-int(surf.Size.Width)-1, 0, surf)

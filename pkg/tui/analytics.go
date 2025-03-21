@@ -103,7 +103,7 @@ func (m *AnalyticsPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw
 		if msg.Matches('t') {
 			enabled, err := m.toggleAnalytics()
 			if err != nil {
-				fmt.Println(err)
+				m.err = err
 			}
 			var wdgt vxfw.Widget = m
 			if enabled {

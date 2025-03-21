@@ -1810,7 +1810,6 @@ func (me *PsqlDB) InsertTunsEventLog(log *db.TunsEventLog) error {
 
 func (me *PsqlDB) FindTunsEventLogsByAddr(userID, addr string) ([]*db.TunsEventLog, error) {
 	logs := []*db.TunsEventLog{}
-	fmt.Println(addr)
 	rs, err := me.Db.Query(
 		`SELECT id, user_id, server_id, remote_addr, event_type, tunnel_type, connection_type, tunnel_id, created_at
 		FROM tuns_event_logs WHERE user_id=$1 AND tunnel_id=$2 ORDER BY created_at DESC`, userID, addr)
