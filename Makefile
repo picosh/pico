@@ -139,7 +139,7 @@ psql:
 .PHONY: psql
 
 dump:
-	$(DOCKER_CMD) exec -it $(DB_CONTAINER) pg_dump -U $(PGUSER) $(PGDATABASE) > ./backup.sql
+	$(DOCKER_CMD) exec $(DB_CONTAINER) pg_dump -U $(PGUSER) $(PGDATABASE) > ./backup.sql
 .PHONY: dump
 
 restore:
