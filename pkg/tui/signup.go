@@ -32,12 +32,35 @@ func NewSignupPage(shrd *SharedModel) *SignupPage {
 	return &SignupPage{shared: shrd, btn: btn, input: input}
 }
 
+func (m *SignupPage) Footer() []Shortcut {
+	return []Shortcut{
+		{Shortcut: "tab", Text: "focus"},
+		{Shortcut: "enter", Text: "create user"},
+	}
+}
+
 func (m *SignupPage) createAccount(name string) (*db.User, error) {
 	if name == "" {
 		return nil, fmt.Errorf("name cannot be empty")
 	}
 	key := utils.KeyForKeyText(m.shared.Session.PublicKey())
 	return m.shared.Dbpool.RegisterUser(name, key, "")
+}
+
+func (m *SignupPage) CaptureEvent(ev vaxis.Event) (vxfw.Command, error) {
+	switch msg := ev.(type) {
+	case vaxis.Key:
+		if msg.Matches(vaxis.KeyEnter) {
+			user, err := m.createAccount(m.input.GetValue())
+			if err != nil {
+				m.err = err
+				return vxfw.RedrawCmd{}, nil
+			}
+			m.shared.User = user
+			m.shared.App.PostEvent(Navigate{To: HOME})
+		}
+	}
+	return nil, nil
 }
 
 func (m *SignupPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
@@ -56,17 +79,6 @@ func (m *SignupPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Co
 				cmd,
 				vxfw.FocusWidgetCmd(m.btn),
 			}), nil
-		}
-		if msg.Matches(vaxis.KeyEnter) {
-			if m.focus == "button" {
-				user, err := m.createAccount(m.input.GetValue())
-				if err != nil {
-					m.err = err
-					return vxfw.RedrawCmd{}, nil
-				}
-				m.shared.User = user
-				m.shared.App.PostEvent(Navigate{To: HOME})
-			}
 		}
 	}
 
