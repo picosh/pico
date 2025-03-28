@@ -212,7 +212,7 @@ type Token struct {
 type FeatureFlag struct {
 	ID               string          `json:"id" db:"id"`
 	UserID           string          `json:"user_id" db:"user_id"`
-	PaymentHistoryID string          `json:"payment_history_id" db:"payment_history_id"`
+	PaymentHistoryID sql.NullString  `json:"payment_history_id" db:"payment_history_id"`
 	Name             string          `json:"name" db:"name"`
 	CreatedAt        *time.Time      `json:"created_at" db:"created_at"`
 	ExpiresAt        *time.Time      `json:"expires_at" db:"expires_at"`
@@ -370,7 +370,7 @@ type DB interface {
 	RemoveKeys(pubkeyIDs []string) error
 
 	FindUsers() ([]*User, error)
-	FindUserForName(name string) (*User, error)
+	FindUserByName(name string) (*User, error)
 	FindUserForNameAndKey(name string, pubkey string) (*User, error)
 	FindUserForKey(name string, pubkey string) (*User, error)
 	FindUserByPubkey(pubkey string) (*User, error)
@@ -414,7 +414,7 @@ type DB interface {
 	FindVisitSiteList(opts *SummaryOpts) ([]*VisitUrl, error)
 
 	AddPicoPlusUser(username, email, paymentType, txId string) error
-	FindFeatureForUser(userID string, feature string) (*FeatureFlag, error)
+	FindFeature(userID string, feature string) (*FeatureFlag, error)
 	FindFeaturesForUser(userID string) ([]*FeatureFlag, error)
 	HasFeatureForUser(userID string, feature string) bool
 	FindTotalSizeForUser(userID string) (int, error)

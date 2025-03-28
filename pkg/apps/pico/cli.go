@@ -117,10 +117,10 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 					return err
 				}
 
-				ff, err := dbpool.FindFeatureForUser(user.ID, "plus")
+				ff, err := dbpool.FindFeature(user.ID, "plus")
 				if err != nil {
 					handler.Logger.Error("Unable to find plus feature flag", "err", err, "user", user, "command", args)
-					ff, err = dbpool.FindFeatureForUser(user.ID, "bouncer")
+					ff, err = dbpool.FindFeature(user.ID, "bouncer")
 					if err != nil {
 						handler.Logger.Error("Unable to find bouncer feature flag", "err", err, "user", user, "command", args)
 						sesh.Fatal(err)

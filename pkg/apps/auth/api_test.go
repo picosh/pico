@@ -220,7 +220,7 @@ func (a *AuthDb) AddPicoPlusUser(username, email, from, txid string) error {
 	return nil
 }
 
-func (a *AuthDb) FindUserForName(username string) (*db.User, error) {
+func (a *AuthDb) FindUserByName(username string) (*db.User, error) {
 	return &db.User{ID: testUserID, Name: username}, nil
 }
 
@@ -243,7 +243,7 @@ func (a *AuthDb) FindKeysForUser(user *db.User) ([]*db.PublicKey, error) {
 	return []*db.PublicKey{{ID: "1", UserID: user.ID, Name: "my-key", Key: "nice-pubkey", CreatedAt: &time.Time{}}}, nil
 }
 
-func (a *AuthDb) FindFeatureForUser(userID string, feature string) (*db.FeatureFlag, error) {
+func (a *AuthDb) FindFeature(userID string, feature string) (*db.FeatureFlag, error) {
 	now := time.Date(2021, 8, 15, 14, 30, 45, 100, time.UTC)
 	oneDayWarning := now.AddDate(0, 0, 1)
 	return &db.FeatureFlag{ID: "2", UserID: userID, Name: "plus", ExpiresAt: &oneDayWarning, CreatedAt: &now}, nil

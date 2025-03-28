@@ -76,7 +76,7 @@ func CheckHandler(w http.ResponseWriter, r *http.Request) {
 		if !strings.Contains(hostDomain, appDomain) {
 			subdomain := GetCustomDomain(hostDomain, cfg.Space)
 			if subdomain != "" {
-				u, err := dbpool.FindUserForName(subdomain)
+				u, err := dbpool.FindUserByName(subdomain)
 				if u != nil && err == nil {
 					w.WriteHeader(http.StatusOK)
 					return

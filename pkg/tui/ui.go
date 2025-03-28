@@ -296,7 +296,7 @@ func FindUser(shrd *SharedModel) (*db.User, error) {
 			return nil, fmt.Errorf("only admins can impersonate a user")
 		}
 		impersonate := strings.Replace(usr, adminPrefix, "", 1)
-		user, err = shrd.Dbpool.FindUserForName(impersonate)
+		user, err = shrd.Dbpool.FindUserByName(impersonate)
 		if err != nil {
 			return nil, err
 		}
@@ -311,7 +311,7 @@ func FindFeatureFlag(shrd *SharedModel, name string) (*db.FeatureFlag, error) {
 		return nil, nil
 	}
 
-	ff, err := shrd.Dbpool.FindFeatureForUser(shrd.User.ID, name)
+	ff, err := shrd.Dbpool.FindFeature(shrd.User.ID, name)
 	if err != nil {
 		return nil, err
 	}

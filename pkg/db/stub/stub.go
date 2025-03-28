@@ -77,7 +77,7 @@ func (me *StubDB) ValidateName(name string) (bool, error) {
 	return false, notImpl
 }
 
-func (me *StubDB) FindUserForName(name string) (*db.User, error) {
+func (me *StubDB) FindUserByName(name string) (*db.User, error) {
 	return nil, notImpl
 }
 
@@ -189,7 +189,7 @@ func (me *StubDB) FindTagsForPost(postID string) ([]string, error) {
 	return []string{}, notImpl
 }
 
-func (me *StubDB) FindFeatureForUser(userID string, feature string) (*db.FeatureFlag, error) {
+func (me *StubDB) FindFeature(userID string, feature string) (*db.FeatureFlag, error) {
 	return nil, notImpl
 }
 

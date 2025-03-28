@@ -10,26 +10,14 @@ import (
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/pssh"
 	sendutils "github.com/picosh/pico/pkg/send/utils"
-	"github.com/picosh/utils"
 )
 
 func getUser(s *pssh.SSHServerConnSession, dbpool pgsdb.PgsDB) (*db.User, error) {
-	if s.PublicKey() == nil {
-		return nil, fmt.Errorf("key not found")
+	userID, ok := s.Conn.Permissions.Extensions["user_id"]
+	if !ok {
+		return nil, fmt.Errorf("`user_id` extension not found")
 	}
-
-	key := utils.KeyForKeyText(s.PublicKey())
-
-	user, err := dbpool.FindUserByPubkey(key)
-	if err != nil {
-		return nil, err
-	}
-
-	if user.Name == "" {
-		return nil, fmt.Errorf("must have username set")
-	}
-
-	return user, nil
+	return dbpool.FindUser(userID)
 }
 
 type arrayFlags []string

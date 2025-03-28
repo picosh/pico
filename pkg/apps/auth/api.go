@@ -303,7 +303,7 @@ func userHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 			"publicKey", data.PublicKey,
 		)
 
-		user, err := apiConfig.Dbpool.FindUserForName(data.Username)
+		user, err := apiConfig.Dbpool.FindUserByName(data.Username)
 		if err != nil {
 			apiConfig.Cfg.Logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusNotFound)
@@ -461,7 +461,7 @@ func paymentWebhookHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 		status := event.Data.Attr.Status
 		txID := fmt.Sprint(event.Data.Attr.OrderNumber)
 
-		user, err := apiConfig.Dbpool.FindUserForName(username)
+		user, err := apiConfig.Dbpool.FindUserByName(username)
 		if err != nil {
 			logger.Error("no user found with username", "username", username)
 			w.WriteHeader(http.StatusOK)
@@ -624,7 +624,7 @@ func deserializeCaddyAccessLog(dbpool db.DB, access *AccessLog) (*db.AnalyticsVi
 	}
 
 	// get user ID
-	user, err := dbpool.FindUserForName(props.Username)
+	user, err := dbpool.FindUserByName(props.Username)
 	if err != nil {
 		return nil, fmt.Errorf("could not find user for name %s: %w", props.Username, err)
 	}

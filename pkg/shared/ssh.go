@@ -3,6 +3,7 @@ package shared
 import (
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/utils"
@@ -16,6 +17,8 @@ type SshAuthHandler struct {
 
 type AuthFindUser interface {
 	FindUserByPubkey(key string) (*db.User, error)
+	FindUserByName(name string) (*db.User, error)
+	FindFeature(userID, name string) (*db.FeatureFlag, error)
 }
 
 func NewSshAuthHandler(dbh AuthFindUser, logger *slog.Logger) *SshAuthHandler {
@@ -43,8 +46,29 @@ func (r *SshAuthHandler) PubkeyAuthHandler(conn ssh.ConnMetadata, key ssh.Public
 		return nil, fmt.Errorf("username is not set")
 	}
 
+	// impersonation
+	impID := user.ID
+	adminPrefix := "admin__"
+	usr := conn.User()
+	if strings.HasPrefix(usr, adminPrefix) {
+		ff, err := r.DB.FindFeature(user.ID, "admin")
+		if err != nil {
+			return nil, fmt.Errorf("only admins can impersonate a user: %w", err)
+		}
+		if !ff.IsValid() {
+			return nil, fmt.Errorf("expired admin feature flag, cannot impersonate a user")
+		}
+
+		impersonate := strings.Replace(usr, adminPrefix, "", 1)
+		user, err = r.DB.FindUserByName(impersonate)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return &ssh.Permissions{
 		Extensions: map[string]string{
+			"imp_id":  impID,
 			"user_id": user.ID,
 			"pubkey":  pubkey,
 		},
@@ -52,7 +76,7 @@ func (r *SshAuthHandler) PubkeyAuthHandler(conn ssh.ConnMetadata, key ssh.Public
 }
 
 func FindPlusFF(dbpool db.DB, cfg *ConfigSite, userID string) *db.FeatureFlag {
-	ff, _ := dbpool.FindFeatureForUser(userID, "plus")
+	ff, _ := dbpool.FindFeature(userID, "plus")
 	// we have free tiers so users might not have a feature flag
 	// in which case we set sane defaults
 	if ff == nil {

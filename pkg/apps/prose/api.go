@@ -125,7 +125,7 @@ func blogStyleHandler(w http.ResponseWriter, r *http.Request) {
 	logger := shared.GetLogger(r)
 	cfg := shared.GetCfg(r)
 
-	user, err := dbpool.FindUserForName(username)
+	user, err := dbpool.FindUserByName(username)
 	if err != nil {
 		logger.Info("blog not found", "user", username)
 		http.Error(w, "blog not found", http.StatusNotFound)
@@ -155,7 +155,7 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	logger := shared.GetLogger(r)
 	cfg := shared.GetCfg(r)
 
-	user, err := dbpool.FindUserForName(username)
+	user, err := dbpool.FindUserByName(username)
 	if err != nil {
 		logger.Info("blog not found", "user", username)
 		http.Error(w, "blog not found", http.StatusNotFound)
@@ -301,7 +301,7 @@ func postRawHandler(w http.ResponseWriter, r *http.Request) {
 	logger := shared.GetLogger(r)
 	logger = logger.With("slug", slug)
 
-	user, err := dbpool.FindUserForName(username)
+	user, err := dbpool.FindUserByName(username)
 	if err != nil {
 		logger.Info("blog not found", "user", username)
 		http.Error(w, "blog not found", http.StatusNotFound)
@@ -341,7 +341,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	dbpool := shared.GetDB(r)
 	logger := shared.GetLogger(r)
 
-	user, err := dbpool.FindUserForName(username)
+	user, err := dbpool.FindUserByName(username)
 	if err != nil {
 		logger.Info("blog not found", "user", username)
 		http.Error(w, "blog not found", http.StatusNotFound)
@@ -589,7 +589,7 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 	logger := shared.GetLogger(r)
 	cfg := shared.GetCfg(r)
 
-	user, err := dbpool.FindUserForName(username)
+	user, err := dbpool.FindUserByName(username)
 	if err != nil {
 		logger.Info("rss feed not found", "user", username)
 		http.Error(w, "rss feed not found", http.StatusNotFound)
@@ -852,7 +852,7 @@ func imgRequest(w http.ResponseWriter, r *http.Request) {
 	logger := shared.GetLogger(r)
 	dbpool := shared.GetDB(r)
 	username := shared.GetUsernameFromRequest(r)
-	user, err := dbpool.FindUserForName(username)
+	user, err := dbpool.FindUserByName(username)
 	if err != nil {
 		logger.Error("could not find user", "username", username)
 		http.Error(w, "could find user", http.StatusNotFound)

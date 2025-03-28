@@ -230,7 +230,7 @@ func (m *TunsPage) HandleEvent(ev vaxis.Event, ph vxfw.EventPhase) (vxfw.Command
 	switch msg := ev.(type) {
 	case PageIn:
 		m.loading = true
-		ff, _ := m.shared.Dbpool.FindFeatureForUser(m.shared.User.ID, "admin")
+		ff, _ := m.shared.Dbpool.FindFeature(m.shared.User.ID, "admin")
 		if ff != nil {
 			m.isAdmin = true
 		}

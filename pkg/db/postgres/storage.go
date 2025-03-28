@@ -617,14 +617,14 @@ func (me *PsqlDB) ValidateName(name string) (bool, error) {
 	if !v {
 		return false, fmt.Errorf("%s is invalid: %w", lower, db.ErrNameInvalid)
 	}
-	user, _ := me.FindUserForName(lower)
+	user, _ := me.FindUserByName(lower)
 	if user == nil {
 		return true, nil
 	}
 	return false, fmt.Errorf("%s already taken: %w", lower, db.ErrNameTaken)
 }
 
-func (me *PsqlDB) FindUserForName(name string) (*db.User, error) {
+func (me *PsqlDB) FindUserByName(name string) (*db.User, error) {
 	user := &db.User{}
 	r := me.Db.QueryRow(sqlSelectUserForName, strings.ToLower(name))
 	err := r.Scan(&user.ID, &user.Name, &user.CreatedAt)
@@ -1457,7 +1457,7 @@ func (me *PsqlDB) FindTagsForPost(postID string) ([]string, error) {
 	return tags, nil
 }
 
-func (me *PsqlDB) FindFeatureForUser(userID string, feature string) (*db.FeatureFlag, error) {
+func (me *PsqlDB) FindFeature(userID string, feature string) (*db.FeatureFlag, error) {
 	ff := &db.FeatureFlag{}
 	// payment history is allowed to be null
 	// https://devtidbits.com/2020/08/03/go-sql-error-converting-null-to-string-is-unsupported/
@@ -1475,7 +1475,7 @@ func (me *PsqlDB) FindFeatureForUser(userID string, feature string) (*db.Feature
 		return nil, err
 	}
 
-	ff.PaymentHistoryID = paymentHistoryID.String
+	ff.PaymentHistoryID = paymentHistoryID
 
 	return ff, nil
 }
@@ -1507,7 +1507,7 @@ func (me *PsqlDB) FindFeaturesForUser(userID string) ([]*db.FeatureFlag, error) 
 		if err != nil {
 			return features, err
 		}
-		ff.PaymentHistoryID = paymentHistoryID.String
+		ff.PaymentHistoryID = paymentHistoryID
 
 		features = append(features, ff)
 	}
@@ -1518,7 +1518,7 @@ func (me *PsqlDB) FindFeaturesForUser(userID string) ([]*db.FeatureFlag, error) 
 }
 
 func (me *PsqlDB) HasFeatureForUser(userID string, feature string) bool {
-	ff, err := me.FindFeatureForUser(userID, feature)
+	ff, err := me.FindFeature(userID, feature)
 	if err != nil {
 		return false
 	}
@@ -1695,7 +1695,7 @@ func (me *PsqlDB) InsertFeature(userID, name string, expiresAt time.Time) (*db.F
 		return nil, err
 	}
 
-	feature, err := me.FindFeatureForUser(userID, name)
+	feature, err := me.FindFeature(userID, name)
 	if err != nil {
 		return nil, err
 	}
@@ -1709,7 +1709,7 @@ func (me *PsqlDB) RemoveFeature(userID string, name string) error {
 }
 
 func (me *PsqlDB) createFeatureExpiresAt(userID, name string) time.Time {
-	ff, _ := me.FindFeatureForUser(userID, name)
+	ff, _ := me.FindFeature(userID, name)
 	if ff == nil {
 		t := time.Now()
 		return t.AddDate(1, 0, 0)
@@ -1718,7 +1718,7 @@ func (me *PsqlDB) createFeatureExpiresAt(userID, name string) time.Time {
 }
 
 func (me *PsqlDB) AddPicoPlusUser(username, email, paymentType, txId string) error {
-	user, err := me.FindUserForName(username)
+	user, err := me.FindUserByName(username)
 	if err != nil {
 		return err
 	}

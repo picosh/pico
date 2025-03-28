@@ -78,7 +78,7 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	logger := blogger.With("user", username)
 	cfg := shared.GetCfg(r)
 
-	user, err := dbpool.FindUserForName(username)
+	user, err := dbpool.FindUserByName(username)
 	if err != nil {
 		logger.Info("user not found")
 		http.Error(w, "user not found", http.StatusNotFound)
@@ -170,7 +170,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	blogger := shared.GetLogger(r)
 	logger := blogger.With("slug", slug, "user", username)
 
-	user, err := dbpool.FindUserForName(username)
+	user, err := dbpool.FindUserByName(username)
 	if err != nil {
 		logger.Info("paste not found")
 		http.Error(w, "paste not found", http.StatusNotFound)
@@ -271,7 +271,7 @@ func postHandlerRaw(w http.ResponseWriter, r *http.Request) {
 	blogger := shared.GetLogger(r)
 	logger := blogger.With("user", username, "slug", slug)
 
-	user, err := dbpool.FindUserForName(username)
+	user, err := dbpool.FindUserByName(username)
 	if err != nil {
 		logger.Info("user not found")
 		http.Error(w, "user not found", http.StatusNotFound)

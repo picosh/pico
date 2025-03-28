@@ -90,7 +90,7 @@ func UserFeed(me db.DB, user *db.User, token string) (*feeds.Feed, error) {
 	var feedItems []*feeds.Item
 
 	now := time.Now()
-	ff, err := me.FindFeatureForUser(user.ID, "plus")
+	ff, err := me.FindFeature(user.ID, "plus")
 	if err != nil {
 		// still want to send an empty feed
 	} else {
