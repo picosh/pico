@@ -1,6 +1,7 @@
 package pssh
 
 import (
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -11,7 +12,7 @@ type ctxLoggerKey struct{}
 type ctxUserKey struct{}
 
 type FindUserInterface interface {
-	FindUserByPubkey(string) (*db.User, error)
+	FindUser(string) (*db.User, error)
 }
 
 type GetLoggerInterface interface {
@@ -29,7 +30,11 @@ func LogMiddleware(getLogger GetLoggerInterface, db FindUserInterface) SSHServer
 
 				user := GetUser(s)
 				if user == nil {
-					user, err := db.FindUserByPubkey(s.Permissions().Extensions["pubkey"])
+					userID, ok := s.Permissions().Extensions["user_id"]
+					if !ok {
+						return fmt.Errorf("`user_id` not set in permissions")
+					}
+					user, err := db.FindUser(userID)
 					if err == nil && user != nil {
 						logger = logger.With(
 							"user", user.Name,
