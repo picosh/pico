@@ -71,6 +71,7 @@ func StartSshServer() {
 		host,
 		port,
 		promPort,
+		"ssh_data/term_info_ed25519",
 		sshAuth.PubkeyAuthHandler,
 		[]pssh.SSHServerMiddleware{
 			pipe.Middleware(handler, ".md"),

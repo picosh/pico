@@ -71,6 +71,7 @@ func StartSshServer() {
 		host,
 		port,
 		promPort,
+		"ssh_data/term_info_ed25519",
 		func(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
 			perms, _ := sshAuth.PubkeyAuthHandler(conn, key)
 			if perms == nil {

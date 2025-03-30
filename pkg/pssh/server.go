@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path"
 	"strings"
 	"sync"
 	"time"
@@ -610,7 +611,7 @@ type PubKeyAuthHandler func(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Perm
 func NewSSHServerWithConfig(
 	ctx context.Context,
 	logger *slog.Logger,
-	app, host, port, promPort string,
+	app, host, port, promPort, hostKey string,
 	pubKeyAuthHandler PubKeyAuthHandler,
 	middleware, subsystemMiddleware []SSHServerMiddleware,
 	channelMiddleware map[string]SSHServerChannelMiddleware) (*SSHServer, error) {
@@ -629,7 +630,7 @@ func NewSSHServerWithConfig(
 		server.Config.PromListenAddr = fmt.Sprintf("%s:%s", host, promPort)
 	}
 
-	pemBytes, err := os.ReadFile("ssh_data/term_info_ed25519")
+	pemBytes, err := os.ReadFile(hostKey)
 	if err != nil {
 		logger.Error("failed to read private key file", "error", err)
 		if !os.IsNotExist(err) {
@@ -655,14 +656,14 @@ func NewSSHServerWithConfig(
 			Bytes: privb.Bytes,
 		}
 
-		if err = os.MkdirAll("ssh_data", 0700); err != nil {
+		if err = os.MkdirAll(path.Dir(hostKey), 0700); err != nil {
 			logger.Error("failed to create ssh_data directory", "error", err)
 			return nil, err
 		}
 
 		pemBytes = pem.EncodeToMemory(block)
 
-		if err = os.WriteFile("ssh_data/term_info_ed25519", pemBytes, 0600); err != nil {
+		if err = os.WriteFile(hostKey, pemBytes, 0600); err != nil {
 			logger.Error("failed to write private key", "error", err)
 			return nil, err
 		}
@@ -674,7 +675,7 @@ func NewSSHServerWithConfig(
 		}
 
 		pubb := ssh.MarshalAuthorizedKey(sshPubKey)
-		if err = os.WriteFile("ssh_data/term_info_ed25519.pub", pubb, 0600); err != nil {
+		if err = os.WriteFile(fmt.Sprintf("%s.pub", hostKey), pubb, 0600); err != nil {
 			logger.Error("failed to write public key", "error", err)
 			return nil, err
 		}
