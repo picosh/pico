@@ -22,6 +22,7 @@ services:
       - "[${BOUNCER_V6:-::1}]:443:443"
       - "[${BOUNCER_V6:-::1}]:80:80"
   auth-web:
+    dns: 1.1.1.1
     volumes:
       - ./data/auth-web/data:/app/ssh_data
     networks:
