@@ -630,64 +630,66 @@ func NewSSHServerWithConfig(
 		server.Config.PromListenAddr = fmt.Sprintf("%s:%s", host, promPort)
 	}
 
-	pemBytes, err := os.ReadFile(hostKey)
-	if err != nil {
-		logger.Error("failed to read private key file", "error", err)
-		if !os.IsNotExist(err) {
-			return nil, err
-		}
-
-		logger.Info("generating new private key")
-
-		pubKey, privKey, err := ed25519.GenerateKey(rand.Reader)
+	if hostKey != "" {
+		pemBytes, err := os.ReadFile(hostKey)
 		if err != nil {
-			logger.Error("failed to generate private key", "error", err)
-			return nil, err
+			logger.Error("failed to read private key file", "error", err)
+			if !os.IsNotExist(err) {
+				return nil, err
+			}
+
+			logger.Info("generating new private key")
+
+			pubKey, privKey, err := ed25519.GenerateKey(rand.Reader)
+			if err != nil {
+				logger.Error("failed to generate private key", "error", err)
+				return nil, err
+			}
+
+			privb, err := ssh.MarshalPrivateKey(privKey, "")
+			if err != nil {
+				logger.Error("failed to marshal private key", "error", err)
+				return nil, err
+			}
+
+			block := &pem.Block{
+				Type:  "OPENSSH PRIVATE KEY",
+				Bytes: privb.Bytes,
+			}
+
+			if err = os.MkdirAll(path.Dir(hostKey), 0700); err != nil {
+				logger.Error("failed to create ssh_data directory", "error", err)
+				return nil, err
+			}
+
+			pemBytes = pem.EncodeToMemory(block)
+
+			if err = os.WriteFile(hostKey, pemBytes, 0600); err != nil {
+				logger.Error("failed to write private key", "error", err)
+				return nil, err
+			}
+
+			sshPubKey, err := ssh.NewPublicKey(pubKey)
+			if err != nil {
+				logger.Error("failed to create public key", "error", err)
+				return nil, err
+			}
+
+			pubb := ssh.MarshalAuthorizedKey(sshPubKey)
+			if err = os.WriteFile(fmt.Sprintf("%s.pub", hostKey), pubb, 0600); err != nil {
+				logger.Error("failed to write public key", "error", err)
+				return nil, err
+			}
 		}
 
-		privb, err := ssh.MarshalPrivateKey(privKey, "")
+		signer, err := ssh.ParsePrivateKey(pemBytes)
 		if err != nil {
-			logger.Error("failed to marshal private key", "error", err)
+			logger.Error("failed to parse private key", "error", err)
 			return nil, err
 		}
 
-		block := &pem.Block{
-			Type:  "OPENSSH PRIVATE KEY",
-			Bytes: privb.Bytes,
-		}
-
-		if err = os.MkdirAll(path.Dir(hostKey), 0700); err != nil {
-			logger.Error("failed to create ssh_data directory", "error", err)
-			return nil, err
-		}
-
-		pemBytes = pem.EncodeToMemory(block)
-
-		if err = os.WriteFile(hostKey, pemBytes, 0600); err != nil {
-			logger.Error("failed to write private key", "error", err)
-			return nil, err
-		}
-
-		sshPubKey, err := ssh.NewPublicKey(pubKey)
-		if err != nil {
-			logger.Error("failed to create public key", "error", err)
-			return nil, err
-		}
-
-		pubb := ssh.MarshalAuthorizedKey(sshPubKey)
-		if err = os.WriteFile(fmt.Sprintf("%s.pub", hostKey), pubb, 0600); err != nil {
-			logger.Error("failed to write public key", "error", err)
-			return nil, err
-		}
+		server.Config.AddHostKey(signer)
 	}
-
-	signer, err := ssh.ParsePrivateKey(pemBytes)
-	if err != nil {
-		logger.Error("failed to parse private key", "error", err)
-		return nil, err
-	}
-
-	server.Config.AddHostKey(signer)
 
 	return server, nil
 }
