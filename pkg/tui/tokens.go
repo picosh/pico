@@ -161,7 +161,7 @@ type AddTokenPage struct {
 }
 
 func NewAddTokenPage(shrd *SharedModel) *AddTokenPage {
-	btn := button.New("ADD", func() (vxfw.Command, error) { return nil, nil })
+	btn := button.New("OK", func() (vxfw.Command, error) { return nil, nil })
 	btn.Style = button.StyleSet{
 		Default: vaxis.Style{Background: grey},
 		Focus:   vaxis.Style{Background: oj, Foreground: black},
@@ -171,6 +171,13 @@ func NewAddTokenPage(shrd *SharedModel) *AddTokenPage {
 
 		input: NewTextInput("enter name"),
 		btn:   btn,
+	}
+}
+
+func (m *AddTokenPage) Footer() []Shortcut {
+	return []Shortcut{
+		{Shortcut: "tab", Text: "focus"},
+		{Shortcut: "shift+click", Text: "select text"},
 	}
 }
 
@@ -199,11 +206,15 @@ func (m *AddTokenPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.
 		if msg.Matches(vaxis.KeyEnter) {
 			if m.focus == "button" {
 				if m.token != "" {
+					copyToken := m.token
 					m.token = ""
 					m.err = nil
 					m.input.Reset()
 					m.shared.App.PostEvent(Navigate{To: "tokens"})
-					return vxfw.RedrawCmd{}, nil
+					return vxfw.BatchCmd([]vxfw.Command{
+						vxfw.CopyToClipboardCmd(copyToken),
+						vxfw.RedrawCmd{},
+					}), nil
 				}
 				token, err := m.addToken(m.input.GetValue())
 				m.token = token
@@ -224,42 +235,50 @@ func (m *AddTokenPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	w := ctx.Max.Width
 	h := ctx.Max.Height
 	root := vxfw.NewSurface(w, h, m)
+	ah := 0
 
 	if m.token == "" {
 		header := text.New("Enter a name for the token")
 		headerSurf, _ := header.Draw(ctx)
-		root.AddChild(0, 0, headerSurf)
+		root.AddChild(0, ah, headerSurf)
+		ah += int(headerSurf.Size.Height)
 
 		inputSurf, _ := m.input.Draw(createDrawCtx(ctx, 4))
-		root.AddChild(0, 3, inputSurf)
+		root.AddChild(0, ah, inputSurf)
+		ah += int(inputSurf.Size.Height)
 
 		btnSurf, _ := m.btn.Draw(vxfw.DrawContext{
 			Characters: ctx.Characters,
-			Max:        vxfw.Size{Width: 5, Height: 1},
+			Max:        vxfw.Size{Width: 4, Height: 1},
 		})
-		root.AddChild(0, 6, btnSurf)
+		root.AddChild(0, ah, btnSurf)
+		ah += int(btnSurf.Size.Height)
 	} else {
 		header := text.New(
-			fmt.Sprintf(
-				"Save this token: %s\n\nAfter you exit this screen you will *not* be able to see it again.",
-				m.token,
-			),
+			"After you exit this screen you will *not* be able to see it again.  Use shift+click to select and copy text. If your terminal supports OSC52 then we will copy to your host clipboard upon exit of this screen.\n\n",
 		)
 		headerSurf, _ := header.Draw(ctx)
-		root.AddChild(0, 0, headerSurf)
+		root.AddChild(0, ah, headerSurf)
+		ah += int(headerSurf.Size.Height)
+
+		token := text.New(m.token + "\n")
+		tokenSurf, _ := token.Draw(ctx)
+		root.AddChild(0, ah, tokenSurf)
+		ah += int(tokenSurf.Size.Height)
 
 		btnSurf, _ := m.btn.Draw(vxfw.DrawContext{
 			Characters: ctx.Characters,
-			Max:        vxfw.Size{Width: 5, Height: 1},
+			Max:        vxfw.Size{Width: 4, Height: 1},
 		})
-		root.AddChild(0, 7, btnSurf)
+		root.AddChild(0, ah, btnSurf)
+		ah += int(btnSurf.Size.Height)
 	}
 
 	if m.err != nil {
 		e := text.New(m.err.Error())
 		e.Style = vaxis.Style{Foreground: red}
 		errSurf, _ := e.Draw(ctx)
-		root.AddChild(0, 9, errSurf)
+		root.AddChild(0, ah, errSurf)
 	}
 
 	return root, nil
