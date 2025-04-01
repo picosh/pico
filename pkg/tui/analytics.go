@@ -82,6 +82,9 @@ func (m *AnalyticsPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw
 		m.focus = "page"
 		return vxfw.FocusWidgetCmd(m), nil
 	case SitesLoaded:
+		if findAnalyticsFeature(m.features) == nil {
+			return vxfw.RedrawCmd{}, nil
+		}
 		m.focus = "sites"
 		return vxfw.BatchCmd([]vxfw.Command{
 			vxfw.FocusWidgetCmd(&m.leftPane),
@@ -125,6 +128,9 @@ func (m *AnalyticsPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw
 		}
 		if msg.Matches(vaxis.KeyTab) {
 			var cmd vxfw.Widget
+			if findAnalyticsFeature(m.features) == nil {
+				return nil, nil
+			}
 			if m.focus == "sites" && m.selected != "" {
 				m.focus = "details"
 				cmd = m.rightPane
@@ -389,12 +395,7 @@ func (m *AnalyticsPage) fetchFeatures() error {
 }
 
 func (m *AnalyticsPage) banner(ctx vxfw.DrawContext) vxfw.Surface {
-	style := vaxis.Style{Foreground: red}
-	analytics := richtext.New([]vaxis.Segment{
-		{
-			Text:  "Analytics is only available to pico+ users.\n\n",
-			Style: style,
-		},
+	segs := []vaxis.Segment{
 		{
 			Text: "Get usage statistics on your blog, blog posts, and pages sites. For example, see unique visitors, most popular URLs, and top referers.\n\n",
 		},
@@ -402,9 +403,27 @@ func (m *AnalyticsPage) banner(ctx vxfw.DrawContext) vxfw.Surface {
 			Text: "We do not collect usage statistic unless analytics is enabled. Further, when analytics are disabled we do not purge usage statistics.\n\n",
 		},
 		{
-			Text: "We will only store usage statistics for 1 year from when the event was created.",
+			Text: "We will only store usage statistics for 1 year from when the event was created.\n\n",
 		},
-	})
+	}
+
+	if m.shared.PlusFeatureFlag == nil {
+		style := vaxis.Style{Foreground: red}
+		segs = append(segs,
+			vaxis.Segment{
+				Text:  "Analytics is only available to pico+ users.\n\n",
+				Style: style,
+			})
+	} else {
+		style := vaxis.Style{Foreground: green}
+		segs = append(segs,
+			vaxis.Segment{
+				Text:  "Press 't' to enable analytics\n\n",
+				Style: style,
+			})
+	}
+
+	analytics := richtext.New(segs)
 	brd := NewBorder(analytics)
 	brd.Label = "alert"
 	surf, _ := brd.Draw(ctx)
