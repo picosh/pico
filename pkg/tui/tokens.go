@@ -178,7 +178,37 @@ func (m *AddTokenPage) Footer() []Shortcut {
 	return []Shortcut{
 		{Shortcut: "tab", Text: "focus"},
 		{Shortcut: "shift+click", Text: "select text"},
+		{Shortcut: "enter", Text: "add token"},
 	}
+}
+
+func (m *AddTokenPage) CaptureEvent(ev vaxis.Event) (vxfw.Command, error) {
+	switch msg := ev.(type) {
+	case vaxis.Key:
+		if msg.Matches(vaxis.KeyEnter) {
+			if m.token != "" {
+				copyToken := m.token
+				m.token = ""
+				m.err = nil
+				m.input.Reset()
+				m.shared.App.PostEvent(Navigate{To: "tokens"})
+				return vxfw.BatchCmd([]vxfw.Command{
+					vxfw.CopyToClipboardCmd(copyToken),
+					vxfw.RedrawCmd{},
+				}), nil
+			}
+			token, err := m.addToken(m.input.GetValue())
+			m.token = token
+			m.focus = "button"
+			m.err = err
+
+			return vxfw.BatchCmd([]vxfw.Command{
+				vxfw.FocusWidgetCmd(m.btn),
+				vxfw.RedrawCmd{},
+			}), err
+		}
+	}
+	return nil, nil
 }
 
 func (m *AddTokenPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
@@ -189,9 +219,6 @@ func (m *AddTokenPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.
 		return m.input.FocusIn()
 	case vaxis.Key:
 		if msg.Matches(vaxis.KeyTab) {
-			if m.token != "" {
-				return nil, nil
-			}
 			if m.focus == "input" {
 				m.focus = "button"
 				cmd, _ := m.input.FocusOut()
@@ -202,25 +229,6 @@ func (m *AddTokenPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.
 			}
 			m.focus = "input"
 			return m.input.FocusIn()
-		}
-		if msg.Matches(vaxis.KeyEnter) {
-			if m.focus == "button" {
-				if m.token != "" {
-					copyToken := m.token
-					m.token = ""
-					m.err = nil
-					m.input.Reset()
-					m.shared.App.PostEvent(Navigate{To: "tokens"})
-					return vxfw.BatchCmd([]vxfw.Command{
-						vxfw.CopyToClipboardCmd(copyToken),
-						vxfw.RedrawCmd{},
-					}), nil
-				}
-				token, err := m.addToken(m.input.GetValue())
-				m.token = token
-				m.err = err
-				return vxfw.RedrawCmd{}, nil
-			}
 		}
 	}
 

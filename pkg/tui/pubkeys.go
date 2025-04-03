@@ -188,6 +188,31 @@ func NewAddPubkeyPage(shrd *SharedModel) *AddKeyPage {
 	}
 }
 
+func (m *AddKeyPage) Footer() []Shortcut {
+	return []Shortcut{
+		{Shortcut: "tab", Text: "focus"},
+		{Shortcut: "shift+click", Text: "select text"},
+		{Shortcut: "enter", Text: "add public key"},
+	}
+}
+
+func (m *AddKeyPage) CaptureEvent(ev vaxis.Event) (vxfw.Command, error) {
+	switch msg := ev.(type) {
+	case vaxis.Key:
+		if msg.Matches(vaxis.KeyEnter) {
+			err := m.addPubkey(m.input.GetValue())
+			m.err = err
+			if err == nil {
+				m.input.Reset()
+				m.shared.App.PostEvent(Navigate{To: "pubkeys"})
+				return nil, nil
+			}
+			return vxfw.RedrawCmd{}, nil
+		}
+	}
+	return nil, nil
+}
+
 func (m *AddKeyPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
 	switch msg := ev.(type) {
 	case PageIn:
@@ -206,18 +231,6 @@ func (m *AddKeyPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Co
 			}
 			m.focus = "input"
 			return m.input.FocusIn()
-		}
-		if msg.Matches(vaxis.KeyEnter) {
-			if m.focus == "button" {
-				err := m.addPubkey(m.input.GetValue())
-				m.err = err
-				if err == nil {
-					m.input.Reset()
-					m.shared.App.PostEvent(Navigate{To: "pubkeys"})
-					return nil, nil
-				}
-				return vxfw.RedrawCmd{}, nil
-			}
 		}
 	}
 
