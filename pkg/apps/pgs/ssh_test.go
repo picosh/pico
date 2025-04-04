@@ -67,6 +67,28 @@ func TestSshServerSftp(t *testing.T) {
 		return
 	}
 
+	_, err = WriteFilesMultProjectsWithSftp(cfg, client)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	projects, err := dbpool.FindProjectsByUser(dbpool.Users[0].ID)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	names := ""
+	for _, proj := range projects {
+		names += "_" + proj.Name
+	}
+
+	if names != "_test_mult_mult2" {
+		t.Errorf("not all projects created: %s", names)
+		return
+	}
+
 	close(done)
 
 	p, err := os.FindProcess(os.Getpid())
@@ -400,6 +422,47 @@ func WriteFileWithSftp(cfg *PgsConfig, conn *ssh.Client) (*os.FileInfo, error) {
 	defer client.Close()
 
 	f, err := client.Create("test/hello.txt")
+	if err != nil {
+		cfg.Logger.Error("could not create file", "err", err)
+		return nil, err
+	}
+	if _, err := f.Write([]byte("Hello world!")); err != nil {
+		cfg.Logger.Error("could not write to file", "err", err)
+		return nil, err
+	}
+
+	cfg.Logger.Info("closing", "err", f.Close())
+
+	// check it's there
+	fi, err := client.Lstat("test/hello.txt")
+	if err != nil {
+		cfg.Logger.Error("could not get stat for file", "err", err)
+		return nil, err
+	}
+
+	return &fi, nil
+}
+
+func WriteFilesMultProjectsWithSftp(cfg *PgsConfig, conn *ssh.Client) (*os.FileInfo, error) {
+	// open an SFTP session over an existing ssh connection.
+	client, err := sftp.NewClient(conn)
+	if err != nil {
+		cfg.Logger.Error("could not create sftp client", "err", err)
+		return nil, err
+	}
+	defer client.Close()
+
+	f, err := client.Create("mult/hello.txt")
+	if err != nil {
+		cfg.Logger.Error("could not create file", "err", err)
+		return nil, err
+	}
+	if _, err := f.Write([]byte("Hello world!")); err != nil {
+		cfg.Logger.Error("could not write to file", "err", err)
+		return nil, err
+	}
+
+	f, err = client.Create("mult2/hello.txt")
 	if err != nil {
 		cfg.Logger.Error("could not create file", "err", err)
 		return nil, err

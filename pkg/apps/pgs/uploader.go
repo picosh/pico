@@ -307,7 +307,10 @@ func (h *UploadAssetHandler) Write(s *pssh.SSHServerConnSession, entry *sendutil
 	logger = logger.With("project", projectName)
 
 	// find, create, or update project if we haven't already done it
-	if project == nil {
+	// we need to also check if the project stored in ctx is the same project
+	// being uploaded since users can keep an ssh connection alive via sftp
+	// and created many projects in a single session
+	if project == nil || project.Name != projectName {
 		project, err = h.Cfg.DB.UpsertProject(user.ID, projectName, projectName)
 		if err != nil {
 			logger.Error("upsert project", "err", err.Error())

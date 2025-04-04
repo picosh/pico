@@ -170,7 +170,14 @@ func (me *MemoryDB) FindProjectsByPrefix(userID, prefix string) ([]*db.Project, 
 }
 
 func (me *MemoryDB) FindProjectsByUser(userID string) ([]*db.Project, error) {
-	return []*db.Project{}, errNotImpl
+	pjs := []*db.Project{}
+	for _, project := range me.Projects {
+		if project.UserID != userID {
+			continue
+		}
+		pjs = append(pjs, project)
+	}
+	return pjs, nil
 }
 
 func (me *MemoryDB) FindProjects(userID string) ([]*db.Project, error) {
