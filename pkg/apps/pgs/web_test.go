@@ -146,6 +146,45 @@ func TestApiBasic(t *testing.T) {
 			},
 		},
 		{
+			name:        "_redirects",
+			path:        "/_redirects",
+			want:        "404 not found",
+			status:      http.StatusNotFound,
+			contentType: "text/plain; charset=utf-8",
+
+			storage: map[string]map[string]string{
+				bucketName: {
+					"/test/_redirects": "/ok /index.html 200",
+				},
+			},
+		},
+		{
+			name:        "_headers",
+			path:        "/_headers",
+			want:        "404 not found",
+			status:      http.StatusNotFound,
+			contentType: "text/plain; charset=utf-8",
+
+			storage: map[string]map[string]string{
+				bucketName: {
+					"/test/_headers": "/templates/index.html\n\tX-Frame-Options: DENY",
+				},
+			},
+		},
+		{
+			name:        "_pgs_ignore",
+			path:        "/_pgs_ignore",
+			want:        "404 not found",
+			status:      http.StatusNotFound,
+			contentType: "text/plain; charset=utf-8",
+
+			storage: map[string]map[string]string{
+				bucketName: {
+					"/test/_pgs_ignore": "# nothing",
+				},
+			},
+		},
+		{
 			name:        "not-found-custom",
 			path:        "/anything",
 			want:        "boom!",

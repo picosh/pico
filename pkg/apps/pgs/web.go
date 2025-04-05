@@ -426,6 +426,12 @@ func (web *WebRouter) ServeAsset(fname string, opts *storage.ImgProcessOpts, fro
 		"host", r.Host,
 	)
 
+	if fname == "_headers" || fname == "_redirects" || fname == "_pgs_ignore" {
+		logger.Info("special file names are not allowed to be served over http")
+		http.Error(w, "404 not found", http.StatusNotFound)
+		return
+	}
+
 	props, err := shared.GetProjectFromSubdomain(subdomain)
 	if err != nil {
 		logger.Info(
