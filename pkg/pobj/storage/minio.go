@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -190,9 +189,6 @@ func (s *StorageMinio) GetObject(bucket Bucket, fpath string) (utils.ReadAndRead
 		ETag:         "",
 	}
 
-	cacheKey := filepath.Join(bucket.Name, fpath)
-
-	s.Logger.Info("object info not found in lru cache", "key", cacheKey)
 	info, err := s.Client.StatObject(context.Background(), bucket.Name, fpath, minio.StatObjectOptions{})
 	if err != nil {
 		return nil, objInfo, err
