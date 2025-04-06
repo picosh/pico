@@ -13,15 +13,14 @@ import (
 
 type StorageMinio struct {
 	*sst.StorageMinio
-	Logger *slog.Logger
 }
 
 func NewStorageMinio(logger *slog.Logger, address, user, pass string) (*StorageMinio, error) {
-	st, err := sst.NewStorageMinio(address, user, pass)
+	st, err := sst.NewStorageMinio(logger, address, user, pass)
 	if err != nil {
 		return nil, err
 	}
-	return &StorageMinio{st, logger}, nil
+	return &StorageMinio{st}, nil
 }
 
 func (s *StorageMinio) ServeObject(bucket sst.Bucket, fpath string, opts *ImgProcessOpts) (io.ReadCloser, *sst.ObjectInfo, error) {

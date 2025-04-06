@@ -395,7 +395,7 @@ func (h *UploadAssetHandler) Write(s *pssh.SSHServerConnSession, entry *sendutil
 	)
 
 	specialFileMax := featureFlag.Data.SpecialFileMax
-	if isSpecialFile(entry) {
+	if isSpecialFile(entry.Filepath) {
 		sizeRemaining = min(sizeRemaining, specialFileMax)
 	}
 
@@ -441,9 +441,9 @@ func (h *UploadAssetHandler) Write(s *pssh.SSHServerConnSession, entry *sendutil
 	return str, err
 }
 
-func isSpecialFile(entry *sendutils.FileEntry) bool {
-	fname := filepath.Base(entry.Filepath)
-	return fname == "_headers" || fname == "_redirects"
+func isSpecialFile(entry string) bool {
+	fname := filepath.Base(entry)
+	return fname == "_headers" || fname == "_redirects" || fname == "_pgs_ignore"
 }
 
 func (h *UploadAssetHandler) Delete(s *pssh.SSHServerConnSession, entry *sendutils.FileEntry) error {
@@ -525,7 +525,7 @@ func (h *UploadAssetHandler) validateAsset(data *FileData) (bool, error) {
 	}
 
 	// special files we use for custom routing
-	if fname == "_pgs_ignore" || fname == "_redirects" || fname == "_headers" {
+	if isSpecialFile(fname) {
 		return true, nil
 	}
 

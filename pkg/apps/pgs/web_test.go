@@ -329,7 +329,7 @@ func TestApiBasic(t *testing.T) {
 
 			ct := responseRecorder.Header().Get("content-type")
 			if ct != tc.contentType {
-				t.Errorf("Want status '%s', got '%s'", tc.contentType, ct)
+				t.Errorf("Want content type '%s', got '%s'", tc.contentType, ct)
 			}
 
 			body := strings.TrimSpace(responseRecorder.Body.String())

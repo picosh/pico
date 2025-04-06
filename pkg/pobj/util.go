@@ -29,7 +29,7 @@ func EnvDriverDetector(logger *slog.Logger) (storage.ObjectStorage, error) {
 			"url", url,
 			"user", user,
 		)
-		return storage.NewStorageMinio(url, user, pass)
+		return storage.NewStorageMinio(logger, url, user, pass)
 	}
 
 	// implied driver == "fs"

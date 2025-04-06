@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -20,6 +21,8 @@ import (
 	"github.com/darkweak/souin/plugins/souin/storages"
 	"github.com/darkweak/storages/core"
 	"github.com/gorilla/feeds"
+	"github.com/hashicorp/golang-lru/v2/expirable"
+	"github.com/picosh/pico/pkg/cache"
 	"github.com/picosh/pico/pkg/db"
 	sst "github.com/picosh/pico/pkg/pobj/storage"
 	"github.com/picosh/pico/pkg/shared"
@@ -74,7 +77,7 @@ func StartApiServer(cfg *PgsConfig) {
 		routes:  routes,
 	}
 
-	go routes.cacheMgmt(ctx, httpCache)
+	go routes.cacheMgmt(ctx, httpCache, cfg.CacheClearingQueue)
 
 	portStr := fmt.Sprintf(":%s", cfg.WebPort)
 	cfg.Logger.Info(
@@ -92,17 +95,32 @@ func StartApiServer(cfg *PgsConfig) {
 type HasPerm = func(proj *db.Project) bool
 
 type WebRouter struct {
-	Cfg        *PgsConfig
-	RootRouter *http.ServeMux
-	UserRouter *http.ServeMux
+	Cfg            *PgsConfig
+	RootRouter     *http.ServeMux
+	UserRouter     *http.ServeMux
+	RedirectsCache *expirable.LRU[string, []*RedirectRule]
+	HeadersCache   *expirable.LRU[string, []*HeaderRule]
 }
 
 func NewWebRouter(cfg *PgsConfig) *WebRouter {
 	router := &WebRouter{
-		Cfg: cfg,
+		Cfg:            cfg,
+		RedirectsCache: expirable.NewLRU[string, []*RedirectRule](2048, nil, cache.CacheTimeout),
+		HeadersCache:   expirable.NewLRU[string, []*HeaderRule](2048, nil, cache.CacheTimeout),
 	}
 	router.initRouters()
+	go router.watchCacheClear()
 	return router
+}
+
+func (web *WebRouter) watchCacheClear() {
+	for key := range web.Cfg.CacheClearingQueue {
+		web.Cfg.Logger.Info("lru cache clear request", "key", key)
+		rKey := filepath.Join(key, "_redirects")
+		web.RedirectsCache.Remove(rKey)
+		hKey := filepath.Join(key, "_headers")
+		web.HeadersCache.Remove(hKey)
+	}
 }
 
 func (web *WebRouter) initRouters() {
@@ -259,7 +277,7 @@ func (web *WebRouter) checkHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotFound)
 }
 
-func (web *WebRouter) cacheMgmt(ctx context.Context, httpCache *middleware.SouinBaseHandler) {
+func (web *WebRouter) cacheMgmt(ctx context.Context, httpCache *middleware.SouinBaseHandler, notify chan string) {
 	storer := httpCache.Storers[0]
 	drain := createSubCacheDrain(ctx, web.Cfg.Logger)
 
@@ -269,6 +287,7 @@ func (web *WebRouter) cacheMgmt(ctx context.Context, httpCache *middleware.Souin
 		for scanner.Scan() {
 			surrogateKey := strings.TrimSpace(scanner.Text())
 			web.Cfg.Logger.Info("received cache-drain item", "surrogateKey", surrogateKey)
+			notify <- surrogateKey
 
 			if surrogateKey == "*" {
 				storer.DeleteMany(".+")
@@ -426,7 +445,7 @@ func (web *WebRouter) ServeAsset(fname string, opts *storage.ImgProcessOpts, fro
 		"host", r.Host,
 	)
 
-	if fname == "_headers" || fname == "_redirects" || fname == "_pgs_ignore" {
+	if isSpecialFile(fname) {
 		logger.Info("special file names are not allowed to be served over http")
 		http.Error(w, "404 not found", http.StatusNotFound)
 		return

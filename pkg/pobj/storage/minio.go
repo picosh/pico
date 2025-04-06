@@ -5,27 +5,45 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/hashicorp/golang-lru/v2/expirable"
 	"github.com/minio/madmin-go/v3"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+	"github.com/picosh/pico/pkg/cache"
 	"github.com/picosh/pico/pkg/send/utils"
 )
 
 type StorageMinio struct {
-	Client *minio.Client
-	Admin  *madmin.AdminClient
+	Client      *minio.Client
+	Admin       *madmin.AdminClient
+	BucketCache *expirable.LRU[string, CachedBucket]
+	Logger      *slog.Logger
 }
 
-var _ ObjectStorage = &StorageMinio{}
-var _ ObjectStorage = (*StorageMinio)(nil)
+type CachedBucket struct {
+	Bucket
+	Error error
+}
 
-func NewStorageMinio(address, user, pass string) (*StorageMinio, error) {
+type CachedObjectInfo struct {
+	*ObjectInfo
+	Error error
+}
+
+var (
+	_ ObjectStorage = &StorageMinio{}
+	_ ObjectStorage = (*StorageMinio)(nil)
+)
+
+func NewStorageMinio(logger *slog.Logger, address, user, pass string) (*StorageMinio, error) {
 	endpoint, err := url.Parse(address)
 	if err != nil {
 		return nil, err
@@ -52,13 +70,21 @@ func NewStorageMinio(address, user, pass string) (*StorageMinio, error) {
 	}
 
 	mini := &StorageMinio{
-		Client: mClient,
-		Admin:  aClient,
+		Client:      mClient,
+		Admin:       aClient,
+		BucketCache: expirable.NewLRU[string, CachedBucket](2048, nil, cache.CacheTimeout),
+		Logger:      logger,
 	}
 	return mini, err
 }
 
 func (s *StorageMinio) GetBucket(name string) (Bucket, error) {
+	if cachedBucket, found := s.BucketCache.Get(name); found {
+		s.Logger.Info("bucket found in lru cache", "name", name)
+		return cachedBucket.Bucket, cachedBucket.Error
+	}
+	s.Logger.Info("bucket not found in lru cache", "name", name)
+
 	bucket := Bucket{
 		Name: name,
 	}
@@ -68,8 +94,12 @@ func (s *StorageMinio) GetBucket(name string) (Bucket, error) {
 		if err == nil {
 			err = errors.New("bucket does not exist")
 		}
+
+		s.BucketCache.Add(name, CachedBucket{bucket, err})
 		return bucket, err
 	}
+
+	s.BucketCache.Add(name, CachedBucket{bucket, nil})
 
 	return bucket, nil
 }
@@ -160,6 +190,9 @@ func (s *StorageMinio) GetObject(bucket Bucket, fpath string) (utils.ReadAndRead
 		ETag:         "",
 	}
 
+	cacheKey := filepath.Join(bucket.Name, fpath)
+
+	s.Logger.Info("object info not found in lru cache", "key", cacheKey)
 	info, err := s.Client.StatObject(context.Background(), bucket.Name, fpath, minio.StatObjectOptions{})
 	if err != nil {
 		return nil, objInfo, err
@@ -171,16 +204,16 @@ func (s *StorageMinio) GetObject(bucket Bucket, fpath string) (utils.ReadAndRead
 	objInfo.UserMetadata = info.UserMetadata
 	objInfo.Size = info.Size
 
-	obj, err := s.Client.GetObject(context.Background(), bucket.Name, fpath, minio.GetObjectOptions{})
-	if err != nil {
-		return nil, objInfo, err
-	}
-
 	if mtime, ok := info.UserMetadata["Mtime"]; ok {
 		mtimeUnix, err := strconv.Atoi(mtime)
 		if err == nil {
 			objInfo.LastModified = time.Unix(int64(mtimeUnix), 0)
 		}
+	}
+
+	obj, err := s.Client.GetObject(context.Background(), bucket.Name, fpath, minio.GetObjectOptions{})
+	if err != nil {
+		return nil, objInfo, err
 	}
 
 	return obj, objInfo, nil

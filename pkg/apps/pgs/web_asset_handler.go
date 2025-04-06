@@ -41,28 +41,39 @@ func hasProtocol(url string) bool {
 func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	logger := h.Logger
 	var redirects []*RedirectRule
-	redirectFp, redirectInfo, err := h.Cfg.Storage.GetObject(h.Bucket, filepath.Join(h.ProjectDir, "_redirects"))
-	if err == nil {
-		defer redirectFp.Close()
-		if redirectInfo != nil && redirectInfo.Size > h.Cfg.MaxSpecialFileSize {
-			errMsg := fmt.Sprintf("_redirects file is too large (%d > %d)", redirectInfo.Size, h.Cfg.MaxSpecialFileSize)
-			logger.Error(errMsg)
-			http.Error(w, errMsg, http.StatusInternalServerError)
-			return
-		}
-		buf := new(strings.Builder)
-		lr := io.LimitReader(redirectFp, h.Cfg.MaxSpecialFileSize)
-		_, err := io.Copy(buf, lr)
-		if err != nil {
-			logger.Error("io copy", "err", err.Error())
-			http.Error(w, "cannot read _redirects file", http.StatusInternalServerError)
-			return
+
+	redirectsCacheKey := filepath.Join(getSurrogateKey(h.UserID, h.ProjectDir), "_redirects")
+	logger.Info("looking for _redirects in lru cache", "key", redirectsCacheKey)
+	if cachedRedirects, found := h.RedirectsCache.Get(redirectsCacheKey); found {
+		logger.Info("_redirects found in lru cache", "key", redirectsCacheKey)
+		redirects = cachedRedirects
+	} else {
+		logger.Info("_redirects not found in lru cache", "key", redirectsCacheKey)
+		redirectFp, redirectInfo, err := h.Cfg.Storage.GetObject(h.Bucket, filepath.Join(h.ProjectDir, "_redirects"))
+		if err == nil {
+			defer redirectFp.Close()
+			if redirectInfo != nil && redirectInfo.Size > h.Cfg.MaxSpecialFileSize {
+				errMsg := fmt.Sprintf("_redirects file is too large (%d > %d)", redirectInfo.Size, h.Cfg.MaxSpecialFileSize)
+				logger.Error(errMsg)
+				http.Error(w, errMsg, http.StatusInternalServerError)
+				return
+			}
+			buf := new(strings.Builder)
+			lr := io.LimitReader(redirectFp, h.Cfg.MaxSpecialFileSize)
+			_, err := io.Copy(buf, lr)
+			if err != nil {
+				logger.Error("io copy", "err", err.Error())
+				http.Error(w, "cannot read _redirects file", http.StatusInternalServerError)
+				return
+			}
+
+			redirects, err = parseRedirectText(buf.String())
+			if err != nil {
+				logger.Error("could not parse redirect text", "err", err.Error())
+			}
 		}
 
-		redirects, err = parseRedirectText(buf.String())
-		if err != nil {
-			logger.Error("could not parse redirect text", "err", err.Error())
-		}
+		h.RedirectsCache.Add(redirectsCacheKey, redirects)
 	}
 
 	routes := calcRoutes(h.ProjectDir, h.Filepath, redirects)
@@ -163,28 +174,39 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer contents.Close()
 
 	var headers []*HeaderRule
-	headersFp, headersInfo, err := h.Cfg.Storage.GetObject(h.Bucket, filepath.Join(h.ProjectDir, "_headers"))
-	if err == nil {
-		defer headersFp.Close()
-		if headersInfo != nil && headersInfo.Size > h.Cfg.MaxSpecialFileSize {
-			errMsg := fmt.Sprintf("_headers file is too large (%d > %d)", headersInfo.Size, h.Cfg.MaxSpecialFileSize)
-			logger.Error(errMsg)
-			http.Error(w, errMsg, http.StatusInternalServerError)
-			return
-		}
-		buf := new(strings.Builder)
-		lr := io.LimitReader(headersFp, h.Cfg.MaxSpecialFileSize)
-		_, err := io.Copy(buf, lr)
-		if err != nil {
-			logger.Error("io copy", "err", err.Error())
-			http.Error(w, "cannot read _headers file", http.StatusInternalServerError)
-			return
+
+	headersCacheKey := filepath.Join(getSurrogateKey(h.UserID, h.ProjectDir), "_headers")
+	logger.Info("looking for _headers in lru cache", "key", headersCacheKey)
+	if cachedHeaders, found := h.HeadersCache.Get(headersCacheKey); found {
+		logger.Info("_headers found in lru", "key", headersCacheKey)
+		headers = cachedHeaders
+	} else {
+		logger.Info("_headers not found in lru cache", "key", headersCacheKey)
+		headersFp, headersInfo, err := h.Cfg.Storage.GetObject(h.Bucket, filepath.Join(h.ProjectDir, "_headers"))
+		if err == nil {
+			defer headersFp.Close()
+			if headersInfo != nil && headersInfo.Size > h.Cfg.MaxSpecialFileSize {
+				errMsg := fmt.Sprintf("_headers file is too large (%d > %d)", headersInfo.Size, h.Cfg.MaxSpecialFileSize)
+				logger.Error(errMsg)
+				http.Error(w, errMsg, http.StatusInternalServerError)
+				return
+			}
+			buf := new(strings.Builder)
+			lr := io.LimitReader(headersFp, h.Cfg.MaxSpecialFileSize)
+			_, err := io.Copy(buf, lr)
+			if err != nil {
+				logger.Error("io copy", "err", err.Error())
+				http.Error(w, "cannot read _headers file", http.StatusInternalServerError)
+				return
+			}
+
+			headers, err = parseHeaderText(buf.String())
+			if err != nil {
+				logger.Error("could not parse header text", "err", err.Error())
+			}
 		}
 
-		headers, err = parseHeaderText(buf.String())
-		if err != nil {
-			logger.Error("could not parse header text", "err", err.Error())
-		}
+		h.HeadersCache.Add(headersCacheKey, headers)
 	}
 
 	userHeaders := []*HeaderLine{}
@@ -236,7 +258,7 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(status)
-	_, err = io.Copy(w, contents)
+	_, err := io.Copy(w, contents)
 
 	if err != nil {
 		logger.Error("io copy", "err", err.Error())

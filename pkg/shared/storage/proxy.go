@@ -166,6 +166,7 @@ type ImgProcessOpts struct {
 	Ratio   *Ratio
 	Rotate  int
 	Ext     string
+	NoRaw   bool
 }
 
 func (img *ImgProcessOpts) String() string {
@@ -202,6 +203,10 @@ func (img *ImgProcessOpts) String() string {
 	// https://docs.imgproxy.net/usage/processing#format
 	if img.Ext != "" {
 		processOpts = fmt.Sprintf("%s/ext:%s", processOpts, img.Ext)
+	}
+
+	if processOpts == "" && !img.NoRaw {
+		processOpts = fmt.Sprintf("%s/raw:true", processOpts)
 	}
 
 	return processOpts
