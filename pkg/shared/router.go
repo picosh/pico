@@ -10,6 +10,8 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/hashicorp/golang-lru/v2/expirable"
+	"github.com/picosh/pico/pkg/cache"
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/pssh"
 	"github.com/picosh/pico/pkg/shared/storage"
@@ -211,15 +213,24 @@ func GetSubdomain(r *http.Request) string {
 	return r.Context().Value(CtxSubdomainKey{}).(string)
 }
 
+var txtCache = expirable.NewLRU[string, string](2048, nil, cache.CacheTimeout)
+
 func GetCustomDomain(host string, space string) string {
 	txt := fmt.Sprintf("_%s.%s", space, host)
+	record, found := txtCache.Get(txt)
+	if found {
+		return record
+	}
+
 	records, err := net.LookupTXT(txt)
 	if err != nil {
 		return ""
 	}
 
 	for _, v := range records {
-		return strings.TrimSpace(v)
+		rec := strings.TrimSpace(v)
+		txtCache.Add(txt, rec)
+		return rec
 	}
 
 	return ""
