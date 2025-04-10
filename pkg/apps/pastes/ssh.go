@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/picosh/pico/pkg/db/postgres"
 	"github.com/picosh/pico/pkg/filehandlers"
@@ -60,7 +61,7 @@ func StartSshServer() {
 			scp.Middleware(handler),
 			rsync.Middleware(handler),
 			auth.Middleware(handler),
-			pssh.PtyMdw(pssh.DeprecatedNotice()),
+			pssh.PtyMdw(pssh.DeprecatedNotice(), 200*time.Millisecond),
 			pssh.LogMiddleware(handler, dbh),
 		},
 		[]pssh.SSHServerMiddleware{

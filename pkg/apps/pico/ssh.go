@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"git.sr.ht/~rockorager/vaxis"
 	"github.com/picosh/pico/pkg/db/postgres"
@@ -98,7 +99,7 @@ func StartSshServer() {
 						Dbpool:  handler.DBPool,
 						Logger:  cfg.Logger,
 					}
-					return pssh.PtyMdw(createTui(shrd))(next)(sesh)
+					return pssh.PtyMdw(createTui(shrd), 200*time.Millisecond)(next)(sesh)
 				}
 			},
 			Middleware(cliHandler),

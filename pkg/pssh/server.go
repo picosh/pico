@@ -614,7 +614,8 @@ func NewSSHServerWithConfig(
 	app, host, port, promPort, hostKey string,
 	pubKeyAuthHandler PubKeyAuthHandler,
 	middleware, subsystemMiddleware []SSHServerMiddleware,
-	channelMiddleware map[string]SSHServerChannelMiddleware) (*SSHServer, error) {
+	channelMiddleware map[string]SSHServerChannelMiddleware,
+) (*SSHServer, error) {
 	server := NewSSHServer(ctx, logger, &SSHServerConfig{
 		App:        app,
 		ListenAddr: fmt.Sprintf("%s:%s", host, port),

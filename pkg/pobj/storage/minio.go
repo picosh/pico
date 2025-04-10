@@ -82,6 +82,7 @@ func (s *StorageMinio) GetBucket(name string) (Bucket, error) {
 		s.Logger.Info("bucket found in lru cache", "name", name)
 		return cachedBucket.Bucket, cachedBucket.Error
 	}
+
 	s.Logger.Info("bucket not found in lru cache", "name", name)
 
 	bucket := Bucket{
@@ -113,6 +114,8 @@ func (s *StorageMinio) UpsertBucket(name string) (Bucket, error) {
 	if err != nil {
 		return bucket, err
 	}
+
+	s.BucketCache.Remove(name)
 
 	return bucket, nil
 }
