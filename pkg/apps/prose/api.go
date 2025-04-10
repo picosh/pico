@@ -481,6 +481,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			Footer:       footerHTML,
 			Contents:     contents,
 			Unlisted:     true,
+			WithStyles:   withStyles,
 		}
 		w.WriteHeader(http.StatusNotFound)
 	}
