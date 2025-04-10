@@ -76,7 +76,13 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.RedirectsCache.Add(redirectsCacheKey, redirects)
 	}
 
-	routes := calcRoutes(h.ProjectDir, h.Filepath, redirects)
+	fpath := h.Filepath
+	if isSpecialFile(fpath) {
+		logger.Info("special file names are not allowed to be served over http")
+		fpath = "404.html"
+	}
+
+	routes := calcRoutes(h.ProjectDir, fpath, redirects)
 
 	var contents io.ReadCloser
 	assetFilepath := ""
