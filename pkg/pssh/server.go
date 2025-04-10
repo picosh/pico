@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/subtle"
+	"encoding/base64"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -17,6 +18,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/antoniomika/syncmap"
 	"github.com/prometheus/client_golang/prometheus"
@@ -485,6 +487,8 @@ func NewSSHServer(ctx context.Context, logger *slog.Logger, config *SSHServerCon
 								return
 							}
 
+							command := "shell"
+
 							if len(req.Payload) > 0 {
 								var payload = struct{ Value string }{}
 								err := ssh.Unmarshal(req.Payload, &payload)
@@ -494,15 +498,21 @@ func NewSSHServer(ctx context.Context, logger *slog.Logger, config *SSHServerCon
 									return
 								}
 
-								if sc.SSHServer.Config.PromListenAddr != "" {
-									sc.SSHServer.SessionsCreated.WithLabelValues(payload.Value).Inc()
-									defer func() {
-										sc.SSHServer.SessionsFinished.WithLabelValues(payload.Value).Inc()
-										sc.SSHServer.SessionsDuration.WithLabelValues(payload.Value).Add(time.Since(sc.Start).Seconds())
-									}()
-								}
+								command = payload.Value
 
 								sesh.SetValue("command", strings.Fields(payload.Value))
+							}
+
+							if !utf8.ValidString(command) {
+								command = base64.StdEncoding.EncodeToString([]byte(command))
+							}
+
+							if sc.SSHServer.Config.PromListenAddr != "" {
+								sc.SSHServer.SessionsCreated.WithLabelValues(command).Inc()
+								defer func() {
+									sc.SSHServer.SessionsFinished.WithLabelValues(command).Inc()
+									sc.SSHServer.SessionsDuration.WithLabelValues(command).Add(time.Since(sc.Start).Seconds())
+								}()
 							}
 
 							h := func(*SSHServerConnSession) error { return nil }
