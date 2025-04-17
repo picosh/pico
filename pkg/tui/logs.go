@@ -124,10 +124,13 @@ func (m *LogsPage) getWidget(i uint, cursor uint) vxfw.Widget {
 
 func (m *LogsPage) connectToLogs() error {
 	ctx, cancel := context.WithCancel(m.shared.Session.Context())
+	defer cancel()
+
 	m.ctx = ctx
 	m.done = cancel
+
 	conn := shared.NewPicoPipeClient()
-	drain, err := pipeLogger.ReadLogs(m.ctx, m.shared.Logger, conn)
+	drain, err := pipeLogger.ReadLogs(ctx, m.shared.Logger, conn)
 	if err != nil {
 		return err
 	}
@@ -149,6 +152,11 @@ func (m *LogsPage) connectToLogs() error {
 		if user == m.shared.User.Name || userId == m.shared.User.ID {
 			m.shared.App.PostEvent(LogLineLoaded{parsedData})
 		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		m.shared.Logger.Error("scanner error", "err", err)
+		return err
 	}
 
 	return nil

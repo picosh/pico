@@ -61,6 +61,26 @@ func (c *Cmd) logs(ctx context.Context) error {
 		return err
 	}
 
+	logChan := make(chan string)
+	defer close(logChan)
+
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case log, ok := <-logChan:
+				if log == "" {
+					continue
+				}
+				if !ok {
+					return
+				}
+				fmt.Fprintln(c.SshSession, log)
+			}
+		}
+	}()
+
 	scanner := bufio.NewScanner(stdoutPipe)
 	scanner.Buffer(make([]byte, 32*1024), 32*1024)
 	for scanner.Scan() {
@@ -76,7 +96,14 @@ func (c *Cmd) logs(ctx context.Context) error {
 		user := utils.AnyToStr(parsedData, "user")
 		userId := utils.AnyToStr(parsedData, "userId")
 		if user == c.User.Name || userId == c.User.ID {
-			fmt.Fprintln(c.SshSession, line)
+			select {
+			case logChan <- line:
+			case <-ctx.Done():
+				return nil
+			default:
+				c.Log.Error("logChan is full, dropping log", "log", line)
+				continue
+			}
 		}
 	}
 	return scanner.Err()
