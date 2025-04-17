@@ -174,10 +174,13 @@ func (m *TunsPage) getEventLogWidget(i uint, cursor uint) vxfw.Widget {
 
 func (m *TunsPage) connectToLogs() error {
 	ctx, cancel := context.WithCancel(m.shared.Session.Context())
+	defer cancel()
+
 	m.ctx = ctx
 	m.done = cancel
+
 	conn := shared.NewPicoPipeClient()
-	drain, err := pipe.Sub(m.ctx, m.shared.Logger, conn, "sub tuns-result-drain -k")
+	drain, err := pipe.Sub(ctx, m.shared.Logger, conn, "sub tuns-result-drain -k")
 	if err != nil {
 		return err
 	}
@@ -213,6 +216,11 @@ func (m *TunsPage) connectToLogs() error {
 		if (m.isAdmin || isUser) && parsedData.TunnelID == selected {
 			m.shared.App.PostEvent(ResultLogLineLoaded{parsedData})
 		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		m.shared.Logger.Error("scanner error", "err", err)
+		return err
 	}
 
 	return nil
