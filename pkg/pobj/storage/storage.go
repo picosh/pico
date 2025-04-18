@@ -33,5 +33,4 @@ type ObjectInfo struct {
 	LastModified time.Time
 	ETag         string
 	Metadata     http.Header
-	UserMetadata map[string]string
 }
