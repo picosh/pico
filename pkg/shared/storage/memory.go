@@ -6,6 +6,7 @@ import (
 	"time"
 
 	sst "github.com/picosh/pico/pkg/pobj/storage"
+	"github.com/picosh/pico/pkg/shared/mime"
 )
 
 type StorageMemory struct {
@@ -32,7 +33,7 @@ func (s *StorageMemory) ServeObject(bucket sst.Bucket, fpath string, opts *ImgPr
 	if info.ETag == "" {
 		info.ETag = "static-etag-for-testing-purposes"
 	}
-	mimeType := GetMimeType(fpath)
+	mimeType := mime.GetMimeType(fpath)
 	info.Metadata.Set("content-type", mimeType)
 	return obj, info, err
 }
