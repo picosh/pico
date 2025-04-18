@@ -200,7 +200,6 @@ func (s *StorageMinio) GetObject(bucket Bucket, fpath string) (utils.ReadAndRead
 	objInfo.LastModified = info.LastModified
 	objInfo.ETag = info.ETag
 	objInfo.Metadata = info.Metadata
-	objInfo.UserMetadata = info.UserMetadata
 	objInfo.Size = info.Size
 
 	if mtime, ok := info.UserMetadata["Mtime"]; ok {

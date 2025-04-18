@@ -97,7 +97,6 @@ func (s *StorageFS) GetObject(bucket Bucket, fpath string) (utils.ReadAndReaderA
 	objInfo := &ObjectInfo{
 		LastModified: time.Time{},
 		Metadata:     nil,
-		UserMetadata: map[string]string{},
 	}
 
 	dat, err := os.Open(filepath.Join(bucket.Path, fpath))
