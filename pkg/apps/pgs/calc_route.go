@@ -10,7 +10,7 @@ import (
 
 	"github.com/picosh/pico/pkg/send/utils"
 	"github.com/picosh/pico/pkg/shared"
-	"github.com/picosh/pico/pkg/shared/storage"
+	"github.com/picosh/pico/pkg/shared/mime"
 )
 
 type HttpReply struct {
@@ -23,7 +23,7 @@ func expandRoute(projectName, fp string, status int) []*HttpReply {
 	if fp == "" {
 		fp = "/"
 	}
-	mimeType := storage.GetMimeType(fp)
+	mimeType := mime.GetMimeType(fp)
 	fname := filepath.Base(fp)
 	fdir := filepath.Dir(fp)
 	fext := filepath.Ext(fp)

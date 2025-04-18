@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	sst "github.com/picosh/pico/pkg/pobj/storage"
+	"github.com/picosh/pico/pkg/shared/mime"
 )
 
 type StorageFS struct {
@@ -28,7 +29,7 @@ func (s *StorageFS) ServeObject(bucket sst.Bucket, fpath string, opts *ImgProces
 	var rc io.ReadCloser
 	info := &sst.ObjectInfo{}
 	var err error
-	mimeType := GetMimeType(fpath)
+	mimeType := mime.GetMimeType(fpath)
 	if !strings.HasPrefix(mimeType, "image/") || opts == nil || os.Getenv("IMGPROXY_URL") == "" {
 		rc, info, err = s.GetObject(bucket, fpath)
 		if info.Metadata == nil {
