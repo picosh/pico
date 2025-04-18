@@ -5,6 +5,7 @@ import (
 	"io"
 	"io/fs"
 	"log/slog"
+	"net/http"
 	"os"
 	"path"
 	"path/filepath"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/picosh/pico/pkg/send/utils"
+	"github.com/picosh/pico/pkg/shared/mime"
 )
 
 // https://stackoverflow.com/a/32482941
@@ -96,7 +98,7 @@ func (s *StorageFS) DeleteBucket(bucket Bucket) error {
 func (s *StorageFS) GetObject(bucket Bucket, fpath string) (utils.ReadAndReaderAtCloser, *ObjectInfo, error) {
 	objInfo := &ObjectInfo{
 		LastModified: time.Time{},
-		Metadata:     nil,
+		Metadata:     make(http.Header),
 	}
 
 	dat, err := os.Open(filepath.Join(bucket.Path, fpath))
@@ -111,6 +113,7 @@ func (s *StorageFS) GetObject(bucket Bucket, fpath string) (utils.ReadAndReaderA
 
 	objInfo.Size = info.Size()
 	objInfo.LastModified = info.ModTime()
+	objInfo.Metadata.Set("content-type", mime.GetMimeType(fpath))
 	return dat, objInfo, nil
 }
 
@@ -146,6 +149,10 @@ func (s *StorageFS) DeleteObject(bucket Bucket, fpath string) error {
 	if err != nil {
 		return err
 	}
+
+	// try to remove dir if it is empty
+	dir := filepath.Dir(loc)
+	_ = os.Remove(dir)
 
 	return nil
 }
