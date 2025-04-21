@@ -76,7 +76,7 @@ func (s *StorageFS) UpsertBucket(name string) (Bucket, error) {
 		return bucket, nil
 	}
 
-	dir := filepath.Join(s.Dir, bucket.Path)
+	dir := filepath.Join(s.Dir, name)
 	s.Logger.Info("bucket not found, creating", "dir", dir, "err", err)
 	err = os.MkdirAll(dir, os.ModePerm)
 	if err != nil {
@@ -91,6 +91,8 @@ func (s *StorageFS) GetBucketQuota(bucket Bucket) (uint64, error) {
 	return uint64(dsize), err
 }
 
+// DeleteBucket will delete all contents regardless if files exist inside of it.
+// This is different from minio impl which requires all files be deleted first.
 func (s *StorageFS) DeleteBucket(bucket Bucket) error {
 	return os.RemoveAll(bucket.Path)
 }
@@ -150,15 +152,34 @@ func (s *StorageFS) DeleteObject(bucket Bucket, fpath string) error {
 		return err
 	}
 
-	// try to remove dir if it is empty
+	// traverse up the folder tree and remove all empty folders
 	dir := filepath.Dir(loc)
-	_ = os.Remove(dir)
+	for dir != "" {
+		err = os.Remove(dir)
+		if err != nil {
+			break
+		}
+		fp := strings.Split(dir, "/")
+		dir = "/" + filepath.Join(fp[:len(fp)-1]...)
+	}
 
 	return nil
 }
 
 func (s *StorageFS) ListBuckets() ([]string, error) {
-	return []string{}, fmt.Errorf("not implemented")
+	entries, err := os.ReadDir(s.Dir)
+	if err != nil {
+		return []string{}, err
+	}
+
+	buckets := []string{}
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		buckets = append(buckets, e.Name())
+	}
+	return buckets, nil
 }
 
 func (s *StorageFS) ListObjects(bucket Bucket, dir string, recursive bool) ([]os.FileInfo, error) {
