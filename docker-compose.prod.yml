@@ -275,6 +275,11 @@ services:
       - .env.prod
     volumes:
       - ./data/feeds-ssh/data:/app/ssh_data
+    logging:
+      driver: "json-file"
+      options:
+        max-file: "3"
+        max-size: "1024m"
   feeds-ssh:
     networks:
       feeds:
@@ -287,6 +292,11 @@ services:
     ports:
       - "${FEEDS_SSH_V4:-22}:2222"
       - "${FEEDS_SSH_V6:-[::1]:22}:2222"
+    logging:
+      driver: "json-file"
+      options:
+        max-file: "3"
+        max-size: "1024m"
   pico-caddy:
     image: ghcr.io/picosh/pico/caddy:latest
     restart: always
