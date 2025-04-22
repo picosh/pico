@@ -831,14 +831,13 @@ func StartApiServer() {
 	db := postgres.NewDB(cfg.DbURL, logger)
 	defer db.Close()
 
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	// gather metrics in the auth service
 	go metricDrainSub(ctx, db, logger, cfg.Secret)
 	// gather connect/disconnect logs from tuns
 	go tunsEventLogDrainSub(ctx, db, logger, cfg.Secret)
-
-	defer ctx.Done()
 
 	apiConfig := &shared.ApiConfig{
 		Cfg:    cfg,

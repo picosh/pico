@@ -14,6 +14,7 @@ import (
 	pgsdb "github.com/picosh/pico/pkg/apps/pgs/db"
 	"github.com/picosh/pico/pkg/db"
 	sst "github.com/picosh/pico/pkg/pobj/storage"
+	"github.com/picosh/pico/pkg/pssh"
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/utils"
 )
@@ -507,11 +508,22 @@ func (c *Cmd) cache(projectName string) error {
 		"user", c.User.Name,
 		"project", projectName,
 	)
+
 	c.output(fmt.Sprintf("clearing http cache for %s", projectName))
-	ctx := context.Background()
-	defer ctx.Done()
-	send := createPubCacheDrain(ctx, c.Log)
+
 	if c.Write {
+		var ctx context.Context
+		if s, ok := c.Session.(*pssh.SSHServerConnSession); ok {
+			ctx = s.Context()
+		} else {
+			ctx = context.Background()
+		}
+
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+
+		send := createPubCacheDrain(ctx, c.Log)
+
 		surrogate := getSurrogateKey(c.User.Name, projectName)
 		return purgeCache(c.Cfg, send, surrogate)
 	}
@@ -537,8 +549,16 @@ func (c *Cmd) cacheAll() error {
 	)
 	c.output("clearing http cache for all sites")
 	if c.Write {
-		ctx := context.Background()
-		defer ctx.Done()
+		var ctx context.Context
+		if s, ok := c.Session.(*pssh.SSHServerConnSession); ok {
+			ctx = s.Context()
+		} else {
+			ctx = context.Background()
+		}
+
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+
 		send := createPubCacheDrain(ctx, c.Log)
 		return purgeAllCache(c.Cfg, send)
 	}
