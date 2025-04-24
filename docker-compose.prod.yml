@@ -35,6 +35,11 @@ services:
       - .env.prod
     volumes:
       - ./data/pipemgr/data/term_info_ed25519:/key:ro
+    logging:
+      driver: "json-file"
+      options:
+        max-file: "3"
+        max-size: "1024m"
   imgproxy:
     env_file:
       - .env.prod
@@ -210,6 +215,11 @@ services:
       - pgs
       - caddy
       - all
+    logging:
+      driver: "json-file"
+      options:
+        max-file: "3"
+        max-size: "1024m"
   pgs-web:
     dns: 1.1.1.1
     networks:
@@ -225,6 +235,11 @@ services:
       resources:
         limits:
           memory: 3g
+    logging:
+      driver: "json-file"
+      options:
+        max-file: "3"
+        max-size: "1024m"
   pgs-ssh:
     networks:
       pgs:
@@ -243,6 +258,11 @@ services:
       resources:
         limits:
           memory: 3g
+    logging:
+      driver: "json-file"
+      options:
+        max-file: "3"
+        max-size: "1024m"
   feeds-caddy:
     image: ghcr.io/picosh/pico/caddy:latest
     restart: always
@@ -320,6 +340,11 @@ services:
       - pico
       - caddy
       - all
+    logging:
+      driver: "json-file"
+      options:
+        max-file: "3"
+        max-size: "1024m"
   pico-ssh:
     networks:
       pico:
