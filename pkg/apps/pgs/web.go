@@ -143,8 +143,8 @@ func (web *WebRouter) initRouters() {
 
 	// subdomain or custom domains
 	userRouter := http.NewServeMux()
-	userRouter.HandleFunc("GET /{fname...}", web.AssetRequest)
-	userRouter.HandleFunc("GET /{$}", web.AssetRequest)
+	userRouter.HandleFunc("GET /{fname...}", web.AssetRequest(WebPerm))
+	userRouter.HandleFunc("GET /{$}", web.AssetRequest(WebPerm))
 	web.UserRouter = userRouter
 }
 
@@ -397,42 +397,46 @@ func (web *WebRouter) createRssHandler(by string) http.HandlerFunc {
 	}
 }
 
-func (web *WebRouter) Perm(proj *db.Project) bool {
+func WebPerm(proj *db.Project) bool {
 	return proj.Acl.Type == "public" || proj.Acl.Type == ""
 }
 
 var imgRegex = regexp.MustCompile("(.+.(?:jpg|jpeg|png|gif|webp|svg))(/.+)")
 
-func (web *WebRouter) AssetRequest(w http.ResponseWriter, r *http.Request) {
-	fname := r.PathValue("fname")
-	if imgRegex.MatchString(fname) {
-		web.ImageRequest(w, r)
-		return
+func (web *WebRouter) AssetRequest(perm func(proj *db.Project) bool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		fname := r.PathValue("fname")
+		if imgRegex.MatchString(fname) {
+			web.ImageRequest(perm)(w, r)
+			return
+		}
+		web.ServeAsset(fname, nil, false, perm, w, r)
 	}
-	web.ServeAsset(fname, nil, false, web.Perm, w, r)
 }
 
-func (web *WebRouter) ImageRequest(w http.ResponseWriter, r *http.Request) {
-	rawname := r.PathValue("fname")
-	matches := imgRegex.FindStringSubmatch(rawname)
-	fname := rawname
-	imgOpts := ""
-	if len(matches) >= 2 {
-		fname = matches[1]
-	}
-	if len(matches) >= 3 {
-		imgOpts = matches[2]
-	}
+func (web *WebRouter) ImageRequest(perm func(proj *db.Project) bool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		rawname := r.PathValue("fname")
+		matches := imgRegex.FindStringSubmatch(rawname)
+		fname := rawname
+		imgOpts := ""
+		if len(matches) >= 2 {
+			fname = matches[1]
+		}
+		if len(matches) >= 3 {
+			imgOpts = matches[2]
+		}
 
-	opts, err := storage.UriToImgProcessOpts(imgOpts)
-	if err != nil {
-		errMsg := fmt.Sprintf("error processing img options: %s", err.Error())
-		web.Cfg.Logger.Error("error processing img options", "err", errMsg)
-		http.Error(w, errMsg, http.StatusUnprocessableEntity)
-		return
-	}
+		opts, err := storage.UriToImgProcessOpts(imgOpts)
+		if err != nil {
+			errMsg := fmt.Sprintf("error processing img options: %s", err.Error())
+			web.Cfg.Logger.Error("error processing img options", "err", errMsg)
+			http.Error(w, errMsg, http.StatusUnprocessableEntity)
+			return
+		}
 
-	web.ServeAsset(fname, opts, false, web.Perm, w, r)
+		web.ServeAsset(fname, opts, false, perm, w, r)
+	}
 }
 
 func (web *WebRouter) ServeAsset(fname string, opts *storage.ImgProcessOpts, fromImgs bool, hasPerm HasPerm, w http.ResponseWriter, r *http.Request) {
@@ -502,6 +506,7 @@ func (web *WebRouter) ServeAsset(fname string, opts *storage.ImgProcessOpts, fro
 		projectID = project.ID
 		projectDir = project.ProjectDir
 		if !hasPerm(project) {
+			logger.Error("You do not have access to this site")
 			http.Error(w, "You do not have access to this site", http.StatusUnauthorized)
 			return
 		}

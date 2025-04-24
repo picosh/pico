@@ -1,6 +1,7 @@
 package tunkit
 
 import (
+	"context"
 	"errors"
 	"io"
 	"log/slog"
@@ -51,9 +52,12 @@ func LocalForwardHandler(handler Tunnel) pssh.SSHServerChannelMiddleware {
 			return err
 		}
 
+		origCtx, cancel := context.WithCancel(context.Background())
 		ctx := &pssh.SSHServerConnSession{
 			Channel:       ch,
 			SSHServerConn: sc,
+			Ctx:           origCtx,
+			CancelFunc:    cancel,
 		}
 
 		go ssh.DiscardRequests(reqs)

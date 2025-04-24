@@ -19,12 +19,12 @@ type TunnelWebRouter struct {
 
 func (web *TunnelWebRouter) InitRouter() {
 	router := http.NewServeMux()
-	router.HandleFunc("GET /{fname...}", web.AssetRequest)
-	router.HandleFunc("GET /{$}", web.AssetRequest)
+	router.HandleFunc("GET /{fname...}", web.AssetRequest(tunnelPerm))
+	router.HandleFunc("GET /{$}", web.AssetRequest(tunnelPerm))
 	web.UserRouter = router
 }
 
-func (web *TunnelWebRouter) Perm(proj *db.Project) bool {
+func tunnelPerm(proj *db.Project) bool {
 	return true
 }
 
@@ -128,7 +128,7 @@ func createHttpHandler(cfg *PgsConfig) CtxHttpBridge {
 
 		routes := NewWebRouter(cfg)
 		tunnelRouter := TunnelWebRouter{routes, subdomain}
-		tunnelRouter.initRouters()
+		tunnelRouter.InitRouter()
 		return &tunnelRouter
 	}
 }
