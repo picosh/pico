@@ -645,6 +645,11 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 	curl := shared.CreateURLFromRequest(cfg, r)
 	blogUrl := cfg.FullBlogURL(curl, username)
 
+	updatedAt := &time.Time{}
+	if len(posts) > 0 {
+		updatedAt = posts[0].PublishAt
+	}
+
 	feed := &feeds.Feed{
 		Id:          blogUrl,
 		Title:       headerTxt.Title,
@@ -652,6 +657,7 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 		Description: headerTxt.Bio,
 		Author:      &feeds.Author{Name: username},
 		Created:     *user.CreatedAt,
+		Updated:     *updatedAt,
 	}
 
 	var feedItems []*feeds.Item
@@ -690,8 +696,8 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 			Title:       utils.FilenameToTitle(post.Filename, post.Title),
 			Link:        &feeds.Link{Href: realUrl},
 			Content:     tpl.String(),
-			Updated:     *post.UpdatedAt,
-			Created:     *post.CreatedAt,
+			Updated:     *post.PublishAt,
+			Created:     *post.PublishAt,
 			Description: post.Description,
 		}
 

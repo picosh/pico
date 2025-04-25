@@ -108,11 +108,16 @@ func (m *PubkeysPage) getWidget(i uint, cursor uint) vxfw.Widget {
 		return nil
 	}
 
+	keyStr := pubkey.Key[0:25] + "..." + pubkey.Key[len(pubkey.Key)-15:]
+
 	txt := richtext.New([]vaxis.Segment{
 		{Text: "Name: ", Style: style},
 		{Text: pubkey.Name + "\n"},
 
 		{Text: "Key: ", Style: style},
+		{Text: keyStr + "\n"},
+
+		{Text: "Sha: ", Style: style},
 		{Text: ssh.FingerprintSHA256(key) + "\n"},
 
 		{Text: "Created: ", Style: style},
