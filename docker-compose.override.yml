@@ -11,6 +11,13 @@ services:
     ports:
       - "9000:9000"
       - "9001:9001"
+  garage:
+    env_file:
+      - .env.example
+    ports:
+      - "3900-3904:3900-3904"
+    tmpfs:
+      - /data
   imgproxy:
     env_file:
       - .env.example

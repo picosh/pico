@@ -21,6 +21,7 @@ toolchain go1.24.0
 // replace git.sr.ht/~rockorager/vaxis => ../../vaxis
 
 require (
+	git.deuxfleurs.fr/garage-sdk/garage-admin-sdk-golang v0.0.0-20250305093803-0806b8639fd3
 	git.sr.ht/~delthas/senpai v0.4.0
 	git.sr.ht/~rockorager/vaxis v0.13.0
 	github.com/alecthomas/chroma/v2 v2.15.0

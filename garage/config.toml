@@ -1,0 +1,15 @@
+metadata_dir = "/data/meta"
+data_dir = "/data/data"
+
+db_engine = "sqlite"
+
+replication_factor = 1
+
+rpc_bind_addr = "[::]:3901"
+
+[s3_api]
+s3_region = "ash"
+api_bind_addr = "[::]:3900"
+
+[admin]
+api_bind_addr = "[::]:3903"

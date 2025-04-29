@@ -921,14 +921,7 @@ func StartApiServer() {
 	defer dbpool.Close()
 	logger := cfg.Logger
 
-	var st storage.StorageServe
-	var err error
-	if cfg.MinioURL == "" {
-		st, err = storage.NewStorageFS(cfg.Logger, cfg.StorageDir)
-	} else {
-		st, err = storage.NewStorageMinio(cfg.Logger, cfg.MinioURL, cfg.MinioUser, cfg.MinioPass)
-	}
-
+	st, err := storage.NewStorage(cfg.Logger)
 	if err != nil {
 		logger.Error(err.Error())
 	}

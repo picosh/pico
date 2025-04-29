@@ -9,6 +9,7 @@ import (
 	"github.com/picosh/pico/pkg/apps/prose"
 	"github.com/picosh/pico/pkg/db/postgres"
 	"github.com/picosh/pico/pkg/shared"
+	"github.com/picosh/utils"
 )
 
 func bail(err error) {
@@ -21,11 +22,11 @@ func main() {
 	cfg := prose.NewConfigSite("prose-rm-old-buckets")
 	logger := cfg.Logger
 	picoDb := postgres.NewDB(cfg.DbURL, logger)
-	endpoint, err := url.Parse(cfg.MinioURL)
+	endpoint, err := url.Parse(utils.GetEnv("MINIO_URL", ""))
 	bail(err)
 	ssl := endpoint.Scheme == "https"
 	mClient, err := minio.New(endpoint.Host, &minio.Options{
-		Creds:  credentials.NewStaticV4(cfg.MinioUser, cfg.MinioPass, ""),
+		Creds:  credentials.NewStaticV4(utils.GetEnv("MINIO_ROOT_USER", ""), utils.GetEnv("MINIO_ROOT_PASSWORD", ""), ""),
 		Secure: ssl,
 	})
 	bail(err)

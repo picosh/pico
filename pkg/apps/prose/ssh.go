@@ -42,14 +42,7 @@ func StartSshServer() {
 		Db:  dbh,
 	}
 
-	var st storage.StorageServe
-	var err error
-	if cfg.MinioURL == "" {
-		st, err = storage.NewStorageFS(cfg.Logger, cfg.StorageDir)
-	} else {
-		st, err = storage.NewStorageMinio(cfg.Logger, cfg.MinioURL, cfg.MinioUser, cfg.MinioPass)
-	}
-
+	st, err := storage.NewStorage(cfg.Logger)
 	if err != nil {
 		logger.Error("storage", "err", err.Error())
 		return

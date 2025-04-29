@@ -3,6 +3,7 @@ PGHOST?="db"
 PGUSER?="postgres"
 PORT?="5432"
 DB_CONTAINER?=pico-postgres-1
+GARAGE_CONTAINER?=pico-garage-1
 DOCKER_TAG?=$(shell git log --format="%H" -n 1)
 DOCKER_PLATFORM?=linux/amd64,linux/arm64
 DOCKER_CMD?=docker
@@ -149,3 +150,18 @@ restore:
 	$(DOCKER_CMD) exec -it $(DB_CONTAINER) /bin/bash
 	# psql postgres -U postgres -d pico < /backup.sql
 .PHONY: restore
+
+dev-db-up:
+	$(DOCKER_CMD) compose --profile db up -d
+	sleep 5
+	make setup-dev-garage
+.PHONY: db-up
+
+dev-db-down:
+	$(DOCKER_CMD) compose --profile db down
+.PHONY: db-down
+
+setup-dev-garage:
+	$(DOCKER_CMD) exec $(GARAGE_CONTAINER) /garage layout assign -z ash -c 10G $(shell $(DOCKER_CMD) exec $(GARAGE_CONTAINER) /garage status 2>&1 | grep -A 1 ID | tail -n1 | awk '{print $$1}')
+	$(DOCKER_CMD) exec $(GARAGE_CONTAINER) /garage layout apply --version 1
+.PHONY: setup-garage

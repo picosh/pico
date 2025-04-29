@@ -30,6 +30,29 @@ services:
       - .env.prod
     volumes:
       - ./data/minio-data:/data
+  garage-caddy:
+    image: ghcr.io/picosh/pico/caddy:latest
+    restart: always
+    env_file:
+      - .env.prod
+    environment:
+      APP_DOMAIN: pico.sh
+      APP_EMAIL: ${GARAGE_EMAIL:-hello@pico.sh}
+    volumes:
+      - ${GARAGE_CADDYFILE}:/etc/caddy/Caddyfile
+      - ./data/garage-caddy/data:/data
+      - ./data/garage-caddy/config:/config
+    ports:
+      - "80:80"
+      - "443:443"
+    profiles:
+      - db
+      - all
+  garage:
+    env_file:
+      - .env.prod
+    volumes:
+      - ./data/garage-data:/data
   pipemgr:
     env_file:
       - .env.prod

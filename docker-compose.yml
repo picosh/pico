@@ -12,6 +12,14 @@ services:
     profiles:
       - db
       - all
+  garage:
+    image: dxflrs/garage:v2.0.0-beta1
+    restart: always
+    volumes:
+      - ./garage/config.toml:/etc/garage.toml:ro
+    profiles:
+      - db
+      - all
   imgproxy:
     image: darthsim/imgproxy:latest
     restart: always

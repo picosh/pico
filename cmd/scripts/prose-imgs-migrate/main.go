@@ -14,6 +14,7 @@ import (
 	sendUtils "github.com/picosh/pico/pkg/send/utils"
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/pico/pkg/shared/storage"
+	"github.com/picosh/utils"
 )
 
 func bail(err error) {
@@ -79,7 +80,7 @@ func main() {
 	cfg := prose.NewConfigSite("prose-imgs-migrate")
 	logger := cfg.Logger
 	picoDb := postgres.NewDB(cfg.DbURL, logger)
-	st, err := storage.NewStorageMinio(logger, cfg.MinioURL, cfg.MinioUser, cfg.MinioPass)
+	st, err := storage.NewStorageMinio(logger, utils.GetEnv("MINIO_URL", ""), utils.GetEnv("MINIO_ROOT_USER", ""), utils.GetEnv("MINIO_ROOT_PASSWORD", ""))
 	bail(err)
 
 	users, err := picoDb.FindUsers()
