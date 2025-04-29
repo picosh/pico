@@ -19,12 +19,14 @@ services:
       - ./garage/config.toml:/etc/garage.toml:ro
     profiles:
       - db
+      - storage
       - all
   imgproxy:
     image: darthsim/imgproxy:latest
     restart: always
     profiles:
       - db
+      - storage
       - all
   pipemgr:
     image: ghcr.io/picosh/pipemgr:latest

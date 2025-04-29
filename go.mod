@@ -20,6 +20,8 @@ toolchain go1.24.0
 
 // replace git.sr.ht/~rockorager/vaxis => ../../vaxis
 
+replace git.deuxfleurs.fr/garage-sdk/garage-admin-sdk-golang => github.com/picosh/garage-admin-sdk-golang v0.0.0-20250429033256-41fd1604e078
+
 require (
 	git.deuxfleurs.fr/garage-sdk/garage-admin-sdk-golang v0.0.0-20250305093803-0806b8639fd3
 	git.sr.ht/~delthas/senpai v0.4.0

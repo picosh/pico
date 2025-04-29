@@ -60,8 +60,6 @@ dmitri.shuralyov.com/state v0.0.0-20180228185332-28bcc343414c/go.mod h1:0PRwlb0D
 filippo.io/edwards25519 v1.1.0 h1:FNf4tywRC1HmFuKW5xopWpigGjJKiJSV0Cqo0cJWDaA=
 filippo.io/edwards25519 v1.1.0/go.mod h1:BxyFTGdWcka3PhytdK4V28tE5sGfRvvvRV7EaN4VDT4=
 git.apache.org/thrift.git v0.0.0-20180902110319-2566ecd5d999/go.mod h1:fPE2ZNJGynbRyZ4dJvy6G277gSllfV2HJqblrnkyeyg=
-git.deuxfleurs.fr/garage-sdk/garage-admin-sdk-golang v0.0.0-20250305093803-0806b8639fd3 h1:NpX0332pBuKAshN6CRAst8AC9kBBpI5TK0nq+r+XrSY=
-git.deuxfleurs.fr/garage-sdk/garage-admin-sdk-golang v0.0.0-20250305093803-0806b8639fd3/go.mod h1:TlSL6QVxozmdRaSgP6Akspi0HCJv4HAkkq3Dldru4GM=
 git.sr.ht/~delthas/senpai v0.4.0 h1:G1cycL0ARqYkqOErjEx/7Cneqykq3POfCsMYnpkWhUY=
 git.sr.ht/~delthas/senpai v0.4.0/go.mod h1:mzdu4o3wANA6cYzRnrz3w+uGPHA2z3j02JDrr/M3Myc=
 git.sr.ht/~rockorager/vaxis v0.13.0 h1:+F3ze1t4X5x87QEsyn/b9b9pWXw9MDqoHynoR/PHqKg=
@@ -699,6 +697,8 @@ github.com/peterbourgon/diskv/v3 v3.0.1 h1:x06SQA46+PKIUftmEujdwSEpIx8kR+M9eLYsU
 github.com/peterbourgon/diskv/v3 v3.0.1/go.mod h1:kJ5Ny7vLdARGU3WUuy6uzO6T0nb/2gWcT1JiBvRmb5o=
 github.com/philhofer/fwd v1.1.3-0.20240916144458-20a13a1f6b7c h1:dAMKvw0MlJT1GshSTtih8C2gDs04w8dReiOGXrGLNoY=
 github.com/philhofer/fwd v1.1.3-0.20240916144458-20a13a1f6b7c/go.mod h1:RqIHx9QI14HlwKwm98g9Re5prTQ6LdeRQn+gXJFxsJM=
+github.com/picosh/garage-admin-sdk-golang v0.0.0-20250429033256-41fd1604e078 h1:Rz1oV7833UY31sXYPdPp6xeXbaNHB/fBbYXRxTLfxbA=
+github.com/picosh/garage-admin-sdk-golang v0.0.0-20250429033256-41fd1604e078/go.mod h1:O9swF+XWas/2fJ22OryTD1u4FR514bMFfuMQKxb88fc=
 github.com/picosh/go-rsync-receiver v0.0.0-20250304201040-fcc11dd22d79 h1:MyB9P43hlQ6A2FoP9LGeiTBL3WKToW4gcWd6lQPg/Zg=
 github.com/picosh/go-rsync-receiver v0.0.0-20250304201040-fcc11dd22d79/go.mod h1:4ZICsr6bESoHP8He9DqROlZiMw4hHHjcbDzhtTTDQzA=
 github.com/picosh/pubsub v0.0.0-20241114191831-ec8f16c0eb88 h1:hdxE6rquHHw1/eeqS1b+ojLaxGtN8zOiTUclPwaVbPg=
