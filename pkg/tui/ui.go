@@ -15,7 +15,10 @@ import (
 	"github.com/picosh/utils"
 )
 
-var HOME = "dash"
+const (
+	adminPrefix = "admin__"
+	HOME        = "dash"
+)
 
 type SharedModel struct {
 	Logger             *slog.Logger
@@ -286,21 +289,19 @@ func FindUser(shrd *SharedModel) (*db.User, error) {
 		// no user and not error indicates we need to create an account
 		return nil, nil
 	}
+
 	origUserName := user.Name
 
 	// impersonation
-	adminPrefix := "admin__"
 	if strings.HasPrefix(usr, adminPrefix) {
 		hasFeature := shrd.Dbpool.HasFeatureForUser(user.ID, "admin")
-		if !hasFeature {
-			return nil, fmt.Errorf("only admins can impersonate a user")
+		if hasFeature {
+			impersonate := strings.TrimPrefix(usr, adminPrefix)
+			user, err = shrd.Dbpool.FindUserByName(impersonate)
+			if err == nil {
+				shrd.Impersonator = origUserName
+			}
 		}
-		impersonate := strings.Replace(usr, adminPrefix, "", 1)
-		user, err = shrd.Dbpool.FindUserByName(impersonate)
-		if err != nil {
-			return nil, err
-		}
-		shrd.Impersonator = origUserName
 	}
 
 	return user, nil

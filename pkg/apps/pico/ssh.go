@@ -97,7 +97,7 @@ func StartSshServer() {
 						Session: sesh,
 						Cfg:     cfg,
 						Dbpool:  handler.DBPool,
-						Logger:  cfg.Logger,
+						Logger:  pssh.GetLogger(sesh),
 					}
 					return pssh.PtyMdw(createTui(shrd), 200*time.Millisecond)(next)(sesh)
 				}

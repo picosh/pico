@@ -361,9 +361,12 @@ func (s *SSHServer) HandleConn(conn net.Conn) error {
 
 	newLogger := s.Logger.With(
 		"remoteAddr", conn.RemoteAddr().String(),
-		"user", sshConn.User(),
-		"pubkey", sshConn.Permissions.Extensions["pubkey"],
+		"sshUser", sshConn.User(),
 	)
+
+	if pubKey, ok := sshConn.Permissions.Extensions["pubkey"]; ok {
+		newLogger = newLogger.With("pubkey", pubKey)
+	}
 
 	newConn := NewSSHServerConn(
 		s.Ctx,

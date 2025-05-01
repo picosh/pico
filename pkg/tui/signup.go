@@ -9,6 +9,7 @@ import (
 	"git.sr.ht/~rockorager/vaxis/vxfw/richtext"
 	"git.sr.ht/~rockorager/vaxis/vxfw/text"
 	"github.com/picosh/pico/pkg/db"
+	"github.com/picosh/pico/pkg/pssh"
 	"github.com/picosh/utils"
 	"golang.org/x/crypto/ssh"
 )
@@ -56,7 +57,18 @@ func (m *SignupPage) CaptureEvent(ev vaxis.Event) (vxfw.Command, error) {
 				m.err = err
 				return vxfw.RedrawCmd{}, nil
 			}
+
 			m.shared.User = user
+
+			pssh.SetUser(m.shared.Session, user)
+
+			m.shared.Logger = m.shared.Logger.With(
+				"user", user.Name,
+				"userId", user.ID,
+			)
+
+			pssh.SetLogger(m.shared.Session, m.shared.Logger)
+
 			m.shared.App.PostEvent(Navigate{To: HOME})
 		}
 	}

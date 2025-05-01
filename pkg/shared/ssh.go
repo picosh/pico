@@ -10,6 +10,8 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+const adminPrefix = "admin__"
+
 type SshAuthHandler struct {
 	DB     AuthFindUser
 	Logger *slog.Logger
@@ -47,32 +49,32 @@ func (r *SshAuthHandler) PubkeyAuthHandler(conn ssh.ConnMetadata, key ssh.Public
 	}
 
 	// impersonation
-	impID := user.ID
-	adminPrefix := "admin__"
+	var impID string
 	usr := conn.User()
 	if strings.HasPrefix(usr, adminPrefix) {
 		ff, err := r.DB.FindFeature(user.ID, "admin")
-		if err != nil {
-			return nil, fmt.Errorf("only admins can impersonate a user: %w", err)
-		}
-		if !ff.IsValid() {
-			return nil, fmt.Errorf("expired admin feature flag, cannot impersonate a user")
-		}
-
-		impersonate := strings.Replace(usr, adminPrefix, "", 1)
-		user, err = r.DB.FindUserByName(impersonate)
-		if err != nil {
-			return nil, err
+		if err == nil && ff.IsValid() {
+			impersonate := strings.TrimPrefix(usr, adminPrefix)
+			impersonatedUser, err := r.DB.FindUserByName(impersonate)
+			if err == nil {
+				impID = user.ID
+				user = impersonatedUser
+			}
 		}
 	}
 
-	return &ssh.Permissions{
+	perms := &ssh.Permissions{
 		Extensions: map[string]string{
-			"imp_id":  impID,
 			"user_id": user.ID,
 			"pubkey":  pubkey,
 		},
-	}, nil
+	}
+
+	if impID != "" {
+		perms.Extensions["imp_id"] = impID
+	}
+
+	return perms, nil
 }
 
 func FindPlusFF(dbpool db.DB, cfg *ConfigSite, userID string) *db.FeatureFlag {

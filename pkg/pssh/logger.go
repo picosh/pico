@@ -12,41 +12,60 @@ type ctxUserKey struct{}
 
 type FindUserInterface interface {
 	FindUser(string) (*db.User, error)
+	FindUserByPubkey(string) (*db.User, error)
 }
 
 type GetLoggerInterface interface {
 	GetLogger(s *SSHServerConnSession) *slog.Logger
 }
 
-func LogMiddleware(getLogger GetLoggerInterface, db FindUserInterface) SSHServerMiddleware {
+func LogMiddleware(getLogger GetLoggerInterface, database FindUserInterface) SSHServerMiddleware {
 	return func(sshHandler SSHServerHandler) SSHServerHandler {
 		return func(s *SSHServerConnSession) error {
 			ct := time.Now()
 
 			logger := GetLogger(s)
-			if logger == slog.Default() {
+			if logger == slog.Default() || logger == s.Logger {
 				logger = getLogger.GetLogger(s)
 
 				user := GetUser(s)
 				if user == nil {
-					userID, ok := s.Permissions().Extensions["user_id"]
-					if ok {
-						user, err := db.FindUser(userID)
+					_, impersonated := s.Permissions().Extensions["imp_id"]
+
+					var user *db.User
+					var err error
+					var found bool
+
+					if !impersonated {
+						pubKey, ok := s.Permissions().Extensions["pubkey"]
+						if ok {
+							user, err = database.FindUserByPubkey(pubKey)
+							found = true
+						}
+					} else {
+						userID, ok := s.Permissions().Extensions["user_id"]
+						if ok {
+							user, err = database.FindUser(userID)
+							found = true
+						}
+					}
+
+					if found {
 						if err == nil && user != nil {
 							logger = logger.With(
 								"user", user.Name,
 								"userId", user.ID,
 								"ip", s.RemoteAddr().String(),
 							)
-							s.SetValue(ctxUserKey{}, user)
-						}
-					} else {
-						logger.Error("`user_id` not set in permissions")
-					}
 
+							SetUser(s, user)
+						} else {
+							logger.Error("`user` not set in permissions", "err", err)
+						}
+					}
 				}
 
-				s.SetValue(ctxLoggerKey{}, logger)
+				SetLogger(s, logger)
 			}
 
 			pty, _, ok := s.Pty()
@@ -101,11 +120,21 @@ func GetLogger(s *SSHServerConnSession) *slog.Logger {
 		return logger
 	}
 
+	logger = s.Logger
+
 	if v, ok := s.Context().Value(ctxLoggerKey{}).(*slog.Logger); ok {
 		return v
 	}
 
 	return logger
+}
+
+func SetLogger(s *SSHServerConnSession, logger *slog.Logger) {
+	if s == nil {
+		return
+	}
+
+	s.SetValue(ctxLoggerKey{}, logger)
 }
 
 func GetUser(s *SSHServerConnSession) *db.User {
@@ -114,4 +143,12 @@ func GetUser(s *SSHServerConnSession) *db.User {
 	}
 
 	return nil
+}
+
+func SetUser(s *SSHServerConnSession, user *db.User) {
+	if s == nil {
+		return
+	}
+
+	s.SetValue(ctxUserKey{}, user)
 }
