@@ -63,9 +63,22 @@ html {
   color: var(--text-color);
   font-size: 16px;
   line-height: var(--line-height);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
-    Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", Arial,
-    sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    Oxygen,
+    Ubuntu,
+    Cantarell,
+    "Fira Sans",
+    "Droid Sans",
+    "Helvetica Neue",
+    Arial,
+    sans-serif,
+    "Apple Color Emoji",
+    "Segoe UI Emoji",
+    "Segoe UI Symbol";
   -webkit-text-size-adjust: 100%;
   -moz-tab-size: 4;
   -o-tab-size: 4;
@@ -227,7 +240,6 @@ ul[style*="list-style-type: none;"] {
 
 ol {
   padding: 0 0 0 var(--line-height);
-  list-style-position: inside;
   list-style-type: decimal;
   margin: var(--line-height) 0;
 }
@@ -289,13 +301,6 @@ sup {
   width: 100%;
 }
 
-.container-center {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  justify-content: center;
-}
-
 .mono {
   font-family: monospace;
 }
@@ -350,16 +355,8 @@ sup {
   font-size: 0.8rem;
 }
 
-.cursor-pointer {
-  cursor: pointer;
-}
-
 .w-full {
   width: 100%;
-}
-
-.h-full {
-  height: 100%;
 }
 
 .border {
@@ -401,14 +398,6 @@ sup {
 
 .max-w-half {
   max-width: 50%;
-}
-
-.h-screen {
-  height: 100vh;
-}
-
-.w-screen {
-  width: 100vw;
 }
 
 .flex {
@@ -463,16 +452,8 @@ sup {
   margin-right: 0.5rem;
 }
 
-.ml-sm {
-  margin-left: 0.25rem;
-}
-
 .ml {
   margin-left: 0.5rem;
-}
-
-.pt-0 {
-  padding-top: 0;
 }
 
 .my {
@@ -490,24 +471,6 @@ sup {
   margin-bottom: calc(var(--line-height) * 2);
 }
 
-.mx {
-  margin-left: 0.5rem;
-  margin-right: 0.5rem;
-}
-
-.mx-2 {
-  margin-left: 1rem;
-  margin-right: 1rem;
-}
-
-.m-1 {
-  margin: var(--grid-height);
-}
-
-.p-1 {
-  padding: var(--grid-height);
-}
-
 .p-0 {
   padding: 0;
 }
@@ -515,11 +478,6 @@ sup {
 .px {
   padding-left: 0.5rem;
   padding-right: 0.5rem;
-}
-
-.px-2 {
-  padding-left: 1rem;
-  padding-right: 1rem;
 }
 
 .px-4 {
@@ -530,11 +488,6 @@ sup {
 .py {
   padding-top: var(--grid-height);
   padding-bottom: var(--grid-height);
-}
-
-.py-2 {
-  padding-top: var(--line-height);
-  padding-bottom: var(--line-height);
 }
 
 .py-4 {
@@ -654,11 +607,11 @@ h1 code, h2 code, h3 code, h4 code {
 .logo-header {
   line-height: 1;
   display: inline-block;
-  background-color: #FF79C6;
-  background-image: linear-gradient(to right, #FF5555, #FF79C6, #F8F859);
+  background-color: #ff79c6;
+  background-image: linear-gradient(to right, #ff5555, #ff79c6, #f8f859);
   color: transparent;
   background-clip: text;
-  border: 3px solid #FF79C6;
+  border: 3px solid #ff79c6;
   padding: 8px 10px 10px 10px;
   border-radius: 10px;
   background-size: 100%;

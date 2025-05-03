@@ -10,14 +10,14 @@ DOCKER_BUILDX_BUILD?=$(DOCKER_CMD) buildx build --push --platform $(DOCKER_PLATF
 WRITE?=0
 
 smol:
-	curl https://pico.sh/smol.css -o ./prose/public/smol-v2.css
-	cat ./prose/artifacts/main.css >> ./prose/public/smol-v2.css
-	curl https://pico.sh/smol.css -o ./pastes/public/smol.css
+	curl https://pico.sh/smol.css -o ./pkg/apps/prose/public/smol-v2.css
+	cat ./pkg/apps/prose/artifacts/main.css >> ./pkg/apps/prose/public/smol-v2.css
+	curl https://pico.sh/smol.css -o ./pkg/apps/pastes/public/smol.css
 .PHONY: smol
 
 css:
-	cp ./syntax.css pastes/public/syntax.css
-	cp ./syntax.css prose/public/syntax.css
+	cp ./syntax.css ./pkg/apps/pastes/public/syntax.css
+	cp ./syntax.css ./pkg/apps/prose/public/syntax.css
 .PHONY: css
 
 lint:
