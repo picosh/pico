@@ -241,6 +241,26 @@ func (s *StorageMinio) PutObject(bucket Bucket, fpath string, contents io.Reader
 	return fmt.Sprintf("%s/%s", info.Bucket, info.Key), info.Size, nil
 }
 
+func (s *StorageMinio) PutEmptyObject(bucket Bucket, fpath string, entry *utils.FileEntry) (string, error) {
+	opts := minio.PutObjectOptions{
+		UserMetadata: map[string]string{
+			"Mtime": fmt.Sprint(time.Now().Unix()),
+		},
+	}
+
+	if entry.Mtime > 0 {
+		opts.UserMetadata["Mtime"] = fmt.Sprint(entry.Mtime)
+	}
+
+	info, err := s.Client.PutObject(context.TODO(), bucket.Name, fpath, nil, 0, opts)
+
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%s/%s", info.Bucket, info.Key), nil
+}
+
 func (s *StorageMinio) DeleteObject(bucket Bucket, fpath string) error {
 	err := s.Client.RemoveObject(context.TODO(), bucket.Name, fpath, minio.RemoveObjectOptions{})
 	return err

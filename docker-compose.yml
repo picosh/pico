@@ -13,7 +13,16 @@ services:
       - db
       - all
   garage:
-    image: dxflrs/garage:v2.0.0-beta1
+    image: dxflrs/garage:v1.1.0
+    restart: always
+    volumes:
+      - ./garage/config.toml:/etc/garage.toml:ro
+    profiles:
+      - db
+      - storage
+      - all
+  garage-webui:
+    image: khairul169/garage-webui:latest
     restart: always
     volumes:
       - ./garage/config.toml:/etc/garage.toml:ro

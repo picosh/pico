@@ -18,6 +18,11 @@ services:
       - "3900-3904:3900-3904"
     tmpfs:
       - /data
+  garage-webui:
+    env_file:
+      - .env.example
+    ports:
+      - "3909:3909"
   imgproxy:
     env_file:
       - .env.example

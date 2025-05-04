@@ -1,7 +1,6 @@
 package pgs
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -325,12 +324,12 @@ func (h *UploadAssetHandler) Write(s *pssh.SSHServerConnSession, entry *sendutil
 	}
 
 	if entry.Mode.IsDir() {
-		_, _, err := h.Cfg.Storage.PutObject(
+		_, err := h.Cfg.Storage.PutEmptyObject(
 			bucket,
 			path.Join(shared.GetAssetFileName(entry), "._pico_keep_dir"),
-			bytes.NewReader([]byte{}),
 			entry,
 		)
+
 		return "", err
 	}
 
@@ -399,9 +398,14 @@ func (h *UploadAssetHandler) Write(s *pssh.SSHServerConnSession, entry *sendutil
 		sizeRemaining = min(sizeRemaining, specialFileMax)
 	}
 
+	var r io.Reader
+	if entry.Reader != nil {
+		r = utils.NewMaxBytesReader(data.Reader, int64(sizeRemaining))
+	}
+
 	fsize, err := h.writeAsset(
 		s,
-		utils.NewMaxBytesReader(data.Reader, int64(sizeRemaining)),
+		r,
 		data,
 	)
 	if err != nil {
@@ -494,16 +498,17 @@ func (h *UploadAssetHandler) Delete(s *pssh.SSHServerConnSession, entry *senduti
 	})
 
 	if len(sibs) == 0 {
-		_, _, err := h.Cfg.Storage.PutObject(
+		_, err := h.Cfg.Storage.PutEmptyObject(
 			bucket,
 			filepath.Join(pathDir, "._pico_keep_dir"),
-			bytes.NewReader([]byte{}),
 			entry,
 		)
+
 		if err != nil {
 			return err
 		}
 	}
+
 	err = h.Cfg.Storage.DeleteObject(bucket, assetFilepath)
 
 	surrogate := getSurrogateKey(user.Name, projectName)
@@ -551,12 +556,24 @@ func (h *UploadAssetHandler) writeAsset(s *pssh.SSHServerConnSession, reader io.
 		"filename", assetFilepath,
 	)
 
-	_, fsize, err := h.Cfg.Storage.PutObject(
-		data.Bucket,
-		assetFilepath,
-		reader,
-		data.FileEntry,
-	)
+	var fsize int64
+	var err error
+
+	if reader == nil {
+		_, err = h.Cfg.Storage.PutEmptyObject(
+			data.Bucket,
+			assetFilepath,
+			data.FileEntry,
+		)
+	} else {
+		_, fsize, err = h.Cfg.Storage.PutObject(
+			data.Bucket,
+			assetFilepath,
+			reader,
+			data.FileEntry,
+		)
+	}
+
 	return fsize, err
 }
 

@@ -20,7 +20,7 @@ toolchain go1.24.0
 
 // replace git.sr.ht/~rockorager/vaxis => ../../vaxis
 
-replace git.deuxfleurs.fr/garage-sdk/garage-admin-sdk-golang => github.com/picosh/garage-admin-sdk-golang v0.0.0-20250429033256-41fd1604e078
+replace git.deuxfleurs.fr/garage-sdk/garage-admin-sdk-golang => github.com/picosh/garage-admin-sdk-golang v0.0.0-20250504231927-e10d3d8e125c
 
 require (
 	git.deuxfleurs.fr/garage-sdk/garage-admin-sdk-golang v0.0.0-20250305093803-0806b8639fd3
@@ -282,7 +282,7 @@ require (
 	golang.org/x/image v0.25.0 // indirect
 	golang.org/x/mod v0.24.0 // indirect
 	golang.org/x/net v0.38.0 // indirect
-	golang.org/x/oauth2 v0.28.0 // indirect
+	golang.org/x/oauth2 v0.29.0 // indirect
 	golang.org/x/sync v0.12.0 // indirect
 	golang.org/x/sys v0.31.0 // indirect
 	golang.org/x/term v0.30.0 // indirect
@@ -293,6 +293,7 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250324211829-b45e905df463 // indirect
 	google.golang.org/grpc v1.71.0 // indirect
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.5.1 // indirect
+	gopkg.in/validator.v2 v2.0.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	howett.net/plist v1.0.1 // indirect
 	mvdan.cc/xurls/v2 v2.6.0 // indirect

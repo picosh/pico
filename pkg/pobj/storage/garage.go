@@ -23,6 +23,7 @@ import (
 
 type StorageGarage struct {
 	Client      *minio.Client
+	ClientKey   string
 	Admin       *garage.APIClient
 	AdminCtx    context.Context
 	BucketCache *expirable.LRU[string, CachedBucket]
@@ -34,7 +35,7 @@ var (
 	_ ObjectStorage = (*StorageGarage)(nil)
 )
 
-func NewStorageGarage(logger *slog.Logger, address, user, pass, token string) (*StorageGarage, error) {
+func NewStorageGarage(logger *slog.Logger, address, user, pass, adminAddress, token string) (*StorageGarage, error) {
 	endpoint, err := url.Parse(address)
 	if err != nil {
 		return nil, err
@@ -49,20 +50,26 @@ func NewStorageGarage(logger *slog.Logger, address, user, pass, token string) (*
 		return nil, err
 	}
 
+	adminEndpoint, err := url.Parse(adminAddress)
+	if err != nil {
+		return nil, err
+	}
+
 	configuration := garage.NewConfiguration()
-	configuration.Host = endpoint.Host
-	configuration.Scheme = endpoint.Scheme
+	configuration.Host = adminEndpoint.Host
+	configuration.Scheme = adminEndpoint.Scheme
 
 	client := garage.NewAPIClient(configuration)
 	ctx := context.WithValue(context.Background(), garage.ContextAccessToken, token)
 
-	_, _, err = client.LayoutApi.GetLayout(ctx).Execute()
+	_, _, err = client.LayoutAPI.GetLayout(ctx).Execute()
 	if err != nil {
 		return nil, err
 	}
 
 	mini := &StorageGarage{
 		Client:      mClient,
+		ClientKey:   user,
 		Admin:       client,
 		AdminCtx:    ctx,
 		BucketCache: expirable.NewLRU[string, CachedBucket](2048, nil, cache.CacheTimeout),
@@ -104,10 +111,33 @@ func (s *StorageGarage) UpsertBucket(name string) (Bucket, error) {
 		return bucket, nil
 	}
 
-	err = s.Client.MakeBucket(context.TODO(), name, minio.MakeBucketOptions{})
+	createBucketRequest := garage.NewCreateBucketRequest()
+	createBucketRequest.SetGlobalAlias(name)
+
+	bucketInfo, _, err := s.Admin.BucketAPI.CreateBucket(s.AdminCtx).CreateBucketRequest(*createBucketRequest).Execute()
 	if err != nil {
 		return bucket, err
 	}
+
+	permissions := garage.NewAllowBucketKeyRequestPermissions(true, true, true)
+	allowBucketKeyRequest := garage.NewAllowBucketKeyRequest(bucketInfo.GetId(), s.ClientKey, *permissions)
+
+	_, _, err = s.Admin.BucketAPI.AllowBucketKey(s.AdminCtx).AllowBucketKeyRequest(*allowBucketKeyRequest).Execute()
+	if err != nil {
+		return bucket, err
+	}
+
+	// We can have garage enforce the quota on the bucket
+	// bucketQuotas := garage.NewUpdateBucketRequestQuotas()
+	// bucketQuotas.SetMaxSize()
+
+	// updateBucketRequest := garage.NewUpdateBucketRequest()
+	// updateBucketRequest.SetQuotas(*bucketQuotas)
+
+	// _, _, err = s.Admin.BucketAPI.UpdateBucket(s.AdminCtx).Id(bucketInfo.GetId()).UpdateBucketRequest(*updateBucketRequest).Execute()
+	// if err != nil {
+	// 	return bucket, err
+	// }
 
 	s.BucketCache.Remove(name)
 
@@ -115,7 +145,7 @@ func (s *StorageGarage) UpsertBucket(name string) (Bucket, error) {
 }
 
 func (s *StorageGarage) GetBucketQuota(bucket Bucket) (uint64, error) {
-	info, _, err := s.Admin.BucketApi.GetBucketInfo(s.AdminCtx).GlobalAlias(bucket.Name).Execute()
+	info, _, err := s.Admin.BucketAPI.GetBucketInfo(s.AdminCtx).GlobalAlias(bucket.Name).Execute()
 	if err != nil {
 		return 0, err
 	}
@@ -124,15 +154,11 @@ func (s *StorageGarage) GetBucketQuota(bucket Bucket) (uint64, error) {
 		return 0, fmt.Errorf("bucket %s not found", bucket.Name)
 	}
 
-	if info.Quotas == nil {
-		return 0, fmt.Errorf("bucket %s has no quota", bucket.Name)
+	if info.Bytes == nil {
+		return 0, fmt.Errorf("bucket %s has no size", bucket.Name)
 	}
 
-	if info.Quotas.MaxSize.Get() == nil {
-		return 0, fmt.Errorf("bucket %s has no quota", bucket.Name)
-	}
-
-	return uint64(*info.Quotas.MaxSize.Get()), nil
+	return uint64(info.GetBytes()), nil
 }
 
 func (s *StorageGarage) ListBuckets() ([]string, error) {
@@ -240,6 +266,26 @@ func (s *StorageGarage) PutObject(bucket Bucket, fpath string, contents io.Reade
 	}
 
 	return fmt.Sprintf("%s/%s", info.Bucket, info.Key), info.Size, nil
+}
+
+func (s *StorageGarage) PutEmptyObject(bucket Bucket, fpath string, entry *utils.FileEntry) (string, error) {
+	opts := minio.PutObjectOptions{
+		UserMetadata: map[string]string{
+			"Mtime": fmt.Sprint(time.Now().Unix()),
+		},
+	}
+
+	if entry.Mtime > 0 {
+		opts.UserMetadata["Mtime"] = fmt.Sprint(entry.Mtime)
+	}
+
+	info, err := s.Client.PutObject(context.TODO(), bucket.Name, fpath, nil, 0, opts)
+
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%s/%s", info.Bucket, info.Key), nil
 }
 
 func (s *StorageGarage) DeleteObject(bucket Bucket, fpath string) error {

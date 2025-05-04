@@ -53,6 +53,9 @@ services:
       - .env.prod
     volumes:
       - ./data/garage-data:/data
+  garage-webui:
+    env_file:
+      - .env.prod
   pipemgr:
     env_file:
       - .env.prod

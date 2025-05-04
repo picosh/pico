@@ -16,8 +16,8 @@ type StorageGarage struct {
 	*sst.StorageGarage
 }
 
-func NewStorageGarage(logger *slog.Logger, address, user, pass, token string) (*StorageGarage, error) {
-	st, err := sst.NewStorageGarage(logger, address, user, pass, token)
+func NewStorageGarage(logger *slog.Logger, address, user, pass, adminAddress, token string) (*StorageGarage, error) {
+	st, err := sst.NewStorageGarage(logger, address, user, pass, adminAddress, token)
 	if err != nil {
 		return nil, err
 	}

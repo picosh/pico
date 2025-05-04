@@ -8,7 +8,7 @@ replication_factor = 1
 rpc_bind_addr = "[::]:3901"
 
 [s3_api]
-s3_region = "ash"
+s3_region = "us-east-1"
 api_bind_addr = "[::]:3900"
 
 [admin]

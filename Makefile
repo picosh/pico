@@ -153,15 +153,23 @@ restore:
 
 dev-db-up:
 	$(DOCKER_CMD) compose --profile db up -d
-	sleep 5
+	sleep 2
+	make create migrate
 	make setup-dev-garage
-.PHONY: db-up
+.PHONY: dev-db-up
 
 dev-db-down:
 	$(DOCKER_CMD) compose --profile db down
-.PHONY: db-down
+.PHONY: dev-db-down
+
+setup-dev-db:
+	$(DOCKER_CMD) exec $(GARAGE_CONTAINER) /garage layout assign -z ash -c 10G $(shell $(DOCKER_CMD) exec $(GARAGE_CONTAINER) /garage status 2>&1 | grep -A 1 ID | tail -n1 | awk '{print $$1}')
+	$(DOCKER_CMD) exec $(GARAGE_CONTAINER) /garage layout apply --version 1
+.PHONY: setup-dev-db
 
 setup-dev-garage:
 	$(DOCKER_CMD) exec $(GARAGE_CONTAINER) /garage layout assign -z ash -c 10G $(shell $(DOCKER_CMD) exec $(GARAGE_CONTAINER) /garage status 2>&1 | grep -A 1 ID | tail -n1 | awk '{print $$1}')
 	$(DOCKER_CMD) exec $(GARAGE_CONTAINER) /garage layout apply --version 1
-.PHONY: setup-garage
+	$(DOCKER_CMD) exec $(GARAGE_CONTAINER) /garage key import --yes -n dev GK03c0bc4880d00a540d929ee9 88a01d80ba28c04f2c7013445506bdcd883cb44aa32e63731bcd42971697f171
+	$(DOCKER_CMD) exec $(GARAGE_CONTAINER) /garage key allow --create-bucket dev
+.PHONY: setup-dev-garage
