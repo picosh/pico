@@ -107,7 +107,7 @@ func main() {
 		&utils.VirtualFile{FName: "nice/test.txt", FSize: 19},
 	}
 	ignore := cmpopts.IgnoreFields(utils.VirtualFile{}, "FModTime", "FSize")
-	if cmp.Equal(objs, expectedObjs, ignore) == false {
+	if !cmp.Equal(objs, expectedObjs, ignore) {
 		//nolint
 		panic(cmp.Diff(objs, expectedObjs, ignore))
 	}
