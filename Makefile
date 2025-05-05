@@ -26,8 +26,12 @@ lint:
 .PHONY: lint
 
 test:
-	go test ./...
+	STORAGE_TYPE="memory" go test ./...
 .PHONY: test
+
+test_storage:
+	go run ./cmd/scripts/storage
+.PHONY:
 
 snaps:
 	UPDATE_SNAPS=true go test ./...

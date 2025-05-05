@@ -17,5 +17,5 @@ runs:
     - name: Run tests
       shell: bash
       run: |
-        PICO_SECRET="danger" go test -v ./... -cover -race -coverprofile=coverage.out
+        STORAGE_TYPE="memory" PICO_SECRET="danger" go test -v ./... -cover -race -coverprofile=coverage.out
         go tool cover -func=coverage.out -o=coverage.out

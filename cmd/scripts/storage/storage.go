@@ -1,4 +1,4 @@
-package storage
+package main
 
 import (
 	"fmt"
@@ -9,49 +9,46 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/picosh/pico/pkg/send/utils"
+	"github.com/picosh/pico/pkg/shared/storage"
 )
 
-func TestGarageAdapter(t *testing.T) {
+// This script will use whatever storage adapter is set by the env var
+// `STORAGE_TYPE`.  These tests will *not* confirm the adapter is working properly
+// beyond calling all of the methods and ensuring no errors are returned.
+// It is up to you to go into the adapter GUI and confirm the following:
+//   - Only 1 bucket remains: "test"
+//   - Only 1 object is inside the folder: here/we/go/again.txt"
+func main() {
 	logger := slog.Default()
 	f, err := os.MkdirTemp("", "fs-tests-")
 	if err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
 	defer os.RemoveAll(f)
 
-	st, err := NewStorage(logger)
+	st, err := storage.NewStorage(logger)
 	if err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
 
-	bucketName := "main-v4"
+	bucketName := "test"
 	// create bucket
 	bucket, err := st.UpsertBucket(bucketName)
 	if err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
-
-	// ensure bucket exists
-	/* file, err := os.Stat(bucket.Path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !file.IsDir() {
-		t.Fatal("bucket must be directory")
-	} */
 
 	bucketCheck, err := st.GetBucket(bucketName)
 	if err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
 	if bucketCheck.Path != bucket.Path || bucketCheck.Name != bucket.Name {
-		t.Fatal("upsert and get bucket incongruent")
+		panic("upsert and get bucket incongruent")
 	}
 
 	modTime := time.Now()
@@ -62,38 +59,32 @@ func TestGarageAdapter(t *testing.T) {
 		Mtime: modTime.Unix(),
 	})
 	if err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
 	if size != int64(len(str)) {
-		t.Fatalf("size, actual: %d, expected: %d", size, int64(len(str)))
+		panic(fmt.Sprintf("size, actual: %d, expected: %d", size, int64(len(str))))
 	}
 	expectedPath := filepath.Join(bucket.Name, "nice", "test.txt")
 	if actualPath != expectedPath {
-		t.Fatalf("path, actual: %s, expected: %s", actualPath, expectedPath)
+		panic(fmt.Sprintf("path, actual: %s, expected: %s", actualPath, expectedPath))
 	}
 
-	// ensure file exists
-	/* _, err = os.Stat(expectedPath)
-	if err != nil {
-		t.Fatal(err)
-	} */
-
 	// get file
-	r, info, err := st.GetObject(bucket, "nice/test.txt")
+	r, info, err := st.GetObject(bucket, "/nice/test.txt")
 	if err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
 	buf := new(strings.Builder)
 	_, err = io.Copy(buf, r)
 	if err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
 	actualStr := buf.String()
 	if actualStr != str {
-		t.Fatalf("contents, actual: %s, expected: %s", actualStr, str)
+		panic(fmt.Sprintf("contents, actual: %s, expected: %s", actualStr, str))
 	}
 	if info.Size != size {
-		t.Fatalf("size, actual: %d, expected: %d", size, info.Size)
+		panic(fmt.Sprintf("size, actual: %d, expected: %d", size, info.Size))
 	}
 
 	str = "a deeply nested test file"
@@ -102,13 +93,13 @@ func TestGarageAdapter(t *testing.T) {
 		Mtime: modTime.Unix(),
 	})
 	if err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
 
 	// list objects
 	objs, err := st.ListObjects(bucket, "/", true)
 	if err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
 
 	expectedObjs := []fs.FileInfo{
@@ -118,15 +109,15 @@ func TestGarageAdapter(t *testing.T) {
 	ignore := cmpopts.IgnoreFields(utils.VirtualFile{}, "FModTime", "FSize")
 	if cmp.Equal(objs, expectedObjs, ignore) == false {
 		//nolint
-		t.Fatal(cmp.Diff(objs, expectedObjs, ignore))
+		panic(cmp.Diff(objs, expectedObjs, ignore))
 	}
 
 	// list buckets
 	aBucket, _ := st.UpsertBucket("another")
-	_, _ = st.UpsertBucket("and-another")
+	bBucket, _ := st.UpsertBucket("and-another")
 	buckets, err := st.ListBuckets()
 	if err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
 	expectedBuckets := []string{"and-another", "another", "main"}
 	notFound := ""
@@ -137,37 +128,19 @@ func TestGarageAdapter(t *testing.T) {
 		}
 	}
 	if notFound != "" {
-		t.Fatal(fmt.Sprintf("bucket not found: %s", notFound))
+		panic(fmt.Sprintf("bucket not found: %s", notFound))
 	}
 
 	// delete bucket
 	err = st.DeleteBucket(aBucket)
 	if err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
-
-	// ensure bucket was actually deleted
-	/* _, err = os.Stat(aBucket.Path)
-	if !os.IsNotExist(err) {
-		t.Fatal("directory should have been deleted")
-	} */
 
 	err = st.DeleteObject(bucket, "nice/test.txt")
 	if err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
-
-	// ensure file was actually deleted
-	/* _, err = os.Stat(filepath.Join(bucket.Path, "nice/test.txt"))
-	if !os.IsNotExist(err) {
-		t.Fatal("file should have been deleted")
-	} */
-
-	// ensure containing folder was also deleted
-	/* _, err = os.Stat(filepath.Join(bucket.Path, "nice"))
-	if !os.IsNotExist(err) {
-		t.Fatal("containing folder should have been deleted")
-	} */
 
 	str = "a deeply nested test file"
 	reader = strings.NewReader(str)
@@ -175,26 +148,18 @@ func TestGarageAdapter(t *testing.T) {
 		Mtime: modTime.Unix(),
 	})
 	if err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
 
 	// delete deeply nested file and all parent folders that are now empty
-	err = st.DeleteObject(bucket, "here/yes/we/can.txt")
+	err = st.DeleteObject(bucket, "/here/yes/we/can.txt")
 	if err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
-	/* _, err = os.Stat(filepath.Join(bucket.Path, "here"))
-	if os.IsNotExist(err) {
-		t.Fatal("this folder had multiple files and should not have been deleted")
-	}
-	_, err = os.Stat(filepath.Join(bucket.Path, "here/yes"))
-	if !os.IsNotExist(err) {
-		t.Fatal("containing folder should have been deleted")
-	} */
 
-	// delete bucket even with file contents
-	/* err = st.DeleteBucket(bucket)
+	// delete bucket
+	err = st.DeleteBucket(bBucket)
 	if err != nil {
-		t.Fatal(err)
-	} */
+		panic(err)
+	}
 }
