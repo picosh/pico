@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -34,6 +35,15 @@ var (
 	_ ObjectStorage = &StorageGarage{}
 	_ ObjectStorage = (*StorageGarage)(nil)
 )
+
+func cleanPath(path string) string {
+	cleanPath := filepath.Clean(path)
+	if cleanPath == "." {
+		return ""
+	}
+
+	return cleanPath
+}
 
 func NewStorageGarage(logger *slog.Logger, address, user, pass, adminAddress, token string) (*StorageGarage, error) {
 	endpoint, err := url.Parse(address)
@@ -209,7 +219,18 @@ func (s *StorageGarage) ListObjects(bucket Bucket, dir string, recursive bool) (
 }
 
 func (s *StorageGarage) DeleteBucket(bucket Bucket) error {
-	return s.Client.RemoveBucket(context.TODO(), bucket.Name)
+	info, _, err := s.Admin.BucketAPI.GetBucketInfo(s.AdminCtx).GlobalAlias(bucket.Name).Execute()
+	if err != nil {
+		return err
+	}
+
+	_, err = s.Admin.BucketAPI.DeleteBucket(s.AdminCtx).Id(info.GetId()).Execute()
+	if err != nil {
+		return err
+	}
+
+	s.BucketCache.Remove(bucket.Name)
+	return nil
 }
 
 func (s *StorageGarage) GetObject(bucket Bucket, fpath string) (utils.ReadAndReaderAtCloser, *ObjectInfo, error) {
@@ -219,7 +240,7 @@ func (s *StorageGarage) GetObject(bucket Bucket, fpath string) (utils.ReadAndRea
 		ETag:         "",
 	}
 
-	info, err := s.Client.StatObject(context.Background(), bucket.Name, fpath, minio.StatObjectOptions{})
+	info, err := s.Client.StatObject(context.Background(), bucket.Name, cleanPath(fpath), minio.StatObjectOptions{})
 	if err != nil {
 		return nil, objInfo, err
 	}
@@ -236,7 +257,7 @@ func (s *StorageGarage) GetObject(bucket Bucket, fpath string) (utils.ReadAndRea
 		}
 	}
 
-	obj, err := s.Client.GetObject(context.Background(), bucket.Name, fpath, minio.GetObjectOptions{})
+	obj, err := s.Client.GetObject(context.Background(), bucket.Name, cleanPath(fpath), minio.GetObjectOptions{})
 	if err != nil {
 		return nil, objInfo, err
 	}
@@ -259,13 +280,18 @@ func (s *StorageGarage) PutObject(bucket Bucket, fpath string, contents io.Reade
 	if entry.Size > 0 {
 		objSize = entry.Size
 	}
-	info, err := s.Client.PutObject(context.TODO(), bucket.Name, fpath, contents, objSize, opts)
 
-	if err != nil {
-		return "", 0, err
+	info, err := s.Client.PutObject(context.TODO(), bucket.Name, cleanPath(fpath), contents, objSize, opts)
+	if err == nil {
+		return fmt.Sprintf("%s/%s", info.Bucket, info.Key), info.Size, nil
 	}
 
-	return fmt.Sprintf("%s/%s", info.Bucket, info.Key), info.Size, nil
+	if err.Error() == "Bad request: Empty body" {
+		r, err := s.PutEmptyObject(bucket, fpath, entry)
+		return r, 0, err
+	}
+
+	return "", 0, err
 }
 
 func (s *StorageGarage) PutEmptyObject(bucket Bucket, fpath string, entry *utils.FileEntry) (string, error) {
@@ -279,7 +305,7 @@ func (s *StorageGarage) PutEmptyObject(bucket Bucket, fpath string, entry *utils
 		opts.UserMetadata["Mtime"] = fmt.Sprint(entry.Mtime)
 	}
 
-	info, err := s.Client.PutObject(context.TODO(), bucket.Name, fpath, nil, 0, opts)
+	info, err := s.Client.PutObject(context.TODO(), bucket.Name, cleanPath(fpath), nil, 0, opts)
 
 	if err != nil {
 		return "", err
@@ -289,6 +315,6 @@ func (s *StorageGarage) PutEmptyObject(bucket Bucket, fpath string, entry *utils
 }
 
 func (s *StorageGarage) DeleteObject(bucket Bucket, fpath string) error {
-	err := s.Client.RemoveObject(context.TODO(), bucket.Name, fpath, minio.RemoveObjectOptions{})
+	err := s.Client.RemoveObject(context.TODO(), bucket.Name, cleanPath(fpath), minio.RemoveObjectOptions{})
 	return err
 }
