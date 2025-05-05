@@ -71,6 +71,10 @@ func (m *PubkeysPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.C
 		}
 		if msg.Matches('y') {
 			if m.confirm {
+				cursor := int(m.list.Cursor())
+				if cursor >= len(m.keys) {
+					return nil, nil
+				}
 				m.confirm = false
 				err := m.shared.Dbpool.RemoveKeys([]string{m.keys[m.list.Cursor()].ID})
 				if err != nil {

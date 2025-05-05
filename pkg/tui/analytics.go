@@ -121,6 +121,10 @@ func (m *AnalyticsPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw
 			}), nil
 		}
 		if msg.Matches(vaxis.KeyEnter) {
+			cursor := int(m.leftPane.Cursor())
+			if cursor >= len(m.sites) {
+				return nil, nil
+			}
 			m.selected = m.sites[m.leftPane.Cursor()].Url
 			m.loadingDetails = true
 			go m.fetchSiteStats(m.selected, m.interval)

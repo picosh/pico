@@ -77,6 +77,10 @@ func (m *MenuPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Comm
 		}), nil
 	case vaxis.Key:
 		if msg.Matches(vaxis.KeyEnter) {
+			cursor := int(m.list.Cursor())
+			if cursor >= len(menuChoices) {
+				return nil, nil
+			}
 			choice := menuChoices[m.list.Cursor()]
 			m.shared.App.PostEvent(Navigate{To: choice})
 		}

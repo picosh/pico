@@ -65,6 +65,10 @@ func (m *TokensPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Co
 		}
 		if msg.Matches('y') {
 			if m.confirm {
+				cursor := int(m.list.Cursor())
+				if cursor >= len(m.tokens) {
+					return nil, nil
+				}
 				m.confirm = false
 				err := m.shared.Dbpool.RemoveToken(m.tokens[m.list.Cursor()].ID)
 				if err != nil {
