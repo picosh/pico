@@ -121,6 +121,7 @@ func (s *StorageGarage) UpsertBucket(name string) (Bucket, error) {
 		return bucket, nil
 	}
 
+	s.Logger.Info("creating bucket", "name", name)
 	createBucketRequest := garage.NewCreateBucketRequest()
 	createBucketRequest.SetGlobalAlias(name)
 
@@ -155,6 +156,7 @@ func (s *StorageGarage) UpsertBucket(name string) (Bucket, error) {
 }
 
 func (s *StorageGarage) GetBucketQuota(bucket Bucket) (uint64, error) {
+	s.Logger.Info("getting bucket quota", "name", bucket.Name)
 	info, _, err := s.Admin.BucketAPI.GetBucketInfo(s.AdminCtx).GlobalAlias(bucket.Name).Execute()
 	if err != nil {
 		return 0, err
@@ -172,6 +174,7 @@ func (s *StorageGarage) GetBucketQuota(bucket Bucket) (uint64, error) {
 }
 
 func (s *StorageGarage) ListBuckets() ([]string, error) {
+	s.Logger.Info("list buckets")
 	bcks := []string{}
 	buckets, err := s.Client.ListBuckets(context.Background())
 	if err != nil {
@@ -185,6 +188,7 @@ func (s *StorageGarage) ListBuckets() ([]string, error) {
 }
 
 func (s *StorageGarage) ListObjects(bucket Bucket, dir string, recursive bool) ([]os.FileInfo, error) {
+	s.Logger.Info("list objects", "bucket", bucket.Name, "dir", dir, "recursive", recursive)
 	var fileList []os.FileInfo
 
 	resolved := strings.TrimPrefix(dir, "/")
@@ -219,6 +223,7 @@ func (s *StorageGarage) ListObjects(bucket Bucket, dir string, recursive bool) (
 }
 
 func (s *StorageGarage) DeleteBucket(bucket Bucket) error {
+	s.Logger.Info("delete bucket", "name", bucket.Name)
 	info, _, err := s.Admin.BucketAPI.GetBucketInfo(s.AdminCtx).GlobalAlias(bucket.Name).Execute()
 	if err != nil {
 		return err
@@ -234,6 +239,7 @@ func (s *StorageGarage) DeleteBucket(bucket Bucket) error {
 }
 
 func (s *StorageGarage) GetObject(bucket Bucket, fpath string) (utils.ReadAndReaderAtCloser, *ObjectInfo, error) {
+	s.Logger.Info("get object", "bucket", bucket.Name, "fpath", fpath)
 	objInfo := &ObjectInfo{
 		Size:         0,
 		LastModified: time.Time{},
@@ -266,6 +272,7 @@ func (s *StorageGarage) GetObject(bucket Bucket, fpath string) (utils.ReadAndRea
 }
 
 func (s *StorageGarage) PutObject(bucket Bucket, fpath string, contents io.Reader, entry *utils.FileEntry) (string, int64, error) {
+	s.Logger.Info("put object", "bucket", bucket.Name, "fpath", fpath)
 	opts := minio.PutObjectOptions{
 		UserMetadata: map[string]string{
 			"Mtime": fmt.Sprint(time.Now().Unix()),
@@ -295,6 +302,7 @@ func (s *StorageGarage) PutObject(bucket Bucket, fpath string, contents io.Reade
 }
 
 func (s *StorageGarage) PutEmptyObject(bucket Bucket, fpath string, entry *utils.FileEntry) (string, error) {
+	s.Logger.Info("put empty object", "bucket", bucket.Name, "fpath", fpath)
 	opts := minio.PutObjectOptions{
 		UserMetadata: map[string]string{
 			"Mtime": fmt.Sprint(time.Now().Unix()),
@@ -315,6 +323,7 @@ func (s *StorageGarage) PutEmptyObject(bucket Bucket, fpath string, entry *utils
 }
 
 func (s *StorageGarage) DeleteObject(bucket Bucket, fpath string) error {
+	s.Logger.Info("delete object", "bucket", bucket.Name, "fpath", fpath)
 	err := s.Client.RemoveObject(context.TODO(), bucket.Name, cleanPath(fpath), minio.RemoveObjectOptions{})
 	return err
 }
