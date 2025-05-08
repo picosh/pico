@@ -185,6 +185,11 @@ func Middleware(writeHandler utils.CopyFromClientHandler) pssh.SSHServerMiddlewa
 			}()
 
 			cmdFlags := session.Command()
+			flgs := cmdFlags[1:]
+			for idx, f := range flgs {
+				// openrsync sends "delete-before" when the client provided "delete"
+				flgs[idx] = strings.ReplaceAll(f, "delete-before", "delete")
+			}
 
 			optsCtx, err := rsyncopts.ParseArguments(cmdFlags[1:], true)
 			if err != nil {
