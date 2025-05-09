@@ -1,7 +1,6 @@
 package sftp
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -118,7 +117,6 @@ func toFileEntry(r *sftp.Request) *utils.FileEntry {
 
 func (f *handler) Filewrite(r *sftp.Request) (io.WriterAt, error) {
 	entry := toFileEntry(r)
-	entry.Reader = bytes.NewReader([]byte{})
 
 	_, err := f.writeHandler.Write(f.session, entry)
 	if err != nil {

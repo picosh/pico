@@ -112,6 +112,14 @@ func (s *StorageMemory) PutObject(bucket Bucket, fpath string, contents io.Reade
 	return fmt.Sprintf("%s%s", bucket.Path, fpath), int64(len(d)), nil
 }
 
+func (s *StorageMemory) PutEmptyObject(bucket Bucket, fpath string, entry *utils.FileEntry) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.storage[bucket.Path][fpath] = ""
+	return fmt.Sprintf("%s%s", bucket.Path, fpath), nil
+}
+
 func (s *StorageMemory) DeleteObject(bucket Bucket, fpath string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

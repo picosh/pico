@@ -35,7 +35,7 @@ func TestSshServerSftp(t *testing.T) {
 	dbpool := pgsdb.NewDBMemory(logger)
 	// setup test data
 	dbpool.SetupTestData()
-	st, err := storage.NewStorageMemory(map[string]map[string]string{})
+	st, err := storage.NewStorage(logger)
 	if err != nil {
 		panic(err)
 	}
@@ -61,13 +61,13 @@ func TestSshServerSftp(t *testing.T) {
 	}
 	defer client.Close()
 
-	_, err = WriteFileWithSftp(cfg, client)
+	_, err = writeFileWithSftp(cfg, client)
 	if err != nil {
 		t.Error(err)
 		return
 	}
 
-	_, err = WriteFilesMultProjectsWithSftp(cfg, client)
+	_, err = writeFilesMultProjectsWithSftp(cfg, client)
 	if err != nil {
 		t.Error(err)
 		return
@@ -117,7 +117,7 @@ func TestSshServerRsync(t *testing.T) {
 	dbpool := pgsdb.NewDBMemory(logger)
 	// setup test data
 	dbpool.SetupTestData()
-	st, err := storage.NewStorageMemory(map[string]map[string]string{})
+	st, err := storage.NewStorage(logger)
 	if err != nil {
 		panic(err)
 	}
@@ -412,7 +412,7 @@ func GenerateUser() UserSSH {
 	}
 }
 
-func WriteFileWithSftp(cfg *PgsConfig, conn *ssh.Client) (*os.FileInfo, error) {
+func writeFileWithSftp(cfg *PgsConfig, conn *ssh.Client) (*os.FileInfo, error) {
 	// open an SFTP session over an existing ssh connection.
 	client, err := sftp.NewClient(conn)
 	if err != nil {
@@ -443,7 +443,7 @@ func WriteFileWithSftp(cfg *PgsConfig, conn *ssh.Client) (*os.FileInfo, error) {
 	return &fi, nil
 }
 
-func WriteFilesMultProjectsWithSftp(cfg *PgsConfig, conn *ssh.Client) (*os.FileInfo, error) {
+func writeFilesMultProjectsWithSftp(cfg *PgsConfig, conn *ssh.Client) (*os.FileInfo, error) {
 	// open an SFTP session over an existing ssh connection.
 	client, err := sftp.NewClient(conn)
 	if err != nil {

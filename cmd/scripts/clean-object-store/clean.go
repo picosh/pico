@@ -38,14 +38,11 @@ func main() {
 	picoCfg := shared.NewConfigSite()
 	picoCfg.Logger = logger
 	picoCfg.DbURL = os.Getenv("DATABASE_URL")
-	picoCfg.MinioURL = os.Getenv("MINIO_URL")
-	picoCfg.MinioUser = os.Getenv("MINIO_ROOT_USER")
-	picoCfg.MinioPass = os.Getenv("MINIO_ROOT_PASSWORD")
 	picoDb, err := pgsdb.NewDB(picoCfg.DbURL, picoCfg.Logger)
 	bail(err)
 
 	var st storage.StorageServe
-	st, err = storage.NewStorageMinio(logger, picoCfg.MinioURL, picoCfg.MinioUser, picoCfg.MinioPass)
+	st, err = storage.NewStorageMinio(logger, utils.GetEnv("MINIO_URL", ""), utils.GetEnv("MINIO_ROOT_USER", ""), utils.GetEnv("MINIO_ROOT_PASSWORD", ""))
 	bail(err)
 
 	logger.Info("fetching all users")
