@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"strings"
 
 	"git.sr.ht/~rockorager/vaxis"
@@ -48,11 +49,20 @@ var purp = vaxis.HexColor(0xBD93F9)
 var black = vaxis.HexColor(0x282A36)
 
 func createDrawCtx(ctx vxfw.DrawContext, h uint16) vxfw.DrawContext {
+	// setting some sane defaults to prevent exceptions
+	var height uint16 = 1
+	if h >= height {
+		height = h
+	}
+	var width uint16 = 80
+	if ctx.Max.Width < math.MaxUint16 {
+		width = ctx.Max.Width
+	}
 	return vxfw.DrawContext{
 		Characters: ctx.Characters,
 		Max: vxfw.Size{
-			Width:  ctx.Max.Width,
-			Height: h,
+			Width:  width,
+			Height: height,
 		},
 	}
 }
