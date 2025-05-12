@@ -66,9 +66,13 @@
         {{.Contents}}
 
         <div class="tags">
-        {{range .Tags}}
-            <code class="pill tag"><a href="{{$.BlogURL}}?tag={{.}}">#{{.}}</a></code>
-        {{end}}
+          {{range .Tags}}
+              <code class="pill tag"><a href="{{$.BlogURL}}?tag={{.}}">#{{.}}</a></code>
+          {{end}}
+        </div>
+
+        <div id="last-updated" class="text-sm">
+          last updated: <time datetime="{{.UpdatedAtISO}}">{{.UpdatedAt}}</time>
         </div>
 
         <div id="post-footer">{{.Footer}}</div>

@@ -87,6 +87,8 @@ type PostPageData struct {
 	Favicon      template.URL
 	Unlisted     bool
 	Diff         template.HTML
+	UpdatedAtISO string
+	UpdatedAt    string
 }
 
 type HeaderTxt struct {
@@ -426,6 +428,8 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			Slug:         post.Slug,
 			PublishAt:    post.PublishAt.Format(time.DateOnly),
 			PublishAtISO: post.PublishAt.Format(time.RFC3339),
+			UpdatedAt:    post.UpdatedAt.Format(time.DateOnly),
+			UpdatedAtISO: post.UpdatedAt.Format(time.RFC3339),
 			Username:     username,
 			BlogName:     blogName,
 			Contents:     template.HTML(parsedText.Html),
@@ -471,6 +475,8 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			Title:        title,
 			PublishAt:    time.Now().Format(time.DateOnly),
 			PublishAtISO: time.Now().Format(time.RFC3339),
+			UpdatedAt:    post.UpdatedAt.Format(time.DateOnly),
+			UpdatedAtISO: post.UpdatedAt.Format(time.RFC3339),
 			Username:     username,
 			BlogName:     blogName,
 			HasCSS:       hasCSS,
