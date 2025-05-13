@@ -467,16 +467,18 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			contents = template.HTML(notFoundParsed.Html)
 		}
 
+		now := time.Now()
+
 		data = PostPageData{
 			Site:         *cfg.GetSiteData(),
 			BlogURL:      template.URL(cfg.FullBlogURL(curl, username)),
 			PageTitle:    title,
 			Description:  desc,
 			Title:        title,
-			PublishAt:    time.Now().Format(time.DateOnly),
-			PublishAtISO: time.Now().Format(time.RFC3339),
-			UpdatedAt:    post.UpdatedAt.Format(time.DateOnly),
-			UpdatedAtISO: post.UpdatedAt.Format(time.RFC3339),
+			PublishAt:    now.Format(time.DateOnly),
+			PublishAtISO: now.Format(time.RFC3339),
+			UpdatedAt:    now.Format(time.DateOnly),
+			UpdatedAtISO: now.Format(time.RFC3339),
 			Username:     username,
 			BlogName:     blogName,
 			HasCSS:       hasCSS,
