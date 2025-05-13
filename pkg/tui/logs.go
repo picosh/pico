@@ -46,32 +46,48 @@ func (m *LogsPage) Footer() []Shortcut {
 	return []Shortcut{}
 }
 
+func (m *LogsPage) filterLogLine(match string, ll *LogLine) bool {
+	if match == "" {
+		return true
+	}
+
+	lvlMatch := matched(ll.Level, match)
+	msgMatch := matched(ll.Msg, match)
+	serviceMatch := matched(ll.Service, match)
+	errMatch := matched(ll.ErrMsg, match)
+	urlMatch := matched(ll.Url, match)
+	statusMatch := matched(fmt.Sprintf("%d", ll.Status), match)
+
+	if !lvlMatch && !msgMatch && !serviceMatch && !errMatch && !urlMatch && !statusMatch {
+		return false
+	}
+
+	return true
+}
+
 func (m *LogsPage) filterLogs() {
 	match := m.input.GetValue()
-	m.filtered = []int{}
+	filtered := []int{}
 	for idx, ll := range m.logs {
-		if match == "" {
-			m.filtered = append(m.filtered, idx)
-			continue
+		if m.filterLogLine(match, ll) {
+			filtered = append(m.filtered, idx)
 		}
-
-		lvlMatch := matched(ll.Level, match)
-		msgMatch := matched(ll.Msg, match)
-		serviceMatch := matched(ll.Service, match)
-		errMatch := matched(ll.ErrMsg, match)
-		urlMatch := matched(ll.Url, match)
-		statusMatch := matched(fmt.Sprintf("%d", ll.Status), match)
-		if !lvlMatch && !msgMatch && !serviceMatch && !errMatch && !urlMatch && !statusMatch {
-			continue
-		}
-
-		m.filtered = append(m.filtered, idx)
 	}
+	m.filtered = filtered
 
 	// scroll to bottom
 	if len(m.filtered) > 0 {
 		m.list.SetCursor(uint(len(m.filtered) - 1))
 	}
+}
+
+func (m *LogsPage) CaptureEvent(ev vaxis.Event) (vxfw.Command, error) {
+	switch ev.(type) {
+	case vaxis.Key:
+		m.filterLogs()
+		return vxfw.RedrawCmd{}, nil
+	}
+	return nil, nil
 }
 
 func (m *LogsPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
@@ -84,7 +100,8 @@ func (m *LogsPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Comm
 	case PageOut:
 		m.done()
 	case LogLineLoaded:
-		m.logs = append(m.logs, NewLogLine(msg.Line))
+		ll := NewLogLine(msg.Line)
+		m.logs = append(m.logs, ll)
 		m.filterLogs()
 		return vxfw.RedrawCmd{}, nil
 	}
