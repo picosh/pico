@@ -3,6 +3,7 @@ PGHOST?="db"
 PGUSER?="postgres"
 PORT?="5432"
 DB_CONTAINER?=pico-postgres-1
+GARAGE_CONTAINER?=pico-garage-1
 DOCKER_TAG?=$(shell git log --format="%H" -n 1)
 DOCKER_PLATFORM?=linux/amd64,linux/arm64
 DOCKER_CMD?=docker
@@ -25,8 +26,12 @@ lint:
 .PHONY: lint
 
 test:
-	go test ./...
+	STORAGE_TYPE="memory" go test ./...
 .PHONY: test
+
+test_storage:
+	go run ./cmd/scripts/storage
+.PHONY:
 
 snaps:
 	UPDATE_SNAPS=true go test ./...
@@ -149,3 +154,26 @@ restore:
 	$(DOCKER_CMD) exec -it $(DB_CONTAINER) /bin/bash
 	# psql postgres -U postgres -d pico < /backup.sql
 .PHONY: restore
+
+dev-db-up:
+	$(DOCKER_CMD) compose --profile db up -d
+	sleep 2
+	make create migrate
+	make setup-dev-garage
+.PHONY: dev-db-up
+
+dev-db-down:
+	$(DOCKER_CMD) compose --profile db down
+.PHONY: dev-db-down
+
+setup-dev-db:
+	$(DOCKER_CMD) exec $(GARAGE_CONTAINER) /garage layout assign -z ash -c 10G $(shell $(DOCKER_CMD) exec $(GARAGE_CONTAINER) /garage status 2>&1 | grep -A 1 ID | tail -n1 | awk '{print $$1}')
+	$(DOCKER_CMD) exec $(GARAGE_CONTAINER) /garage layout apply --version 1
+.PHONY: setup-dev-db
+
+setup-dev-garage:
+	$(DOCKER_CMD) exec $(GARAGE_CONTAINER) /garage layout assign -z ash -c 10G $(shell $(DOCKER_CMD) exec $(GARAGE_CONTAINER) /garage status 2>&1 | grep -A 1 ID | tail -n1 | awk '{print $$1}')
+	$(DOCKER_CMD) exec $(GARAGE_CONTAINER) /garage layout apply --version 1
+	$(DOCKER_CMD) exec $(GARAGE_CONTAINER) /garage key import --yes -n dev GK03c0bc4880d00a540d929ee9 88a01d80ba28c04f2c7013445506bdcd883cb44aa32e63731bcd42971697f171
+	$(DOCKER_CMD) exec $(GARAGE_CONTAINER) /garage key allow --create-bucket dev
+.PHONY: setup-dev-garage

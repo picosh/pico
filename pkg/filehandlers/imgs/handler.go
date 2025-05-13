@@ -150,6 +150,10 @@ func (h *UploadImgHandler) Write(s *pssh.SSHServerConnSession, entry *sendutils.
 
 	filename := filepath.Base(entry.Filepath)
 
+	if entry.Reader == nil {
+		return "", nil
+	}
+
 	var text []byte
 	if b, err := io.ReadAll(entry.Reader); err == nil {
 		text = b

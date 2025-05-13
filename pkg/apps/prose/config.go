@@ -13,9 +13,6 @@ func NewConfigSite(service string) *shared.ConfigSite {
 	port := utils.GetEnv("PROSE_WEB_PORT", "3000")
 	protocol := utils.GetEnv("PROSE_PROTOCOL", "https")
 	storageDir := utils.GetEnv("PROSE_STORAGE_DIR", ".storage")
-	minioURL := utils.GetEnv("MINIO_URL", "")
-	minioUser := utils.GetEnv("MINIO_ROOT_USER", "")
-	minioPass := utils.GetEnv("MINIO_ROOT_PASSWORD", "")
 	dbURL := utils.GetEnv("DATABASE_URL", "")
 	maxSize := uint64(25 * utils.MB)
 	maxImgSize := int64(10 * utils.MB)
@@ -27,9 +24,6 @@ func NewConfigSite(service string) *shared.ConfigSite {
 		Protocol:   protocol,
 		DbURL:      dbURL,
 		StorageDir: storageDir,
-		MinioURL:   minioURL,
-		MinioUser:  minioUser,
-		MinioPass:  minioPass,
 		Space:      "prose",
 		AllowedExt: []string{
 			".md",

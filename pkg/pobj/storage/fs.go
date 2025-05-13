@@ -145,6 +145,27 @@ func (s *StorageFS) PutObject(bucket Bucket, fpath string, contents io.Reader, e
 	return loc, size, nil
 }
 
+func (s *StorageFS) PutEmptyObject(bucket Bucket, fpath string, entry *utils.FileEntry) (string, error) {
+	loc := filepath.Join(bucket.Path, fpath)
+	err := os.MkdirAll(filepath.Dir(loc), os.ModePerm)
+	if err != nil {
+		return "", err
+	}
+
+	f, err := os.OpenFile(loc, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	if entry.Mtime > 0 {
+		uTime := time.Unix(entry.Mtime, 0)
+		_ = os.Chtimes(loc, uTime, uTime)
+	}
+
+	return loc, nil
+}
+
 func (s *StorageFS) DeleteObject(bucket Bucket, fpath string) error {
 	loc := filepath.Join(bucket.Path, fpath)
 	err := os.Remove(loc)
