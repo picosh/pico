@@ -273,6 +273,10 @@ func (m *TunsPage) HandleEvent(ev vaxis.Event, ph vxfw.EventPhase) (vxfw.Command
 	case vaxis.Key:
 		if msg.Matches(vaxis.KeyEnter) {
 			m.mu.Lock()
+			cursor := int(m.leftPane.Cursor())
+			if cursor >= len(m.tuns) {
+				return nil, nil
+			}
 			m.selected = m.tuns[m.leftPane.Cursor()].TunAddress
 			m.logs = []*ResultLog{}
 			m.eventLogs = []*db.TunsEventLog{}
