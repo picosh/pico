@@ -3,6 +3,5 @@ linters:
   default: standard
   enable:
     - godot
-    - goimports
 run:
   timeout: 10m
