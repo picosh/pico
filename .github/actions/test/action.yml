@@ -10,7 +10,7 @@ runs:
       with:
         go-version: 1.24
     - name: Lint the codebase
-      uses: golangci/golangci-lint-action@v3
+      uses: golangci/golangci-lint-action@v8
       with:
         version: latest
     - name: Run tests
