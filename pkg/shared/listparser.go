@@ -101,26 +101,27 @@ func PublishAtDate(date string) (*time.Time, error) {
 }
 
 func TokenToMetaField(meta *ListMetaData, token *SplitToken) error {
-	if token.Key == "publish_at" {
+	switch token.Key {
+	case "publish_at":
 		publishAt, err := PublishAtDate(token.Value)
 		if err == nil {
 			meta.PublishAt = publishAt
 		}
-	} else if token.Key == "title" {
+	case "title":
 		meta.Title = token.Value
-	} else if token.Key == "description" {
+	case "description":
 		meta.Description = token.Value
-	} else if token.Key == "list_type" {
+	case "list_type":
 		meta.ListType = token.Value
-	} else if token.Key == "tags" {
+	case "tags":
 		tags := strings.Split(token.Value, ",")
 		meta.Tags = make([]string, 0)
 		for _, tag := range tags {
 			meta.Tags = append(meta.Tags, strings.TrimSpace(tag))
 		}
-	} else if token.Key == "layout" {
+	case "layout":
 		meta.Layout = token.Value
-	} else if token.Key == "digest_interval" {
+	case "digest_interval":
 		if !slices.Contains(DigestIntervalOpts, token.Value) {
 			return fmt.Errorf(
 				"(%s) is not a valid option, choose from [%s]",
@@ -129,9 +130,9 @@ func TokenToMetaField(meta *ListMetaData, token *SplitToken) error {
 			)
 		}
 		meta.DigestInterval = token.Value
-	} else if token.Key == "email" {
+	case "email":
 		meta.Email = token.Value
-	} else if token.Key == "inline_content" {
+	case "inline_content":
 		v, err := strconv.ParseBool(token.Value)
 		if err != nil {
 			// its empty or its improperly configured, just send the content

@@ -187,16 +187,17 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 
 			cmd := strings.TrimSpace(args[0])
 			if len(args) == 1 {
-				if cmd == "help" {
+				switch cmd {
+				case "help":
 					opts.help()
 					return nil
-				} else if cmd == "logs" {
+				case "logs":
 					err = opts.logs(sesh.Context())
 					if err != nil {
 						sesh.Fatal(err)
 					}
 					return nil
-				} else {
+				default:
 					return next(sesh)
 				}
 			}

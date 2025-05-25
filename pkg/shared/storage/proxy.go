@@ -38,12 +38,13 @@ func UriToImgProcessOpts(uri string) (*ImgProcessOpts, error) {
 				if sg == "" {
 					continue
 				}
-				if idx == 1 {
+				switch idx {
+				case 1:
 					r.Width, err = strconv.Atoi(sg)
 					if err != nil {
 						return opts, err
 					}
-				} else if idx == 2 {
+				case 2:
 					r.Height, err = strconv.Atoi(sg)
 					if err != nil {
 						return opts, err

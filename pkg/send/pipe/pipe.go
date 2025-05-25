@@ -51,7 +51,7 @@ func Middleware(writeHandler utils.CopyFromClientHandler, ext string) pssh.SSHSe
 			}
 
 			if result != "" {
-				_, err = session.Write([]byte(fmt.Sprintf("%s\r\n", result)))
+				_, err := fmt.Fprintf(session, fmt.Sprintf("%s\r\n", result))
 				if err != nil {
 					utils.ErrorHandler(session, err)
 				}

@@ -73,7 +73,7 @@ func (f *handler) Filelist(r *sftp.Request) (sftp.ListerAt, error) {
 
 		if !list {
 			listData = slices.DeleteFunc(listData, func(f os.FileInfo) bool {
-				return !(f.Name() == "" || f.Name() == filepath.Base(r.Filepath))
+				return f.Name() != "" && f.Name() != filepath.Base(r.Filepath)
 			})
 		}
 

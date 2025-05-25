@@ -443,7 +443,7 @@ func StartApiServer() {
 
 	go func() {
 		for {
-			_, err := pingSession.Write([]byte(fmt.Sprintf("%s: pipe-web ping\n", time.Now().UTC().Format(time.RFC3339))))
+			_, err := fmt.Fprintf(pingSession, fmt.Sprintf("%s: pipe-web ping\n", time.Now().UTC().Format(time.RFC3339)))
 			if err != nil {
 				logger.Error("pipe ping error", "err", err.Error())
 			}

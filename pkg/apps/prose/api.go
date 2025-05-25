@@ -387,8 +387,8 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			logger.Error("readme", "err", err.Error())
 		}
-		if readmeParsed.MetaData.Title != "" {
-			blogName = readmeParsed.MetaData.Title
+		if readmeParsed.Title != "" {
+			blogName = readmeParsed.Title
 		}
 		withStyles = readmeParsed.WithStyles
 		ogImage = readmeParsed.Image
@@ -455,11 +455,11 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				logger.Error("parse not found file", "err", err.Error())
 			}
-			if notFoundParsed.MetaData.Title != "" {
-				title = notFoundParsed.MetaData.Title
+			if notFoundParsed.Title != "" {
+				title = notFoundParsed.Title
 			}
-			if notFoundParsed.MetaData.Description != "" {
-				desc = notFoundParsed.MetaData.Description
+			if notFoundParsed.Description != "" {
+				desc = notFoundParsed.Description
 			}
 			ogImage = notFoundParsed.Image
 			ogImageCard = notFoundParsed.ImageCard

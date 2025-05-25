@@ -4,77 +4,82 @@ import "path/filepath"
 
 func GetMimeType(fpath string) string {
 	ext := filepath.Ext(fpath)
-	if ext == ".svg" {
+	switch ext {
+	case ".svg":
 		return "image/svg+xml"
-	} else if ext == ".css" {
+	case ".css":
 		return "text/css"
-	} else if ext == ".js" {
+	case ".js":
 		return "text/javascript"
-	} else if ext == ".ico" {
+	case ".ico":
 		return "image/x-icon"
-	} else if ext == ".pdf" {
+	case ".pdf":
 		return "application/pdf"
-	} else if ext == ".html" || ext == ".htm" {
+	case ".htm":
+	case ".html":
 		return "text/html"
-	} else if ext == ".jpg" || ext == ".jpeg" {
+	case ".jpeg":
+	case ".jpg":
 		return "image/jpeg"
-	} else if ext == ".png" {
+	case ".png":
 		return "image/png"
-	} else if ext == ".gif" {
+	case ".gif":
 		return "image/gif"
-	} else if ext == ".webp" {
+	case ".webp":
 		return "image/webp"
-	} else if ext == ".otf" {
+	case ".otf":
 		return "font/otf"
-	} else if ext == ".woff" {
+	case ".woff":
 		return "font/woff"
-	} else if ext == ".woff2" {
+	case ".woff2":
 		return "font/woff2"
-	} else if ext == ".ttf" {
+	case ".ttf":
 		return "font/ttf"
-	} else if ext == ".md" {
+	case ".md":
 		return "text/markdown; charset=UTF-8"
-	} else if ext == ".json" || ext == ".map" {
+	case ".map":
+	case ".json":
 		return "application/json"
-	} else if ext == ".rss" {
+	case ".rss":
 		return "application/rss+xml"
-	} else if ext == ".atom" {
+	case ".atom":
 		return "application/atom+xml"
-	} else if ext == ".webmanifest" {
+	case ".webmanifest":
 		return "application/manifest+json"
-	} else if ext == ".xml" {
+	case ".xml":
 		return "application/xml"
-	} else if ext == ".xsl" {
+	case ".xsl":
 		return "application/xml"
-	} else if ext == ".avif" {
+	case ".avif":
 		return "image/avif"
-	} else if ext == ".heif" {
+	case ".heif":
 		return "image/heif"
-	} else if ext == ".heic" {
+	case ".heic":
 		return "image/heif"
-	} else if ext == ".opus" {
+	case ".opus":
 		return "audio/opus"
-	} else if ext == ".wav" {
+	case ".wav":
 		return "audio/wav"
-	} else if ext == ".mp3" {
+	case ".mp3":
 		return "audio/mpeg"
-	} else if ext == ".mp4" {
+	case ".mp4":
 		return "video/mp4"
-	} else if ext == ".mpeg" {
+	case ".mpeg":
 		return "video/mpeg"
-	} else if ext == ".wasm" {
+	case ".wasm":
 		return "application/wasm"
-	} else if ext == ".opml" {
+	case ".opml":
 		return "text/x-opml"
-	} else if ext == ".eot" {
+	case ".eot":
 		return "application/vnd.ms-fontobject"
-	} else if ext == ".yml" || ext == ".yaml" {
+	case ".yaml":
+	case ".yml":
 		return "text/x-yaml"
-	} else if ext == ".zip" {
+	case ".zip":
 		return "application/zip"
-	} else if ext == ".rar" {
+	case ".rar":
 		return "application/vnd.rar"
-	} else if ext == ".txt" {
+	case ".txt":
 		return "text/plain"
 	}
 

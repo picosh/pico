@@ -150,7 +150,7 @@ func (h *ScpUploadHandler) Write(s *pssh.SSHServerConnSession, entry *sendutils.
 	if post != nil {
 		metadata.Cur = post
 		metadata.Data = post.Data
-		metadata.Post.PublishAt = post.PublishAt
+		metadata.PublishAt = post.PublishAt
 	}
 
 	err = h.Hooks.FileMeta(s, &metadata)

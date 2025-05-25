@@ -147,7 +147,7 @@ func (s *SSHServerConnSession) Close() error {
 
 func (s *SSHServerConnSession) Exit(code int) error {
 	status := struct{ Status uint32 }{uint32(code)}
-	_, err := s.Channel.SendRequest("exit-status", false, ssh.Marshal(&status))
+	_, err := s.SendRequest("exit-status", false, ssh.Marshal(&status))
 	return err
 }
 

@@ -12,6 +12,7 @@ func Middleware(writeHandler utils.CopyFromClientHandler) pssh.SSHServerMiddlewa
 	return func(sshHandler pssh.SSHServerHandler) pssh.SSHServerHandler {
 		return func(session *pssh.SSHServerConnSession) error {
 			cmd := session.Command()
+			//nolint
 			if !(len(cmd) > 1 && cmd[0] == "command" && cmd[1] == "ls") {
 				return sshHandler(session)
 			}

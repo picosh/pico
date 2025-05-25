@@ -74,11 +74,11 @@ func (p *MarkdownHooks) FileMeta(s *pssh.SSHServerConnSession, data *filehandler
 	data.Description = parsedText.Description
 
 	if parsedText.PublishAt != nil && !parsedText.PublishAt.IsZero() {
-		data.PublishAt = parsedText.MetaData.PublishAt
+		data.PublishAt = parsedText.PublishAt
 	}
 
 	isHiddenFilename := slices.Contains(p.Cfg.HiddenPosts, data.Filename)
-	data.Hidden = parsedText.MetaData.Hidden || isHiddenFilename
+	data.Hidden = parsedText.Hidden || isHiddenFilename
 
 	return nil
 }

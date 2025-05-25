@@ -30,11 +30,7 @@ func PtyMdw(mdw SSHServerMiddleware, waitTimeout time.Duration) SSHServerMiddlew
 			if waitTimeout > 0 {
 				afterTime := time.Now().Add(waitTimeout)
 
-				for {
-					if time.Now().After(afterTime) {
-						break
-					}
-
+				for time.Now().After(afterTime) {
 					_, _, ok := sesh.Pty()
 					if ok {
 						break

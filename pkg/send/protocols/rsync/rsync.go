@@ -157,7 +157,7 @@ func (h *handler) Remove(willReceive []*rsyncutils.ReceiverFile) error {
 
 	for _, file := range toDelete {
 		errs = append(errs, h.writeHandler.Delete(h.session, &utils.FileEntry{Filepath: path.Join("/", h.root, file)}))
-		_, err = h.session.Stderr().Write([]byte(fmt.Sprintf("deleting %s\r\n", file)))
+		_, err = fmt.Fprintf(h.session.Stderr(), fmt.Sprintf("deleting %s\r\n", file))
 		errs = append(errs, err)
 	}
 

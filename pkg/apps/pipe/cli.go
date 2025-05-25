@@ -254,11 +254,12 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 							var pipes []*psub.Client
 
 							for _, client := range channel.GetClients() {
-								if client.Direction == psub.ChannelDirectionInput {
+								switch client.Direction {
+								case psub.ChannelDirectionInput:
 									pubs = append(pubs, client)
-								} else if client.Direction == psub.ChannelDirectionOutput {
+								case psub.ChannelDirectionOutput:
 									subs = append(subs, client)
-								} else if client.Direction == psub.ChannelDirectionInputOutput {
+								case psub.ChannelDirectionInputOutput:
 									pipes = append(pipes, client)
 								}
 							}

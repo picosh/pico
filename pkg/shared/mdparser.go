@@ -257,7 +257,7 @@ func ParseText(text string) (*ParsedText, error) {
 	}
 	// 3. else, set it to nothing (slug should get used later down the line)
 	// this is implicit since it's already ""
-	parsed.MetaData.Title = title
+	parsed.Title = title
 
 	// only handle toc after the title is extracted (if it's getting extracted)
 	mtoc, err := toToc(metaData["toc"])
@@ -275,49 +275,49 @@ func ParseText(text string) (*ParsedText, error) {
 	if err != nil {
 		return &parsed, fmt.Errorf("front-matter field (%s): %w", "description", err)
 	}
-	parsed.MetaData.Description = description
+	parsed.Description = description
 
 	domain, err := toString(metaData["domain"])
 	if err != nil {
 		return &parsed, fmt.Errorf("front-matter field (%s): %w", "domain", err)
 	}
-	parsed.MetaData.Domain = domain
+	parsed.Domain = domain
 
 	layout, err := toString(metaData["layout"])
 	if err != nil {
 		return &parsed, fmt.Errorf("front-matter field (%s): %w", "layout", err)
 	}
-	parsed.MetaData.Layout = layout
+	parsed.Layout = layout
 
 	image, err := toString(metaData["image"])
 	if err != nil {
 		return &parsed, fmt.Errorf("front-matter field (%s): %w", "image", err)
 	}
-	parsed.MetaData.Image = image
+	parsed.Image = image
 
 	card, err := toString(metaData["card"])
 	if err != nil {
 		return &parsed, fmt.Errorf("front-matter field (%s): %w", "card", err)
 	}
-	parsed.MetaData.ImageCard = card
+	parsed.ImageCard = card
 
 	hidden, err := toBool(metaData["draft"], false)
 	if err != nil {
 		return &parsed, fmt.Errorf("front-matter field (%s): %w", "draft", err)
 	}
-	parsed.MetaData.Hidden = hidden
+	parsed.Hidden = hidden
 
 	withStyles, err := toBool(metaData["with_styles"], true)
 	if err != nil {
 		return &parsed, fmt.Errorf("front-matter field (%s): %w", "with_style", err)
 	}
-	parsed.MetaData.WithStyles = withStyles
+	parsed.WithStyles = withStyles
 
 	favicon, err := toString(metaData["favicon"])
 	if err != nil {
 		return &parsed, fmt.Errorf("front-matter field (%s): %w", "favicon", err)
 	}
-	parsed.MetaData.Favicon = favicon
+	parsed.Favicon = favicon
 
 	publishAt := &time.Time{}
 	date, err := toString(metaData["date"])
@@ -332,7 +332,7 @@ func ParseText(text string) (*ParsedText, error) {
 		}
 		publishAt = &nextDate
 	}
-	parsed.MetaData.PublishAt = publishAt
+	parsed.PublishAt = publishAt
 
 	orderedMetaData := meta.GetItems(context)
 
@@ -340,13 +340,13 @@ func ParseText(text string) (*ParsedText, error) {
 	if err != nil {
 		return &parsed, err
 	}
-	parsed.MetaData.Nav = nav
+	parsed.Nav = nav
 
 	aliases, err := toAliases(metaData["aliases"])
 	if err != nil {
 		return &parsed, err
 	}
-	parsed.MetaData.Aliases = aliases
+	parsed.Aliases = aliases
 
 	rtags := metaData["tags"]
 	tags, err := toTags(rtags)
@@ -357,7 +357,7 @@ func ParseText(text string) (*ParsedText, error) {
 	if rtags == nil {
 		tags = AstTags(doc)
 	}
-	parsed.MetaData.Tags = tags
+	parsed.Tags = tags
 
 	// Rendering happens last to allow any of the previous steps to manipulate
 	// the AST.
