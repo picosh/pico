@@ -244,12 +244,12 @@ func (h *UploadHandler) ProcessAuthorizedKeys(text []byte, logger *slog.Logger, 
 	for _, pk := range diff.Add {
 		key := utils.KeyForKeyText(pk.Pk)
 
-		fmt.Fprintf(s.Stderr(), "adding pubkey (%s)\n", key)
+		_, _ = fmt.Fprintf(s.Stderr(), "adding pubkey (%s)\n", key)
 		logger.Info("adding pubkey", "pubkey", key)
 
 		err = dbpool.InsertPublicKey(user.ID, key, pk.Comment, nil)
 		if err != nil {
-			fmt.Fprintf(s.Stderr(), "error: could not insert pubkey: %s (%s)\n", err.Error(), key)
+			_, _ = fmt.Fprintf(s.Stderr(), "error: could not insert pubkey: %s (%s)\n", err.Error(), key)
 			logger.Error("could not insert pubkey", "err", err.Error())
 		}
 	}
@@ -257,7 +257,7 @@ func (h *UploadHandler) ProcessAuthorizedKeys(text []byte, logger *slog.Logger, 
 	for _, pk := range diff.Update {
 		key := utils.KeyForKeyText(pk.Pk)
 
-		fmt.Fprintf(s.Stderr(), "updating pubkey with comment: %s (%s)\n", pk.Comment, key)
+		_, _ = fmt.Fprintf(s.Stderr(), "updating pubkey with comment: %s (%s)\n", pk.Comment, key)
 		logger.Info(
 			"updating pubkey with comment",
 			"pubkey", key,
@@ -266,18 +266,18 @@ func (h *UploadHandler) ProcessAuthorizedKeys(text []byte, logger *slog.Logger, 
 
 		_, err = dbpool.UpdatePublicKey(pk.ID, pk.Comment)
 		if err != nil {
-			fmt.Fprintf(s.Stderr(), "error: could not update pubkey: %s (%s)\n", err.Error(), key)
+			_, _ = fmt.Fprintf(s.Stderr(), "error: could not update pubkey: %s (%s)\n", err.Error(), key)
 			logger.Error("could not update pubkey", "err", err.Error(), "key", key)
 		}
 	}
 
 	if len(diff.Rm) > 0 {
-		fmt.Fprintf(s.Stderr(), "removing pubkeys: %s\n", diff.Rm)
+		_, _ = fmt.Fprintf(s.Stderr(), "removing pubkeys: %s\n", diff.Rm)
 		logger.Info("removing pubkeys", "pubkeys", diff.Rm)
 
 		err = dbpool.RemoveKeys(diff.Rm)
 		if err != nil {
-			fmt.Fprintf(s.Stderr(), "error: could not rm pubkeys: %s\n", err.Error())
+			_, _ = fmt.Fprintf(s.Stderr(), "error: could not rm pubkeys: %s\n", err.Error())
 			logger.Error("could not remove pubkey", "err", err.Error())
 		}
 	}

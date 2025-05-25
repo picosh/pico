@@ -50,7 +50,9 @@ func StartSshServer() {
 	defer cancel()
 
 	dbpool := postgres.NewDB(cfg.DbURL, cfg.Logger)
-	defer dbpool.Close()
+	defer func() {
+		_ = dbpool.Close()
+	}()
 
 	handler := NewUploadHandler(
 		dbpool,

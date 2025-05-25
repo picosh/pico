@@ -127,7 +127,9 @@ func createStaticRoutes() []shared.Route {
 func StartApiServer() {
 	cfg := NewConfigSite("feeds-web")
 	db := postgres.NewDB(cfg.DbURL, cfg.Logger)
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 	logger := cfg.Logger
 
 	// cron daily digest

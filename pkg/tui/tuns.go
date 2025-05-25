@@ -444,7 +444,9 @@ func fetch(fqdn, auth string) (map[string]*TunsClient, error) {
 	if err != nil {
 		return mapper, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	var data TunsClientApi
 	err = json.NewDecoder(resp.Body).Decode(&data)

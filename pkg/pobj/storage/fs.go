@@ -135,7 +135,10 @@ func (s *StorageFS) PutObject(bucket Bucket, fpath string, contents io.Reader, e
 		return "", 0, err
 	}
 
-	f.Close()
+	err = f.Close()
+	if err != nil {
+		return "", 0, err
+	}
 
 	if entry.Mtime > 0 {
 		uTime := time.Unix(entry.Mtime, 0)

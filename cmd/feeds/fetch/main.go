@@ -11,7 +11,9 @@ import (
 func main() {
 	cfg := feeds.NewConfigSite("feeds-fetch")
 	dbh := postgres.NewDB(cfg.DbURL, cfg.Logger)
-	defer dbh.Close()
+	defer func() {
+		_ = dbh.Close()
+	}()
 	fetcher := feeds.NewFetcher(dbh, cfg)
 	fp := gofeed.NewParser()
 	feed, err := fetcher.ParseURL(fp, "https://old.reddit.com/r/Watchexchange/.rss")

@@ -31,13 +31,13 @@ func Middleware(writeHandler utils.CopyFromClientHandler) pssh.SSHServerMiddlewa
 			defer func() {
 				if r := recover(); r != nil {
 					logger.Error("error running sftp middleware", "err", r)
-					fmt.Fprintln(session, "error running sftp middleware, check the flags you are using")
+					_, _ = fmt.Fprintln(session, "error running sftp middleware, check the flags you are using")
 				}
 			}()
 
 			err := writeHandler.Validate(session)
 			if err != nil {
-				fmt.Fprintln(session.Stderr(), err)
+				_, _ = fmt.Fprintln(session.Stderr(), err)
 				return err
 			}
 
@@ -59,7 +59,7 @@ func Middleware(writeHandler utils.CopyFromClientHandler) pssh.SSHServerMiddlewa
 
 			err = requestServer.Serve()
 			if err != nil && !errors.Is(err, io.EOF) {
-				fmt.Fprintln(session.Stderr(), err)
+				_, _ = fmt.Fprintln(session.Stderr(), err)
 				logger.Error("Error serving sftp subsystem", "err", err)
 			}
 

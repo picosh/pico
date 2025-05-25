@@ -167,7 +167,9 @@ func TestSSHServerHandleConn(t *testing.T) {
 
 	// Create a mock connection
 	client, server_conn := net.Pipe()
-	defer client.Close()
+	defer func() {
+		_ = client.Close()
+	}()
 
 	// Start HandleConn in a goroutine
 	errChan := make(chan error, 1)
@@ -190,8 +192,8 @@ func TestSSHServerHandleConn(t *testing.T) {
 	}
 
 	// Close connections to ensure HandleConn returns
-	client.Close()
-	server_conn.Close()
+	_ = client.Close()
+	_ = server_conn.Close()
 
 	// Wait for HandleConn to return
 	select {

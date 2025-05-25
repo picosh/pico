@@ -70,6 +70,8 @@ func (f fakeWrite) Close() error {
 		nMsg := fmt.Sprintf("%s\r\n", msg)
 		_, err = f.handler.session.Stderr().Write([]byte(nMsg))
 	}
-	f.buf.Close()
-	return err
+	if err != nil {
+		return err
+	}
+	return f.buf.Close()
 }

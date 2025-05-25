@@ -157,7 +157,7 @@ func (h *handler) Remove(willReceive []*rsyncutils.ReceiverFile) error {
 
 	for _, file := range toDelete {
 		errs = append(errs, h.writeHandler.Delete(h.session, &utils.FileEntry{Filepath: path.Join("/", h.root, file)}))
-		_, err = fmt.Fprint(h.session.Stderr(), "deleting %s\r\n", file)
+		_, err = fmt.Fprintf(h.session.Stderr(), "deleting %s\r\n", file)
 		errs = append(errs, err)
 	}
 
@@ -193,25 +193,25 @@ func Middleware(writeHandler utils.CopyFromClientHandler) pssh.SSHServerMiddlewa
 
 			optsCtx, err := rsyncopts.ParseArguments(cmdFlags[1:], true)
 			if err != nil {
-				fmt.Fprintf(session.Stderr(), "error parsing rsync arguments: %s\r\n", err.Error())
+				_, _ = fmt.Fprintf(session.Stderr(), "error parsing rsync arguments: %s\r\n", err.Error())
 				return err
 			}
 
 			if optsCtx.Options.Compress() {
 				err := fmt.Errorf("compression is currently unsupported")
-				fmt.Fprintf(session.Stderr(), "error: %s\r\n", err.Error())
+				_, _ = fmt.Fprintf(session.Stderr(), "error: %s\r\n", err.Error())
 				return err
 			}
 
 			if optsCtx.Options.AlwaysChecksum() {
 				err := fmt.Errorf("checksum is currently unsupported")
-				fmt.Fprintf(session.Stderr(), "error: %s\r\n", err.Error())
+				_, _ = fmt.Fprintf(session.Stderr(), "error: %s\r\n", err.Error())
 				return err
 			}
 
 			if len(optsCtx.RemainingArgs) != 2 {
 				err := fmt.Errorf("missing source and destination arguments")
-				fmt.Fprintf(session.Stderr(), "error: %s\r\n", err.Error())
+				_, _ = fmt.Fprintf(session.Stderr(), "error: %s\r\n", err.Error())
 				return err
 			}
 

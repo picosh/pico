@@ -244,7 +244,9 @@ func (h *UploadAssetHandler) findDenylist(bucket sst.Bucket, project *db.Project
 	if err != nil {
 		return "", fmt.Errorf("_pgs_ignore not found")
 	}
-	defer fp.Close()
+	defer func() {
+		_ = fp.Close()
+	}()
 
 	buf := new(strings.Builder)
 	_, err = io.Copy(buf, fp)
@@ -344,7 +346,9 @@ func (h *UploadAssetHandler) Write(s *pssh.SSHServerConnSession, entry *sendutil
 		curFileSize = info.Size
 	}
 	if obj != nil {
-		defer obj.Close()
+		defer func() {
+			_ = obj.Close()
+		}()
 	}
 
 	denylist := getDenylist(s)
@@ -381,8 +385,8 @@ func (h *UploadAssetHandler) Write(s *pssh.SSHServerConnSession, entry *sendutil
 	remaining := int64(storageMax) - int64(curStorageSize)
 	sizeRemaining := min(remaining+curFileSize, fileMax)
 	if sizeRemaining <= 0 {
-		fmt.Fprintln(s.Stderr(), "storage quota reached")
-		fmt.Fprintf(s.Stderr(), "\r")
+		_, _ = fmt.Fprintln(s.Stderr(), "storage quota reached")
+		_, _ = fmt.Fprintf(s.Stderr(), "\r")
 		_ = s.Exit(1)
 		_ = s.Close()
 		return "", fmt.Errorf("storage quota reached")

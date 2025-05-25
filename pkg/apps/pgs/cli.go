@@ -25,14 +25,14 @@ func NewTabWriter(out io.Writer) *tabwriter.Writer {
 
 func projectTable(sesh io.Writer, projects []*db.Project) {
 	writer := NewTabWriter(sesh)
-	fmt.Fprintln(writer, "Name\tLast Updated\tLinks To\tACL Type\tACL\tBlocked")
+	_, _ = fmt.Fprintln(writer, "Name\tLast Updated\tLinks To\tACL Type\tACL\tBlocked")
 
 	for _, project := range projects {
 		links := ""
 		if project.ProjectDir != project.Name {
 			links = project.ProjectDir
 		}
-		fmt.Fprintf(
+		_, _ = fmt.Fprintf(
 			writer,
 			"%s\t%s\t%s\t%s\t%s\t%s\r\n",
 			project.Name,
@@ -43,7 +43,7 @@ func projectTable(sesh io.Writer, projects []*db.Project) {
 			project.Blocked,
 		)
 	}
-	writer.Flush()
+	_ = writer.Flush()
 }
 
 type Cmd struct {
@@ -184,11 +184,11 @@ func (c *Cmd) help() {
 	}
 
 	writer := NewTabWriter(c.Session)
-	fmt.Fprintln(writer, "Cmd\tDescription")
+	_, _ = fmt.Fprintln(writer, "Cmd\tDescription")
 	for _, dat := range data {
-		fmt.Fprintf(writer, "%s\t%s\r\n", dat[0], dat[1])
+		_, _ = fmt.Fprintf(writer, "%s\t%s\r\n", dat[0], dat[1])
 	}
-	writer.Flush()
+	_ = writer.Flush()
 }
 
 func (c *Cmd) stats(cfgMaxSize uint64) error {
@@ -217,8 +217,8 @@ func (c *Cmd) stats(cfgMaxSize uint64) error {
 	}
 
 	writer := NewTabWriter(c.Session)
-	fmt.Fprintln(writer, "Used (GB)\tQuota (GB)\tUsed (%)\tProjects (#)")
-	fmt.Fprintf(
+	_, _ = fmt.Fprintln(writer, "Used (GB)\tQuota (GB)\tUsed (%)\tProjects (#)")
+	_, _ = fmt.Fprintf(
 		writer,
 		"%.4f\t%.4f\t%.4f\t%d\r\n",
 		utils.BytesToGB(int(totalFileSize)),
@@ -226,9 +226,7 @@ func (c *Cmd) stats(cfgMaxSize uint64) error {
 		(float32(totalFileSize)/float32(storageMax))*100,
 		len(projects),
 	)
-	writer.Flush()
-
-	return nil
+	return writer.Flush()
 }
 
 func (c *Cmd) ls() error {

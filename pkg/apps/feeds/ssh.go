@@ -32,7 +32,9 @@ func StartSshServer() {
 	defer cancel()
 
 	dbh := postgres.NewDB(cfg.DbURL, cfg.Logger)
-	defer dbh.Close()
+	defer func() {
+		_ = dbh.Close()
+	}()
 
 	hooks := &FeedHooks{
 		Cfg: cfg,

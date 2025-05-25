@@ -21,7 +21,9 @@ func TestFsAdapter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(f)
+	defer func() {
+		_ = os.RemoveAll(f)
+	}()
 
 	st, err := NewStorageFS(logger, f)
 	if err != nil {

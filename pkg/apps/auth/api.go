@@ -830,7 +830,9 @@ func StartApiServer() {
 	cfg.Logger = logger
 
 	db := postgres.NewDB(cfg.DbURL, logger)
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

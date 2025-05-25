@@ -149,28 +149,28 @@ type handlererr struct {
 func (f *handlererr) Filecmd(r *sftp.Request) error {
 	err := f.Handler.Filecmd(r)
 	if err != nil {
-		fmt.Fprintln(f.Handler.session.Stderr(), err)
+		_, _ = fmt.Fprintln(f.Handler.session.Stderr(), err)
 	}
 	return err
 }
 func (f *handlererr) Filelist(r *sftp.Request) (sftp.ListerAt, error) {
 	result, err := f.Handler.Filelist(r)
 	if err != nil {
-		fmt.Fprintln(f.Handler.session.Stderr(), err)
+		_, _ = fmt.Fprintln(f.Handler.session.Stderr(), err)
 	}
 	return result, err
 }
 func (f *handlererr) Filewrite(r *sftp.Request) (io.WriterAt, error) {
 	result, err := f.Handler.Filewrite(r)
 	if err != nil {
-		fmt.Fprintln(f.Handler.session.Stderr(), err)
+		_, _ = fmt.Fprintln(f.Handler.session.Stderr(), err)
 	}
 	return result, err
 }
 func (f *handlererr) Fileread(r *sftp.Request) (io.ReaderAt, error) {
 	result, err := f.Handler.Fileread(r)
 	if err != nil {
-		fmt.Fprintln(f.Handler.session.Stderr(), err)
+		_, _ = fmt.Fprintln(f.Handler.session.Stderr(), err)
 	}
 	return result, err
 }

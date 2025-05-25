@@ -282,7 +282,9 @@ func handlePipe() http.HandlerFunc {
 			return
 		}
 
-		defer c.Close()
+		defer func() {
+			_ = c.Close()
+		}()
 
 		clientInfo := shared.NewPicoPipeClient()
 		topic, _ := url.PathUnescape(shared.GetField(r, 0))
@@ -326,7 +328,7 @@ func handlePipe() http.HandlerFunc {
 			if err != nil {
 				logger.Error("pipe remove error", "topic", topic, "info", clientInfo, "err", err.Error())
 			}
-			c.Close()
+			_ = c.Close()
 		}()
 
 		var wg sync.WaitGroup
@@ -334,8 +336,8 @@ func handlePipe() http.HandlerFunc {
 
 		go func() {
 			defer func() {
-				p.Close()
-				c.Close()
+				_ = p.Close()
+				_ = c.Close()
 				wg.Done()
 			}()
 
@@ -356,8 +358,8 @@ func handlePipe() http.HandlerFunc {
 
 		go func() {
 			defer func() {
-				p.Close()
-				c.Close()
+				_ = p.Close()
+				_ = c.Close()
 				wg.Done()
 			}()
 
@@ -415,7 +417,9 @@ func createMainRoutes(staticRoutes []shared.Route) []shared.Route {
 func StartApiServer() {
 	cfg := NewConfigSite("pipe-web")
 	db := postgres.NewDB(cfg.DbURL, cfg.Logger)
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 	logger := cfg.Logger
 
 	staticRoutes := createStaticRoutes()
@@ -443,7 +447,7 @@ func StartApiServer() {
 
 	go func() {
 		for {
-			_, err := fmt.Fprint(pingSession, "%s", fmt.Sprintf("%s: pipe-web ping\n", time.Now().UTC().Format(time.RFC3339)))
+			_, err := fmt.Fprintf(pingSession, "%s: pipe-web ping\n", time.Now().UTC().Format(time.RFC3339))
 			if err != nil {
 				logger.Error("pipe ping error", "err", err.Error())
 			}

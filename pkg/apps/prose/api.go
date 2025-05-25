@@ -926,7 +926,9 @@ func createSubdomainRoutes(staticRoutes []shared.Route) []shared.Route {
 func StartApiServer() {
 	cfg := NewConfigSite("prose-web")
 	dbpool := postgres.NewDB(cfg.DbURL, cfg.Logger)
-	defer dbpool.Close()
+	defer func() {
+		_ = dbpool.Close()
+	}()
 	logger := cfg.Logger
 
 	var st storage.StorageServe

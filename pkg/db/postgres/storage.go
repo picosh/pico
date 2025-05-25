@@ -371,7 +371,9 @@ func (me *PsqlDB) RegisterUser(username, pubkey, comment string) (*db.User, erro
 	if err != nil {
 		return nil, err
 	}
-	defer stmt.Close()
+	defer func() {
+		_ = stmt.Close()
+	}()
 
 	var id string
 	err = stmt.QueryRow(lowerName).Scan(&id)

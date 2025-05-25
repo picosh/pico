@@ -59,7 +59,9 @@ func TestSshServerSftp(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	defer client.Close()
+	defer func() {
+		_ = client.Close()
+	}()
 
 	_, err = WriteFileWithSftp(cfg, client)
 	if err != nil {
@@ -142,7 +144,9 @@ func TestSshServerRsync(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	defer conn.Close()
+	defer func() {
+		_ = conn.Close()
+	}()
 
 	// open an SFTP session over an existing ssh connection.
 	client, err := sftp.NewClient(conn)
@@ -150,7 +154,9 @@ func TestSshServerRsync(t *testing.T) {
 		cfg.Logger.Error("could not create sftp client", "err", err)
 		panic(err)
 	}
-	defer client.Close()
+	defer func() {
+		_ = client.Close()
+	}()
 
 	name, err := os.MkdirTemp("", "rsync-")
 	if err != nil {
@@ -229,7 +235,7 @@ func TestSshServerRsync(t *testing.T) {
 	}
 
 	// remove about file
-	os.Remove(aboutFile)
+	_ = os.Remove(aboutFile)
 
 	// copy files with delete
 	delCmd := exec.Command("rsync", "-rv", "--delete", "-e", eCmd, name+"/", "localhost:/test")
@@ -252,7 +258,9 @@ func TestSshServerRsync(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	defer os.RemoveAll(dlName)
+	defer func() {
+		_ = os.RemoveAll(dlName)
+	}()
 	// download files
 	downloadCmd := exec.Command("rsync", "-rvvv", "-e", eCmd, "localhost:/test/", dlName+"/")
 	result, err = downloadCmd.CombinedOutput()
@@ -351,7 +359,9 @@ func (s UserSSH) Cmd(client *ssh.Client, patch []byte, cmd string) (string, erro
 	if err != nil {
 		return "", err
 	}
-	defer session.Close()
+	defer func() {
+		_ = session.Close()
+	}()
 
 	stdinPipe, err := session.StdinPipe()
 	if err != nil {
@@ -374,7 +384,10 @@ func (s UserSSH) Cmd(client *ssh.Client, patch []byte, cmd string) (string, erro
 		}
 	}
 
-	stdinPipe.Close()
+	err = stdinPipe.Close()
+	if err != nil {
+		return "", err
+	}
 
 	if err := session.Wait(); err != nil {
 		return "", err
@@ -419,7 +432,9 @@ func WriteFileWithSftp(cfg *PgsConfig, conn *ssh.Client) (*os.FileInfo, error) {
 		cfg.Logger.Error("could not create sftp client", "err", err)
 		return nil, err
 	}
-	defer client.Close()
+	defer func() {
+		_ = client.Close()
+	}()
 
 	f, err := client.Create("test/hello.txt")
 	if err != nil {
@@ -450,7 +465,9 @@ func WriteFilesMultProjectsWithSftp(cfg *PgsConfig, conn *ssh.Client) (*os.FileI
 		cfg.Logger.Error("could not create sftp client", "err", err)
 		return nil, err
 	}
-	defer client.Close()
+	defer func() {
+		_ = client.Close()
+	}()
 
 	f, err := client.Create("mult/hello.txt")
 	if err != nil {

@@ -375,7 +375,9 @@ func createSubdomainRoutes(staticRoutes []shared.Route) []shared.Route {
 func StartApiServer() {
 	cfg := NewConfigSite("pastes-web")
 	db := postgres.NewDB(cfg.DbURL, cfg.Logger)
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 	logger := cfg.Logger
 
 	go CronDeleteExpiredPosts(cfg, db)

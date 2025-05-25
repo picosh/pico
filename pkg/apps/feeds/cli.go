@@ -20,7 +20,7 @@ func Middleware(dbpool db.DB, cfg *shared.ConfigSite) pssh.SSHServerMiddleware {
 
 			if user == nil {
 				err := fmt.Errorf("user not found")
-				fmt.Fprintln(sesh.Stderr(), err)
+				_, _ = fmt.Fprintln(sesh.Stderr(), err)
 				return err
 			}
 
@@ -31,25 +31,25 @@ func Middleware(dbpool db.DB, cfg *shared.ConfigSite) pssh.SSHServerMiddleware {
 
 			switch cmd {
 			case "help":
-				fmt.Fprintf(sesh, "Commands: [help, ls, rm, run]\r\n\r\n")
+				_, _ = fmt.Fprintf(sesh, "Commands: [help, ls, rm, run]\r\n\r\n")
 				writer := tabwriter.NewWriter(sesh, 0, 0, 1, ' ', tabwriter.TabIndent)
-				fmt.Fprintln(writer, "Cmd\tDesc")
-				fmt.Fprintf(
+				_, _ = fmt.Fprintln(writer, "Cmd\tDesc")
+				_, _ = fmt.Fprintf(
 					writer,
 					"%s\t%s\r\n",
 					"help", "this help text",
 				)
-				fmt.Fprintf(
+				_, _ = fmt.Fprintf(
 					writer,
 					"%s\t%s\r\n",
 					"ls", "list feed digest posts with metadata",
 				)
-				fmt.Fprintf(
+				_, _ = fmt.Fprintf(
 					writer,
 					"%s\t%s\r\n",
 					"rm {filename}", "removes feed digest post",
 				)
-				fmt.Fprintf(
+				_, _ = fmt.Fprintf(
 					writer,
 					"%s\t%s\r\n",
 					"run {filename}", "runs the feed digest post immediately, ignoring last digest time validation",
@@ -58,20 +58,20 @@ func Middleware(dbpool db.DB, cfg *shared.ConfigSite) pssh.SSHServerMiddleware {
 			case "ls":
 				posts, err := dbpool.FindPostsForUser(&db.Pager{Page: 0, Num: 1000}, user.ID, "feeds")
 				if err != nil {
-					fmt.Fprintln(sesh.Stderr(), err)
+					_, _ = fmt.Fprintln(sesh.Stderr(), err)
 					return err
 				}
 
 				if len(posts.Data) == 0 {
-					fmt.Fprintln(sesh, "no posts found")
+					_, _ = fmt.Fprintln(sesh, "no posts found")
 				}
 
 				writer := tabwriter.NewWriter(sesh, 0, 0, 1, ' ', tabwriter.TabIndent)
-				fmt.Fprintln(writer, "Filename\tLast Digest\tNext Digest\tInterval\tFailed Attempts")
+				_, _ = fmt.Fprintln(writer, "Filename\tLast Digest\tNext Digest\tInterval\tFailed Attempts")
 				for _, post := range posts.Data {
 					parsed := shared.ListParseText(post.Text)
 					digestOption := DigestOptionToTime(*post.Data.LastDigest, parsed.DigestInterval)
-					fmt.Fprintf(
+					_, _ = fmt.Fprintf(
 						writer,
 						"%s\t%s\t%s\t%s\t%d/10\r\n",
 						post.Filename,
@@ -84,7 +84,7 @@ func Middleware(dbpool db.DB, cfg *shared.ConfigSite) pssh.SSHServerMiddleware {
 				return writer.Flush()
 			case "rm":
 				filename := args[1]
-				fmt.Fprintf(sesh, "removing digest post %s\r\n", filename)
+				_, _ = fmt.Fprintf(sesh, "removing digest post %s\r\n", filename)
 				write := false
 				if len(args) > 2 {
 					writeRaw := args[2]
@@ -95,37 +95,37 @@ func Middleware(dbpool db.DB, cfg *shared.ConfigSite) pssh.SSHServerMiddleware {
 
 				post, err := dbpool.FindPostWithFilename(filename, user.ID, "feeds")
 				if err != nil {
-					fmt.Fprintln(sesh.Stderr(), err)
+					_, _ = fmt.Fprintln(sesh.Stderr(), err)
 					return err
 				}
 				if write {
 					err = dbpool.RemovePosts([]string{post.ID})
 					if err != nil {
-						fmt.Fprintln(sesh.Stderr(), err)
+						_, _ = fmt.Fprintln(sesh.Stderr(), err)
 					}
 				}
-				fmt.Fprintf(sesh, "digest post removed %s\r\n", filename)
+				_, _ = fmt.Fprintf(sesh, "digest post removed %s\r\n", filename)
 				if !write {
-					fmt.Fprintln(sesh, "WARNING: *must* append with `--write` for the changes to persist.")
+					_, _ = fmt.Fprintln(sesh, "WARNING: *must* append with `--write` for the changes to persist.")
 				}
 				return err
 			case "run":
 				if len(args) < 2 {
 					err := fmt.Errorf("must provide filename of post to run")
-					fmt.Fprintln(sesh.Stderr(), err)
+					_, _ = fmt.Fprintln(sesh.Stderr(), err)
 					return err
 				}
 				filename := args[1]
 				post, err := dbpool.FindPostWithFilename(filename, user.ID, "feeds")
 				if err != nil {
-					fmt.Fprintln(sesh.Stderr(), err)
+					_, _ = fmt.Fprintln(sesh.Stderr(), err)
 					return err
 				}
-				fmt.Fprintf(sesh, "running feed post: %s\r\n", filename)
+				_, _ = fmt.Fprintf(sesh, "running feed post: %s\r\n", filename)
 				fetcher := NewFetcher(dbpool, cfg)
 				err = fetcher.RunPost(logger, user, post, true)
 				if err != nil {
-					fmt.Fprintln(sesh.Stderr(), err)
+					_, _ = fmt.Fprintln(sesh.Stderr(), err)
 				}
 				return err
 			}

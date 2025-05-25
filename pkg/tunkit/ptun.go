@@ -66,10 +66,12 @@ func LocalForwardHandler(handler Tunnel) pssh.SSHServerChannelMiddleware {
 			downConn, err := handler.CreateConn(ctx)
 			if err != nil {
 				log.Error("unable to connect to conn", "err", err)
-				ch.Close()
+				_ = ch.Close()
 				return
 			}
-			defer downConn.Close()
+			defer func() {
+				_ = downConn.Close()
+			}()
 
 			var wg sync.WaitGroup
 			wg.Add(2)
@@ -78,8 +80,8 @@ func LocalForwardHandler(handler Tunnel) pssh.SSHServerChannelMiddleware {
 				defer wg.Done()
 				defer func() {
 					_ = ch.CloseWrite()
+					_ = downConn.Close()
 				}()
-				defer downConn.Close()
 				_, err := io.Copy(ch, downConn)
 				if err != nil {
 					if !errors.Is(err, net.ErrClosed) {
@@ -89,8 +91,10 @@ func LocalForwardHandler(handler Tunnel) pssh.SSHServerChannelMiddleware {
 			}()
 			go func() {
 				defer wg.Done()
-				defer ch.Close()
-				defer downConn.Close()
+				defer func() {
+					_ = ch.Close()
+					_ = downConn.Close()
+				}()
 				_, err := io.Copy(downConn, ch)
 				if err != nil {
 					if !errors.Is(err, net.ErrClosed) {

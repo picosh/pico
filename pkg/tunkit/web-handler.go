@@ -62,9 +62,15 @@ func (wt *WebTunnelHandler) CreateListener(ctx *pssh.SSHServerConnSession) (net.
 		return nil, err
 	}
 
-	tempFile.Close()
+	err = tempFile.Close()
+	if err != nil {
+		return nil, err
+	}
 	address := tempFile.Name()
-	os.Remove(address)
+	err = os.Remove(address)
+	if err != nil {
+		return nil, err
+	}
 
 	connListener, err := net.Listen("unix", address)
 	if err != nil {

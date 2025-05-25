@@ -152,8 +152,8 @@ func (s *SSHServerConnSession) Exit(code int) error {
 }
 
 func (s *SSHServerConnSession) Fatal(err error) {
-	fmt.Fprintln(s.Stderr(), err)
-	fmt.Fprintf(s.Stderr(), "\r")
+	_, _ = fmt.Fprintln(s.Stderr(), err)
+	_, _ = fmt.Fprintf(s.Stderr(), "\r")
 	_ = s.Exit(1)
 	_ = s.Close()
 }
@@ -172,7 +172,9 @@ func (s *SSHServerConnSession) Pty() (*Pty, <-chan Window, bool) {
 var _ context.Context = &SSHServerConnSession{}
 
 func (sc *SSHServerConn) Handle(chans <-chan ssh.NewChannel, reqs <-chan *ssh.Request) error {
-	defer sc.Close()
+	defer func() {
+		_ = sc.Close()
+	}()
 
 	for {
 		select {
@@ -293,7 +295,7 @@ func (s *SSHServer) ListenAndServe() error {
 			go func() {
 				<-s.Ctx.Done()
 				s.Logger.Info("Prometheus server shutting down")
-				srv.Close()
+				_ = srv.Close()
 			}()
 
 			s.Logger.Info("Starting Prometheus server", "addr", s.Config.PromListenAddr)
@@ -317,11 +319,13 @@ func (s *SSHServer) ListenAndServe() error {
 	}
 
 	s.Listener = listen
-	defer s.Listener.Close()
+	defer func() {
+		_ = s.Listener.Close()
+	}()
 
 	go func() {
 		<-s.Ctx.Done()
-		s.Close()
+		_ = s.Close()
 	}()
 
 	var retErr error
@@ -352,7 +356,9 @@ func (s *SSHServer) ListenAndServe() error {
 }
 
 func (s *SSHServer) HandleConn(conn net.Conn) error {
-	defer conn.Close()
+	defer func() {
+		_ = conn.Close()
+	}()
 
 	sshConn, chans, reqs, err := ssh.NewServerConn(conn, s.Config.ServerConfig)
 	if err != nil {

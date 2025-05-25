@@ -25,7 +25,7 @@ func flagSet(cmdName string, sesh *pssh.SSHServerConnSession) *flag.FlagSet {
 	cmd := flag.NewFlagSet(cmdName, flag.ContinueOnError)
 	cmd.SetOutput(sesh)
 	cmd.Usage = func() {
-		fmt.Fprintf(cmd.Output(), "Usage: %s <topic> [args...]\nArgs:\n", cmdName)
+		_, _ = fmt.Fprintf(cmd.Output(), "Usage: %s <topic> [args...]\nArgs:\n", cmdName)
 		cmd.PrintDefaults()
 	}
 	return cmd
@@ -156,7 +156,7 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 			args := sesh.Command()
 
 			if len(args) == 0 {
-				fmt.Fprintln(sesh, helpStr(toSshCmd(handler.Cfg)))
+				_, _ = fmt.Fprintln(sesh, helpStr(toSshCmd(handler.Cfg)))
 				return next(sesh)
 			}
 
@@ -201,7 +201,7 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 
 			cmd := strings.TrimSpace(args[0])
 			if cmd == "help" {
-				fmt.Fprintln(sesh, helpStr(toSshCmd(handler.Cfg)))
+				_, _ = fmt.Fprintln(sesh, helpStr(toSshCmd(handler.Cfg)))
 				return next(sesh)
 			} else if cmd == "ls" {
 				if userName == "public" {
@@ -234,7 +234,7 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 				}
 
 				if len(channels) == 0 && len(waitingChannels) == 0 {
-					fmt.Fprintln(sesh, "no pubsub channels found")
+					_, _ = fmt.Fprintln(sesh, "no pubsub channels found")
 				} else {
 					var outputData string
 					if len(channels) > 0 || len(waitingChannels) > 0 {
@@ -403,7 +403,7 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 				}
 
 				if !*clean {
-					fmt.Fprintf(
+					_, _ = fmt.Fprintf(
 						sesh,
 						"subscribe to this channel:\n  ssh %s sub %s%s\n",
 						toSshCmd(handler.Cfg),
@@ -436,7 +436,7 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 						}
 
 						if !*clean {
-							fmt.Fprintln(sesh, termMsg)
+							_, _ = fmt.Fprintln(sesh, termMsg)
 						}
 
 						ready := make(chan struct{})
@@ -482,7 +482,7 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 									logger.Error("error exiting session", "err", err)
 								}
 
-								sesh.Close()
+								_ = sesh.Close()
 							}
 						}
 
@@ -507,7 +507,7 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 				}
 
 				if !*clean {
-					fmt.Fprintln(sesh, "sending msg ...")
+					_, _ = fmt.Fprintln(sesh, "sending msg ...")
 				}
 
 				err = pubsub.Pub(
@@ -521,11 +521,11 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 				)
 
 				if !*clean {
-					fmt.Fprintln(sesh, "msg sent!")
+					_, _ = fmt.Fprintln(sesh, "msg sent!")
 				}
 
 				if err != nil && !*clean {
-					fmt.Fprintln(sesh.Stderr(), err)
+					_, _ = fmt.Fprintln(sesh.Stderr(), err)
 				}
 			} else if cmd == "sub" {
 				subCmd := flagSet("sub", sesh)
@@ -590,7 +590,7 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 					} else if !*public {
 						name = toTopic(userName, withoutUser)
 					} else {
-						fmt.Fprintln(sesh.Stderr(), "access denied")
+						_, _ = fmt.Fprintln(sesh.Stderr(), "access denied")
 						return err
 					}
 				}
@@ -606,7 +606,7 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 				)
 
 				if err != nil && !*clean {
-					fmt.Fprintln(sesh.Stderr(), err)
+					_, _ = fmt.Fprintln(sesh.Stderr(), err)
 				}
 			} else if cmd == "pipe" {
 				pipeCmd := flagSet("pipe", sesh)
@@ -684,7 +684,7 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 				}
 
 				if isCreator && !*clean {
-					fmt.Fprintf(
+					_, _ = fmt.Fprintf(
 						sesh,
 						"subscribe to this topic:\n  ssh %s sub %s%s\n",
 						toSshCmd(handler.Cfg),
@@ -704,11 +704,11 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 				)
 
 				if readErr != nil && !*clean {
-					fmt.Fprintln(sesh.Stderr(), "error reading from pipe", readErr)
+					_, _ = fmt.Fprintln(sesh.Stderr(), "error reading from pipe", readErr)
 				}
 
 				if writeErr != nil && !*clean {
-					fmt.Fprintln(sesh.Stderr(), "error writing to pipe", writeErr)
+					_, _ = fmt.Fprintln(sesh.Stderr(), "error writing to pipe", writeErr)
 				}
 			}
 

@@ -76,7 +76,7 @@ func (c *Cmd) logs(ctx context.Context) error {
 				if !ok {
 					return
 				}
-				fmt.Fprintln(c.SshSession, log)
+				_, _ = fmt.Fprintln(c.SshSession, log)
 			}
 		}
 	}()
@@ -127,7 +127,7 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 
 			user, err := getUser(sesh, dbpool)
 			if err != nil {
-				fmt.Fprintf(sesh.Stderr(), "detected ssh command: %s\n", args)
+				_, _ = fmt.Fprintf(sesh.Stderr(), "detected ssh command: %s\n", args)
 				s := fmt.Errorf("error: you need to create an account before using the remote cli: %w", err)
 				sesh.Fatal(s)
 				return s
