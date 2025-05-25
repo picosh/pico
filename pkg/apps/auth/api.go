@@ -404,7 +404,7 @@ func paymentWebhookHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 		if err != nil {
 			logger.Error("error reading request body", "err", err.Error())
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(fmt.Sprintf("error reading request body %s", err.Error())))
+			_, _ = fmt.Fprintf(w, "error reading request body %s", err.Error())
 			return
 		}
 
@@ -413,7 +413,7 @@ func paymentWebhookHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 		if err := json.Unmarshal(payload, &event); err != nil {
 			logger.Error("failed to parse webhook body JSON", "err", err.Error())
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(fmt.Sprintf("failed to parse webhook body JSON %s", err.Error())))
+			_, _ = fmt.Fprintf(w, "failed to parse webhook body JSON %s", err.Error())
 			return
 		}
 
@@ -631,7 +631,8 @@ func deserializeCaddyAccessLog(dbpool db.DB, access *AccessLog) (*db.AnalyticsVi
 
 	projectID := ""
 	postID := ""
-	if space == "pgs" { // figure out project ID
+	switch space {
+	case "pgs": // figure out project ID
 		project, err := dbpool.FindProjectByName(user.ID, props.ProjectName)
 		if err != nil {
 			return nil, fmt.Errorf(
@@ -642,7 +643,7 @@ func deserializeCaddyAccessLog(dbpool db.DB, access *AccessLog) (*db.AnalyticsVi
 			)
 		}
 		projectID = project.ID
-	} else if space == "prose" { // figure out post ID
+	case "prose": // figure out post ID
 		if path == "" || path == "/" {
 			// ignore
 		} else {

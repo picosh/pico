@@ -97,24 +97,25 @@ func Middleware(handler *UploadAssetHandler) pssh.SSHServerMiddleware {
 
 			cmd := strings.TrimSpace(args[0])
 			if len(args) == 1 {
-				if cmd == "help" {
+				switch cmd {
+				case "help":
 					opts.help()
 					return nil
-				} else if cmd == "stats" {
+				case "stats":
 					err := opts.stats(cfg.MaxSize)
 					opts.bail(err)
 					return err
-				} else if cmd == "ls" {
+				case "ls":
 					err := opts.ls()
 					opts.bail(err)
 					return err
-				} else if cmd == "cache-all" {
+				case "cache-all":
 					opts.Write = true
 					err := opts.cacheAll()
 					opts.notice()
 					opts.bail(err)
 					return err
-				} else {
+				default:
 					return next(sesh)
 				}
 			}
@@ -129,11 +130,12 @@ func Middleware(handler *UploadAssetHandler) pssh.SSHServerMiddleware {
 				"cmdArgs", cmdArgs,
 			)
 
-			if cmd == "fzf" {
+			switch cmd {
+			case "fzf":
 				err := opts.fzf(projectName)
 				opts.bail(err)
 				return err
-			} else if cmd == "link" {
+			case "link":
 				linkCmd, write := flagSet("link", sesh)
 				linkTo := linkCmd.String("to", "", "symbolic link to this project")
 				if !flagCheck(linkCmd, projectName, cmdArgs) {
@@ -155,7 +157,7 @@ func Middleware(handler *UploadAssetHandler) pssh.SSHServerMiddleware {
 					opts.bail(err)
 				}
 				return err
-			} else if cmd == "unlink" {
+			case "unlink":
 				unlinkCmd, write := flagSet("unlink", sesh)
 				if !flagCheck(unlinkCmd, projectName, cmdArgs) {
 					return nil
@@ -166,11 +168,11 @@ func Middleware(handler *UploadAssetHandler) pssh.SSHServerMiddleware {
 				opts.notice()
 				opts.bail(err)
 				return err
-			} else if cmd == "depends" {
+			case "depends":
 				err := opts.depends(projectName)
 				opts.bail(err)
 				return err
-			} else if cmd == "retain" {
+			case "retain":
 				retainCmd, write := flagSet("retain", sesh)
 				retainNum := retainCmd.Int("n", 3, "latest number of projects to keep")
 				if !flagCheck(retainCmd, projectName, cmdArgs) {
@@ -182,7 +184,7 @@ func Middleware(handler *UploadAssetHandler) pssh.SSHServerMiddleware {
 				opts.notice()
 				opts.bail(err)
 				return err
-			} else if cmd == "prune" {
+			case "prune":
 				pruneCmd, write := flagSet("prune", sesh)
 				if !flagCheck(pruneCmd, projectName, cmdArgs) {
 					return nil
@@ -193,7 +195,7 @@ func Middleware(handler *UploadAssetHandler) pssh.SSHServerMiddleware {
 				opts.notice()
 				opts.bail(err)
 				return err
-			} else if cmd == "rm" {
+			case "rm":
 				rmCmd, write := flagSet("rm", sesh)
 				if !flagCheck(rmCmd, projectName, cmdArgs) {
 					return nil
@@ -204,7 +206,7 @@ func Middleware(handler *UploadAssetHandler) pssh.SSHServerMiddleware {
 				opts.notice()
 				opts.bail(err)
 				return err
-			} else if cmd == "cache" {
+			case "cache":
 				cacheCmd, write := flagSet("cache", sesh)
 				if !flagCheck(cacheCmd, projectName, cmdArgs) {
 					return nil
@@ -215,7 +217,7 @@ func Middleware(handler *UploadAssetHandler) pssh.SSHServerMiddleware {
 				opts.notice()
 				opts.bail(err)
 				return err
-			} else if cmd == "acl" {
+			case "acl":
 				aclCmd, write := flagSet("acl", sesh)
 				aclType := aclCmd.String("type", "", "access type: public, pico, pubkeys")
 				var acls arrayFlags
@@ -242,7 +244,7 @@ func Middleware(handler *UploadAssetHandler) pssh.SSHServerMiddleware {
 				opts.notice()
 				opts.bail(err)
 				return err
-			} else {
+			default:
 				return next(sesh)
 			}
 		}

@@ -47,7 +47,7 @@ func (p *FileHooks) FileMeta(s *pssh.SSHServerConnSession, data *filehandlers.Po
 	// we want the slug to be the filename for pastes
 	data.Slug = data.Filename
 
-	if data.Post.ExpiresAt == nil || data.Post.ExpiresAt.IsZero() {
+	if data.ExpiresAt == nil || data.ExpiresAt.IsZero() {
 		// mark posts for deletion a X days after creation
 		expiresAt := time.Now().AddDate(0, 0, DEFAULT_EXPIRES_AT)
 		data.ExpiresAt = &expiresAt

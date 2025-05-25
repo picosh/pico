@@ -29,10 +29,8 @@ type RmProject struct {
 func main() {
 	// to actually commit changes, set to true
 	writeEnv := utils.GetEnv("WRITE", "0")
-	write := false
-	if writeEnv == "1" {
-		write = true
-	}
+	write := writeEnv == "1"
+
 	logger := slog.Default()
 
 	picoCfg := shared.NewConfigSite()

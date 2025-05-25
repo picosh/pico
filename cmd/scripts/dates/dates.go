@@ -92,13 +92,13 @@ func main() {
 			}
 
 			if parsed.PublishAt != nil && !parsed.PublishAt.IsZero() {
-				err = updateDates(tx, post.ID, parsed.MetaData.PublishAt)
+				err = updateDates(tx, post.ID, parsed.PublishAt)
 				if err != nil {
 					logger.Error(err.Error())
 					continue
 				}
 
-				if !parsed.MetaData.PublishAt.Equal(*post.PublishAt) {
+				if !parsed.PublishAt.Equal(*post.PublishAt) {
 					datesFixed = append(datesFixed, post.ID)
 				}
 			}

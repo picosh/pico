@@ -84,21 +84,22 @@ func itemToTemplate(item *gofeed.Item) *FeedItemTmpl {
 
 func DigestOptionToTime(lastDigest time.Time, interval string) time.Time {
 	day := 24 * time.Hour
-	if interval == "10min" {
+	switch interval {
+	case "10min":
 		return lastDigest.Add(10 * time.Minute)
-	} else if interval == "1hour" {
+	case "1hour":
 		return lastDigest.Add(1 * time.Hour)
-	} else if interval == "6hour" {
+	case "6hour":
 		return lastDigest.Add(6 * time.Hour)
-	} else if interval == "12hour" {
+	case "12hour":
 		return lastDigest.Add(12 * time.Hour)
-	} else if interval == "1day" || interval == "" {
+	case "1day", "":
 		return lastDigest.Add(1 * day)
-	} else if interval == "7day" {
+	case "7day":
 		return lastDigest.Add(7 * day)
-	} else if interval == "30day" {
+	case "30day":
 		return lastDigest.Add(30 * day)
-	} else {
+	default:
 		return lastDigest
 	}
 }

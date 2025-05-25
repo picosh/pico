@@ -29,7 +29,8 @@ func Middleware(dbpool db.DB, cfg *shared.ConfigSite) pssh.SSHServerMiddleware {
 				cmd = args[0]
 			}
 
-			if cmd == "help" {
+			switch cmd {
+			case "help":
 				fmt.Fprintf(sesh, "Commands: [help, ls, rm, run]\r\n\r\n")
 				writer := tabwriter.NewWriter(sesh, 0, 0, 1, ' ', tabwriter.TabIndent)
 				fmt.Fprintln(writer, "Cmd\tDesc")
@@ -54,7 +55,7 @@ func Middleware(dbpool db.DB, cfg *shared.ConfigSite) pssh.SSHServerMiddleware {
 					"run {filename}", "runs the feed digest post immediately, ignoring last digest time validation",
 				)
 				return writer.Flush()
-			} else if cmd == "ls" {
+			case "ls":
 				posts, err := dbpool.FindPostsForUser(&db.Pager{Page: 0, Num: 1000}, user.ID, "feeds")
 				if err != nil {
 					fmt.Fprintln(sesh.Stderr(), err)
@@ -81,7 +82,7 @@ func Middleware(dbpool db.DB, cfg *shared.ConfigSite) pssh.SSHServerMiddleware {
 					)
 				}
 				return writer.Flush()
-			} else if cmd == "rm" {
+			case "rm":
 				filename := args[1]
 				fmt.Fprintf(sesh, "removing digest post %s\r\n", filename)
 				write := false
@@ -108,7 +109,7 @@ func Middleware(dbpool db.DB, cfg *shared.ConfigSite) pssh.SSHServerMiddleware {
 					fmt.Fprintln(sesh, "WARNING: *must* append with `--write` for the changes to persist.")
 				}
 				return err
-			} else if cmd == "run" {
+			case "run":
 				if len(args) < 2 {
 					err := fmt.Errorf("must provide filename of post to run")
 					fmt.Fprintln(sesh.Stderr(), err)
