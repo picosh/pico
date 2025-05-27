@@ -18,11 +18,11 @@ toolchain go1.24.0
 
 // replace git.sr.ht/~delthas/senpai => ../../senpai
 
-// replace git.sr.ht/~rockorager/vaxis => ../../vaxis
+// replace git.sr.ht/~rockorager/vaxis => ../../../src/vaxis
 
 require (
 	git.sr.ht/~delthas/senpai v0.4.0
-	git.sr.ht/~rockorager/vaxis v0.13.0
+	git.sr.ht/~rockorager/vaxis v0.14.1-0.20250527151737-5530f9f4bcf6
 	github.com/alecthomas/chroma/v2 v2.15.0
 	github.com/antoniomika/syncmap v1.0.0
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de

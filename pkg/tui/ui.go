@@ -112,7 +112,7 @@ func (app *App) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command
 		cur := app.GetCurPage()
 		if cur != nil {
 			// send event to page notifying that we are leaving
-			cmd, _ := cur.HandleEvent(PageOut{}, vxfw.TargetPhase)
+			cmd, _ := cur.(vxfw.EventHandler).HandleEvent(PageOut{}, vxfw.TargetPhase)
 			if cmd != nil {
 				cmds = append(cmds, cmd)
 			}
@@ -121,10 +121,10 @@ func (app *App) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command
 		// switch the page
 		app.page = msg.To
 
-		cur = app.GetCurPage()
-		if cur != nil {
+		next := app.GetCurPage()
+		if next != nil {
 			// send event to page notifying that we are entering
-			cmd, _ := app.GetCurPage().HandleEvent(PageIn{}, vxfw.TargetPhase)
+			cmd, _ := next.(vxfw.EventHandler).HandleEvent(PageIn{}, vxfw.TargetPhase)
 			if cmd != nil {
 				cmds = append(cmds, cmd)
 			}
