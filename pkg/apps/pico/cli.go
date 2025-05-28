@@ -89,13 +89,16 @@ func (c *Cmd) logs(ctx context.Context) error {
 
 		err := json.Unmarshal([]byte(line), &parsedData)
 		if err != nil {
-			c.Log.Error("json unmarshal", "err", err)
+			c.Log.Error("json unmarshal", "err", err, "line", line, "hidden", true)
 			continue
 		}
 
 		user := utils.AnyToStr(parsedData, "user")
 		userId := utils.AnyToStr(parsedData, "userId")
-		if user == c.User.Name || userId == c.User.ID {
+
+		hidden := utils.AnyToBool(parsedData, "hidden")
+
+		if !hidden && (user == c.User.Name || userId == c.User.ID) {
 			select {
 			case logChan <- line:
 			case <-ctx.Done():
