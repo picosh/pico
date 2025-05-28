@@ -160,13 +160,16 @@ func (m *LogsPage) connectToLogs() error {
 
 		err := json.Unmarshal([]byte(line), &parsedData)
 		if err != nil {
-			m.shared.Logger.Error("json unmarshal", "err", err, "line", line)
+			m.shared.Logger.Error("json unmarshal", "err", err, "line", line, "hidden", true)
 			continue
 		}
 
 		user := utils.AnyToStr(parsedData, "user")
 		userId := utils.AnyToStr(parsedData, "userId")
-		if user == m.shared.User.Name || userId == m.shared.User.ID {
+
+		hidden := utils.AnyToBool(parsedData, "hidden")
+
+		if !hidden && (user == m.shared.User.Name || userId == m.shared.User.ID) {
 			m.shared.App.PostEvent(LogLineLoaded{parsedData})
 		}
 	}
