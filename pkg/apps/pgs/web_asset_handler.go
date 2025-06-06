@@ -92,6 +92,7 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	status := http.StatusOK
 	attempts := []string{}
 	for _, fp := range routes {
+		logger.Info("attemptming to serve route", "route", fp.Filepath, "status", fp.Status, "query", fp.Query)
 		destUrl, err := url.Parse(fp.Filepath)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)

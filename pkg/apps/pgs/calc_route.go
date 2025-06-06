@@ -174,9 +174,13 @@ func genRedirectRoute(actual string, fromStr string, to string) string {
 	}
 
 	fin := []string{"/"}
+	addSuffix := false
 
 	for _, item := range toList {
 		if strings.HasSuffix(item, ":splat") {
+			if strings.HasSuffix(actual, "/") {
+				addSuffix = true
+			}
 			fin = append(fin, mapper[item])
 		} else if mapper[item] != "" {
 			fin = append(fin, mapper[item])
@@ -186,7 +190,7 @@ func genRedirectRoute(actual string, fromStr string, to string) string {
 	}
 
 	result := prefix + filepath.Join(fin...)
-	if !strings.HasSuffix(result, "/") && (strings.HasSuffix(to, "/") || strings.HasSuffix(actual, "/")) {
+	if !strings.HasSuffix(result, "/") && (strings.HasSuffix(to, "/") || addSuffix) {
 		result += "/"
 	}
 	return result

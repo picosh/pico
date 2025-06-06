@@ -644,6 +644,25 @@ func TestCalcRoutes(t *testing.T) {
 				{Filepath: "public/404.html", Status: 404},
 			},
 		},
+		{
+			Name: "redirect-to-file",
+			Actual: calcRoutes(
+				"public",
+				"/feeds/rss/",
+				[]*RedirectRule{
+					{
+						From:   "/feeds/rss/",
+						To:     "/index.xml",
+						Status: 301,
+					},
+				},
+			),
+			Expected: []*HttpReply{
+				{Filepath: "public/feeds/rss/index.html", Status: 200},
+				{Filepath: "/index.xml", Status: 301},
+				{Filepath: "public/404.html", Status: 404},
+			},
+		},
 	}
 
 	for _, fixture := range fixtures {
