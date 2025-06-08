@@ -21,7 +21,7 @@ func NewStorageMemory(sto map[string]map[string]string) (*StorageMemory, error) 
 	return &StorageMemory{st}, nil
 }
 
-func (s *StorageMemory) ServeObject(bucket sst.Bucket, fpath string, opts *ImgProcessOpts) (io.ReadCloser, *sst.ObjectInfo, error) {
+func (s *StorageMemory) ServeObject(r *http.Request, bucket sst.Bucket, fpath string, opts *ImgProcessOpts) (io.ReadCloser, *sst.ObjectInfo, error) {
 	obj, info, err := s.GetObject(bucket, fpath)
 	if info.Metadata == nil {
 		info.Metadata = make(http.Header)

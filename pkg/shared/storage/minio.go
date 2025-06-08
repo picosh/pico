@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -24,7 +25,7 @@ func NewStorageMinio(logger *slog.Logger, address, user, pass string) (*StorageM
 	return &StorageMinio{st}, nil
 }
 
-func (s *StorageMinio) ServeObject(bucket sst.Bucket, fpath string, opts *ImgProcessOpts) (io.ReadCloser, *sst.ObjectInfo, error) {
+func (s *StorageMinio) ServeObject(r *http.Request, bucket sst.Bucket, fpath string, opts *ImgProcessOpts) (io.ReadCloser, *sst.ObjectInfo, error) {
 	var rc io.ReadCloser
 	info := &sst.ObjectInfo{}
 	var err error
@@ -39,7 +40,7 @@ func (s *StorageMinio) ServeObject(bucket sst.Bucket, fpath string, opts *ImgPro
 	} else {
 		filePath := filepath.Join(bucket.Name, fpath)
 		dataURL := fmt.Sprintf("s3://%s", filePath)
-		rc, info, err = HandleProxy(s.Logger, dataURL, opts)
+		rc, info, err = HandleProxy(r, s.Logger, dataURL, opts)
 	}
 	if err != nil {
 		return nil, nil, err

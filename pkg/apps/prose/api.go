@@ -897,7 +897,7 @@ func imgRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fmt.Println("HERERERERER", fname, opts)
-	contents, info, err := st.ServeObject(bucket, fname, opts)
+	contents, info, err := st.ServeObject(r, bucket, fname, opts)
 	if err != nil {
 		logger.Error("serve object", "err", err)
 		http.Error(w, err.Error(), http.StatusUnprocessableEntity)

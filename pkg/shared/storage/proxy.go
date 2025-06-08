@@ -133,7 +133,7 @@ func (img *ImgProcessOpts) String() string {
 	return processOpts
 }
 
-func HandleProxy(logger *slog.Logger, dataURL string, opts *ImgProcessOpts) (io.ReadCloser, *storage.ObjectInfo, error) {
+func HandleProxy(r *http.Request, logger *slog.Logger, dataURL string, opts *ImgProcessOpts) (io.ReadCloser, *storage.ObjectInfo, error) {
 	imgProxyURL := os.Getenv("IMGPROXY_URL")
 	imgProxySalt := os.Getenv("IMGPROXY_SALT")
 	imgProxyKey := os.Getenv("IMGPROXY_KEY")
@@ -162,7 +162,16 @@ func HandleProxy(logger *slog.Logger, dataURL string, opts *ImgProcessOpts) (io.
 	}
 	proxyAddress := fmt.Sprintf("%s/%s%s", imgProxyURL, signature, processPath)
 
-	res, err := http.Get(proxyAddress)
+	req, err := http.NewRequest(http.MethodGet, proxyAddress, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	req.Header.Set("accept", r.Header.Get("accept"))
+	req.Header.Set("accept-encoding", r.Header.Get("accept-encoding"))
+	req.Header.Set("accept-language", r.Header.Get("accept-language"))
+	req.Header.Set("content-type", r.Header.Get("content-type"))
+	fmt.Println("HEADERS", req.Header)
+	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, nil, err
 	}
