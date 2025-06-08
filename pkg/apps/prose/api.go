@@ -879,6 +879,7 @@ func imgRequest(w http.ResponseWriter, r *http.Request) {
 
 	rawname := shared.GetField(r, 0)
 	imgOpts := shared.GetField(r, 1)
+	// we place all prose images inside a "prose" folder
 	fname := filepath.Join("/prose", rawname)
 
 	opts, err := storage.UriToImgProcessOpts(imgOpts)
@@ -896,7 +897,6 @@ func imgRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println("HERERERERER", fname, opts)
 	contents, info, err := st.ServeObject(r, bucket, fname, opts)
 	if err != nil {
 		logger.Error("serve object", "err", err)

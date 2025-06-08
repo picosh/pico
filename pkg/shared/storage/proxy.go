@@ -169,8 +169,6 @@ func HandleProxy(r *http.Request, logger *slog.Logger, dataURL string, opts *Img
 	req.Header.Set("accept", r.Header.Get("accept"))
 	req.Header.Set("accept-encoding", r.Header.Get("accept-encoding"))
 	req.Header.Set("accept-language", r.Header.Get("accept-language"))
-	req.Header.Set("content-type", r.Header.Get("content-type"))
-	fmt.Println("HEADERS", req.Header)
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, nil, err
@@ -187,7 +185,10 @@ func HandleProxy(r *http.Request, logger *slog.Logger, dataURL string, opts *Img
 	info := &storage.ObjectInfo{
 		Size:     res.ContentLength,
 		ETag:     trimEtag(res.Header.Get("etag")),
-		Metadata: res.Header,
+		Metadata: res.Header.Clone(),
+	}
+	if strings.HasPrefix(info.Metadata.Get("content-type"), "text/xml") {
+		info.Metadata.Set("content-type", "image/svg+xml")
 	}
 	if !parsedTime.IsZero() {
 		info.LastModified = parsedTime
