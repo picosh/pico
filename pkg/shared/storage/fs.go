@@ -39,7 +39,7 @@ func (s *StorageFS) ServeObject(bucket sst.Bucket, fpath string, opts *ImgProces
 		info.Metadata.Set("content-type", mimeType)
 	} else {
 		filePath := filepath.Join(bucket.Name, fpath)
-		dataURL := fmt.Sprintf("s3://%s", filePath)
+		dataURL := fmt.Sprintf("local:///%s", filePath)
 		rc, info, err = HandleProxy(s.Logger, dataURL, opts)
 	}
 	if err != nil {

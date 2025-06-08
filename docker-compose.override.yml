@@ -15,11 +15,9 @@ services:
     env_file:
       - .env.example
     volumes:
-      - ./data/storage/data:/storage
+      - /tmp/pico_storage:/storage
     ports:
       - "8080:8080"
-    links:
-      - minio
   pastes-web:
     build:
       args:
