@@ -931,16 +931,11 @@ func StartApiServer() {
 	}()
 	logger := cfg.Logger
 
-	var st storage.StorageServe
-	var err error
-	if cfg.MinioURL == "" {
-		st, err = storage.NewStorageFS(cfg.Logger, cfg.StorageDir)
-	} else {
-		st, err = storage.NewStorageMinio(cfg.Logger, cfg.MinioURL, cfg.MinioUser, cfg.MinioPass)
-	}
-
+	adapter := storage.GetStorageTypeFromEnv()
+	st, err := storage.NewStorage(cfg.Logger, adapter)
 	if err != nil {
-		logger.Error(err.Error())
+		logger.Error("loading storage", "err", err)
+		return
 	}
 
 	staticRoutes := createStaticRoutes()

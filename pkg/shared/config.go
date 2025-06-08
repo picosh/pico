@@ -122,7 +122,7 @@ func (c *ConfigSite) ReadURL() string {
 }
 
 func (c *ConfigSite) StaticPath(fname string) string {
-	return path.Join(c.Space, fname)
+	return path.Join("pkg", "apps", c.Space, fname)
 }
 
 func (c *ConfigSite) BlogURL(username string) string {
