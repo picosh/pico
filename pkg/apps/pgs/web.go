@@ -410,7 +410,7 @@ func (web *WebRouter) AssetRequest(perm func(proj *db.Project) bool) http.Handle
 			web.ImageRequest(perm)(w, r)
 			return
 		}
-		web.ServeAsset(fname, nil, false, perm, w, r)
+		web.ServeAsset(fname, nil, perm, w, r)
 	}
 }
 
@@ -435,11 +435,11 @@ func (web *WebRouter) ImageRequest(perm func(proj *db.Project) bool) http.Handle
 			return
 		}
 
-		web.ServeAsset(fname, opts, false, perm, w, r)
+		web.ServeAsset(fname, opts, perm, w, r)
 	}
 }
 
-func (web *WebRouter) ServeAsset(fname string, opts *storage.ImgProcessOpts, fromImgs bool, hasPerm HasPerm, w http.ResponseWriter, r *http.Request) {
+func (web *WebRouter) ServeAsset(fname string, opts *storage.ImgProcessOpts, hasPerm HasPerm, w http.ResponseWriter, r *http.Request) {
 	subdomain := shared.GetSubdomain(r)
 
 	logger := web.Cfg.Logger.With(
@@ -475,41 +475,30 @@ func (web *WebRouter) ServeAsset(fname string, opts *storage.ImgProcessOpts, fro
 		"userId", user.ID,
 	)
 
-	projectID := ""
-	// TODO: this could probably be cleaned up more
-	// imgs wont have a project directory
-	projectDir := ""
 	var bucket sst.Bucket
-	// imgs has a different bucket directory
-	if fromImgs {
-		bucket, err = web.Cfg.Storage.GetBucket(shared.GetImgsBucketName(user.ID))
-	} else {
-		bucket, err = web.Cfg.Storage.GetBucket(shared.GetAssetBucketName(user.ID))
-		project, perr := web.Cfg.DB.FindProjectByName(user.ID, props.ProjectName)
-		if perr != nil {
-			logger.Info("project not found")
-			http.Error(w, "project not found", http.StatusNotFound)
-			return
-		}
+	bucket, err = web.Cfg.Storage.GetBucket(shared.GetAssetBucketName(user.ID))
+	project, perr := web.Cfg.DB.FindProjectByName(user.ID, props.ProjectName)
+	if perr != nil {
+		logger.Info("project not found")
+		http.Error(w, "project not found", http.StatusNotFound)
+		return
+	}
 
-		logger = logger.With(
-			"projectId", project.ID,
-			"project", project.Name,
-		)
+	logger = logger.With(
+		"projectId", project.ID,
+		"project", project.Name,
+	)
 
-		if project.Blocked != "" {
-			logger.Error("project has been blocked")
-			http.Error(w, project.Blocked, http.StatusForbidden)
-			return
-		}
+	if project.Blocked != "" {
+		logger.Error("project has been blocked")
+		http.Error(w, project.Blocked, http.StatusForbidden)
+		return
+	}
 
-		projectID = project.ID
-		projectDir = project.ProjectDir
-		if !hasPerm(project) {
-			logger.Error("You do not have access to this site")
-			http.Error(w, "You do not have access to this site", http.StatusUnauthorized)
-			return
-		}
+	if !hasPerm(project) {
+		logger.Error("You do not have access to this site")
+		http.Error(w, "You do not have access to this site", http.StatusUnauthorized)
+		return
 	}
 
 	if err != nil {
@@ -533,11 +522,11 @@ func (web *WebRouter) ServeAsset(fname string, opts *storage.ImgProcessOpts, fro
 		Username:       props.Username,
 		UserID:         user.ID,
 		Subdomain:      subdomain,
-		ProjectDir:     projectDir,
+		ProjectID:      project.ID,
+		ProjectDir:     project.ProjectDir,
 		Filepath:       fname,
 		Bucket:         bucket,
 		ImgProcessOpts: opts,
-		ProjectID:      projectID,
 		HasPicoPlus:    hasPicoPlus,
 	}
 

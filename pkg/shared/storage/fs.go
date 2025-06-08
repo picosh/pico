@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -25,7 +26,7 @@ func NewStorageFS(logger *slog.Logger, dir string) (*StorageFS, error) {
 	return &StorageFS{st, logger}, nil
 }
 
-func (s *StorageFS) ServeObject(bucket sst.Bucket, fpath string, opts *ImgProcessOpts) (io.ReadCloser, *sst.ObjectInfo, error) {
+func (s *StorageFS) ServeObject(r *http.Request, bucket sst.Bucket, fpath string, opts *ImgProcessOpts) (io.ReadCloser, *sst.ObjectInfo, error) {
 	var rc io.ReadCloser
 	info := &sst.ObjectInfo{}
 	var err error
@@ -39,8 +40,8 @@ func (s *StorageFS) ServeObject(bucket sst.Bucket, fpath string, opts *ImgProces
 		info.Metadata.Set("content-type", mimeType)
 	} else {
 		filePath := filepath.Join(bucket.Name, fpath)
-		dataURL := fmt.Sprintf("s3://%s", filePath)
-		rc, info, err = HandleProxy(s.Logger, dataURL, opts)
+		dataURL := fmt.Sprintf("local:///%s", filePath)
+		rc, info, err = HandleProxy(r, s.Logger, dataURL, opts)
 	}
 	if err != nil {
 		return nil, nil, err

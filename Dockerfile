@@ -54,8 +54,8 @@ ARG APP=prose
 
 COPY --from=builder-web /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder-web /go/bin/${APP}-web ./web
-COPY --from=builder-web /app/pkg/apps/${APP}/html ./${APP}/html
-COPY --from=builder-web /app/pkg/apps/${APP}/public ./${APP}/public
+COPY --from=builder-web /app/pkg/apps/${APP}/html ./pkg/apps/${APP}/html
+COPY --from=builder-web /app/pkg/apps/${APP}/public ./pkg/apps/${APP}/public
 
 ENTRYPOINT ["/app/web"]
 
@@ -69,7 +69,7 @@ ARG APP=prose
 COPY --from=builder-ssh /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder-ssh /go/bin/${APP}-ssh ./ssh
 # some services require the html folder
-COPY --from=builder-ssh /app/pkg/apps/${APP}/html ./${APP}/html
+COPY --from=builder-ssh /app/pkg/apps/${APP}/html ./pkg/apps/${APP}/html
 
 
 ENTRYPOINT ["/app/ssh"]

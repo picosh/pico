@@ -44,8 +44,9 @@ services:
     env_file:
       - .env.prod
     volumes:
-      - ./data/imgs-storage/data:/storage/imgs
-      - ./data/pgs-storage/data:/storage/pgs
+      - ./data/storage:/storage
+    networks:
+      prose:
   pastes-caddy:
     image: ghcr.io/picosh/pico/caddy:latest
     restart: always
@@ -174,6 +175,7 @@ services:
       - .env.prod
     volumes:
       - ./data/prose-ssh/data:/app/ssh_data
+      - ./data/storage:/storage
   prose-ssh:
     networks:
       prose:
@@ -183,6 +185,7 @@ services:
       - .env.prod
     volumes:
       - ./data/prose-ssh/data:/app/ssh_data
+      - ./data/storage:/storage
     ports:
       - "${PROSE_SSH_V4:-22}:2222"
       - "${PROSE_SSH_V6:-[::1]:22}:2222"
@@ -229,7 +232,7 @@ services:
     env_file:
       - .env.prod
     volumes:
-      - ./data/storage/data:/app/.storage
+      - ./data/storage:/storage
       - ./data/pgs-ssh/data:/app/ssh_data
     deploy:
       resources:
@@ -248,7 +251,7 @@ services:
     env_file:
       - .env.prod
     volumes:
-      - ./data/storage/data:/app/.storage
+      - ./data/storage:/storage
       - ./data/pgs-ssh/data:/app/ssh_data
       - ./data/tmp:/tmp
     ports:

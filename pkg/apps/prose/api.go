@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"fmt"
 	"html/template"
+	"io"
 	"net/http"
-	"net/http/httputil"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -865,6 +866,7 @@ func createMainRoutes(staticRoutes []shared.Route) []shared.Route {
 
 func imgRequest(w http.ResponseWriter, r *http.Request) {
 	logger := shared.GetLogger(r)
+	st := shared.GetStorage(r)
 	dbpool := shared.GetDB(r)
 	username := shared.GetUsernameFromRequest(r)
 	user, err := dbpool.FindUserByName(username)
@@ -875,22 +877,67 @@ func imgRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	logger = shared.LoggerWithUser(logger, user)
 
-	destUrl, err := url.Parse(fmt.Sprintf("https://%s-prose.pgs.sh%s", username, r.URL.Path))
+	rawname := shared.GetField(r, 0)
+	imgOpts := shared.GetField(r, 1)
+	// we place all prose images inside a "prose" folder
+	fname := filepath.Join("/prose", rawname)
+
+	opts, err := storage.UriToImgProcessOpts(imgOpts)
 	if err != nil {
-		logger.Error("could not parse image proxy url", "username", username)
-		http.Error(w, "could not parse image proxy url", http.StatusInternalServerError)
+		errMsg := fmt.Sprintf("error processing img options: %s", err.Error())
+		logger.Error("error processing img options", "err", errMsg)
+		http.Error(w, errMsg, http.StatusUnprocessableEntity)
 		return
 	}
-	logger.Info("proxy image request", "url", destUrl.String())
 
-	proxy := httputil.NewSingleHostReverseProxy(destUrl)
-	oldDirector := proxy.Director
-	proxy.Director = func(r *http.Request) {
-		oldDirector(r)
-		r.Host = destUrl.Host
-		r.URL = destUrl
+	bucket, err := st.GetBucket(shared.GetAssetBucketName(user.ID))
+	if err != nil {
+		logger.Error("bucket", "err", err)
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
 	}
-	proxy.ServeHTTP(w, r)
+
+	contents, info, err := st.ServeObject(r, bucket, fname, opts)
+	if err != nil {
+		logger.Error("serve object", "err", err)
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	contentType := ""
+	if info != nil {
+		contentType = info.Metadata.Get("content-type")
+		if info.Size != 0 {
+			w.Header().Add("content-length", strconv.Itoa(int(info.Size)))
+		}
+		if info.ETag != "" {
+			// Minio SDK trims off the mandatory quotes (RFC 7232 § 2.3)
+			w.Header().Add("etag", fmt.Sprintf("\"%s\"", info.ETag))
+		}
+
+		if !info.LastModified.IsZero() {
+			w.Header().Add("last-modified", info.LastModified.UTC().Format(http.TimeFormat))
+		}
+	}
+
+	if w.Header().Get("content-type") == "" {
+		w.Header().Set("content-type", contentType)
+	}
+
+	// Allows us to invalidate the cache when files are modified
+	// w.Header().Set("surrogate-key", h.Subdomain)
+
+	finContentType := w.Header().Get("content-type")
+	logger.Info(
+		"serving asset",
+		"asset", fname,
+		"contentType", finContentType,
+	)
+
+	_, err = io.Copy(w, contents)
+	if err != nil {
+		logger.Error("io copy", "err", err)
+	}
 }
 
 func createSubdomainRoutes(staticRoutes []shared.Route) []shared.Route {
@@ -931,16 +978,11 @@ func StartApiServer() {
 	}()
 	logger := cfg.Logger
 
-	var st storage.StorageServe
-	var err error
-	if cfg.MinioURL == "" {
-		st, err = storage.NewStorageFS(cfg.Logger, cfg.StorageDir)
-	} else {
-		st, err = storage.NewStorageMinio(cfg.Logger, cfg.MinioURL, cfg.MinioUser, cfg.MinioPass)
-	}
-
+	adapter := storage.GetStorageTypeFromEnv()
+	st, err := storage.NewStorage(cfg.Logger, adapter)
 	if err != nil {
-		logger.Error(err.Error())
+		logger.Error("loading storage", "err", err)
+		return
 	}
 
 	staticRoutes := createStaticRoutes()

@@ -15,11 +15,9 @@ services:
     env_file:
       - .env.example
     volumes:
-      - ./data/storage/data:/storage
+      - ./data/storage:/storage
     ports:
       - "8080:8080"
-    links:
-      - minio
   pastes-web:
     build:
       args:
@@ -69,6 +67,8 @@ services:
       - .env.example
     ports:
       - "3002:3000"
+    volumes:
+      - ./data/storage:/storage
   prose-ssh:
     build:
       args:
@@ -77,6 +77,7 @@ services:
     env_file:
       - .env.example
     volumes:
+      - ./data/storage:/storage
       - ./data/prose-ssh/data:/app/ssh_data
     ports:
       - "2222:2222"
