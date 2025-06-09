@@ -853,6 +853,7 @@ func createMainRoutes(staticRoutes []shared.Route) []shared.Route {
 		shared.NewRoute("GET", "/read", readHandler),
 		shared.NewRoute("GET", "/check", shared.CheckHandler),
 		shared.NewRoute("GET", "/rss", rssHandler),
+		shared.NewRoute("GET", "/rss.atom", rssHandler),
 		shared.NewRoute("GET", "/_metrics", promhttp.Handler().ServeHTTP),
 	}
 
