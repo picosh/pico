@@ -360,7 +360,7 @@ type ImageStorageMemory struct {
 	Fpath string
 }
 
-func (s *ImageStorageMemory) ServeObject(bucket sst.Bucket, fpath string, opts *storage.ImgProcessOpts) (io.ReadCloser, *sst.ObjectInfo, error) {
+func (s *ImageStorageMemory) ServeObject(r *http.Request, bucket sst.Bucket, fpath string, opts *storage.ImgProcessOpts) (io.ReadCloser, *sst.ObjectInfo, error) {
 	s.Opts = opts
 	s.Fpath = fpath
 	info := sst.ObjectInfo{

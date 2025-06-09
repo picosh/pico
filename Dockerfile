@@ -55,7 +55,7 @@ ARG APP=prose
 COPY --from=builder-web /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder-web /go/bin/${APP}-web ./web
 COPY --from=builder-web /app/pkg/apps/${APP}/html ./pkg/apps/${APP}/html
-COPY --from=builder-web /app/pkg/apps/${APP}/public ./${APP}/public
+COPY --from=builder-web /app/pkg/apps/${APP}/public ./pkg/apps/${APP}/public
 
 ENTRYPOINT ["/app/web"]
 
