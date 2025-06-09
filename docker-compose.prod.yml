@@ -45,6 +45,8 @@ services:
       - .env.prod
     volumes:
       - ./data/storage:/storage
+    networks:
+      prose:
   pastes-caddy:
     image: ghcr.io/picosh/pico/caddy:latest
     restart: always
