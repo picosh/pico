@@ -43,9 +43,7 @@ func (c *CachedHttp) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
 	})
 }
 
-func StartApiServer(cfg *PgsConfig) {
-	ctx := context.Background()
-
+func SetupCache(cfg *PgsConfig) *middleware.SouinBaseHandler {
 	ttl := configurationtypes.Duration{Duration: cfg.CacheTTL}
 	stale := configurationtypes.Duration{Duration: cfg.CacheTTL * 2}
 	c := &middleware.BaseConfiguration{
@@ -68,16 +66,22 @@ func StartApiServer(cfg *PgsConfig) {
 			DefaultCacheControl: cfg.CacheControl,
 		},
 	}
-	c.SetLogger(&CompatLogger{cfg.Logger})
+	c.SetLogger(&CompatLogger{Logger: cfg.Logger})
 	storages.InitFromConfiguration(c)
-	httpCache := middleware.NewHTTPCacheHandler(c)
+	return middleware.NewHTTPCacheHandler(c)
+}
+
+func StartApiServer(cfg *PgsConfig) {
+	ctx := context.Background()
+
+	httpCache := SetupCache(cfg)
 	routes := NewWebRouter(cfg)
 	cacher := &CachedHttp{
 		handler: httpCache,
 		routes:  routes,
 	}
 
-	go routes.cacheMgmt(ctx, httpCache, cfg.CacheClearingQueue)
+	go routes.CacheMgmt(ctx, httpCache, cfg.CacheClearingQueue)
 
 	portStr := fmt.Sprintf(":%s", cfg.WebPort)
 	cfg.Logger.Info(
@@ -109,11 +113,11 @@ func NewWebRouter(cfg *PgsConfig) *WebRouter {
 		HeadersCache:   expirable.NewLRU[string, []*HeaderRule](2048, nil, cache.CacheTimeout),
 	}
 	router.initRouters()
-	go router.watchCacheClear()
+	go router.WatchCacheClear()
 	return router
 }
 
-func (web *WebRouter) watchCacheClear() {
+func (web *WebRouter) WatchCacheClear() {
 	for key := range web.Cfg.CacheClearingQueue {
 		web.Cfg.Logger.Info("lru cache clear request", "key", key)
 		rKey := filepath.Join(key, "_redirects")
@@ -277,7 +281,7 @@ func (web *WebRouter) checkHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotFound)
 }
 
-func (web *WebRouter) cacheMgmt(ctx context.Context, httpCache *middleware.SouinBaseHandler, notify chan string) {
+func (web *WebRouter) CacheMgmt(ctx context.Context, httpCache *middleware.SouinBaseHandler, notify chan string) {
 	storer := httpCache.Storers[0]
 	drain := createSubCacheDrain(ctx, web.Cfg.Logger)
 
@@ -554,7 +558,7 @@ func (web *WebRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type CompatLogger struct {
-	logger *slog.Logger
+	Logger *slog.Logger
 }
 
 func (cl *CompatLogger) marshall(int ...interface{}) string {
@@ -568,44 +572,44 @@ func (cl *CompatLogger) marshall(int ...interface{}) string {
 	return res
 }
 func (cl *CompatLogger) DPanic(int ...interface{}) {
-	cl.logger.Error("panic", "output", cl.marshall(int))
+	cl.Logger.Error("panic", "output", cl.marshall(int))
 }
 func (cl *CompatLogger) DPanicf(st string, int ...interface{}) {
-	cl.logger.Error(fmt.Sprintf(st, int...))
+	cl.Logger.Error(fmt.Sprintf(st, int...))
 }
 func (cl *CompatLogger) Debug(int ...interface{}) {
-	cl.logger.Debug("debug", "output", cl.marshall(int))
+	cl.Logger.Debug("debug", "output", cl.marshall(int))
 }
 func (cl *CompatLogger) Debugf(st string, int ...interface{}) {
-	cl.logger.Debug(fmt.Sprintf(st, int...))
+	cl.Logger.Debug(fmt.Sprintf(st, int...))
 }
 func (cl *CompatLogger) Error(int ...interface{}) {
-	cl.logger.Error("error", "output", cl.marshall(int))
+	cl.Logger.Error("error", "output", cl.marshall(int))
 }
 func (cl *CompatLogger) Errorf(st string, int ...interface{}) {
-	cl.logger.Error(fmt.Sprintf(st, int...))
+	cl.Logger.Error(fmt.Sprintf(st, int...))
 }
 func (cl *CompatLogger) Fatal(int ...interface{}) {
-	cl.logger.Error("fatal", "outpu", cl.marshall(int))
+	cl.Logger.Error("fatal", "outpu", cl.marshall(int))
 }
 func (cl *CompatLogger) Fatalf(st string, int ...interface{}) {
-	cl.logger.Error(fmt.Sprintf(st, int...))
+	cl.Logger.Error(fmt.Sprintf(st, int...))
 }
 func (cl *CompatLogger) Info(int ...interface{}) {
-	cl.logger.Info("info", "output", cl.marshall(int))
+	cl.Logger.Info("info", "output", cl.marshall(int))
 }
 func (cl *CompatLogger) Infof(st string, int ...interface{}) {
-	cl.logger.Info(fmt.Sprintf(st, int...))
+	cl.Logger.Info(fmt.Sprintf(st, int...))
 }
 func (cl *CompatLogger) Panic(int ...interface{}) {
-	cl.logger.Error("panic", "output", cl.marshall(int))
+	cl.Logger.Error("panic", "output", cl.marshall(int))
 }
 func (cl *CompatLogger) Panicf(st string, int ...interface{}) {
-	cl.logger.Error(fmt.Sprintf(st, int...))
+	cl.Logger.Error(fmt.Sprintf(st, int...))
 }
 func (cl *CompatLogger) Warn(int ...interface{}) {
-	cl.logger.Warn("warn", "output", cl.marshall(int))
+	cl.Logger.Warn("warn", "output", cl.marshall(int))
 }
 func (cl *CompatLogger) Warnf(st string, int ...interface{}) {
-	cl.logger.Warn(fmt.Sprintf(st, int...))
+	cl.Logger.Warn(fmt.Sprintf(st, int...))
 }

@@ -243,6 +243,25 @@ services:
       options:
         max-file: "3"
         max-size: "1024m"
+  pgs-web-lite:
+    dns: 1.1.1.1
+    networks:
+      pgs:
+        aliases:
+          - web
+    env_file:
+      - .env.prod
+    volumes:
+      - ./data/pgs-ssh/data:/app/ssh_data
+    deploy:
+      resources:
+        limits:
+          memory: 3g
+    logging:
+      driver: "json-file"
+      options:
+        max-file: "3"
+        max-size: "1024m"
   pgs-ssh:
     networks:
       pgs:
