@@ -14,6 +14,7 @@ import (
 	"github.com/picosh/pico/pkg/apps/pgs"
 	"github.com/picosh/pico/pkg/cache"
 	"github.com/picosh/pico/pkg/shared"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func main() {
@@ -52,6 +53,16 @@ type cachedHttp struct {
 func (c *cachedHttp) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
 	_ = c.handler.ServeHTTP(writer, req, func(w http.ResponseWriter, r *http.Request) error {
 		url, _ := url.Parse(fullURL(r))
+
+		if req.URL.Path == "/_metrics" {
+			promhttp.Handler().ServeHTTP(writer, req)
+			return nil
+		}
+
+		if req.URL.Path == "/check" {
+			url, _ = url.Parse("https://pgs.sh/check?" + r.URL.RawQuery)
+		}
+
 		c.routes.Cfg.Logger.Info("proxying request to ash.pgs.sh", "url", url.String())
 		defaultTransport := http.DefaultTransport.(*http.Transport)
 		newTransport := defaultTransport.Clone()
