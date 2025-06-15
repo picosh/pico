@@ -9,16 +9,14 @@ import (
 )
 
 func main() {
-	minioURL := utils.GetEnv("MINIO_URL", "")
-	minioUser := utils.GetEnv("MINIO_ROOT_USER", "")
-	minioPass := utils.GetEnv("MINIO_ROOT_PASSWORD", "")
 	dbURL := utils.GetEnv("DATABASE_URL", "")
 	logger := shared.CreateLogger("pgs-ssh")
 	dbpool, err := pgsdb.NewDB(dbURL, logger)
 	if err != nil {
 		panic(err)
 	}
-	st, err := storage.NewStorageMinio(logger, minioURL, minioUser, minioPass)
+	adapter := storage.GetStorageTypeFromEnv()
+	st, err := storage.NewStorage(logger, adapter)
 	if err != nil {
 		panic(err)
 	}

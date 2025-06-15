@@ -19,6 +19,7 @@ services:
       - db
       - all
       - prose
+      - pgs
   pipemgr:
     image: ghcr.io/picosh/pipemgr:latest
     command: -command "pub metric-drain -b=false"
