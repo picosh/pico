@@ -26,13 +26,13 @@ ENV GOOS=${TARGETOS} GOARCH=${TARGETARCH}
 
 RUN --mount=type=cache,target=/go/pkg/,rw \
   --mount=type=cache,target=/root/.cache/,rw \
-  go build -ldflags "$LDFLAGS" -o /go/bin/pgs-web-lite ./cmd/pgs/lite
+  go build -ldflags "$LDFLAGS" -o /go/bin/pgs-cdn ./cmd/pgs/cdn
 
 FROM scratch AS release-web
 
 WORKDIR /app
 
 COPY --from=builder-web /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
-COPY --from=builder-web /go/bin/pgs-web-lite ./web
+COPY --from=builder-web /go/bin/pgs-cdn ./web
 
 ENTRYPOINT ["/app/web"]

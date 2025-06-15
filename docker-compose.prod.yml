@@ -243,7 +243,7 @@ services:
       options:
         max-file: "3"
         max-size: "1024m"
-  pgs-web-lite:
+  pgs-cdn:
     dns: 1.1.1.1
     networks:
       pgs:

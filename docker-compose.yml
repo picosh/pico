@@ -83,11 +83,11 @@ services:
       - pgs
       - services
       - all
-  pgs-web-lite:
-    image: ghcr.io/picosh/pico/pgs-web-lite:latest
+  pgs-cdn:
+    image: ghcr.io/picosh/pico/pgs-cdn:latest
     restart: always
     profiles:
-      - pgs-lite
+      - pgs-cdn
       - services
       - all
   pgs-ssh:
@@ -95,7 +95,7 @@ services:
     restart: always
     profiles:
       - pgs
-      - pgs-lite
+      - pgs-cdn
       - services
       - all
   feeds-web:

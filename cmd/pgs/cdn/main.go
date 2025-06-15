@@ -17,7 +17,7 @@ import (
 )
 
 func main() {
-	logger := shared.CreateLogger("pgs-web-lite")
+	logger := shared.CreateLogger("pgs-cdn")
 	ctx := context.Background()
 	cfg := pgs.NewPgsConfig(logger, nil, nil)
 	httpCache := pgs.SetupCache(cfg)
@@ -69,11 +69,8 @@ func (c *cachedHttp) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
 
 func fullURL(r *http.Request) string {
 	builder := strings.Builder{}
-	if r.TLS != nil {
-		builder.WriteString("https://")
-	} else {
-		builder.WriteString("http://")
-	}
+	// this service sits behind a proxy so we need to force it to https
+	builder.WriteString("https://")
 	builder.WriteString(r.Host)
 	builder.WriteString(r.URL.Path)
 

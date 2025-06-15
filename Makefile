@@ -45,9 +45,9 @@ bp-auth: bp-setup
 	$(DOCKER_BUILDX_BUILD) -t ghcr.io/picosh/pico/auth-web:$(DOCKER_TAG) --build-arg APP=auth --target release-web .
 .PHONY: bp-auth
 
-bp-pgs-lite: bp-setup
-	$(DOCKER_BUILDX_BUILD) -t ghcr.io/picosh/pico/pgs-web-lite:$(DOCKER_TAG) --target release-web -f Dockerfile.lite .
-.PHONY: bp-pgs-lite
+bp-pgs-cdn: bp-setup
+	$(DOCKER_BUILDX_BUILD) -t ghcr.io/picosh/pico/pgs-cdn:$(DOCKER_TAG) --target release-web -f Dockerfile.cdn .
+.PHONY: bp-pgs-cdn
 
 bp-pico: bp-setup
 	$(DOCKER_BUILDX_BUILD) -t ghcr.io/picosh/pico/pico-ssh:$(DOCKER_TAG) --build-arg APP=pico --target release-ssh .
@@ -66,7 +66,7 @@ bp-%: bp-setup
 	$(DOCKER_BUILDX_BUILD) --build-arg "APP=$*" -t "ghcr.io/picosh/pico/$*-web:$(DOCKER_TAG)" --target release-web .
 .PHONY: bp-%
 
-bp-all: bp-prose bp-pastes bp-feeds bp-pgs bp-auth bp-bouncer bp-pipe bp-pgs-lite
+bp-all: bp-prose bp-pastes bp-feeds bp-pgs bp-auth bp-bouncer bp-pipe bp-pgs-cdn
 .PHONY: bp-all
 
 build-auth:
