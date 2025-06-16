@@ -51,17 +51,28 @@ type cachedHttp struct {
 }
 
 func (c *cachedHttp) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
+	if req.URL.Path == "/_metrics" {
+		promhttp.Handler().ServeHTTP(writer, req)
+		return
+	}
+
+	if req.URL.Path == "/check" {
+		c.routes.Cfg.Logger.Info("proxying `/check` request to ash.pgs.sh", "query", req.URL.RawQuery)
+		req, _ := http.NewRequest("GET", "https://ash.pgs.sh/check?"+req.URL.RawQuery, nil)
+		req.Host = "pgs.sh"
+		// reqDump, _ := httputil.DumpRequestOut(req, true)
+		// fmt.Printf("REQUEST:\n%s", string(reqDump))
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			c.routes.Cfg.Logger.Error("check request", "err", err)
+		}
+		writer.WriteHeader(resp.StatusCode)
+		return
+	}
+
 	_ = c.handler.ServeHTTP(writer, req, func(w http.ResponseWriter, r *http.Request) error {
 		url, _ := url.Parse(fullURL(r))
-
-		if req.URL.Path == "/_metrics" {
-			promhttp.Handler().ServeHTTP(writer, req)
-			return nil
-		}
-
-		if req.URL.Path == "/check" {
-			url, _ = url.Parse("https://pgs.sh/check?" + r.URL.RawQuery)
-		}
 
 		c.routes.Cfg.Logger.Info("proxying request to ash.pgs.sh", "url", url.String())
 		defaultTransport := http.DefaultTransport.(*http.Transport)
