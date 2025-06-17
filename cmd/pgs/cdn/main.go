@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -50,6 +51,26 @@ type cachedHttp struct {
 	routes  *pgs.WebRouter
 }
 
+type CustomTransport struct {
+	*http.Transport
+	Logger *slog.Logger
+}
+
+func (t *CustomTransport) RoundTrip(request *http.Request) (*http.Response, error) {
+	// reqDump, _ := httputil.DumpRequestOut(request, false)
+	// t.Logger.Info("request", "dump", string(reqDump))
+	response, err := http.DefaultTransport.RoundTrip(request)
+
+	// body, err := httputil.DumpResponse(response, false)
+	// if err != nil {
+	// 	// copying the response body did not work
+	// 	return nil, err
+	// }
+	// t.Logger.Info("response", "dump", string(body))
+
+	return response, err
+}
+
 func (c *cachedHttp) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
 	if req.URL.Path == "/_metrics" {
 		promhttp.Handler().ServeHTTP(writer, req)
@@ -72,36 +93,26 @@ func (c *cachedHttp) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
 	}
 
 	_ = c.handler.ServeHTTP(writer, req, func(w http.ResponseWriter, r *http.Request) error {
-		url, _ := url.Parse(fullURL(r))
+		url, _ := url.Parse(partialURL(r))
 
 		c.routes.Cfg.Logger.Info("proxying request to ash.pgs.sh", "url", url.String())
 		defaultTransport := http.DefaultTransport.(*http.Transport)
-		newTransport := defaultTransport.Clone()
-		oldDialContext := newTransport.DialContext
+		oldDialContext := defaultTransport.DialContext
+		newTransport := CustomTransport{Transport: defaultTransport, Logger: c.routes.Cfg.Logger}
 		newTransport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
 			return oldDialContext(ctx, "tcp", "ash.pgs.sh:443")
 		}
 		proxy := httputil.NewSingleHostReverseProxy(url)
-		proxy.Transport = newTransport
-
+		proxy.Transport = &newTransport
 		proxy.ServeHTTP(w, r)
 		return nil
 	})
 }
 
-func fullURL(r *http.Request) string {
+func partialURL(r *http.Request) string {
 	builder := strings.Builder{}
 	// this service sits behind a proxy so we need to force it to https
 	builder.WriteString("https://")
 	builder.WriteString(r.Host)
-	builder.WriteString(r.URL.Path)
-
-	if r.URL.RawQuery != "" {
-		builder.WriteString("?" + r.URL.RawQuery)
-	}
-	if r.URL.Fragment != "" {
-		builder.WriteString("#" + r.URL.Fragment)
-	}
-
 	return builder.String()
 }
