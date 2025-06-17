@@ -22,7 +22,7 @@
 	encode zstd gzip
 }
 
-# subdomains and root pgs domain
+# subdomains and root app domain
 *.{$APP_DOMAIN}, {$APP_DOMAIN} {
 	reverse_proxy web:3000
 	log {
@@ -52,6 +52,8 @@
 
 		# keep referrer data off of HTTP connections
 		?Referrer-Policy no-referrer-when-downgrade
+
+		?Content-Security-Policy "default-src 'self'; img-src * 'unsafe-inline'; style-src * 'unsafe-inline'"
 
 		?X-XSS-Protection "1; mode=block"
 	}
@@ -83,5 +85,40 @@
 	handle @webmetrics {
 		rewrite * /_metrics
 		reverse_proxy web:3000
+	}
+}
+
+monitoring.{$MONITORING_APP_DOMAIN}, prometheus.{$MONITORING_APP_DOMAIN}, grafana.{$MONITORING_APP_DOMAIN} {
+	@grafana {
+		host grafana.{$MONITORING_APP_DOMAIN}
+	}
+
+	@prometheus {
+		host prometheus.{$MONITORING_APP_DOMAIN}
+	}
+
+	tls {$MONITORING_APP_EMAIL} {
+		dns cloudflare {$CF_API_TOKEN}
+		resolvers 1.1.1.1
+	}
+
+	encode zstd gzip
+
+	reverse_proxy @grafana grafana:3000
+
+	basicauth @prometheus {
+		eric JDJhJDE0JDdPOXhoNUdhSmNVNDl6UWpmeTE0cWVkLjRwcUNJUnc0dVQ4MTZNSmVaNjA1TlptaVZYY1hh
+		antonio JDJhJDE0JHI5dkVtMW0vcGxIb011OG4vME5HOU91c3U2VjM2QTZiWVpUeXdSbEg3VUtNZVdhN3BRazFH
+		bot JDJhJDE0JFVsRlNHSDlJbFhDeUd0NldRR2JkcGVFYUJtWGluTHZDVlc5L3QwNWNwWUMuODRlcXZNZHpT
+	}
+	reverse_proxy @prometheus prometheus:9090
+
+	@caddymetrics {
+		host monitoring.{$MONITORING_APP_DOMAIN}
+		path /_caddy/metrics
+	}
+
+	metrics @caddymetrics {
+		disable_openmetrics
 	}
 }

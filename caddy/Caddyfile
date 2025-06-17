@@ -4,9 +4,25 @@
 	}
 	servers {
 		metrics
+		trusted_proxies static 0.0.0.0/0
 	}
 }
 
+# custom domains
+:443 {
+	reverse_proxy web:3000
+	log {
+		format append {
+			server_id {$APP_DOMAIN}
+		}
+	}
+	tls {$APP_EMAIL} {
+		on_demand
+	}
+	encode zstd gzip
+}
+
+# subdomains and root app domain
 *.{$APP_DOMAIN}, {$APP_DOMAIN} {
 	reverse_proxy web:3000
 	log {
@@ -18,6 +34,7 @@
 		dns cloudflare {$CF_API_TOKEN}
 		resolvers 1.1.1.1
 	}
+
 	encode zstd gzip
 
 	header {
@@ -69,17 +86,4 @@
 		rewrite * /_metrics
 		reverse_proxy web:3000
 	}
-}
-
-:443 {
-	reverse_proxy web:3000
-	log {
-		format append {
-			server_id {$APP_DOMAIN}
-		}
-	}
-	tls {$APP_EMAIL} {
-		on_demand
-	}
-	encode zstd gzip
 }
