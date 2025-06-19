@@ -1,6 +1,8 @@
 package storage
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"io/fs"
@@ -14,6 +16,7 @@ import (
 
 	"github.com/picosh/pico/pkg/send/utils"
 	"github.com/picosh/pico/pkg/shared/mime"
+	putils "github.com/picosh/utils"
 )
 
 // https://stackoverflow.com/a/32482941
@@ -113,6 +116,20 @@ func (s *StorageFS) GetObject(bucket Bucket, fpath string) (utils.ReadAndReaderA
 		return nil, objInfo, err
 	}
 
+	etag := ""
+	// only generate etag if file is less than 10MB
+	if info.Size() <= int64(10*putils.MB) {
+		// calculate etag
+		h := md5.New()
+		tr := io.TeeReader(dat, h)
+		if _, err := io.Copy(h, tr); err != nil {
+			return nil, nil, err
+		}
+		md5Sum := h.Sum(nil)
+		etag = hex.EncodeToString(md5Sum)
+	}
+
+	objInfo.ETag = etag
 	objInfo.Size = info.Size()
 	objInfo.LastModified = info.ModTime()
 	objInfo.Metadata.Set("content-type", mime.GetMimeType(fpath))
