@@ -37,10 +37,6 @@ type ConfigSite struct {
 	PortOverride       string
 	Protocol           string
 	DbURL              string
-	StorageDir         string
-	MinioURL           string
-	MinioUser          string
-	MinioPass          string
 	Space              string
 	Issuer             string
 	Secret             string

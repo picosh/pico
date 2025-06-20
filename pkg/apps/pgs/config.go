@@ -20,7 +20,6 @@ type PgsConfig struct {
 	MaxSpecialFileSize int64
 	SshHost            string
 	SshPort            string
-	StorageDir         string
 	TxtPrefix          string
 	WebPort            string
 	WebProtocol        string
@@ -71,7 +70,6 @@ func NewPgsConfig(logger *slog.Logger, dbpool pgsdb.PgsDB, st storage.StorageSer
 	domain := utils.GetEnv("PGS_DOMAIN", "pgs.sh")
 	port := utils.GetEnv("PGS_WEB_PORT", "3000")
 	protocol := utils.GetEnv("PGS_PROTOCOL", "https")
-	storageDir := utils.GetEnv("PGS_STORAGE_DIR", ".storage")
 	cacheTTL, err := time.ParseDuration(utils.GetEnv("PGS_CACHE_TTL", ""))
 	if err != nil {
 		cacheTTL = 600 * time.Second
@@ -92,7 +90,6 @@ func NewPgsConfig(logger *slog.Logger, dbpool pgsdb.PgsDB, st storage.StorageSer
 		MaxSpecialFileSize: maxSpecialFileSize,
 		SshHost:            sshHost,
 		SshPort:            sshPort,
-		StorageDir:         storageDir,
 		TxtPrefix:          "pgs",
 		WebPort:            port,
 		WebProtocol:        protocol,
