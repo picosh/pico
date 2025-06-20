@@ -122,7 +122,7 @@ func (s *StorageFS) GetObject(bucket Bucket, fpath string) (utils.ReadAndReaderA
 		// calculate etag
 		h := md5.New()
 		if _, err := io.Copy(h, dat); err != nil {
-			return nil, nil, err
+			return nil, objInfo, err
 		}
 		md5Sum := h.Sum(nil)
 		etag = hex.EncodeToString(md5Sum)
@@ -131,7 +131,7 @@ func (s *StorageFS) GetObject(bucket Bucket, fpath string) (utils.ReadAndReaderA
 	// reset os.File reader
 	_, err = dat.Seek(0, io.SeekStart)
 	if err != nil {
-		return nil, nil, err
+		return nil, objInfo, err
 	}
 
 	objInfo.ETag = etag

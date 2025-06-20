@@ -394,7 +394,7 @@ networks:
       com.docker.network.bridge.name: prose
     ipam:
       config:
-        - subnet: 172.18.0.0/16
+        - subnet: 172.30.0.0/16
         - subnet: fd00:dead:beef:18::/112
   pastes:
     enable_ipv6: true
