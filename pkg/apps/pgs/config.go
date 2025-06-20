@@ -58,7 +58,7 @@ func (c *PgsConfig) AssetURL(username, projectName, fpath string) string {
 }
 
 func (c *PgsConfig) StaticPath(fname string) string {
-	return filepath.Join("pgs", fname)
+	return filepath.Join("pkg", "apps", "pgs", fname)
 }
 
 var maxSize = uint64(25 * utils.MB)
