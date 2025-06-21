@@ -141,6 +141,12 @@ func TestFsAdapter(t *testing.T) {
 		t.Fatal(cmp.Diff(objs, expectedObjs, ignore))
 	}
 
+	// it should not error if folder doesn't exist
+	_, err = st.ListObjects(bucket, "/not-real", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// list buckets
 	aBucket, _ := st.UpsertBucket("another")
 	_, _ = st.UpsertBucket("and-another")
@@ -181,6 +187,12 @@ func TestFsAdapter(t *testing.T) {
 	_, err = os.Stat(filepath.Join(bucket.Path, "nice"))
 	if !os.IsNotExist(err) {
 		t.Fatal("containing folder should have been deleted")
+	}
+
+	// it should not error if file doesn't exist
+	err = st.DeleteObject(bucket, "nice/not-real.txt")
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	str = "a deeply nested test file"

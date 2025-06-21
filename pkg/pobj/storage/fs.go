@@ -174,6 +174,9 @@ func (s *StorageFS) DeleteObject(bucket Bucket, fpath string) error {
 	loc := filepath.Join(bucket.Path, fpath)
 	err := os.Remove(loc)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
 		return err
 	}
 
@@ -208,12 +211,15 @@ func (s *StorageFS) ListBuckets() ([]string, error) {
 }
 
 func (s *StorageFS) ListObjects(bucket Bucket, dir string, recursive bool) ([]os.FileInfo, error) {
-	var fileList []os.FileInfo
+	fileList := []os.FileInfo{}
 
 	fpath := path.Join(bucket.Path, dir)
 
 	info, err := os.Stat(fpath)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return fileList, nil
+		}
 		return fileList, err
 	}
 
