@@ -185,10 +185,15 @@ func (s *StorageFS) DeleteObject(bucket Bucket, fpath string) error {
 	for dir != "" {
 		err = os.Remove(dir)
 		if err != nil {
+			s.Logger.Info("removing dir", "dir", dir, "err", err)
 			break
 		}
 		fp := strings.Split(dir, "/")
-		dir = "/" + filepath.Join(fp[:len(fp)-1]...)
+		prefix := ""
+		if strings.HasPrefix(loc, "/") {
+			prefix = "/"
+		}
+		dir = prefix + filepath.Join(fp[:len(fp)-1]...)
 	}
 
 	return nil
@@ -234,14 +239,27 @@ func (s *StorageFS) ListObjects(bucket Bucket, dir string, recursive bool) ([]os
 		return fileList, err
 	}
 
-	var files []fs.DirEntry
+	var files []utils.VirtualFile
 
 	if recursive {
 		err = filepath.WalkDir(fpath, func(s string, d fs.DirEntry, err error) error {
 			if err != nil {
 				return err
 			}
-			files = append(files, d)
+			info, err := d.Info()
+			if err != nil {
+				return nil
+			}
+			fname := strings.TrimPrefix(s, fpath)
+			if fname == "" {
+				return nil
+			}
+			files = append(files, utils.VirtualFile{
+				FName:    fname,
+				FIsDir:   info.IsDir(),
+				FSize:    info.Size(),
+				FModTime: info.ModTime(),
+			})
 			return nil
 		})
 		if err != nil {
@@ -249,27 +267,28 @@ func (s *StorageFS) ListObjects(bucket Bucket, dir string, recursive bool) ([]os
 			return fileList, nil
 		}
 	} else {
-		files, err = os.ReadDir(fpath)
+		fls, err := os.ReadDir(fpath)
 		if err != nil {
 			fileList = append(fileList, info)
 			return fileList, nil
 		}
+		for _, d := range fls {
+			info, err := d.Info()
+			if err != nil {
+				continue
+			}
+			fp := info.Name()
+			files = append(files, utils.VirtualFile{
+				FName:    fp,
+				FIsDir:   info.IsDir(),
+				FSize:    info.Size(),
+				FModTime: info.ModTime(),
+			})
+		}
 	}
 
 	for _, f := range files {
-		info, err := f.Info()
-		if err != nil {
-			return fileList, err
-		}
-
-		i := &utils.VirtualFile{
-			FName:    f.Name(),
-			FIsDir:   f.IsDir(),
-			FSize:    info.Size(),
-			FModTime: info.ModTime(),
-		}
-
-		fileList = append(fileList, i)
+		fileList = append(fileList, &f)
 	}
 
 	return fileList, err

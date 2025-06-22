@@ -102,6 +102,9 @@ func (c *Cmd) RmProjectAssets(projectName string) error {
 	c.output(fmt.Sprintf("found (%d) assets for project (%s), removing", len(fileList), projectName))
 
 	for _, file := range fileList {
+		if file.IsDir() {
+			continue
+		}
 		intent := fmt.Sprintf("deleted (%s)", file.Name())
 		c.Log.Info(
 			"attempting to delete file",
