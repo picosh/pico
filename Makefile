@@ -33,8 +33,12 @@ snaps:
 .PHONY: snaps
 
 bp-setup:
+ifeq ($(DOCKER_CMD),docker)
 	$(DOCKER_CMD) buildx ls | grep pico || $(DOCKER_CMD) buildx create --name pico
 	$(DOCKER_CMD) buildx use pico
+else
+	# podman
+endif
 .PHONY: bp-setup
 
 bp-caddy: bp-setup

@@ -113,23 +113,23 @@ func TestFsAdapter(t *testing.T) {
 
 	expectedObjs := []fs.FileInfo{
 		&utils.VirtualFile{
-			FName:  "/here",
+			FName:  "here",
 			FIsDir: true,
 		},
 		&utils.VirtualFile{
-			FName:  "/here/we",
+			FName:  "here/we",
 			FIsDir: true,
 		},
 		&utils.VirtualFile{
-			FName:  "/here/we/go",
+			FName:  "here/we/go",
 			FIsDir: true,
 		},
-		&utils.VirtualFile{FName: "/here/we/go/again.txt", FSize: 25},
+		&utils.VirtualFile{FName: "here/we/go/again.txt", FSize: 25},
 		&utils.VirtualFile{
-			FName:  "/nice",
+			FName:  "nice",
 			FIsDir: true,
 		},
-		&utils.VirtualFile{FName: "/nice/test.txt", FSize: 19},
+		&utils.VirtualFile{FName: "nice/test.txt", FSize: 19},
 	}
 	ignore := cmpopts.IgnoreFields(utils.VirtualFile{}, "FModTime", "FSize")
 	if cmp.Equal(objs, expectedObjs, ignore) == false {

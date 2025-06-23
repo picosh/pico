@@ -254,6 +254,8 @@ func (s *StorageFS) ListObjects(bucket Bucket, dir string, recursive bool) ([]os
 			if fname == "" {
 				return nil
 			}
+			// rsync does not expect prefixed `/` so without this `rsync --delete` is borked
+			fname = strings.TrimPrefix(fname, "/")
 			files = append(files, utils.VirtualFile{
 				FName:    fname,
 				FIsDir:   info.IsDir(),

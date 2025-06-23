@@ -17,23 +17,23 @@ func TestNewSSHServer(t *testing.T) {
 	logger := slog.Default()
 	server := pssh.NewSSHServer(ctx, logger, &pssh.SSHServerConfig{})
 
-	if server == nil {
+	if server == nil { //nolint:all
 		t.Fatal("expected non-nil server")
 	}
 
-	if server.Ctx == nil {
+	if server.Ctx == nil { //nolint:all
 		t.Error("expected non-nil context")
 	}
 
-	if server.Logger == nil {
+	if server.Logger == nil { //nolint:all
 		t.Error("expected non-nil logger")
 	}
 
-	if server.Config == nil {
+	if server.Config == nil { //nolint:all
 		t.Error("expected non-nil config")
 	}
 
-	if server.Conns == nil {
+	if server.Conns == nil { //nolint:all
 		t.Error("expected non-nil connections map")
 	}
 }
@@ -46,23 +46,23 @@ func TestNewSSHServerConn(t *testing.T) {
 
 	serverConn := pssh.NewSSHServerConn(ctx, logger, conn, server)
 
-	if serverConn == nil {
+	if serverConn == nil { //nolint:all
 		t.Fatal("expected non-nil server connection")
 	}
 
-	if serverConn.Ctx == nil {
+	if serverConn.Ctx == nil { //nolint:all
 		t.Error("expected non-nil context")
 	}
 
-	if serverConn.Logger == nil {
+	if serverConn.Logger == nil { //nolint:all
 		t.Error("expected non-nil logger")
 	}
 
-	if serverConn.Conn != conn {
+	if serverConn.Conn != conn { //nolint:all
 		t.Error("expected conn to match")
 	}
 
-	if serverConn.SSHServer != server {
+	if serverConn.SSHServer != server { //nolint:all
 		t.Error("expected server to match")
 	}
 }
@@ -122,15 +122,15 @@ func TestSSHServerNilParams(t *testing.T) {
 	//lint:ignore SA1012 ignores nil check
 	server := pssh.NewSSHServer(nil, nil, nil)
 
-	if server == nil {
+	if server == nil { //nolint:all
 		t.Fatal("expected non-nil server")
 	}
 
-	if server.Ctx == nil {
+	if server.Ctx == nil { //nolint:all
 		t.Error("expected non-nil context even when nil is passed")
 	}
 
-	if server.Logger == nil {
+	if server.Logger == nil { //nolint:all
 		t.Error("expected non-nil logger even when nil is passed")
 	}
 
@@ -139,15 +139,15 @@ func TestSSHServerNilParams(t *testing.T) {
 	//lint:ignore SA1012 ignores nil check
 	conn := pssh.NewSSHServerConn(nil, nil, &ssh.ServerConn{}, server)
 
-	if conn == nil {
+	if conn == nil { //nolint:all
 		t.Fatal("expected non-nil server connection")
 	}
 
-	if conn.Ctx == nil {
+	if conn.Ctx == nil { //nolint:all
 		t.Error("expected non-nil context even when nil is passed")
 	}
 
-	if conn.Logger == nil {
+	if conn.Logger == nil { //nolint:all
 		t.Error("expected non-nil logger even when nil is passed")
 	}
 }
