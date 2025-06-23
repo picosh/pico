@@ -47,6 +47,12 @@ services:
       - ./data/storage:/storage
     networks:
       prose:
+  auth-web:
+    logging:
+      driver: "json-file"
+      options:
+        max-file: "3"
+        max-size: "1024m"
   pastes-caddy:
     image: ghcr.io/picosh/pico/caddy:latest
     restart: always
