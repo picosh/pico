@@ -47,6 +47,7 @@ services:
       - ./data/storage:/storage
     networks:
       prose:
+      pgs:
   auth-web:
     logging:
       driver: "json-file"
