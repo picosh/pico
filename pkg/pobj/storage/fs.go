@@ -53,7 +53,7 @@ func (s *StorageFS) GetBucket(name string) (Bucket, error) {
 		Name: name,
 		Path: dirPath,
 	}
-	s.Logger.Info("get bucket", "dir", dirPath)
+	// s.Logger.Info("get bucket", "dir", dirPath)
 
 	info, err := os.Stat(dirPath)
 	if os.IsNotExist(err) {
