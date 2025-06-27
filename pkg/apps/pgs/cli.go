@@ -274,7 +274,7 @@ func (c *Cmd) fzf(projectName string) error {
 		return err
 	}
 
-	objs, err := c.Store.ListObjects(bucket, project.ProjectDir, true)
+	objs, err := c.Store.ListObjects(bucket, project.ProjectDir+"/", true)
 	if err != nil {
 		return err
 	}
