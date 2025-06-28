@@ -50,7 +50,7 @@ func (c *Cmd) output(out string) {
 }
 
 func (c *Cmd) help() {
-	helpStr := "Commands: [help, user, logs, chat]\n"
+	helpStr := "Commands: [help, user, logs, chat, not-found]\n"
 	helpStr += "help - this message\n"
 	helpStr += "user - display user information (returns name, id, account created, pico+ expiration)\n"
 	helpStr += "logs - stream user logs\n"
