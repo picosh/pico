@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/pssh"
@@ -49,8 +50,50 @@ func (c *Cmd) output(out string) {
 }
 
 func (c *Cmd) help() {
-	helpStr := "Commands: [help, pico+]\n"
+	helpStr := "Commands: [help, user, logs, chat]\n"
+	helpStr += "help - this message\n"
+	helpStr += "user - display user information (returns name, id, account created, pico+ expiration)\n"
+	helpStr += "logs - stream user logs\n"
+	helpStr += "chat - IRC chat (must enable pty with `-t` to the SSH command)\n"
+	helpStr += "not-found - return all status 404 requests for a host (hostname.com [year|month])\n"
 	c.output(helpStr)
+}
+
+func (c *Cmd) user() {
+	plus := ""
+	ff, _ := c.Dbpool.FindFeature(c.User.ID, "plus")
+	if ff != nil {
+		plus = ff.ExpiresAt.Format(time.RFC3339)
+	}
+	helpStr := fmt.Sprintf(
+		"%s\n%s\n%s\n%s",
+		c.User.Name,
+		c.User.ID,
+		c.User.CreatedAt.Format(time.RFC3339),
+		plus,
+	)
+	c.output(helpStr)
+}
+
+func (c *Cmd) notFound(host, interval string) error {
+	origin := utils.StartOfYear()
+	if interval == "month" {
+		origin = utils.StartOfMonth()
+	}
+	c.output(fmt.Sprintf("starting from: %s\n", origin.Format(time.RFC3339)))
+	urls, err := c.Dbpool.VisitUrlNotFound(&db.SummaryOpts{
+		Host:   host,
+		UserID: c.User.ID,
+		Limit:  100,
+		Origin: origin,
+	})
+	if err != nil {
+		return err
+	}
+	for _, url := range urls {
+		c.output(fmt.Sprintf("%d %s", url.Count, url.Url))
+	}
+	return nil
 }
 
 func (c *Cmd) logs(ctx context.Context) error {
@@ -194,6 +237,9 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 				case "help":
 					opts.help()
 					return nil
+				case "user":
+					opts.user()
+					return nil
 				case "logs":
 					err = opts.logs(sesh.Context())
 					if err != nil {
@@ -203,6 +249,18 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 				default:
 					return next(sesh)
 				}
+			}
+
+			if cmd == "not-found" {
+				if len(args) < 3 {
+					sesh.Fatal(fmt.Errorf("must provide host name and interval (`month` or `year`)"))
+					return nil
+				}
+				err = opts.notFound(args[1], args[2])
+				if err != nil {
+					sesh.Fatal(err)
+				}
+				return nil
 			}
 
 			return next(sesh)

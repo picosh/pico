@@ -280,3 +280,7 @@ func (me *StubDB) FindTunsEventLogsByAddr(userID, addr string) ([]*db.TunsEventL
 func (me *StubDB) FindTunsEventLogs(userID string) ([]*db.TunsEventLog, error) {
 	return nil, errNotImpl
 }
+
+func (me *StubDB) VisitUrlNotFound(opts *db.SummaryOpts) ([]*db.VisitUrl, error) {
+	return nil, errNotImpl
+}

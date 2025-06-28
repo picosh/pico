@@ -157,6 +157,7 @@ type SummaryOpts struct {
 	Host     string
 	Path     string
 	UserID   string
+	Limit    int
 }
 
 type SummaryVisits struct {
@@ -412,6 +413,7 @@ type DB interface {
 	InsertVisit(view *AnalyticsVisits) error
 	VisitSummary(opts *SummaryOpts) (*SummaryVisits, error)
 	FindVisitSiteList(opts *SummaryOpts) ([]*VisitUrl, error)
+	VisitUrlNotFound(opts *SummaryOpts) ([]*VisitUrl, error)
 
 	AddPicoPlusUser(username, email, paymentType, txId string) error
 	FindFeature(userID string, feature string) (*FeatureFlag, error)

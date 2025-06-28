@@ -1097,7 +1097,11 @@ func (me *PsqlDB) visitUrl(opts *db.SummaryOpts) ([]*db.VisitUrl, error) {
 	return intervals, nil
 }
 
-func (me *PsqlDB) visitUrlNotFound(opts *db.SummaryOpts) ([]*db.VisitUrl, error) {
+func (me *PsqlDB) VisitUrlNotFound(opts *db.SummaryOpts) ([]*db.VisitUrl, error) {
+	limit := opts.Limit
+	if limit == 0 {
+		limit = 10
+	}
 	where, with := visitFilterBy(opts)
 	topUrls := fmt.Sprintf(`SELECT
 		path,
@@ -1106,7 +1110,7 @@ func (me *PsqlDB) visitUrlNotFound(opts *db.SummaryOpts) ([]*db.VisitUrl, error)
 	WHERE created_at >= $1 AND %s = $2 AND user_id = $3 AND path <> '' AND status = 404
 	GROUP BY path
 	ORDER BY path_count DESC
-	LIMIT 10`, where)
+	LIMIT %d`, where, limit)
 
 	intervals := []*db.VisitUrl{}
 	rs, err := me.Db.Query(topUrls, opts.Origin, with, opts.UserID)
@@ -1176,7 +1180,7 @@ func (me *PsqlDB) VisitSummary(opts *db.SummaryOpts) (*db.SummaryVisits, error) 
 		return nil, err
 	}
 
-	notFound, err := me.visitUrlNotFound(opts)
+	notFound, err := me.VisitUrlNotFound(opts)
 	if err != nil {
 		return nil, err
 	}
