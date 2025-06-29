@@ -32,6 +32,7 @@ require (
 	github.com/darkweak/storages/core v0.0.14
 	github.com/gkampitakis/go-snaps v0.5.7
 	github.com/google/go-cmp v0.7.0
+	github.com/google/renameio/v2 v2.0.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/feeds v1.2.0
 	github.com/gorilla/websocket v1.5.3

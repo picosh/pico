@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/renameio/v2"
 	"github.com/picosh/pico/pkg/send/utils"
 	"github.com/picosh/pico/pkg/shared/mime"
 	putils "github.com/picosh/utils"
@@ -152,16 +153,17 @@ func (s *StorageFS) PutObject(bucket Bucket, fpath string, contents io.Reader, e
 	if err != nil {
 		return "", 0, err
 	}
-	f, err := os.OpenFile(loc, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	out, err := renameio.NewPendingFile(loc)
 	if err != nil {
 		return "", 0, err
 	}
-	defer func() {
-		_ = f.Close()
-	}()
 
-	size, err := io.Copy(f, contents)
+	size, err := io.Copy(out, contents)
 	if err != nil {
+		return "", 0, err
+	}
+
+	if err := out.CloseAtomicallyReplace(); err != nil {
 		return "", 0, err
 	}
 
