@@ -102,8 +102,10 @@ func (s *StorageFS) DeleteBucket(bucket Bucket) error {
 
 func (s *StorageFS) GetObject(bucket Bucket, fpath string) (utils.ReadAndReaderAtCloser, *ObjectInfo, error) {
 	objInfo := &ObjectInfo{
+		Size:         0,
 		LastModified: time.Time{},
 		Metadata:     make(http.Header),
+		ETag:         "",
 	}
 
 	dat, err := os.Open(filepath.Join(bucket.Path, fpath))
@@ -113,6 +115,7 @@ func (s *StorageFS) GetObject(bucket Bucket, fpath string) (utils.ReadAndReaderA
 
 	info, err := dat.Stat()
 	if err != nil {
+		_ = dat.Close()
 		return nil, objInfo, err
 	}
 
@@ -122,16 +125,18 @@ func (s *StorageFS) GetObject(bucket Bucket, fpath string) (utils.ReadAndReaderA
 		// calculate etag
 		h := md5.New()
 		if _, err := io.Copy(h, dat); err != nil {
+			_ = dat.Close()
 			return nil, objInfo, err
 		}
 		md5Sum := h.Sum(nil)
 		etag = hex.EncodeToString(md5Sum)
-	}
 
-	// reset os.File reader
-	_, err = dat.Seek(0, io.SeekStart)
-	if err != nil {
-		return nil, objInfo, err
+		// reset os.File reader
+		_, err = dat.Seek(0, io.SeekStart)
+		if err != nil {
+			_ = dat.Close()
+			return nil, objInfo, err
+		}
 	}
 
 	objInfo.ETag = etag
@@ -151,13 +156,11 @@ func (s *StorageFS) PutObject(bucket Bucket, fpath string, contents io.Reader, e
 	if err != nil {
 		return "", 0, err
 	}
+	defer func() {
+		_ = f.Close()
+	}()
 
 	size, err := io.Copy(f, contents)
-	if err != nil {
-		return "", 0, err
-	}
-
-	err = f.Close()
 	if err != nil {
 		return "", 0, err
 	}
@@ -183,9 +186,28 @@ func (s *StorageFS) DeleteObject(bucket Bucket, fpath string) error {
 	// traverse up the folder tree and remove all empty folders
 	dir := filepath.Dir(loc)
 	for dir != "" {
+		f, err := os.Open(dir)
+		if err != nil {
+			s.Logger.Info("open dir", "dir", dir, "err", err)
+			break
+		}
+		defer func() {
+			_ = f.Close()
+		}()
+
+		// https://stackoverflow.com/a/30708914
+		contents, err := f.Readdirnames(-1)
+		if err != nil {
+			s.Logger.Info("read dir", "dir", dir, "err", err)
+			break
+		}
+		if len(contents) > 0 {
+			break
+		}
+
 		err = os.Remove(dir)
 		if err != nil {
-			s.Logger.Info("removing dir", "dir", dir, "err", err)
+			s.Logger.Info("remove dir", "dir", dir, "err", err)
 			break
 		}
 		fp := strings.Split(dir, "/")
