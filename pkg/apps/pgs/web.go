@@ -283,10 +283,9 @@ func (web *WebRouter) checkHandler(w http.ResponseWriter, r *http.Request) {
 
 func (web *WebRouter) CacheMgmt(ctx context.Context, httpCache *middleware.SouinBaseHandler, notify chan string) {
 	storer := httpCache.Storers[0]
-	drain := createSubCacheDrain(ctx, web.Cfg.Logger)
 
 	for {
-		scanner := bufio.NewScanner(drain)
+		scanner := bufio.NewScanner(web.Cfg.Pubsub)
 		scanner.Buffer(make([]byte, 32*1024), 32*1024)
 		for scanner.Scan() {
 			surrogateKey := strings.TrimSpace(scanner.Text())

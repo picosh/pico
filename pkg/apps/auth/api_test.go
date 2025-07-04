@@ -276,7 +276,7 @@ func mkpath(path string) string {
 }
 
 func setupTest() *shared.ApiConfig {
-	logger := shared.CreateLogger("auth-test")
+	logger := shared.CreateLogger("auth-test", false)
 	cfg := &shared.ConfigSite{
 		Issuer:        "auth.pico.test",
 		Domain:        "http://0.0.0.0:3000",

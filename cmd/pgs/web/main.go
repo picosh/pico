@@ -1,6 +1,9 @@
 package main
 
 import (
+	"context"
+	"strings"
+
 	"github.com/picosh/pico/pkg/apps/pgs"
 	pgsdb "github.com/picosh/pico/pkg/apps/pgs/db"
 	"github.com/picosh/pico/pkg/shared"
@@ -10,7 +13,8 @@ import (
 
 func main() {
 	dbURL := utils.GetEnv("DATABASE_URL", "")
-	logger := shared.CreateLogger("pgs-web")
+	withPipe := strings.ToLower(utils.GetEnv("PICO_PIPE_ENABLED", "true")) == "true"
+	logger := shared.CreateLogger("pgs-web", withPipe)
 	dbpool, err := pgsdb.NewDB(dbURL, logger)
 	if err != nil {
 		panic(err)
@@ -20,6 +24,12 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	cfg := pgs.NewPgsConfig(logger, dbpool, st)
+	ctx := context.Background()
+	drain := pgs.CreateSubCacheDrain(ctx, logger)
+	pubsub := pgs.NewPubsubPipe(drain)
+	defer func() {
+		_ = pubsub.Close()
+	}()
+	cfg := pgs.NewPgsConfig(logger, dbpool, st, pubsub)
 	pgs.StartApiServer(cfg)
 }

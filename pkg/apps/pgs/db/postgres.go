@@ -109,7 +109,12 @@ func (me *PgsPsqlDB) UpsertProject(userID, projectName, projectDir string) (*db.
 		// this just updates the `createdAt` timestamp, useful for book-keeping
 		err = me.UpdateProject(userID, projectName)
 		if err != nil {
-			me.Logger.Error("could not update project", "err", err)
+			me.Logger.Error(
+				"could not update project",
+				"err", err,
+				"projectName", projectName,
+				"projectDir", projectDir,
+			)
 			return nil, err
 		}
 		return project, nil
@@ -117,7 +122,12 @@ func (me *PgsPsqlDB) UpsertProject(userID, projectName, projectDir string) (*db.
 
 	_, err = me.InsertProject(userID, projectName, projectName)
 	if err != nil {
-		me.Logger.Error("could not create project", "err", err)
+		me.Logger.Error(
+			"could not create project",
+			"err", err,
+			"projectName", projectName,
+			"projectDir", projectDir,
+		)
 		return nil, err
 	}
 	return me.FindProjectByName(userID, projectName)

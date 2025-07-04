@@ -45,7 +45,7 @@ func getInfoFromUser(user string) (string, string) {
 	return "", user
 }
 
-func createHttpHandler(cfg *PgsConfig) CtxHttpBridge {
+func CreateHttpHandler(cfg *PgsConfig) CtxHttpBridge {
 	return func(ctx *pssh.SSHServerConnSession) http.Handler {
 		logger := cfg.Logger
 		asUser, subdomain := getInfoFromUser(ctx.User())

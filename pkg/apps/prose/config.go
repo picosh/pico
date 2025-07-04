@@ -1,6 +1,8 @@
 package prose
 
 import (
+	"strings"
+
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/utils"
 )
@@ -15,6 +17,7 @@ func NewConfigSite(service string) *shared.ConfigSite {
 	dbURL := utils.GetEnv("DATABASE_URL", "")
 	maxSize := uint64(25 * utils.MB)
 	maxImgSize := int64(10 * utils.MB)
+	withPipe := strings.ToLower(utils.GetEnv("PICO_PIPE_ENABLED", "true")) == "true"
 
 	return &shared.ConfigSite{
 		Debug:    debug == "1",
@@ -34,7 +37,7 @@ func NewConfigSite(service string) *shared.ConfigSite {
 			".ico",
 		},
 		HiddenPosts:  []string{"_readme.md", "_styles.css", "_footer.md", "_404.md"},
-		Logger:       shared.CreateLogger(service),
+		Logger:       shared.CreateLogger(service, withPipe),
 		MaxSize:      maxSize,
 		MaxAssetSize: maxImgSize,
 	}

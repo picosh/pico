@@ -318,7 +318,11 @@ func TestApiBasic(t *testing.T) {
 			responseRecorder := httptest.NewRecorder()
 
 			st, _ := storage.NewStorageMemory(tc.storage)
-			cfg := NewPgsConfig(logger, dbpool, st)
+			pubsub := NewPubsubChan()
+			defer func() {
+				_ = pubsub.Close()
+			}()
+			cfg := NewPgsConfig(logger, dbpool, st, pubsub)
 			cfg.Domain = "pgs.test"
 			router := NewWebRouter(cfg)
 			router.ServeHTTP(responseRecorder, request)
@@ -416,7 +420,11 @@ func TestImageManipulation(t *testing.T) {
 					Ratio: &storage.Ratio{},
 				},
 			}
-			cfg := NewPgsConfig(logger, dbpool, st)
+			pubsub := NewPubsubChan()
+			defer func() {
+				_ = pubsub.Close()
+			}()
+			cfg := NewPgsConfig(logger, dbpool, st, pubsub)
 			cfg.Domain = "pgs.test"
 			router := NewWebRouter(cfg)
 			router.ServeHTTP(responseRecorder, request)

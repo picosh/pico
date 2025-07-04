@@ -14,6 +14,22 @@ var ErrNameDenied = errors.New("username is on the denylist")
 var ErrNameInvalid = errors.New("username has invalid characters in it")
 var ErrPublicKeyTaken = errors.New("public key is already associated with another user")
 
+// sqlite uses string to BLOB type and postgres uses []uint8 for JSONB.
+func tcast(value any) ([]byte, error) {
+	switch val := value.(type) {
+	// sqlite3 BLOB
+	case string:
+		return []byte(val), nil
+	// postgres JSONB: []uint8
+	default:
+		b, ok := val.([]byte)
+		if !ok {
+			return []byte{}, errors.New("type assertion to []byte failed")
+		}
+		return b, nil
+	}
+}
+
 type PublicKey struct {
 	ID        string     `json:"id" db:"id"`
 	UserID    string     `json:"user_id" db:"user_id"`
@@ -43,10 +59,10 @@ func (p PostData) Value() (driver.Value, error) {
 
 // Make the Attrs struct implement the sql.Scanner interface. This method
 // simply decodes a JSON-encoded value into the struct fields.
-func (p *PostData) Scan(value interface{}) error {
-	b, ok := value.([]byte)
-	if !ok {
-		return errors.New("type assertion to []byte failed")
+func (p *PostData) Scan(value any) error {
+	b, err := tcast(value)
+	if err != nil {
+		return err
 	}
 
 	return json.Unmarshal(b, &p)
@@ -77,12 +93,11 @@ func (p ProjectAcl) Value() (driver.Value, error) {
 
 // Make the Attrs struct implement the sql.Scanner interface. This method
 // simply decodes a JSON-encoded value into the struct fields.
-func (p *ProjectAcl) Scan(value interface{}) error {
-	b, ok := value.([]byte)
-	if !ok {
-		return errors.New("type assertion to []byte failed")
+func (p *ProjectAcl) Scan(value any) error {
+	b, err := tcast(value)
+	if err != nil {
+		return err
 	}
-
 	return json.Unmarshal(b, &p)
 }
 
@@ -102,11 +117,12 @@ func (p FeedItemData) Value() (driver.Value, error) {
 
 // Make the Attrs struct implement the sql.Scanner interface. This method
 // simply decodes a JSON-encoded value into the struct fields.
-func (p *FeedItemData) Scan(value interface{}) error {
-	b, ok := value.([]byte)
-	if !ok {
-		return errors.New("type assertion to []byte failed")
+func (p *FeedItemData) Scan(value any) error {
+	b, err := tcast(value)
+	if err != nil {
+		return err
 	}
+
 	return json.Unmarshal(b, &p)
 }
 
@@ -274,11 +290,12 @@ func (p FeatureFlagData) Value() (driver.Value, error) {
 
 // Make the Attrs struct implement the sql.Scanner interface. This method
 // simply decodes a JSON-encoded value into the struct fields.
-func (p *FeatureFlagData) Scan(value interface{}) error {
-	b, ok := value.([]byte)
-	if !ok {
-		return errors.New("type assertion to []byte failed")
+func (p *FeatureFlagData) Scan(value any) error {
+	b, err := tcast(value)
+	if err != nil {
+		return err
 	}
+
 	return json.Unmarshal(b, &p)
 }
 
@@ -295,11 +312,12 @@ func (p PaymentHistoryData) Value() (driver.Value, error) {
 
 // Make the Attrs struct implement the sql.Scanner interface. This method
 // simply decodes a JSON-encoded value into the struct fields.
-func (p *PaymentHistoryData) Scan(value interface{}) error {
-	b, ok := value.([]byte)
-	if !ok {
-		return errors.New("type assertion to []byte failed")
+func (p *PaymentHistoryData) Scan(value any) error {
+	b, err := tcast(value)
+	if err != nil {
+		return err
 	}
+
 	return json.Unmarshal(b, &p)
 }
 
