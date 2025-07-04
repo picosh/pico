@@ -38,7 +38,7 @@ func StartSshServer(cfg *PgsConfig, killCh chan error) {
 
 	webTunnel := &tunkit.WebTunnelHandler{
 		Logger:      logger,
-		HttpHandler: createHttpHandler(cfg),
+		HttpHandler: CreateHttpHandler(cfg),
 	}
 
 	// Create a new SSH server

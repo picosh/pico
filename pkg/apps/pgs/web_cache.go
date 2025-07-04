@@ -3,6 +3,7 @@ package pgs
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"time"
 
@@ -10,11 +11,64 @@ import (
 	"github.com/picosh/utils/pipe"
 )
 
+type PicoPubsub interface {
+	io.Reader
+	io.Writer
+	io.Closer
+}
+
+type PubsubPipe struct {
+	Pipe *pipe.ReconnectReadWriteCloser
+}
+
+func (p *PubsubPipe) Read(b []byte) (int, error) {
+	return p.Pipe.Read(b)
+}
+
+func (p *PubsubPipe) Write(b []byte) (int, error) {
+	return p.Pipe.Write(b)
+}
+
+func (p *PubsubPipe) Close() error {
+	return p.Pipe.Close()
+}
+
+func NewPubsubPipe(pipe *pipe.ReconnectReadWriteCloser) *PubsubPipe {
+	return &PubsubPipe{
+		Pipe: pipe,
+	}
+}
+
+type PubsubChan struct {
+	Chan chan []byte
+}
+
+func (p *PubsubChan) Read(b []byte) (int, error) {
+	n := copy(b, <-p.Chan)
+	return n, nil
+}
+
+func (p *PubsubChan) Write(b []byte) (int, error) {
+	p.Chan <- b
+	return len(b), nil
+}
+
+func (p *PubsubChan) Close() error {
+	close(p.Chan)
+	return nil
+}
+
+func NewPubsubChan() *PubsubChan {
+	return &PubsubChan{
+		Chan: make(chan []byte),
+	}
+}
+
 func getSurrogateKey(userName, projectName string) string {
 	return fmt.Sprintf("%s-%s", userName, projectName)
 }
 
-func createPubCacheDrain(ctx context.Context, logger *slog.Logger) *pipe.ReconnectReadWriteCloser {
+func CreatePubCacheDrain(ctx context.Context, logger *slog.Logger) *pipe.ReconnectReadWriteCloser {
 	info := shared.NewPicoPipeClient()
 	send := pipe.NewReconnectReadWriteCloser(
 		ctx,
@@ -28,7 +82,7 @@ func createPubCacheDrain(ctx context.Context, logger *slog.Logger) *pipe.Reconne
 	return send
 }
 
-func createSubCacheDrain(ctx context.Context, logger *slog.Logger) *pipe.ReconnectReadWriteCloser {
+func CreateSubCacheDrain(ctx context.Context, logger *slog.Logger) *pipe.ReconnectReadWriteCloser {
 	info := shared.NewPicoPipeClient()
 	send := pipe.NewReconnectReadWriteCloser(
 		ctx,
@@ -48,13 +102,13 @@ func createSubCacheDrain(ctx context.Context, logger *slog.Logger) *pipe.Reconne
 // cached assets for a given subdomain are grouped under a single key (which is
 // separate from the "GET-https-example.com-/path" key used for serving files
 // from the cache).
-func purgeCache(cfg *PgsConfig, send *pipe.ReconnectReadWriteCloser, surrogate string) error {
+func purgeCache(cfg *PgsConfig, writer io.Writer, surrogate string) error {
 	cfg.Logger.Info("purging cache", "surrogate", surrogate)
 	time.Sleep(1 * time.Second)
-	_, err := send.Write([]byte(surrogate + "\n"))
+	_, err := writer.Write([]byte(surrogate + "\n"))
 	return err
 }
 
-func purgeAllCache(cfg *PgsConfig, send *pipe.ReconnectReadWriteCloser) error {
-	return purgeCache(cfg, send, "*")
+func purgeAllCache(cfg *PgsConfig, writer io.Writer) error {
+	return purgeCache(cfg, writer, "*")
 }

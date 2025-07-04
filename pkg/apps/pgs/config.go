@@ -33,6 +33,7 @@ type PgsConfig struct {
 	Logger *slog.Logger
 	// Where we store the static assets uploaded to our service.
 	Storage storage.StorageServe
+	Pubsub  PicoPubsub
 }
 
 func (c *PgsConfig) AssetURL(username, projectName, fpath string) string {
@@ -66,7 +67,7 @@ var maxAssetSize = int64(10 * utils.MB)
 // Needs to be small for caching files like _headers and _redirects.
 var maxSpecialFileSize = int64(5 * utils.KB)
 
-func NewPgsConfig(logger *slog.Logger, dbpool pgsdb.PgsDB, st storage.StorageServe) *PgsConfig {
+func NewPgsConfig(logger *slog.Logger, dbpool pgsdb.PgsDB, st storage.StorageServe, pubsub PicoPubsub) *PgsConfig {
 	domain := utils.GetEnv("PGS_DOMAIN", "pgs.sh")
 	port := utils.GetEnv("PGS_WEB_PORT", "3000")
 	protocol := utils.GetEnv("PGS_PROTOCOL", "https")
@@ -98,6 +99,7 @@ func NewPgsConfig(logger *slog.Logger, dbpool pgsdb.PgsDB, st storage.StorageSer
 		DB:                 dbpool,
 		Logger:             logger,
 		Storage:            st,
+		Pubsub:             pubsub,
 	}
 
 	return &cfg

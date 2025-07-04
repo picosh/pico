@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/picosh/pico/pkg/db"
-	"github.com/picosh/utils"
 
 	pipeLogger "github.com/picosh/utils/pipe/log"
 )
@@ -269,7 +268,7 @@ func (c *ConfigSite) AssetURL(username, projectName, fpath string) string {
 	)
 }
 
-func CreateLogger(space string) *slog.Logger {
+func CreateLogger(space string, withPipe bool) *slog.Logger {
 	logger := slog.New(
 		slog.NewTextHandler(
 			os.Stdout,
@@ -280,7 +279,7 @@ func CreateLogger(space string) *slog.Logger {
 		),
 	)
 
-	if strings.ToLower(utils.GetEnv("PICO_PIPE_ENABLED", "true")) == "true" {
+	if withPipe {
 		conn := NewPicoPipeClient()
 		logger = pipeLogger.RegisterReconnectLogger(context.Background(), logger, conn, 100, 10*time.Millisecond)
 	}

@@ -15,13 +15,20 @@ import (
 	"github.com/picosh/pico/pkg/apps/pgs"
 	"github.com/picosh/pico/pkg/cache"
 	"github.com/picosh/pico/pkg/shared"
+	"github.com/picosh/utils"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func main() {
-	logger := shared.CreateLogger("pgs-cdn")
+	withPipe := strings.ToLower(utils.GetEnv("PICO_PIPE_ENABLED", "true")) == "true"
+	logger := shared.CreateLogger("pgs-cdn", withPipe)
 	ctx := context.Background()
-	cfg := pgs.NewPgsConfig(logger, nil, nil)
+	drain := pgs.CreateSubCacheDrain(ctx, logger)
+	pubsub := pgs.NewPubsubPipe(drain)
+	defer func() {
+		_ = pubsub.Close()
+	}()
+	cfg := pgs.NewPgsConfig(logger, nil, nil, drain)
 	httpCache := pgs.SetupCache(cfg)
 	router := &pgs.WebRouter{
 		Cfg:            cfg,

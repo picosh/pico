@@ -806,6 +806,7 @@ func authMux(apiConfig *shared.ApiConfig) *http.ServeMux {
 
 func StartApiServer() {
 	debug := utils.GetEnv("AUTH_DEBUG", "0")
+	withPipe := strings.ToLower(utils.GetEnv("PICO_PIPE_ENABLED", "true")) == "true"
 
 	cfg := &shared.ConfigSite{
 		DbURL:         utils.GetEnv("DATABASE_URL", ""),
@@ -825,7 +826,7 @@ func StartApiServer() {
 		panic("must provide PICO_SECRET environment variable")
 	}
 
-	logger := shared.CreateLogger("auth-web")
+	logger := shared.CreateLogger("auth-web", withPipe)
 
 	cfg.Logger = logger
 

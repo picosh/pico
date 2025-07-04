@@ -569,7 +569,6 @@ func (h *UploadAssetHandler) writeAsset(s *pssh.SSHServerConnSession, reader io.
 // Repeated messages for the same site are grouped so that we only flush once
 // per site per 5 seconds.
 func runCacheQueue(cfg *PgsConfig, ctx context.Context) {
-	send := createPubCacheDrain(ctx, cfg.Logger)
 	var pendingFlushes sync.Map
 	tick := time.Tick(5 * time.Second)
 	for {
@@ -580,7 +579,7 @@ func runCacheQueue(cfg *PgsConfig, ctx context.Context) {
 			go func() {
 				pendingFlushes.Range(func(key, value any) bool {
 					pendingFlushes.Delete(key)
-					err := purgeCache(cfg, send, key.(string))
+					err := purgeCache(cfg, cfg.Pubsub, key.(string))
 					if err != nil {
 						cfg.Logger.Error("failed to clear cache", "err", err.Error())
 					}

@@ -39,7 +39,11 @@ func TestSshServerSftp(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	cfg := NewPgsConfig(logger, dbpool, st)
+	pubsub := NewPubsubChan()
+	defer func() {
+		_ = pubsub.Close()
+	}()
+	cfg := NewPgsConfig(logger, dbpool, st, pubsub)
 	done := make(chan error)
 	prometheus.DefaultRegisterer = prometheus.NewRegistry()
 	go StartSshServer(cfg, done)
@@ -123,7 +127,11 @@ func TestSshServerRsync(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	cfg := NewPgsConfig(logger, dbpool, st)
+	pubsub := NewPubsubChan()
+	defer func() {
+		_ = pubsub.Close()
+	}()
+	cfg := NewPgsConfig(logger, dbpool, st, pubsub)
 	done := make(chan error)
 	prometheus.DefaultRegisterer = prometheus.NewRegistry()
 	go StartSshServer(cfg, done)
