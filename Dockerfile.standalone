@@ -1,0 +1,42 @@
+FROM --platform=$BUILDPLATFORM golang:1.24 AS builder-deps
+LABEL maintainer="Pico Maintainers <hello@pico.sh>"
+
+WORKDIR /app
+
+RUN apt-get update
+RUN apt-get install -y git ca-certificates
+
+COPY go.* ./
+
+RUN --mount=type=cache,target=/go/pkg/,rw \
+  --mount=type=cache,target=/root/.cache/,rw \
+  go mod download
+
+FROM builder-deps AS builder
+
+COPY . .
+
+ARG TARGETOS
+ARG TARGETARCH
+
+ENV CGO_ENABLED=0
+ENV LDFLAGS="-s -w"
+
+ENV GOOS=${TARGETOS} GOARCH=${TARGETARCH}
+
+RUN --mount=type=cache,target=/go/pkg/,rw \
+  --mount=type=cache,target=/root/.cache/,rw \
+  go build -ldflags "$LDFLAGS" -o /go/bin/pgs ./cmd/pgs/standalone
+
+FROM scratch AS release
+
+ENV TERM="xterm-256color"
+
+WORKDIR /app
+
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=builder /go/bin/pgs ./pgs
+COPY --from=builder /app/pkg/apps/pgs/html ./pkg/apps/pgs/html
+COPY --from=builder /app/pkg/apps/pgs/public ./pkg/apps/pgs/public
+
+ENTRYPOINT ["/app/pgs"]

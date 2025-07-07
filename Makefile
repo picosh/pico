@@ -53,6 +53,10 @@ bp-pgs-cdn: bp-setup
 	$(DOCKER_BUILDX_BUILD) -t ghcr.io/picosh/pico/pgs-cdn:$(DOCKER_TAG) --target release-web -f Dockerfile.cdn .
 .PHONY: bp-pgs-cdn
 
+bp-pgs-standalone: bp-setup
+	$(DOCKER_BUILDX_BUILD) --manifest ghcr.io/picosh/pgs:$(DOCKER_TAG) --target release -f Dockerfile.standalone .
+.PHONY: bp-pgs-standalone
+
 bp-pico: bp-setup
 	$(DOCKER_BUILDX_BUILD) -t ghcr.io/picosh/pico/pico-ssh:$(DOCKER_TAG) --build-arg APP=pico --target release-ssh .
 .PHONY: bp-auth
