@@ -86,6 +86,16 @@
 		rewrite * /_metrics
 		reverse_proxy web:3000
 	}
+
+	@imgproxymetrics {
+		host {$APP_DOMAIN}
+		path /_imgproxy/metrics
+	}
+
+	handle @imgproxymetrics {
+		rewrite * /metrics
+		reverse_proxy imgproxy:8081
+	}
 }
 
 monitoring.{$MONITORING_APP_DOMAIN}, prometheus.{$MONITORING_APP_DOMAIN}, grafana.{$MONITORING_APP_DOMAIN} {
