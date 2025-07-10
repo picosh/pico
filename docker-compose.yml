@@ -10,13 +10,13 @@ services:
     command: server /data --console-address ":9001"
     restart: always
     profiles:
-      - db
+      - minio
       - all
   imgproxy:
     image: darthsim/imgproxy:latest
     restart: always
     profiles:
-      - db
+      - minio
       - all
       - prose
       - pgs
