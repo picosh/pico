@@ -96,7 +96,6 @@ services:
     restart: always
     profiles:
       - pgs
-      - pgs-cdn
       - services
       - all
   feeds-web:
