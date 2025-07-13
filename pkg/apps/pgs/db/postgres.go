@@ -241,7 +241,10 @@ func (me *PgsPsqlDB) UpdateProjectAcl(userID, name string, acl db.ProjectAcl) er
 	return err
 }
 
-func (me *PgsPsqlDB) RegisterAdmin(username, pubkey string) error {
+func (me *PgsPsqlDB) RegisterAdmin(username, pubkey, pubkeyName string) error {
+	if pubkeyName == "" {
+		pubkeyName = "main"
+	}
 	var userID string
 	row := me.Db.QueryRow("INSERT INTO app_users (name) VALUES ($1) RETURNING id", username)
 	err := row.Scan(&userID)
@@ -249,7 +252,7 @@ func (me *PgsPsqlDB) RegisterAdmin(username, pubkey string) error {
 		return err
 	}
 
-	_, err = me.Db.Exec("INSERT INTO public_keys (user_id, name, public_key) VALUES ($1, 'main', $2)", userID, pubkey)
+	_, err = me.Db.Exec("INSERT INTO public_keys (user_id, name, public_key) VALUES ($1, $2, $3)", userID, pubkeyName, pubkey)
 	if err != nil {
 		return err
 	}

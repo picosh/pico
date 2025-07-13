@@ -188,6 +188,6 @@ func (me *MemoryDB) UpdateProjectAcl(userID, name string, acl db.ProjectAcl) err
 	return errNotImpl
 }
 
-func (me *MemoryDB) RegisterAdmin(username, pubkey string) error {
+func (me *MemoryDB) RegisterAdmin(username, pubkey, pubkeyName string) error {
 	return errNotImpl
 }

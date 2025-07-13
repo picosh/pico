@@ -41,7 +41,7 @@ func main() {
 
 			userName := args[2]
 			pubkeyRaw := strings.Join(args[3:], " ")
-			key, _, _, _, err := ssh.ParseAuthorizedKey([]byte(pubkeyRaw))
+			key, comment, _, _, err := ssh.ParseAuthorizedKey([]byte(pubkeyRaw))
 			if err != nil {
 				logger.Error("parse pubkey", "err", err)
 				return
@@ -49,7 +49,7 @@ func main() {
 			pubkey := utils.KeyForKeyText(key)
 			logger.Info("init cli", "userName", userName, "pubkey", pubkey)
 
-			err = dbpool.RegisterAdmin(userName, pubkey)
+			err = dbpool.RegisterAdmin(userName, pubkey, comment)
 			if err != nil {
 				panic(err)
 			}
