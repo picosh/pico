@@ -22,5 +22,7 @@ type PgsDB interface {
 	FindProjectsByPrefix(userID, name string) ([]*db.Project, error)
 	FindProjects(by string) ([]*db.Project, error)
 
+	RegisterAdmin(username string, pubkey string) error
+
 	Close() error
 }

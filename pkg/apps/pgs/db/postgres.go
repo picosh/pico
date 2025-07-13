@@ -240,3 +240,25 @@ func (me *PgsPsqlDB) UpdateProjectAcl(userID, name string, acl db.ProjectAcl) er
 	)
 	return err
 }
+
+func (me *PgsPsqlDB) RegisterAdmin(username, pubkey string) error {
+	var userID string
+	row := me.Db.QueryRow("INSERT INTO app_users (name) VALUES ($1) RETURNING id", username)
+	err := row.Scan(&userID)
+	if err != nil {
+		return err
+	}
+
+	_, err = me.Db.Exec("INSERT INTO public_keys (user_id, name, public_key) VALUES ($1, 'main', $2)", userID, pubkey)
+	if err != nil {
+		return err
+	}
+
+	_, err = me.Db.Exec("INSERT INTO feature_flags (user_id, name, expires_at) VALUES (1, 'plus', '2100-01-01')", userID)
+	if err != nil {
+		return err
+	}
+
+	_, err = me.Db.Exec("INSERT INTO feature_flags (user_id, name, expires_at) VALUES (1, 'admin', '2100-01-01')", userID)
+	return err
+}

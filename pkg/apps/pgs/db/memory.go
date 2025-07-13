@@ -187,3 +187,7 @@ func (me *MemoryDB) FindProjects(userID string) ([]*db.Project, error) {
 func (me *MemoryDB) UpdateProjectAcl(userID, name string, acl db.ProjectAcl) error {
 	return errNotImpl
 }
+
+func (me *MemoryDB) RegisterAdmin(username, pubkey string) error {
+	return errNotImpl
+}

@@ -67,28 +67,24 @@ func Middleware(handler *UploadAssetHandler) pssh.SSHServerMiddleware {
 				height = pty.Window.Height
 			}
 
+			opts := Cmd{
+				Session: sesh,
+				Store:   store,
+				Log:     log,
+				Dbpool:  dbpool,
+				Write:   false,
+				Width:   width,
+				Height:  height,
+				Cfg:     handler.Cfg,
+			}
+
 			user, err := getUser(sesh, dbpool)
 			if err != nil {
 				sendutils.ErrorHandler(sesh, err)
 				return err
 			}
 
-			// renderer := bm.MakeRenderer(sesh)
-			// renderer.SetColorProfile(termenv.TrueColor)
-			// styles := common.DefaultStyles(renderer)
-
-			opts := Cmd{
-				Session: sesh,
-				User:    user,
-				Store:   store,
-				Log:     log,
-				Dbpool:  dbpool,
-				Write:   false,
-				// Styles:  styles,
-				Width:  width,
-				Height: height,
-				Cfg:    handler.Cfg,
-			}
+			opts.User = user
 
 			if len(args) == 0 {
 				opts.help()
