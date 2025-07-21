@@ -328,6 +328,32 @@ func postRawHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func robotsHandler(w http.ResponseWriter, r *http.Request) {
+	username := shared.GetUsernameFromRequest(r)
+	cfg := shared.GetCfg(r)
+	dbpool := shared.GetDB(r)
+	logger := shared.GetLogger(r)
+	user, err := dbpool.FindUserByName(username)
+	if err != nil {
+		logger.Info("blog not found", "user", username)
+		http.Error(w, "blog not found", http.StatusNotFound)
+		return
+	}
+	logger = shared.LoggerWithUser(logger, user)
+	w.Header().Add("Content-Type", "text/plain")
+
+	post, err := dbpool.FindPostWithFilename("robots.txt", user.ID, cfg.Space)
+	txt := ""
+	if err == nil {
+		txt = post.Text
+	}
+	_, err = w.Write([]byte(txt))
+	if err != nil {
+		logger.Error("write to response writer", "err", err)
+		http.Error(w, "server error", 500)
+	}
+}
+
 func postHandler(w http.ResponseWriter, r *http.Request) {
 	username := shared.GetUsernameFromRequest(r)
 	subdomain := shared.GetSubdomain(r)
@@ -945,6 +971,7 @@ func createSubdomainRoutes(staticRoutes []shared.Route) []shared.Route {
 	routes := []shared.Route{
 		shared.NewRoute("GET", "/", blogHandler),
 		shared.NewRoute("GET", "/_styles.css", blogStyleHandler),
+		shared.NewRoute("GET", "/robots.txt", robotsHandler),
 		shared.NewRoute("GET", "/rss", rssBlogHandler),
 		shared.NewRoute("GET", "/rss.xml", rssBlogHandler),
 		shared.NewRoute("GET", "/atom.xml", rssBlogHandler),

@@ -36,7 +36,7 @@ func NewConfigSite(service string) *shared.ConfigSite {
 			".svg",
 			".ico",
 		},
-		HiddenPosts:  []string{"_readme.md", "_styles.css", "_footer.md", "_404.md"},
+		HiddenPosts:  []string{"_readme.md", "_styles.css", "_footer.md", "_404.md", "robots.txt"},
 		Logger:       shared.CreateLogger(service, withPipe),
 		MaxSize:      maxSize,
 		MaxAssetSize: maxImgSize,

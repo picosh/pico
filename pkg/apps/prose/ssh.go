@@ -53,6 +53,7 @@ func StartSshServer() {
 
 	fileMap := map[string]filehandlers.ReadWriteHandler{
 		".md":      filehandlers.NewScpPostHandler(dbh, cfg, hooks),
+		".txt":     filehandlers.NewScpPostHandler(dbh, cfg, hooks),
 		".css":     filehandlers.NewScpPostHandler(dbh, cfg, hooks),
 		"fallback": uploadimgs.NewUploadImgHandler(dbh, cfg, st),
 	}

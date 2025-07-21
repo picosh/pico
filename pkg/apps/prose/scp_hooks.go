@@ -29,10 +29,15 @@ func (p *MarkdownHooks) FileValidate(s *pssh.SSHServerConnSession, data *filehan
 		return false, err
 	}
 
+	fp := strings.Replace(data.Filename, "/", "", 1)
 	// special styles css file we want to permit but no other css file.
 	// sometimes the directory is provided in the filename, so we want to
 	// remove that before we perform this check.
-	if strings.Replace(data.Filename, "/", "", 1) == "_styles.css" {
+	if fp == "_styles.css" {
+		return true, nil
+	}
+	// allow users to upload robots file
+	if fp == "robots.txt" {
 		return true, nil
 	}
 
