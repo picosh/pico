@@ -203,6 +203,14 @@ func (sc *SSHServerConn) Handle(chans <-chan ssh.NewChannel, reqs <-chan *ssh.Re
 				return nil
 			}
 			sc.Logger.Info("new request", "type", req.Type, "wantReply", req.WantReply, "payload", req.Payload)
+			switch req.Type {
+			case "keepalive@openssh.com":
+				sc.Logger.Info("keepalive reply")
+				err := req.Reply(true, nil)
+				if err != nil {
+					sc.Logger.Error("keepalive", "err", err)
+				}
+			}
 		}
 	}
 }
