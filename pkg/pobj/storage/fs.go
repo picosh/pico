@@ -153,7 +153,7 @@ func (s *StorageFS) PutObject(bucket Bucket, fpath string, contents io.Reader, e
 	if err != nil {
 		return "", 0, err
 	}
-	out, err := renameio.NewPendingFile(loc)
+	out, err := renameio.NewPendingFile(loc, renameio.WithPermissions(os.ModePerm))
 	if err != nil {
 		return "", 0, err
 	}
