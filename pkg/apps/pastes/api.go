@@ -53,6 +53,7 @@ type PostPageData struct {
 	Username     string
 	BlogName     string
 	Contents     template.HTML
+	Text         string
 	PublishAtISO string
 	PublishAt    string
 	ExpiresAt    string
@@ -219,6 +220,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			Username:     username,
 			BlogName:     blogName,
 			Contents:     template.HTML(parsedText),
+			Text:         post.Text,
 			ExpiresAt:    expiresAt,
 			Unlisted:     unlisted,
 		}
@@ -235,6 +237,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			Username:     username,
 			BlogName:     blogName,
 			Contents:     "oops!  we can't seem to find this post.",
+			Text:         "oops!  we can't seem to find this post.",
 			ExpiresAt:    "",
 		}
 	}
