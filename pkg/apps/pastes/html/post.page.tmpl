@@ -37,6 +37,13 @@
     <p class="font-bold m-0">expires: {{.ExpiresAt}}</p>
 </header>
 <main>
+<script>
+function copyText() {
+    const text = `{{.Text}}`
+    navigator.clipboard.writeText(text)
+}
+</script>
+    <button onclick="copyText()" class="btn mt inline-block">Copy Paste</button>
     <article>
         {{.Contents}}
     </article>
