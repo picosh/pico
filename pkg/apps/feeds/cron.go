@@ -530,9 +530,9 @@ func (f *Fetcher) SendEmail(logger *slog.Logger, username, email, subject string
 	fromEmail := "hello@pico.sh"
 	to := []string{email}
 	headers := map[string]string{
-		"From": fromEmail,
-		"To": email,
-		"Subject": subject,
+		"From":         fromEmail,
+		"To":           email,
+		"Subject":      subject,
 		"MIME-Version": "1.0",
 		"Content-Type": `multipart/alternative; boundary="boundary123"`,
 	}
