@@ -30,6 +30,8 @@ require (
 	github.com/darkweak/souin v1.7.6
 	github.com/darkweak/souin/plugins/souin/storages v1.7.6
 	github.com/darkweak/storages/core v0.0.14
+	github.com/emersion/go-sasl v0.0.0-20241020182733-b788ff22d5a6
+	github.com/emersion/go-smtp v0.23.0
 	github.com/gkampitakis/go-snaps v0.5.7
 	github.com/google/go-cmp v0.7.0
 	github.com/google/renameio/v2 v2.0.0
@@ -51,7 +53,6 @@ require (
 	github.com/pkg/sftp v1.13.9
 	github.com/prometheus/client_golang v1.21.1
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06
-	github.com/sendgrid/sendgrid-go v3.16.0+incompatible
 	github.com/simplesurance/go-ip-anonymizer v0.0.0-20200429124537-35a880f8e87d
 	github.com/x-way/crawlerdetect v0.2.28
 	github.com/yuin/goldmark v1.7.8
@@ -232,7 +233,6 @@ require (
 	github.com/safchain/ethtool v0.5.10 // indirect
 	github.com/sean-/seed v0.0.0-20170313163322-e2103e2c3529 // indirect
 	github.com/secure-io/sio-go v0.3.1 // indirect
-	github.com/sendgrid/rest v2.6.9+incompatible // indirect
 	github.com/shirou/gopsutil/v3 v3.24.5 // indirect
 	github.com/shoenig/go-m1cpu v0.1.6 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect

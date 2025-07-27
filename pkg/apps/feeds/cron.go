@@ -10,15 +10,16 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"text/template"
 	"time"
 
+	"github.com/emersion/go-sasl"
+	"github.com/emersion/go-smtp"
 	"github.com/mmcdole/gofeed"
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/shared"
-	"github.com/sendgrid/sendgrid-go"
-	"github.com/sendgrid/sendgrid-go/helpers/mail"
 )
 
 var ErrNoRecentArticles = errors.New("no recent articles")
@@ -125,14 +126,19 @@ func isValidItem(logger *slog.Logger, item *gofeed.Item, feedItems []*db.FeedIte
 }
 
 type Fetcher struct {
-	cfg *shared.ConfigSite
-	db  db.DB
+	cfg  *shared.ConfigSite
+	db   db.DB
+	auth sasl.Client
 }
 
 func NewFetcher(dbpool db.DB, cfg *shared.ConfigSite) *Fetcher {
+	smtPass := os.Getenv("PICO_SMTP_PASS")
+	emailLogin := os.Getenv("PICO_SMTP_USER")
+	auth := sasl.NewPlainClient("", emailLogin, smtPass)
 	return &Fetcher{
-		db:  dbpool,
-		cfg: cfg,
+		db:   dbpool,
+		cfg:  cfg,
+		auth: auth,
 	}
 }
 
@@ -516,41 +522,43 @@ func (f *Fetcher) FetchAll(logger *slog.Logger, urls []string, inlineContent boo
 	}, nil
 }
 
-func (f *Fetcher) SendEmail(logger *slog.Logger, username, email string, subject string, msg *MsgBody) error {
+func (f *Fetcher) SendEmail(logger *slog.Logger, username, email, subject string, msg *MsgBody) error {
 	if email == "" {
 		return fmt.Errorf("(%s) does not have an email associated with their feed post", username)
 	}
+	smtpAddr := "smtp.fastmail.com:587"
+	fromEmail := "hello@pico.sh"
+	to := []string{email}
+	headers := map[string]string{
+		"From": fromEmail,
+		"To": email,
+		"Subject": subject,
+		"MIME-Version": "1.0",
+		"Content-Type": `multipart/alternative; boundary="boundary123"`,
+	}
+	var content strings.Builder
+	for k, v := range headers {
+		content.WriteString(fmt.Sprintf("%s: %s\r\n", k, v))
+	}
+	content.WriteString("\r\n")
+	content.WriteString("\r\n--boundary123\r\n")
+	content.WriteString("Content-Type: text/plain; charset=\"utf-8\"\r\n")
+	content.WriteString("\r\n" + msg.Text + "\r\n")
+	content.WriteString("--boundary123\r\n")
+	content.WriteString("Content-Type: text/html; charset=\"utf-8\"\r\n")
+	content.WriteString("\r\n" + msg.Html + "\r\n")
+	content.WriteString("--boundary123--")
 
-	from := mail.NewEmail("team pico", shared.DefaultEmail)
-	to := mail.NewEmail(username, email)
-
-	// f.logger.Infof("message body (%s)", plainTextContent)
-
-	message := mail.NewSingleEmail(from, subject, to, msg.Text, msg.Html)
-	client := sendgrid.NewSendClient(f.cfg.SendgridKey)
-
+	reader := strings.NewReader(content.String())
 	logger.Info("sending email digest")
-	response, err := client.Send(message)
-	if err != nil {
-		return err
-	}
-
-	// f.logger.Infof("(%s) email digest response: %v", username, response)
-
-	if len(response.Headers["X-Message-Id"]) > 0 {
-		logger.Info(
-			"successfully sent email digest",
-			"email", email,
-			"x-message-id", response.Headers["X-Message-Id"][0],
-		)
-	} else {
-		logger.Error(
-			"could not find x-message-id, which means sending an email failed",
-			"email", email,
-		)
-	}
-
-	return nil
+	err := smtp.SendMail(
+		smtpAddr,
+		f.auth,
+		fromEmail,
+		to,
+		reader,
+	)
+	return err
 }
 
 func (f *Fetcher) Run(logger *slog.Logger) error {
