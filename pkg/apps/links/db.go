@@ -10,8 +10,8 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
-	"github.com/picosh/pico/db"
-	"github.com/picosh/pico/shared"
+	"github.com/picosh/pico/pkg/db"
+	"github.com/picosh/pico/pkg/shared"
 )
 
 type DB interface {
@@ -19,6 +19,9 @@ type DB interface {
 
 	FindUser(userID string) (*db.User, error)
 	FindUserByPubkey(pubkey string) (*db.User, error)
+	FindUserByName(name string) (*db.User, error)
+
+	FindFeature(userID string, name string) (*db.FeatureFlag, error)
 
 	CreateLink(*LinkTree) (*LinkTree, error)
 	EditLink(*LinkTree, *db.User) error
@@ -135,6 +138,18 @@ func (me *PsqlDB) FindUser(userID string) (*db.User, error) {
 	user := db.User{}
 	err := me.Db.Get(&user, "SELECT * FROM app_users WHERE id=$1", userID)
 	return &user, err
+}
+
+func (me *PsqlDB) FindUserByName(name string) (*db.User, error) {
+	user := db.User{}
+	err := me.Db.Get(&user, "SELECT * FROM app_users WHERE name=$1", name)
+	return &user, err
+}
+
+func (me *PsqlDB) FindFeature(userID string, name string) (*db.FeatureFlag, error) {
+	ff := db.FeatureFlag{}
+	err := me.Db.Get(&ff, "SELECT * FROM feature_flags WHERE user_id=$1 AND name=$2 ORDER BY expires_at DESC LIMIT 1", userID, name)
+	return &ff, err
 }
 
 func (me *PsqlDB) FindLink(linkID string) (*LinkTree, error) {

@@ -1,14 +1,17 @@
 package main
 
 import (
-	"github.com/picosh/pico/links"
-	"github.com/picosh/pico/shared"
+	"strings"
+
+	"github.com/picosh/pico/pkg/apps/links"
+	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/utils"
 )
 
 func main() {
 	dbUrl := utils.GetEnv("DATABASE_URL", "")
-	logger := shared.CreateLogger("links")
+	withPipe := strings.ToLower(utils.GetEnv("PICO_PIPE_ENABLED", "true")) == "true"
+	logger := shared.CreateLogger("links", withPipe)
 	dbpool, err := links.NewDB(dbUrl, logger)
 	if err != nil {
 		panic(err)

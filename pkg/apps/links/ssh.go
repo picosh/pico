@@ -4,82 +4,91 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 	"text/tabwriter"
-	"time"
 
-	"github.com/charmbracelet/promwish"
-	"github.com/charmbracelet/ssh"
-	"github.com/charmbracelet/wish"
-	"github.com/picosh/pico/db"
-	"github.com/picosh/pico/shared"
+	"github.com/picosh/pico/pkg/db"
+	"github.com/picosh/pico/pkg/pssh"
+	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/utils"
 	"github.com/urfave/cli"
 )
 
+type CfgLogger struct{}
+
+func (h *CfgLogger) GetLogger(s *pssh.SSHServerConnSession) *slog.Logger {
+	return pssh.GetLogger(s)
+}
+
 func StartSshServer(cfg *LinksConfig, killCh chan error) {
 	logger := cfg.Logger
-
-	ctx := context.Background()
-	defer ctx.Done()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	sshAuth := shared.NewSshAuthHandler(cfg.DB, logger)
-	s, err := wish.NewServer(
-		wish.WithAddress(
-			fmt.Sprintf("%s:%s", cfg.SshHost, cfg.SshPort),
-		),
-		wish.WithHostKeyPath("ssh_data/term_info_ed25519"),
-		wish.WithPublicKeyAuth(sshAuth.PubkeyAuthHandler),
-		wish.WithMiddleware(
+	server, err := pssh.NewSSHServerWithConfig(
+		ctx,
+		logger,
+		"links-ssh",
+		cfg.SshHost,
+		cfg.SshPort,
+		cfg.PromPort,
+		"ssh_data/term_info_ed25519",
+		sshAuth.PubkeyAuthHandler,
+		[]pssh.SSHServerMiddleware{
 			CliMiddleware(cfg),
-			promwish.Middleware(fmt.Sprintf("%s:%s", cfg.SshHost, cfg.PromPort), "links-ssh"),
-		),
+			pssh.LogMiddleware(&CfgLogger{}, cfg.DB),
+		},
+		[]pssh.SSHServerMiddleware{},
+		map[string]pssh.SSHServerChannelMiddleware{},
 	)
+
 	if err != nil {
-		logger.Error(err.Error())
-		return
+		logger.Error("failed to create ssh server", "err", err.Error())
+		os.Exit(1)
 	}
 
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-	logger.Info("starting SSH server on", "host", cfg.SshHost, "port", cfg.SshPort)
+	logger.Info("Starting SSH server", "addr", server.Config.ListenAddr)
 	go func() {
-		if err = s.ListenAndServe(); err != nil {
+		if err = server.ListenAndServe(); err != nil {
 			logger.Error("serve", "err", err.Error())
 			os.Exit(1)
 		}
 	}()
 
+	exit := func() {
+		logger.Info("stopping ssh server")
+		cancel()
+	}
+
 	select {
-	case <-done:
-		logger.Info("stopping ssh server")
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer func() { cancel() }()
-		if err := s.Shutdown(ctx); err != nil {
-			logger.Error("shutdown", "err", err.Error())
-			os.Exit(1)
-		}
 	case <-killCh:
-		logger.Info("stopping ssh server")
+		exit()
+	case <-done:
+		exit()
 	}
 }
 
-func CliMiddleware(cfg *LinksConfig) wish.Middleware {
-	return func(next ssh.Handler) ssh.Handler {
-		return func(sesh ssh.Session) {
+func CliMiddleware(cfg *LinksConfig) pssh.SSHServerMiddleware {
+	return func(next pssh.SSHServerHandler) pssh.SSHServerHandler {
+		return func(sesh *pssh.SSHServerConnSession) error {
 			args := sesh.Command()
 			cli := NewCli(sesh, cfg)
 			margs := append([]string{"links"}, args...)
 			err := cli.Run(margs)
 			if err != nil {
 				cfg.Logger.Error("error when running cli", "err", err)
-				wish.Fatalln(sesh, fmt.Errorf("err: %w", err))
+				sesh.Fatal(fmt.Errorf("err: %w", err))
 				next(sesh)
-				return
+				return err
 			}
+			return nil
 		}
 	}
 }
@@ -88,7 +97,7 @@ func NewTabWriter(out io.Writer) *tabwriter.Writer {
 	return tabwriter.NewWriter(out, 0, 0, 1, ' ', tabwriter.TabIndent)
 }
 
-func NewCli(sesh ssh.Session, cfg *LinksConfig) *cli.App {
+func NewCli(sesh *pssh.SSHServerConnSession, cfg *LinksConfig) *cli.App {
 	pubkey := utils.KeyForKeyText(sesh.PublicKey())
 	user, err := cfg.DB.FindUserByPubkey(pubkey)
 	if err != nil {
@@ -104,12 +113,12 @@ func NewCli(sesh ssh.Session, cfg *LinksConfig) *cli.App {
 		ErrWriter:   sesh,
 		ExitErrHandler: func(cCtx *cli.Context, err error) {
 			if err != nil {
-				wish.Fatalln(sesh, fmt.Errorf("err: %w", err))
+				sesh.Fatal(fmt.Errorf("err: %w", err))
 			}
 		},
 		OnUsageError: func(cCtx *cli.Context, err error, isSubcommand bool) error {
 			if err != nil {
-				wish.Fatalln(sesh, fmt.Errorf("err: %w", err))
+				sesh.Fatal(fmt.Errorf("err: %w", err))
 			}
 			return nil
 		},
@@ -141,13 +150,15 @@ func NewCli(sesh ssh.Session, cfg *LinksConfig) *cli.App {
 						sp := strings.Split(link.Path, ".")
 						ident := len(sp) - len(orig)
 						col := strings.Repeat(" ", int(ident))
-						wish.Printf(
-							sesh, "%s|%d %s %s.%s\n",
-							col, link.Votes, link.Username, link.Path, link.ShortID,
+						sesh.Println(
+							fmt.Sprintf(
+								"%s|%d %s %s.%s\n",
+								col, link.Votes, link.Username, link.Path, link.ShortID,
+							),
 						)
 						lines := strings.Split(link.Text, "\n")
 						for _, line := range lines {
-							wish.Printf(sesh, "%s| %s\n", col, line)
+							sesh.Println(fmt.Sprintf("%s| %s\n", col, line))
 						}
 					}
 

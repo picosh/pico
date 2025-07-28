@@ -151,6 +151,10 @@ func (s *SSHServerConnSession) Exit(code int) error {
 	return err
 }
 
+func (s *SSHServerConnSession) Println(out string) {
+	_, _ = fmt.Fprintln(s, out)
+}
+
 func (s *SSHServerConnSession) Fatal(err error) {
 	_, _ = fmt.Fprintln(s.Stderr(), err)
 	_, _ = fmt.Fprintf(s.Stderr(), "\r")
