@@ -152,13 +152,13 @@ func NewCli(sesh *pssh.SSHServerConnSession, cfg *LinksConfig) *cli.App {
 						col := strings.Repeat(" ", int(ident))
 						sesh.Println(
 							fmt.Sprintf(
-								"%s|%d %s %s.%s\n",
+								"%s|%d %s %s.%s",
 								col, link.Votes, link.Username, link.Path, link.ShortID,
 							),
 						)
 						lines := strings.Split(link.Text, "\n")
 						for _, line := range lines {
-							sesh.Println(fmt.Sprintf("%s| %s\n", col, line))
+							sesh.Println(fmt.Sprintf("%s| %s", col, line))
 						}
 					}
 
