@@ -35,15 +35,25 @@
       <a href="{{.RawURL}}">raw</a>
     </p>
     <p class="font-bold m-0">expires: {{.ExpiresAt}}</p>
+    <script>
+      function init() {
+        const btn = document.querySelector("#copy-btn");
+        const res = document.querySelector("#copy-result");
+        const text = "{{.Text}}";
+        btn.addEventListener("click", () => {
+          res.innerHtml = "";
+          navigator.clipboard.writeText(text)
+            .then(() => res.innerHTML = "success!");
+        })
+      }
+      document.addEventListener("DOMContentLoaded", init);
+    </script>
 </header>
 <main>
-<script>
-function copyText() {
-    const text = `{{.Text}}`
-    navigator.clipboard.writeText(text)
-}
-</script>
-    <button onclick="copyText()" class="btn mt inline-block">Copy Paste</button>
+    <div class="flex gap items-center">
+      <button id="copy-btn" class="btn" style="background-color: transparent;">copy</button>
+      <div id="copy-result" class=""></div>
+    </div>
     <article>
         {{.Contents}}
     </article>
