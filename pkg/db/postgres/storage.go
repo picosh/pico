@@ -183,25 +183,28 @@ const (
 	// add some users to deny list since they are robogenerating a bunch of posts
 	// per day and are creating a lot of noise.
 	sqlSelectPostsByRank = `
-	SELECT
-		posts.id,
-		user_id,
-		filename,
-		slug,
-		title,
-		text,
-		description,
-		publish_at,
-		app_users.name as username,
-		posts.updated_at,
-		posts.mime_type
-	FROM posts
-	LEFT JOIN app_users ON app_users.id = posts.user_id
-	WHERE
-		hidden = FALSE AND
-		publish_at::date <= CURRENT_DATE AND
-		cur_space = $3 AND
-		app_users.name NOT IN ('algiegray', 'mrrccc')
+	SELECT *
+	FROM (
+	    SELECT DISTINCT ON (posts.user_id)
+	        posts.id,
+	        posts.user_id,
+	        posts.filename,
+	        posts.slug,
+	        posts.title,
+	        posts.text,
+	        posts.description,
+	        posts.publish_at,
+	        app_users.name AS username,
+	        posts.updated_at,
+	        posts.mime_type
+	    FROM posts
+	    LEFT JOIN app_users ON app_users.id = posts.user_id
+	    WHERE
+	        hidden = FALSE
+	        AND publish_at::date <= CURRENT_DATE
+	        AND cur_space = $3
+	    ORDER BY posts.user_id, publish_at DESC
+	) AS latest_posts
 	ORDER BY publish_at DESC
 	LIMIT $1 OFFSET $2`
 
@@ -757,7 +760,7 @@ func (me *PsqlDB) postPager(rs *sql.Rows, pageNum int, space string, tag string)
 	return pager, nil
 }
 
-func (me *PsqlDB) FindAllPosts(page *db.Pager, space string) (*db.Paginate[*db.Post], error) {
+func (me *PsqlDB) FindPostsForFeed(page *db.Pager, space string) (*db.Paginate[*db.Post], error) {
 	rs, err := me.Db.Query(sqlSelectPostsByRank, page.Num, page.Num*page.Page, space)
 	if err != nil {
 		return nil, err

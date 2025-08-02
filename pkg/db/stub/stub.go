@@ -105,7 +105,7 @@ func (me *StubDB) FindPost(postID string) (*db.Post, error) {
 	return nil, errNotImpl
 }
 
-func (me *StubDB) FindAllPosts(page *db.Pager, space string) (*db.Paginate[*db.Post], error) {
+func (me *StubDB) FindPostsForFeed(page *db.Pager, space string) (*db.Paginate[*db.Post], error) {
 	return &db.Paginate[*db.Post]{}, errNotImpl
 }
 
