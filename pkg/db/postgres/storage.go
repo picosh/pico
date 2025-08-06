@@ -1561,7 +1561,7 @@ func (me *PsqlDB) InsertFeedItems(postID string, items []*db.FeedItem) error {
 			item.Data,
 		)
 		if err != nil {
-			return err
+			return fmt.Errorf("post id:%s, guid:%s, err:%w", item.PostID, item.GUID, err)
 		}
 	}
 

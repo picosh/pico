@@ -106,10 +106,10 @@ func DigestOptionToTime(lastDigest time.Time, interval string) time.Time {
 }
 
 func getFeedItemID(logger *slog.Logger, item *gofeed.Item) string {
-	guid := item.GUID
+	guid := strings.ToValidUTF8(item.GUID, "")
 	if item.GUID == "" {
 		logger.Info("no <guid> found for feed item, using <link> instead for its unique id")
-		return item.Link
+		return strings.ToValidUTF8(item.Link, "")
 	}
 	return guid
 }
@@ -487,9 +487,9 @@ func (f *Fetcher) FetchAll(logger *slog.Logger, urls []string, inlineContent boo
 				PostID: post.ID,
 				GUID:   uid,
 				Data: db.FeedItemData{
-					Title:       item.Title,
-					Description: item.Description,
-					Content:     item.Content,
+					Title:       strings.ToValidUTF8(item.Title, ""),
+					Description: strings.ToValidUTF8(item.Description, ""),
+					Content:     strings.ToValidUTF8(item.Content, ""),
 					Link:        item.Link,
 					PublishedAt: item.PublishedParsed,
 				},
