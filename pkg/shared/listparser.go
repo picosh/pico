@@ -11,6 +11,7 @@ import (
 
 	"slices"
 
+	"github.com/adhocore/gronx"
 	"github.com/araddon/dateparse"
 )
 
@@ -52,6 +53,7 @@ type ListMetaData struct {
 	Tags           []string
 	ListType       string // https://developer.mozilla.org/en-US/docs/Web/CSS/list-style-type
 	DigestInterval string
+	Cron           string
 	Email          string
 	InlineContent  bool // allows content inlining to be disabled in feeds.pico.sh emails
 }
@@ -130,6 +132,11 @@ func TokenToMetaField(meta *ListMetaData, token *SplitToken) error {
 			)
 		}
 		meta.DigestInterval = token.Value
+	case "cron":
+		if !gronx.IsValid(token.Value) {
+			return fmt.Errorf("(%s) is not in a valid cron format: https://github.com/adhocore/gronx?tab=readme-ov-file#cron-expression", token.Value)
+		}
+		meta.Cron = token.Value
 	case "email":
 		meta.Email = token.Value
 	case "inline_content":

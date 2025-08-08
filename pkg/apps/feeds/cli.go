@@ -70,13 +70,20 @@ func Middleware(dbpool db.DB, cfg *shared.ConfigSite) pssh.SSHServerMiddleware {
 				_, _ = fmt.Fprintln(writer, "Filename\tLast Digest\tNext Digest\tInterval\tFailed Attempts")
 				for _, post := range posts.Data {
 					parsed := shared.ListParseText(post.Text)
-					digestOption := DigestOptionToTime(*post.Data.LastDigest, parsed.DigestInterval)
+
+					nextDigest := ""
+					if parsed.Cron != "" {
+						nextDigest = parsed.Cron
+					} else {
+						digestOption := DigestOptionToTime(*post.Data.LastDigest, parsed.DigestInterval)
+						nextDigest = digestOption.Format(time.RFC3339)
+					}
 					_, _ = fmt.Fprintf(
 						writer,
 						"%s\t%s\t%s\t%s\t%d/10\r\n",
 						post.Filename,
 						post.Data.LastDigest.Format(time.RFC3339),
-						digestOption.Format(time.RFC3339),
+						nextDigest,
 						parsed.DigestInterval,
 						post.Data.Attempts,
 					)
@@ -123,7 +130,7 @@ func Middleware(dbpool db.DB, cfg *shared.ConfigSite) pssh.SSHServerMiddleware {
 				}
 				_, _ = fmt.Fprintf(sesh, "running feed post: %s\r\n", filename)
 				fetcher := NewFetcher(dbpool, cfg)
-				err = fetcher.RunPost(logger, user, post, true)
+				err = fetcher.RunPost(logger, user, post, true, time.Now().UTC())
 				if err != nil {
 					_, _ = fmt.Fprintln(sesh.Stderr(), err)
 				}

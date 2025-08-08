@@ -15,6 +15,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/adhocore/gronx"
 	"github.com/emersion/go-sasl"
 	"github.com/emersion/go-smtp"
 	"github.com/mmcdole/gofeed"
@@ -129,26 +130,34 @@ type Fetcher struct {
 	cfg  *shared.ConfigSite
 	db   db.DB
 	auth sasl.Client
+	gron *gronx.Gronx
 }
 
 func NewFetcher(dbpool db.DB, cfg *shared.ConfigSite) *Fetcher {
 	smtPass := os.Getenv("PICO_SMTP_PASS")
 	emailLogin := os.Getenv("PICO_SMTP_USER")
 	auth := sasl.NewPlainClient("", emailLogin, smtPass)
+	gron := gronx.New()
 	return &Fetcher{
 		db:   dbpool,
 		cfg:  cfg,
 		auth: auth,
+		gron: gron,
 	}
 }
 
-func (f *Fetcher) Validate(post *db.Post, parsed *shared.ListParsedText) error {
+func (f *Fetcher) Validate(post *db.Post, parsed *shared.ListParsedText, now time.Time) error {
 	lastDigest := post.Data.LastDigest
 	if lastDigest == nil {
 		return nil
 	}
 
-	now := time.Now().UTC()
+	toTheMin := time.Date(
+		now.Year(), now.Month(), now.Day(),
+		now.Hour(), now.Minute(),
+		0, 0, // zero out second and nano-second for cron
+		now.Location(),
+	)
 
 	expiresAt := post.ExpiresAt
 	if expiresAt != nil {
@@ -157,14 +166,29 @@ func (f *Fetcher) Validate(post *db.Post, parsed *shared.ListParsedText) error {
 		}
 	}
 
-	digestAt := DigestOptionToTime(*lastDigest, parsed.DigestInterval)
-	if digestAt.After(now) {
-		return fmt.Errorf("(%s) not time to digest, skipping", digestAt.Format(time.RFC3339))
+	if parsed.Cron != "" {
+		isDue, err := f.gron.IsDue(parsed.Cron, toTheMin)
+		if err != nil {
+			return fmt.Errorf("cron error, skipping; err: %w", err)
+		}
+		if !isDue {
+			nextTime, _ := gronx.NextTick(parsed.Cron, true)
+			return fmt.Errorf(
+				"cron not time to digest, skipping; cur run: %s, next run: %s",
+				f.gron.C.GetRef(),
+				nextTime,
+			)
+		}
+	} else if parsed.DigestInterval != "" {
+		digestAt := DigestOptionToTime(*lastDigest, parsed.DigestInterval)
+		if digestAt.After(now) {
+			return fmt.Errorf("(%s) not time to digest, skipping", digestAt.Format(time.RFC3339))
+		}
 	}
 	return nil
 }
 
-func (f *Fetcher) RunPost(logger *slog.Logger, user *db.User, post *db.Post, skipValidation bool) error {
+func (f *Fetcher) RunPost(logger *slog.Logger, user *db.User, post *db.Post, skipValidation bool, now time.Time) error {
 	logger = logger.With("filename", post.Filename)
 	logger.Info("running feed post")
 
@@ -178,8 +202,8 @@ func (f *Fetcher) RunPost(logger *slog.Logger, user *db.User, post *db.Post, ski
 		}
 	}
 
-	logger.Info("last digest at", "lastDigest", post.Data.LastDigest.Format(time.RFC3339))
-	err := f.Validate(post, parsed)
+	logger.Info("last digest", "timestamp", post.Data.LastDigest.Format(time.RFC3339))
+	err := f.Validate(post, parsed, now)
 	if err != nil {
 		logger.Info("validation failed", "err", err)
 		if skipValidation {
@@ -212,9 +236,8 @@ func (f *Fetcher) RunPost(logger *slog.Logger, user *db.User, post *db.Post, ski
 		urls = append(urls, u)
 	}
 
-	now := time.Now().UTC()
 	if post.ExpiresAt == nil {
-		expiresAt := time.Now().AddDate(0, 12, 0)
+		expiresAt := now.AddDate(0, 12, 0)
 		post.ExpiresAt = &expiresAt
 	}
 	_, err = f.db.UpdatePost(post)
@@ -291,8 +314,9 @@ Also, we have centralized logs in our pico.sh TUI that will display realtime fee
 	return nil
 }
 
-func (f *Fetcher) RunUser(user *db.User) error {
+func (f *Fetcher) RunUser(user *db.User, now time.Time) error {
 	logger := shared.LoggerWithUser(f.cfg.Logger, user)
+	logger.Info("run user")
 	posts, err := f.db.FindPostsForUser(&db.Pager{Num: 100}, user.ID, "feeds")
 	if err != nil {
 		return err
@@ -303,7 +327,7 @@ func (f *Fetcher) RunUser(user *db.User) error {
 	}
 
 	for _, post := range posts.Data {
-		err = f.RunPost(logger, user, post, false)
+		err = f.RunPost(logger, user, post, false, now)
 		if err != nil {
 			logger.Error("run post failed", "err", err)
 		}
@@ -561,16 +585,16 @@ func (f *Fetcher) SendEmail(logger *slog.Logger, username, email, subject string
 	return err
 }
 
-func (f *Fetcher) Run(logger *slog.Logger) error {
+func (f *Fetcher) Run(now time.Time) error {
 	users, err := f.db.FindUsers()
 	if err != nil {
 		return err
 	}
 
 	for _, user := range users {
-		err := f.RunUser(user)
+		err := f.RunUser(user, now)
 		if err != nil {
-			logger.Error("run user failed", "err", err)
+			f.cfg.Logger.Error("run user failed", "err", err)
 			continue
 		}
 	}
@@ -583,12 +607,12 @@ func (f *Fetcher) Loop() {
 	for {
 		logger.Info("running digest emailer")
 
-		err := f.Run(logger)
+		err := f.Run(time.Now().UTC())
 		if err != nil {
 			logger.Error("run failed", "err", err)
 		}
 
-		logger.Info("digest emailer finished, waiting 10 mins")
-		time.Sleep(10 * time.Minute)
+		logger.Info("digest emailer finished, waiting 1min ...")
+		time.Sleep(1 * time.Minute)
 	}
 }
