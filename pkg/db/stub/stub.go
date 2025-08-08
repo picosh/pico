@@ -284,3 +284,7 @@ func (me *StubDB) FindTunsEventLogs(userID string) ([]*db.TunsEventLog, error) {
 func (me *StubDB) VisitUrlNotFound(opts *db.SummaryOpts) ([]*db.VisitUrl, error) {
 	return nil, errNotImpl
 }
+
+func (me *StubDB) FindUsersWithPost(space string) ([]*db.User, error) {
+	return nil, errNotImpl
+}

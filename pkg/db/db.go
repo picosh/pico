@@ -408,6 +408,7 @@ type DB interface {
 	FindPost(postID string) (*Post, error)
 	FindPostsForUser(pager *Pager, userID string, space string) (*Paginate[*Post], error)
 	FindAllPostsForUser(userID string, space string) ([]*Post, error)
+	FindUsersWithPost(space string) ([]*User, error)
 	FindPostsBeforeDate(date *time.Time, space string) ([]*Post, error)
 	FindExpiredPosts(space string) ([]*Post, error)
 	FindUpdatedPostsForUser(userID string, space string) ([]*Post, error)

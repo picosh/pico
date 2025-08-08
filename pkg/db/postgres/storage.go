@@ -554,6 +554,40 @@ func (me *PsqlDB) FindPostsBeforeDate(date *time.Time, space string) ([]*db.Post
 	return posts, nil
 }
 
+func (me *PsqlDB) FindUsersWithPost(space string) ([]*db.User, error) {
+	var users []*db.User
+	rs, err := me.Db.Query(
+		`SELECT u.id, u.name, u.created_at
+		FROM app_users u
+		INNER JOIN posts ON u.id=posts.user_id
+		WHERE cur_space='feeds'
+		GROUP BY u.id, u.name, u.created_at
+		ORDER BY name ASC`,
+	)
+	if err != nil {
+		return users, err
+	}
+	for rs.Next() {
+		var name sql.NullString
+		user := &db.User{}
+		err := rs.Scan(
+			&user.ID,
+			&name,
+			&user.CreatedAt,
+		)
+		if err != nil {
+			return users, err
+		}
+		user.Name = name.String
+
+		users = append(users, user)
+	}
+	if rs.Err() != nil {
+		return users, rs.Err()
+	}
+	return users, nil
+}
+
 func (me *PsqlDB) FindUserForKey(username string, key string) (*db.User, error) {
 	me.Logger.Info("attempting to find user with only public key", "key", key)
 	pk, err := me.FindPublicKeyForKey(key)

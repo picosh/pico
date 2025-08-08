@@ -586,7 +586,7 @@ func (f *Fetcher) SendEmail(logger *slog.Logger, username, email, subject string
 }
 
 func (f *Fetcher) Run(now time.Time) error {
-	users, err := f.db.FindUsers()
+	users, err := f.db.FindUsersWithPost("feeds")
 	if err != nil {
 		return err
 	}
