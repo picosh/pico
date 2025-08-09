@@ -62,7 +62,7 @@ func TestPaymentWebhook(t *testing.T) {
 			continue
 		}
 		expectedText := `=: email auth@pico.test
-=: digest_interval 10min
+=: cron */10 * * * *
 =: inline_content true
 => https://auth.pico.sh/rss/123
 => https://blog.pico.sh/rss`

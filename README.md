@@ -95,7 +95,7 @@ Create a blogs.txt file:
 
 ```
 =: email rss@myemail.com
-=: digest_interval 1day
+=: cron 0 13 * * *
 => https://pico.prose.sh/rss
 => https://erock.prose.sh/rss
 ```

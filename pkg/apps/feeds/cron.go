@@ -154,7 +154,7 @@ func DateToMin(now time.Time) time.Time {
 	)
 }
 
-func (f *Fetcher) Validate(post *db.Post, parsed *shared.ListParsedText, now time.Time) error {
+func (f *Fetcher) Validate(logger *slog.Logger, post *db.Post, parsed *shared.ListParsedText, now time.Time) error {
 	expiresAt := post.ExpiresAt
 	if expiresAt != nil {
 		if post.ExpiresAt.Before(now) {
@@ -167,6 +167,7 @@ func (f *Fetcher) Validate(post *db.Post, parsed *shared.ListParsedText, now tim
 	if parsed.DigestInterval != "" {
 		cron = DigestIntervalToCron(parsed.DigestInterval)
 	}
+	logger.Info("found cron", "cron", cron)
 
 	if !f.gron.IsValid(cron) {
 		return fmt.Errorf("(%s) is invalid `cron`, skipping", cron)
@@ -202,8 +203,8 @@ func (f *Fetcher) RunPost(logger *slog.Logger, user *db.User, post *db.Post, ski
 		}
 	}
 
-	logger.Info("last digest", "timestamp", post.Data.LastDigest.Format(time.RFC3339))
-	err := f.Validate(post, parsed, now)
+	logger.Info("last digest", "at", post.Data.LastDigest.Format(time.RFC3339))
+	err := f.Validate(logger, post, parsed, now)
 	if err != nil {
 		logger.Info("validation failed", "err", err)
 		if skipValidation {
