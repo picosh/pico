@@ -53,7 +53,7 @@ func Middleware(dbpool db.DB, cfg *shared.ConfigSite) pssh.SSHServerMiddleware {
 				_, _ = fmt.Fprintf(
 					writer,
 					"%s\t%s\r\n",
-					"run {filename}", "runs the feed digest post immediately, ignoring last digest time validation",
+					"run {filename}", "runs the feed digest post immediately, ignoring cron timer",
 				)
 				return writer.Flush()
 			case "ls":
