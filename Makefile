@@ -6,7 +6,7 @@ DB_CONTAINER?=pico-postgres-1
 DOCKER_TAG?=$(shell git log --format="%H" -n 1)
 DOCKER_PLATFORM?=linux/amd64,linux/arm64
 DOCKER_CMD?=docker
-DOCKER_BUILDX_BUILD?=$(DOCKER_CMD) buildx build --push --platform $(DOCKER_PLATFORM)
+DOCKER_BUILDX_BUILD?=$(DOCKER_CMD) buildx build --push --platform $(DOCKER_PLATFORM) -t
 WRITE?=0
 
 smol:
@@ -42,36 +42,36 @@ endif
 .PHONY: bp-setup
 
 bp-caddy: bp-setup
-	$(DOCKER_BUILDX_BUILD) -t ghcr.io/picosh/pico/caddy:$(DOCKER_TAG) ./caddy
+	$(DOCKER_BUILDX_BUILD) ghcr.io/picosh/pico/caddy:$(DOCKER_TAG) ./caddy
 .PHONY: bp-caddy
 
 bp-auth: bp-setup
-	$(DOCKER_BUILDX_BUILD) -t ghcr.io/picosh/pico/auth-web:$(DOCKER_TAG) --build-arg APP=auth --target release-web .
+	$(DOCKER_BUILDX_BUILD) ghcr.io/picosh/pico/auth-web:$(DOCKER_TAG) --build-arg APP=auth --target release-web .
 .PHONY: bp-auth
 
 bp-pgs-cdn: bp-setup
-	$(DOCKER_BUILDX_BUILD) -t ghcr.io/picosh/pico/pgs-cdn:$(DOCKER_TAG) --target release-web -f Dockerfile.cdn .
+	$(DOCKER_BUILDX_BUILD) ghcr.io/picosh/pico/pgs-cdn:$(DOCKER_TAG) --target release-web -f Dockerfile.cdn .
 .PHONY: bp-pgs-cdn
 
 bp-pgs-standalone: bp-setup
-	$(DOCKER_BUILDX_BUILD) --manifest ghcr.io/picosh/pgs:$(DOCKER_TAG) --target release -f Dockerfile.standalone .
+	$(DOCKER_BUILDX_BUILD) ghcr.io/picosh/pgs:$(DOCKER_TAG) --target release -f Dockerfile.standalone .
 .PHONY: bp-pgs-standalone
 
 bp-pico: bp-setup
-	$(DOCKER_BUILDX_BUILD) -t ghcr.io/picosh/pico/pico-ssh:$(DOCKER_TAG) --build-arg APP=pico --target release-ssh .
+	$(DOCKER_BUILDX_BUILD) ghcr.io/picosh/pico/pico-ssh:$(DOCKER_TAG) --build-arg APP=pico --target release-ssh .
 .PHONY: bp-auth
 
 bp-bouncer: bp-setup
-	$(DOCKER_BUILDX_BUILD) -t ghcr.io/picosh/pico/bouncer:$(DOCKER_TAG) ./bouncer
+	$(DOCKER_BUILDX_BUILD) ghcr.io/picosh/pico/bouncer:$(DOCKER_TAG) ./bouncer
 .PHONY: bp-bouncer
 
 bp-ssh-%: bp-setup
-	$(DOCKER_BUILDX_BUILD) --build-arg "APP=$*" -t "ghcr.io/picosh/pico/$*-ssh:$(DOCKER_TAG)" --target release-ssh .
+	$(DOCKER_BUILDX_BUILD) "ghcr.io/picosh/pico/$*-ssh:$(DOCKER_TAG)" --build-arg "APP=$*" --target release-ssh .
 .PHONY: pgs-ssh
 
 bp-%: bp-setup
-	$(DOCKER_BUILDX_BUILD) --build-arg "APP=$*" -t "ghcr.io/picosh/pico/$*-ssh:$(DOCKER_TAG)" --target release-ssh .
-	$(DOCKER_BUILDX_BUILD) --build-arg "APP=$*" -t "ghcr.io/picosh/pico/$*-web:$(DOCKER_TAG)" --target release-web .
+	$(DOCKER_BUILDX_BUILD) "ghcr.io/picosh/pico/$*-ssh:$(DOCKER_TAG)" --build-arg "APP=$*" --target release-ssh .
+	$(DOCKER_BUILDX_BUILD) "ghcr.io/picosh/pico/$*-web:$(DOCKER_TAG)" --build-arg "APP=$*" --target release-web .
 .PHONY: bp-%
 
 bp-all: bp-prose bp-pastes bp-feeds bp-pgs bp-auth bp-bouncer bp-pipe bp-pgs-cdn

@@ -84,25 +84,24 @@ func itemToTemplate(item *gofeed.Item) *FeedItemTmpl {
 	}
 }
 
-func DigestOptionToTime(lastDigest time.Time, interval string) time.Time {
-	day := 24 * time.Hour
+func DigestIntervalToCron(interval string) string {
 	switch interval {
 	case "10min":
-		return lastDigest.Add(10 * time.Minute)
+		return "*/10 * * * *"
 	case "1hour":
-		return lastDigest.Add(1 * time.Hour)
+		return "0 * * * *"
 	case "6hour":
-		return lastDigest.Add(6 * time.Hour)
+		return "0 */6 * * *"
 	case "12hour":
-		return lastDigest.Add(12 * time.Hour)
+		return "0 */12 * * *"
 	case "1day", "":
-		return lastDigest.Add(1 * day)
+		return "0 13 * * *"
 	case "7day":
-		return lastDigest.Add(7 * day)
+		return "0 13 * * 0"
 	case "30day":
-		return lastDigest.Add(30 * day)
+		return "0 13 1 * *"
 	default:
-		return lastDigest
+		return "0 13 * * *"
 	}
 }
 
@@ -146,19 +145,16 @@ func NewFetcher(dbpool db.DB, cfg *shared.ConfigSite) *Fetcher {
 	}
 }
 
-func (f *Fetcher) Validate(post *db.Post, parsed *shared.ListParsedText, now time.Time) error {
-	lastDigest := post.Data.LastDigest
-	if lastDigest == nil {
-		return nil
-	}
-
-	toTheMin := time.Date(
+func DateToMin(now time.Time) time.Time {
+	return time.Date(
 		now.Year(), now.Month(), now.Day(),
 		now.Hour(), now.Minute(),
 		0, 0, // zero out second and nano-second for cron
 		now.Location(),
 	)
+}
 
+func (f *Fetcher) Validate(post *db.Post, parsed *shared.ListParsedText, now time.Time) error {
 	expiresAt := post.ExpiresAt
 	if expiresAt != nil {
 		if post.ExpiresAt.Before(now) {
@@ -166,24 +162,28 @@ func (f *Fetcher) Validate(post *db.Post, parsed *shared.ListParsedText, now tim
 		}
 	}
 
-	if parsed.Cron != "" {
-		isDue, err := f.gron.IsDue(parsed.Cron, toTheMin)
-		if err != nil {
-			return fmt.Errorf("cron error, skipping; err: %w", err)
-		}
-		if !isDue {
-			nextTime, _ := gronx.NextTick(parsed.Cron, true)
-			return fmt.Errorf(
-				"cron not time to digest, skipping; cur run: %s, next run: %s",
-				f.gron.C.GetRef(),
-				nextTime,
-			)
-		}
-	} else if parsed.DigestInterval != "" {
-		digestAt := DigestOptionToTime(*lastDigest, parsed.DigestInterval)
-		if digestAt.After(now) {
-			return fmt.Errorf("(%s) not time to digest, skipping", digestAt.Format(time.RFC3339))
-		}
+	cron := parsed.Cron
+	// support for posts with deprecated `digest_interval` property
+	if parsed.DigestInterval != "" {
+		cron = DigestIntervalToCron(parsed.DigestInterval)
+	}
+
+	if !f.gron.IsValid(cron) {
+		return fmt.Errorf("(%s) is invalid `cron`, skipping", cron)
+	}
+
+	dt := DateToMin(now)
+	isDue, err := f.gron.IsDue(cron, dt)
+	if err != nil {
+		return fmt.Errorf("cron error, skipping; err: %w", err)
+	}
+	if !isDue {
+		nextTime, _ := gronx.NextTickAfter(cron, dt, true)
+		return fmt.Errorf(
+			"cron not time to digest, skipping; cur run: %s, next run: %s",
+			f.gron.C.GetRef(),
+			nextTime,
+		)
 	}
 	return nil
 }

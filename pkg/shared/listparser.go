@@ -9,22 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"slices"
-
-	"github.com/adhocore/gronx"
 	"github.com/araddon/dateparse"
 )
 
 var reIndent = regexp.MustCompile(`^[[:blank:]]+`)
-var DigestIntervalOpts = []string{
-	"10min",
-	"1hour",
-	"6hour",
-	"12hour",
-	"1day",
-	"7day",
-	"30day",
-}
 
 type ListParsedText struct {
 	Items []*ListItem
@@ -124,18 +112,8 @@ func TokenToMetaField(meta *ListMetaData, token *SplitToken) error {
 	case "layout":
 		meta.Layout = token.Value
 	case "digest_interval":
-		if !slices.Contains(DigestIntervalOpts, token.Value) {
-			return fmt.Errorf(
-				"(%s) is not a valid option, choose from [%s]",
-				token.Value,
-				strings.Join(DigestIntervalOpts, ","),
-			)
-		}
 		meta.DigestInterval = token.Value
 	case "cron":
-		if !gronx.IsValid(token.Value) {
-			return fmt.Errorf("(%s) is not in a valid cron format: https://github.com/adhocore/gronx?tab=readme-ov-file#cron-expression", token.Value)
-		}
 		meta.Cron = token.Value
 	case "email":
 		meta.Email = token.Value

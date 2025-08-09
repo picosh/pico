@@ -4,10 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-
 	"strings"
-	"time"
 
+	"github.com/adhocore/gronx"
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/filehandlers"
 	"github.com/picosh/pico/pkg/pssh"
@@ -51,6 +50,16 @@ func (p *FeedHooks) FileValidate(s *pssh.SSHServerConnSession, data *filehandler
 		return false, fmt.Errorf("ERROR: no email variable detected for %s, check the format of your file, skipping", data.Filename)
 	}
 
+	if parsed.DigestInterval != "" {
+		return false, fmt.Errorf("ERROR: `digest_interval` is deprecated; use `cron`: https://pico.sh/feeds#cron")
+	}
+
+	if parsed.Cron != "" {
+		if !gronx.IsValid(parsed.Cron) {
+			return false, fmt.Errorf("ERROR: `cron` is invalid, reference: https://github.com/adhocore/gronx?tab=readme-ov-file#cron-expression")
+		}
+	}
+
 	var allErr error
 	for _, txt := range parsed.Items {
 		u := ""
@@ -74,12 +83,5 @@ func (p *FeedHooks) FileValidate(s *pssh.SSHServerConnSession, data *filehandler
 }
 
 func (p *FeedHooks) FileMeta(s *pssh.SSHServerConnSession, data *filehandlers.PostMetaData) error {
-	if data.Data.LastDigest == nil {
-		now := time.Now()
-		// let it run on the next loop
-		dd := now.AddDate(0, 0, -31)
-		data.Data.LastDigest = &dd
-	}
-
 	return nil
 }

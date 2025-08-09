@@ -5,6 +5,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/adhocore/gronx"
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/pssh"
 	"github.com/picosh/pico/pkg/shared"
@@ -67,24 +68,24 @@ func Middleware(dbpool db.DB, cfg *shared.ConfigSite) pssh.SSHServerMiddleware {
 				}
 
 				writer := tabwriter.NewWriter(sesh, 0, 0, 1, ' ', tabwriter.TabIndent)
-				_, _ = fmt.Fprintln(writer, "Filename\tLast Digest\tNext Digest\tInterval\tFailed Attempts")
+				_, _ = fmt.Fprintln(writer, "Filename\tLast Digest\tNext Digest\tCron\tFailed Attempts")
 				for _, post := range posts.Data {
 					parsed := shared.ListParseText(post.Text)
 
 					nextDigest := ""
-					if parsed.Cron != "" {
-						nextDigest = parsed.Cron
-					} else {
-						digestOption := DigestOptionToTime(*post.Data.LastDigest, parsed.DigestInterval)
-						nextDigest = digestOption.Format(time.RFC3339)
+					cron := parsed.Cron
+					if parsed.DigestInterval != "" {
+						cron = DigestIntervalToCron(parsed.DigestInterval)
 					}
+					nd, _ := gronx.NextTickAfter(cron, DateToMin(time.Now()), true)
+					nextDigest = nd.Format(time.RFC3339)
 					_, _ = fmt.Fprintf(
 						writer,
 						"%s\t%s\t%s\t%s\t%d/10\r\n",
 						post.Filename,
 						post.Data.LastDigest.Format(time.RFC3339),
 						nextDigest,
-						parsed.DigestInterval,
+						cron,
 						post.Data.Attempts,
 					)
 				}
