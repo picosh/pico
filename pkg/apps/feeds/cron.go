@@ -203,7 +203,11 @@ func (f *Fetcher) RunPost(logger *slog.Logger, user *db.User, post *db.Post, ski
 		}
 	}
 
-	logger.Info("last digest", "at", post.Data.LastDigest.Format(time.RFC3339))
+	if post.Data.LastDigest != nil {
+		logger.Info("last digest", "at", post.Data.LastDigest.Format(time.RFC3339))
+	} else {
+		logger.Info("first time running post")
+	}
 	err := f.Validate(logger, post, parsed, now)
 	if err != nil {
 		logger.Info("validation failed", "err", err)
@@ -213,6 +217,7 @@ func (f *Fetcher) RunPost(logger *slog.Logger, user *db.User, post *db.Post, ski
 			return nil
 		}
 	}
+	logger.Info("validation success")
 
 	urls := []string{}
 	for _, item := range parsed.Items {
