@@ -81,6 +81,64 @@ jobs:
         platforms: ${{ env.PLATFORMS }}
         registry: ${{ env.REGISTRY }}
         web: false
+  build-pgs-cdn:
+    runs-on: ubuntu-22.04
+    needs: test
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
+    - name: Setup docker
+      uses: ./.github/actions/setup
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    - name: Collect web image metadata
+      id: pgscdnmeta
+      uses: docker/metadata-action@v4
+      with:
+        images: ${{ env.REGISTRY }}/${{ github.repository }}/pgs-cdn
+    - name: Build and push
+      uses: docker/build-push-action@v3
+      with:
+        context: .
+        file: Dockerfile.cdn
+        push: true
+        target: release-web
+        tags: ${{ steps.pgscdnmeta.outputs.tags }}
+        labels: ${{ steps.pgscdnmeta.outputs.labels }}
+        platforms: ${{ env.PLATFORMS }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+  build-pgs-standalone:
+    runs-on: ubuntu-22.04
+    needs: test
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
+    - name: Setup docker
+      uses: ./.github/actions/setup
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    - name: Collect web image metadata
+      id: pgsstandalonemeta
+      uses: docker/metadata-action@v4
+      with:
+        images: ${{ env.REGISTRY }}/picosh/pgs
+    - name: Build and push
+      uses: docker/build-push-action@v3
+      with:
+        context: .
+        file: Dockerfile.standalone
+        push: true
+        target: release
+        tags: ${{ steps.pgsstandalonemeta.outputs.tags }}
+        labels: ${{ steps.pgsstandalonemeta.outputs.labels }}
+        platforms: ${{ env.PLATFORMS }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
   build-bouncer:
     runs-on: ubuntu-22.04
     needs: test
