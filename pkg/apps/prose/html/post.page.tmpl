@@ -48,14 +48,16 @@
 {{if .HasCSS}}<link rel="stylesheet" href="{{.CssURL}}" />{{end}}
 {{end}}
 
-{{define "attrs"}}id="post" class="{{.Slug}}"{{end}}
+{{define "attrs"}}id="post" class="{{.Slug}}{{if .Unlisted}} post-draft{{end}}"{{end}}
 
 {{define "body"}}
 <header>
     <h1 class="text-2xl font-bold">{{.Title}}</h1>
     <p class="font-bold m-0">
-        <time datetime="{{.PublishAtISO}}">{{.PublishAt}}</time>
-        <span>&middot;<span>
+        <span id="publish-at">
+          <time datetime="{{.PublishAtISO}}">{{.PublishAt}}</time>
+          <span>&middot;</span>
+        </span>
         <a href="{{.BlogURL}}">{{.BlogName}}</a>
     </p>
     {{if .Description}}<blockquote>{{.Description}}</blockquote>{{end}}
