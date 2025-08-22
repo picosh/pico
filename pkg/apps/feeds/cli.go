@@ -25,6 +25,8 @@ func Middleware(dbpool db.DB, cfg *shared.ConfigSite) pssh.SSHServerMiddleware {
 				return err
 			}
 
+			logger = shared.LoggerWithUser(logger, user)
+
 			cmd := "help"
 			if len(args) > 0 {
 				cmd = args[0]
@@ -32,7 +34,7 @@ func Middleware(dbpool db.DB, cfg *shared.ConfigSite) pssh.SSHServerMiddleware {
 
 			switch cmd {
 			case "help":
-				_, _ = fmt.Fprintf(sesh, "Commands: [help, ls, rm, run]\r\n\r\n")
+				_, _ = fmt.Fprintf(sesh, "Commands: [help, ls, rm, print, run]\r\n\r\n")
 				writer := tabwriter.NewWriter(sesh, 0, 0, 1, ' ', tabwriter.TabIndent)
 				_, _ = fmt.Fprintln(writer, "Cmd\tDesc")
 				_, _ = fmt.Fprintf(
@@ -49,6 +51,11 @@ func Middleware(dbpool db.DB, cfg *shared.ConfigSite) pssh.SSHServerMiddleware {
 					writer,
 					"%s\t%s\r\n",
 					"rm {filename}", "removes feed digest post",
+				)
+				_, _ = fmt.Fprintf(
+					writer,
+					"%s\t%s\r\n",
+					"print {filename}", "prints the feed digest file",
 				)
 				_, _ = fmt.Fprintf(
 					writer,
@@ -106,6 +113,7 @@ func Middleware(dbpool db.DB, cfg *shared.ConfigSite) pssh.SSHServerMiddleware {
 					_, _ = fmt.Fprintln(sesh.Stderr(), err)
 					return err
 				}
+				logger.Info("rm cmd", "filename", filename, "write", write)
 				if write {
 					err = dbpool.RemovePosts([]string{post.ID})
 					if err != nil {
@@ -117,6 +125,20 @@ func Middleware(dbpool db.DB, cfg *shared.ConfigSite) pssh.SSHServerMiddleware {
 					_, _ = fmt.Fprintln(sesh, "WARNING: *must* append with `--write` for the changes to persist.")
 				}
 				return err
+			case "print":
+				if len(args) < 2 {
+					err := fmt.Errorf("must provide filename of post to run")
+					_, _ = fmt.Fprintln(sesh.Stderr(), err)
+					return err
+				}
+				filename := args[1]
+				post, err := dbpool.FindPostWithFilename(filename, user.ID, "feeds")
+				if err != nil {
+					_, _ = fmt.Fprintln(sesh.Stderr(), err)
+					return err
+				}
+				_, _ = fmt.Fprintf(sesh, "%s\n", post.Text)
+				return nil
 			case "run":
 				if len(args) < 2 {
 					err := fmt.Errorf("must provide filename of post to run")
@@ -130,6 +152,7 @@ func Middleware(dbpool db.DB, cfg *shared.ConfigSite) pssh.SSHServerMiddleware {
 					return err
 				}
 				_, _ = fmt.Fprintf(sesh, "running feed post: %s\r\n", filename)
+				logger.Info("run cmd", "filename", filename)
 				fetcher := NewFetcher(dbpool, cfg)
 				err = fetcher.RunPost(logger, user, post, true, time.Now().UTC())
 				if err != nil {
