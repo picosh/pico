@@ -21,6 +21,7 @@ import (
 	"github.com/mmcdole/gofeed"
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/shared"
+	"github.com/picosh/utils"
 )
 
 var ErrNoRecentArticles = errors.New("no recent articles")
@@ -68,6 +69,7 @@ type DigestFeed struct {
 	UnsubURL     string
 	DaysLeft     string
 	ShowBanner   bool
+	SizeWarning  bool
 }
 
 type DigestOptions struct {
@@ -539,6 +541,16 @@ func (f *Fetcher) FetchAll(logger *slog.Logger, urls []string, inlineContent boo
 	html, err := f.PrintHtml(feeds)
 	if err != nil {
 		return nil, err
+	}
+
+	// cap body size to prevent abuse
+	if len(html)+len(text) > 5*utils.MB {
+		feeds.Options.InlineContent = false
+		feeds.SizeWarning = true
+		html, err = f.PrintHtml(feeds)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if allErrors != nil {

@@ -10,14 +10,15 @@ img {
 </style>
 
 {{if .SizeWarning}}
-<blockquote style="color: #ff0000; background-color: #ffe6e6; padding: 10px; border-left: 3px solid #ff0000;">
-    WARNING: This email is over the size limit. Inline content has been enabled to avoid email delivery issues.
+<blockquote>
+  <strong>NOTICE:</strong> This email is over the size limit (5MB). Inline content has been enabled to avoid email delivery issues.
+  We recommend splitting your RSS feeds into multiple digests.
 </blockquote>
 {{end}}
 
 {{if .ShowBanner}}
 <blockquote>
-  In order to keep this digest email active you must <a href="{{.KeepAliveURL}}">click this link</a>.
+  <strong>NOTICE:</strong> In order to keep this digest email active you must <a href="{{.KeepAliveURL}}">click this link</a>.
   You have {{.DaysLeft}} days left.
 </blockquote>
 {{end}}
