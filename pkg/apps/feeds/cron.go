@@ -132,11 +132,14 @@ type Fetcher struct {
 	db   db.DB
 	auth sasl.Client
 	gron *gronx.Gronx
+	host string
 }
 
 func NewFetcher(dbpool db.DB, cfg *shared.ConfigSite) *Fetcher {
+	host := os.Getenv("PICO_SMTP_HOST")
 	smtPass := os.Getenv("PICO_SMTP_PASS")
 	emailLogin := os.Getenv("PICO_SMTP_USER")
+
 	auth := sasl.NewPlainClient("", emailLogin, smtPass)
 	gron := gronx.New()
 	return &Fetcher{
@@ -144,6 +147,7 @@ func NewFetcher(dbpool db.DB, cfg *shared.ConfigSite) *Fetcher {
 		cfg:  cfg,
 		auth: auth,
 		gron: gron,
+		host: host,
 	}
 }
 
@@ -253,7 +257,8 @@ func (f *Fetcher) RunPost(logger *slog.Logger, user *db.User, post *db.Post, ski
 		return err
 	}
 
-	subject := fmt.Sprintf("%s feed digest", post.Title)
+	subject := fmt.Sprintf("%s feed digest", post.Filename)
+	unsubURL := getUnsubURL(post)
 
 	msgBody, err := f.FetchAll(logger, urls, parsed.InlineContent, user.Name, post)
 	if err != nil {
@@ -277,9 +282,11 @@ Also, we have centralized logs in our pico.sh TUI that will display realtime fee
 
 %s`, post.Data.Attempts, maxAttempts, errForUser.Error(), post.Text)
 		err = f.SendEmail(
-			logger, user.Name,
+			logger,
+			user.Name,
 			parsed.Email,
 			subject,
+			unsubURL,
 			&MsgBody{Html: strings.ReplaceAll(errBody, "\n", "<br />"), Text: errBody},
 		)
 		if err != nil {
@@ -307,7 +314,7 @@ Also, we have centralized logs in our pico.sh TUI that will display realtime fee
 	}
 
 	if msgBody != nil {
-		err = f.SendEmail(logger, user.Name, parsed.Email, subject, msgBody)
+		err = f.SendEmail(logger, user.Name, parsed.Email, subject, unsubURL, msgBody)
 		if err != nil {
 			return err
 		}
@@ -460,6 +467,10 @@ type MsgBody struct {
 	Text string
 }
 
+func getUnsubURL(post *db.Post) string {
+	return fmt.Sprintf("https://feeds.pico.sh/unsub/%s", post.ID)
+}
+
 func (f *Fetcher) FetchAll(logger *slog.Logger, urls []string, inlineContent bool, username string, post *db.Post) (*MsgBody, error) {
 	logger.Info("fetching feeds", "inlineContent", inlineContent)
 	fp := gofeed.NewParser()
@@ -475,7 +486,7 @@ func (f *Fetcher) FetchAll(logger *slog.Logger, urls []string, inlineContent boo
 	}
 	feeds := &DigestFeed{
 		KeepAliveURL: fmt.Sprintf("https://feeds.pico.sh/keep-alive/%s", post.ID),
-		UnsubURL:     fmt.Sprintf("https://feeds.pico.sh/unsub/%s", post.ID),
+		UnsubURL:     getUnsubURL(post),
 		DaysLeft:     daysLeft,
 		ShowBanner:   showBanner,
 		Options:      DigestOptions{InlineContent: inlineContent},
@@ -564,19 +575,20 @@ func (f *Fetcher) FetchAll(logger *slog.Logger, urls []string, inlineContent boo
 	}, nil
 }
 
-func (f *Fetcher) SendEmail(logger *slog.Logger, username, email, subject string, msg *MsgBody) error {
+func (f *Fetcher) SendEmail(logger *slog.Logger, username, email, subject, unsubURL string, msg *MsgBody) error {
 	if email == "" {
 		return fmt.Errorf("(%s) does not have an email associated with their feed post", username)
 	}
-	smtpAddr := "smtp.fastmail.com:587"
+	smtpAddr := f.host
 	fromEmail := "hello@pico.sh"
 	to := []string{email}
 	headers := map[string]string{
-		"From":         fromEmail,
-		"To":           email,
-		"Subject":      subject,
-		"MIME-Version": "1.0",
-		"Content-Type": `multipart/alternative; boundary="boundary123"`,
+		"From":             fromEmail,
+		"Subject":          subject,
+		"To":               email,
+		"MIME-Version":     "1.0",
+		"Content-Type":     `multipart/alternative; boundary="boundary123"`,
+		"List-Unsubscribe": "<" + unsubURL + ">",
 	}
 	var content strings.Builder
 	for k, v := range headers {
