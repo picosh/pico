@@ -37,7 +37,7 @@ domains!
 
 ## Access localhost using https
 
-if you have a local webserver on localhost:8000, activate an SSH tunnel to us:
+If you have a local webserver on localhost:8000, activate an SSH tunnel to us:
 
 ```bash
 ssh -R dev:80:localhost:8000 tuns.sh
