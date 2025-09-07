@@ -86,11 +86,16 @@ func Middleware(dbpool db.DB, cfg *shared.ConfigSite) pssh.SSHServerMiddleware {
 					}
 					nd, _ := gronx.NextTickAfter(cron, DateToMin(time.Now()), true)
 					nextDigest = nd.Format(time.RFC3339)
+					last := post.Data.LastDigest
+					lastStr := "never"
+					if last != nil {
+						lastStr = last.Format(time.RFC3339)
+					}
 					_, _ = fmt.Fprintf(
 						writer,
 						"%s\t%s\t%s\t%s\t%d/10\r\n",
 						post.Filename,
-						post.Data.LastDigest.Format(time.RFC3339),
+						lastStr,
 						nextDigest,
 						cron,
 						post.Data.Attempts,
