@@ -289,6 +289,10 @@ func (h *UploadHandler) Write(s *pssh.SSHServerConnSession, entry *sendutils.Fil
 	logger := pssh.GetLogger(s)
 	user := pssh.GetUser(s)
 
+	if entry == nil || entry.Reader == nil {
+		return "", fmt.Errorf("file entry is nil, no file to update")
+	}
+
 	if user == nil {
 		err := fmt.Errorf("could not get user from ctx")
 		logger.Error("error getting user from ctx", "err", err)
