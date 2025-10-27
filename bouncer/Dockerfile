@@ -8,11 +8,13 @@ RUN apt-get install -y git ca-certificates
 
 RUN git clone https://codeberg.org/emersion/soju.git
 
-COPY subscriber-change.diff .
+# COPY subscriber-change.diff .
 
 WORKDIR /app/soju
 
-RUN git apply ../subscriber-change.diff
+RUN git checkout v0.9.0
+
+# RUN git apply ../subscriber-change.diff
 
 RUN --mount=type=cache,target=/go/pkg/,rw \
   --mount=type=cache,target=/root/.cache/,rw \
