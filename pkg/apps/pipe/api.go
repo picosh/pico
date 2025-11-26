@@ -98,6 +98,10 @@ func handleSub(pubsub bool) http.HandlerFunc {
 			params += " -k"
 		}
 
+		if r.URL.Query().Get("block") == "false" {
+			params += " -b=false"
+		}
+
 		if accessList := r.URL.Query().Get("access"); accessList != "" {
 			logger.Info("adding access list", "topic", topic, "info", clientInfo, "access", accessList)
 			cleanList := cleanRegex.ReplaceAllString(accessList, "")
