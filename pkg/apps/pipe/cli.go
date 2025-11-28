@@ -49,10 +49,16 @@ func NewTabWriter(out io.Writer) *tabwriter.Writer {
 
 // scope topic to user by prefixing name.
 func toTopic(userName, topic string) string {
+	if strings.HasPrefix(topic, userName+"/") {
+		return topic
+	}
 	return fmt.Sprintf("%s/%s", userName, topic)
 }
 
 func toPublicTopic(topic string) string {
+	if strings.HasPrefix(topic, "public/") {
+		return topic
+	}
 	return fmt.Sprintf("public/%s", topic)
 }
 
@@ -403,12 +409,17 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 				}
 
 				if !*clean {
+					fmtTopic := topic
+					if *access != "" {
+						fmtTopic = fmt.Sprintf("%s/%s", userName, topic)
+					}
+
 					_, _ = fmt.Fprintf(
 						sesh,
 						"subscribe to this channel:\n  ssh %s sub %s%s\n",
 						toSshCmd(handler.Cfg),
 						msgFlag,
-						topic,
+						fmtTopic,
 					)
 				}
 
@@ -684,12 +695,17 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 				}
 
 				if isCreator && !*clean {
+					fmtTopic := topic
+					if *access != "" {
+						fmtTopic = fmt.Sprintf("%s/%s", userName, topic)
+					}
+
 					_, _ = fmt.Fprintf(
 						sesh,
 						"subscribe to this topic:\n  ssh %s sub %s%s\n",
 						toSshCmd(handler.Cfg),
 						flagMsg,
-						topic,
+						fmtTopic,
 					)
 				}
 
