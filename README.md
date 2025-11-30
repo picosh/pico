@@ -1,25 +1,27 @@
-# pico.sh - hacker labs
+# pico.sh
+
+The ultimate `ssh` powered services for developers
 
 > [!IMPORTANT]\
 > Read our docs at [pico.sh](https://pico.sh).
 
-Open source and managed web services leveraging SSH.
+Open source and managed web services leveraging `ssh`.
 
 The secret ingredient to all our services is how we let users publish content
-without needing to install anything. We accomplish this with the SSH tools you
+without needing to install anything. We accomplish this with the `ssh` tools you
 already have installed on your system.
 
 Want to publish a blog post? Use rsync, scp, or sftp. Want to publish a website?
 Use rsync, scp, or sftp. Want to share a code snippet with a colleague? Use
 rsync, scp, or sftp. Hopefully you see the trend.
 
-- [pages](https://pico.sh/pgs): A static site hosting platform using SSH for
-  site deployments. SSH.
+- [pages](https://pico.sh/pgs): A static site hosting platform using `ssh` for
+  site deployments. `ssh`.
 - [tuns](https://pico.sh/tuns): https/wss/tcp tunnels to localhost using only
-- [pipe](https://pipe.pico.sh): Authenticated `*nix` pipes over SSH
-- [prose](https://pico.sh/prose): A blog platform using SSH for content
+- [pipe](https://pipe.pico.sh): Authenticated `*nix` pipes over `ssh`
+- [prose](https://pico.sh/prose): A blog platform using `ssh` for content
   management.
-- [rss-to-email](https://pico.sh/feeds): An RSS email notification service using SSH.
+- [rss-to-email](https://pico.sh/feeds): An RSS email notification service using `ssh`.
 - [pastes](https://pico.sh/pastes): Upload code snippets using rsync, scp, and
   sftp.
 
@@ -37,7 +39,7 @@ domains!
 
 ## Access localhost using https
 
-If you have a local webserver on localhost:8000, activate an SSH tunnel to us:
+If you have a local webserver on localhost:8000, activate an `ssh` tunnel to us:
 
 ```bash
 ssh -R dev:80:localhost:8000 tuns.sh
@@ -96,8 +98,8 @@ Create a blogs.txt file:
 ```
 =: email rss@myemail.com
 =: cron 0 13 * * *
-=> https://pico.prose.sh/rss
-=> https://erock.prose.sh/rss
+=> https://blog.pico.sh/rss
+=> https://bower.sh/rss
 ```
 
 Then upload it to us:
