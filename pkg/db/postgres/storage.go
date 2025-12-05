@@ -1756,7 +1756,9 @@ func (me *PsqlDB) RemoveFeature(userID string, name string) error {
 
 func (me *PsqlDB) createFeatureExpiresAt(userID, name string) time.Time {
 	ff, _ := me.FindFeature(userID, name)
-	if ff == nil {
+	// if the feature flag has already expired we don't want to add a year to it since that will
+	// not grant the user a full year
+	if ff == nil || !ff.IsValid() {
 		t := time.Now()
 		return t.AddDate(1, 0, 0)
 	}
