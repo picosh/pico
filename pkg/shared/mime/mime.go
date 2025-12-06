@@ -79,6 +79,8 @@ func GetMimeType(fpath string) string {
 		return "application/zip"
 	case ".rar":
 		return "application/vnd.rar"
+	case ".tar.gz":
+		return "application/gzip"
 	case ".txt":
 		return "text/plain"
 	}
