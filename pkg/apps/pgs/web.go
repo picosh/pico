@@ -404,7 +404,7 @@ func WebPerm(proj *db.Project) bool {
 	return proj.Acl.Type == "public" || proj.Acl.Type == ""
 }
 
-var imgRegex = regexp.MustCompile("(.+.(?:jpg|jpeg|png|gif|webp|svg))(/.+)")
+var imgRegex = regexp.MustCompile(`(.+\.(?:jpg|jpeg|png|gif|webp|svg))(/.+)`)
 
 func (web *WebRouter) AssetRequest(perm func(proj *db.Project) bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
