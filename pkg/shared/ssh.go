@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/utils"
@@ -13,8 +14,9 @@ import (
 const adminPrefix = "admin__"
 
 type SshAuthHandler struct {
-	DB     AuthFindUser
-	Logger *slog.Logger
+	DB        AuthFindUser
+	Logger    *slog.Logger
+	Principal string
 }
 
 type AuthFindUser interface {
@@ -23,18 +25,54 @@ type AuthFindUser interface {
 	FindFeature(userID, name string) (*db.FeatureFlag, error)
 }
 
-func NewSshAuthHandler(dbh AuthFindUser, logger *slog.Logger) *SshAuthHandler {
+func NewSshAuthHandler(dbh AuthFindUser, logger *slog.Logger, principal string) *SshAuthHandler {
 	return &SshAuthHandler{
-		DB:     dbh,
-		Logger: logger,
+		DB:        dbh,
+		Logger:    logger,
+		Principal: principal,
 	}
 }
 
 func (r *SshAuthHandler) PubkeyAuthHandler(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
-	pubkey := utils.KeyForKeyText(key)
-	user, err := r.DB.FindUserByPubkey(pubkey)
+	log := r.Logger
+	var user *db.User
+	var err error
+	pubkey := ""
+
+	cert, ok := key.(*ssh.Certificate)
+	if ok {
+		if cert.CertType != ssh.UserCert {
+			return nil, fmt.Errorf("ssh-cert has type %d", cert.CertType)
+		}
+
+		found := false
+		for _, princ := range cert.ValidPrincipals {
+			if princ == "admin" || princ == r.Principal {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, fmt.Errorf("ssh-cert principals not valid")
+		}
+
+		clock := time.Now
+		unixNow := clock().Unix()
+		if after := int64(cert.ValidAfter); after < 0 || unixNow < int64(cert.ValidAfter) {
+			return nil, fmt.Errorf("ssh-cert is not yet valid")
+		}
+		if before := int64(cert.ValidBefore); cert.ValidBefore != uint64(ssh.CertTimeInfinity) && (unixNow >= before || before < 0) {
+			return nil, fmt.Errorf("ssh-cert has expired")
+		}
+
+		pubkey = utils.KeyForKeyText(cert.SignatureKey)
+	} else {
+		pubkey = utils.KeyForKeyText(key)
+	}
+
+	user, err = r.DB.FindUserByPubkey(pubkey)
 	if err != nil {
-		r.Logger.Error(
+		log.Error(
 			"could not find user for key",
 			"keyType", key.Type(),
 			"key", string(key.Marshal()),
@@ -44,7 +82,7 @@ func (r *SshAuthHandler) PubkeyAuthHandler(conn ssh.ConnMetadata, key ssh.Public
 	}
 
 	if user.Name == "" {
-		r.Logger.Error("username is not set")
+		log.Error("username is not set")
 		return nil, fmt.Errorf("username is not set")
 	}
 

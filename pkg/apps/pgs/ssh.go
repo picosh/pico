@@ -34,7 +34,7 @@ func StartSshServer(cfg *PgsConfig, killCh chan error) {
 		ctx,
 	)
 
-	sshAuth := shared.NewSshAuthHandler(cfg.DB, logger)
+	sshAuth := shared.NewSshAuthHandler(cfg.DB, logger, "pgs")
 
 	webTunnel := &tunkit.WebTunnelHandler{
 		Logger:      logger,

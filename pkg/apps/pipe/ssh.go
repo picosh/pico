@@ -46,7 +46,7 @@ func StartSshServer() {
 		Access:  syncmap.New[string, []string](),
 	}
 
-	sshAuth := shared.NewSshAuthHandler(dbh, logger)
+	sshAuth := shared.NewSshAuthHandler(dbh, logger, "pipe")
 
 	// Create a new SSH server
 	server, err := pssh.NewSSHServerWithConfig(

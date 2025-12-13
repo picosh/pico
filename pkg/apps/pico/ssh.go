@@ -64,7 +64,7 @@ func StartSshServer() {
 		DBPool: dbpool,
 	}
 
-	sshAuth := shared.NewSshAuthHandler(dbpool, logger)
+	sshAuth := shared.NewSshAuthHandler(dbpool, logger, "pico")
 
 	// Create a new SSH server
 	server, err := pssh.NewSSHServerWithConfig(
@@ -76,7 +76,8 @@ func StartSshServer() {
 		promPort,
 		"ssh_data/term_info_ed25519",
 		func(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
-			perms, _ := sshAuth.PubkeyAuthHandler(conn, key)
+			perms, err := sshAuth.PubkeyAuthHandler(conn, key)
+			logger.Warn("pubkey auth handler", "err", err)
 			if perms == nil {
 				perms = &ssh.Permissions{
 					Extensions: map[string]string{

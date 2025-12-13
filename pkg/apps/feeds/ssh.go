@@ -46,7 +46,7 @@ func StartSshServer() {
 	}
 	handler := filehandlers.NewFileHandlerRouter(cfg, dbh, fileMap)
 
-	sshAuth := shared.NewSshAuthHandler(dbh, logger)
+	sshAuth := shared.NewSshAuthHandler(dbh, logger, "feeds")
 
 	// Create a new SSH server
 	server, err := pssh.NewSSHServerWithConfig(
