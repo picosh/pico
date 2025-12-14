@@ -23,6 +23,7 @@ import (
 	"github.com/picosh/utils/pipe"
 	"github.com/picosh/utils/pipe/metrics"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"golang.org/x/crypto/ssh"
 )
 
 //go:embed html/* public/*
@@ -245,22 +246,38 @@ func keyHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 
 		space := r.URL.Query().Get("space")
 
-		apiConfig.Cfg.Logger.Info(
-			"handle key",
+		log := apiConfig.Cfg.Logger.With(
 			"remoteAddress", data.RemoteAddress,
 			"user", data.Username,
 			"space", space,
 			"publicKey", data.PublicKey,
 		)
 
-		user, err := apiConfig.Dbpool.FindUserForKey(data.Username, data.PublicKey)
+		log.Info("handle key")
+
+		key, _, _, _, err := ssh.ParseAuthorizedKey([]byte(data.PublicKey))
 		if err != nil {
-			apiConfig.Cfg.Logger.Error(err.Error())
+			log.Error("parse authorized key", "err", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		pubkey, err := shared.PubkeyCertVerify(key, space)
+		if err != nil {
+			log.Error("pubkey cert verify", "err", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		user, err := apiConfig.Dbpool.FindUserForKey(data.Username, pubkey)
+		if err != nil {
+			log.Error("find user for key", "err", err)
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 
 		if !apiConfig.HasPlusOrSpace(user, space) {
+			log.Error("key handler unauthorized")
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
@@ -274,7 +291,7 @@ func keyHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 		w.WriteHeader(http.StatusOK)
 		err = json.NewEncoder(w).Encode(user)
 		if err != nil {
-			apiConfig.Cfg.Logger.Error(err.Error())
+			log.Error("json encode", "err", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	}

@@ -97,7 +97,7 @@ func TestKey(t *testing.T) {
 
 	data := sishData{
 		Username:  testUsername,
-		PublicKey: "zzz",
+		PublicKey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFxVPgEqtWOa5l0QHZV6TQKhV+l46SAXU07c9RuHlGka test@pico",
 	}
 	jso, err := json.Marshal(data)
 	bail(err)

@@ -33,41 +33,46 @@ func NewSshAuthHandler(dbh AuthFindUser, logger *slog.Logger, principal string) 
 	}
 }
 
-func (r *SshAuthHandler) PubkeyAuthHandler(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
-	log := r.Logger
-	var user *db.User
-	var err error
-	pubkey := ""
-
+func PubkeyCertVerify(key ssh.PublicKey, srcPrincipal string) (string, error) {
 	cert, ok := key.(*ssh.Certificate)
 	if ok {
 		if cert.CertType != ssh.UserCert {
-			return nil, fmt.Errorf("ssh-cert has type %d", cert.CertType)
+			return "", fmt.Errorf("ssh-cert has type %d", cert.CertType)
 		}
 
 		found := false
 		for _, princ := range cert.ValidPrincipals {
-			if princ == "admin" || princ == r.Principal {
+			if princ == "admin" || princ == srcPrincipal {
 				found = true
 				break
 			}
 		}
 		if !found {
-			return nil, fmt.Errorf("ssh-cert principals not valid")
+			return "", fmt.Errorf("ssh-cert principals not valid")
 		}
 
 		clock := time.Now
 		unixNow := clock().Unix()
 		if after := int64(cert.ValidAfter); after < 0 || unixNow < int64(cert.ValidAfter) {
-			return nil, fmt.Errorf("ssh-cert is not yet valid")
+			return "", fmt.Errorf("ssh-cert is not yet valid")
 		}
 		if before := int64(cert.ValidBefore); cert.ValidBefore != uint64(ssh.CertTimeInfinity) && (unixNow >= before || before < 0) {
-			return nil, fmt.Errorf("ssh-cert has expired")
+			return "", fmt.Errorf("ssh-cert has expired")
 		}
 
-		pubkey = utils.KeyForKeyText(cert.SignatureKey)
-	} else {
-		pubkey = utils.KeyForKeyText(key)
+		return utils.KeyForKeyText(cert.SignatureKey), nil
+	}
+
+	return utils.KeyForKeyText(key), nil
+}
+
+func (r *SshAuthHandler) PubkeyAuthHandler(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
+	log := r.Logger
+	var user *db.User
+	var err error
+	pubkey, err := PubkeyCertVerify(key, r.Principal)
+	if err != nil {
+		return nil, err
 	}
 
 	user, err = r.DB.FindUserByPubkey(pubkey)
