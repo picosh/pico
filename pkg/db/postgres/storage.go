@@ -225,8 +225,7 @@ const (
 	sqlSelectTagsForPost     = `SELECT name FROM post_tags WHERE post_id=$1`
 	sqlSelectFeedItemsByPost = `SELECT id, post_id, guid, data, created_at FROM feed_items WHERE post_id=$1`
 
-	sqlInsertPublicKey = `INSERT INTO public_keys (user_id, public_key) VALUES ($1, $2)`
-	sqlInsertPost      = `
+	sqlInsertPost = `
 	INSERT INTO posts
 		(user_id, filename, slug, title, text, description, publish_at, hidden, cur_space,
 		file_size, mime_type, shasum, data, expires_at, updated_at)
@@ -243,7 +242,6 @@ const (
 		file_size = $7, shasum = $8, data = $9, hidden = $11, expires_at = $12
 	WHERE id = $10`
 	sqlUpdateUserName = `UPDATE app_users SET name = $1 WHERE id = $2`
-	sqlIncrementViews = `UPDATE posts SET views = views + 1 WHERE id = $1 RETURNING views`
 
 	sqlRemoveAliasesByPost = `DELETE FROM post_aliases WHERE post_id = $1`
 	sqlRemoveTagsByPost    = `DELETE FROM post_tags WHERE post_id = $1`
@@ -251,15 +249,9 @@ const (
 	sqlRemoveKeys          = `DELETE FROM public_keys WHERE id = ANY($1::uuid[])`
 	sqlRemoveUsers         = `DELETE FROM app_users WHERE id = ANY($1::uuid[])`
 
-	sqlInsertProject        = `INSERT INTO projects (user_id, name, project_dir) VALUES ($1, $2, $3) RETURNING id;`
-	sqlUpdateProject        = `UPDATE projects SET updated_at = $3 WHERE user_id = $1 AND name = $2;`
-	sqlFindProjectByName    = `SELECT id, user_id, name, project_dir, acl, blocked, created_at, updated_at FROM projects WHERE user_id = $1 AND name = $2;`
-	sqlSelectProjectCount   = `SELECT count(id) FROM projects`
-	sqlFindProjectsByUser   = `SELECT id, user_id, name, project_dir, acl, blocked, created_at, updated_at FROM projects WHERE user_id = $1 ORDER BY name ASC, updated_at DESC;`
-	sqlFindProjectsByPrefix = `SELECT id, user_id, name, project_dir, acl, blocked, created_at, updated_at FROM projects WHERE user_id = $1 AND name = project_dir AND name ILIKE $2 ORDER BY updated_at ASC, name ASC;`
-	sqlFindProjectLinks     = `SELECT id, user_id, name, project_dir, acl, blocked, created_at, updated_at FROM projects WHERE user_id = $1 AND name != project_dir AND project_dir = $2 ORDER BY name ASC;`
-	sqlLinkToProject        = `UPDATE projects SET project_dir = $1, updated_at = $2 WHERE id = $3;`
-	sqlRemoveProject        = `DELETE FROM projects WHERE id = $1;`
+	sqlInsertProject     = `INSERT INTO projects (user_id, name, project_dir) VALUES ($1, $2, $3) RETURNING id;`
+	sqlUpdateProject     = `UPDATE projects SET updated_at = $3 WHERE user_id = $1 AND name = $2;`
+	sqlFindProjectByName = `SELECT id, user_id, name, project_dir, acl, blocked, created_at, updated_at FROM projects WHERE user_id = $1 AND name = $2;`
 )
 
 type PsqlDB struct {
