@@ -51,10 +51,8 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		logger.Info("_redirects not found in lru cache", "key", redirectsCacheKey)
 		redirectFp, redirectInfo, err := h.Cfg.Storage.GetObject(h.Bucket, filepath.Join(h.ProjectDir, "_redirects"))
 		if err == nil {
-			defer func() {
-				_ = redirectFp.Close()
-			}()
 			if redirectInfo != nil && redirectInfo.Size > h.Cfg.MaxSpecialFileSize {
+				_ = redirectFp.Close()
 				errMsg := fmt.Sprintf("_redirects file is too large (%d > %d)", redirectInfo.Size, h.Cfg.MaxSpecialFileSize)
 				logger.Error(errMsg)
 				http.Error(w, errMsg, http.StatusInternalServerError)
@@ -63,6 +61,7 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			buf := new(strings.Builder)
 			lr := io.LimitReader(redirectFp, h.Cfg.MaxSpecialFileSize)
 			_, err := io.Copy(buf, lr)
+			_ = redirectFp.Close()
 			if err != nil {
 				logger.Error("io copy", "err", err.Error())
 				http.Error(w, "cannot read _redirects file", http.StatusInternalServerError)
@@ -109,9 +108,7 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				if err != nil {
 					continue
 				}
-				defer func() {
-					_ = obj.Close()
-				}()
+				_ = obj.Close()
 			}
 			logger.Info(
 				"redirecting request",
@@ -219,10 +216,8 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		logger.Info("_headers not found in lru cache", "key", headersCacheKey)
 		headersFp, headersInfo, err := h.Cfg.Storage.GetObject(h.Bucket, filepath.Join(h.ProjectDir, "_headers"))
 		if err == nil {
-			defer func() {
-				_ = headersFp.Close()
-			}()
 			if headersInfo != nil && headersInfo.Size > h.Cfg.MaxSpecialFileSize {
+				_ = headersFp.Close()
 				errMsg := fmt.Sprintf("_headers file is too large (%d > %d)", headersInfo.Size, h.Cfg.MaxSpecialFileSize)
 				logger.Error(errMsg)
 				http.Error(w, errMsg, http.StatusInternalServerError)
@@ -231,6 +226,7 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			buf := new(strings.Builder)
 			lr := io.LimitReader(headersFp, h.Cfg.MaxSpecialFileSize)
 			_, err := io.Copy(buf, lr)
+			_ = headersFp.Close()
 			if err != nil {
 				logger.Error("io copy", "err", err.Error())
 				http.Error(w, "cannot read _headers file", http.StatusInternalServerError)
