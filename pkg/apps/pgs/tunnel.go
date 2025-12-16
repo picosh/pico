@@ -126,7 +126,7 @@ func CreateHttpHandler(cfg *PgsConfig) CtxHttpBridge {
 
 		log.Info("user has access to site")
 
-		routes := NewWebRouter(cfg)
+		routes := newWebRouter(cfg)
 		tunnelRouter := TunnelWebRouter{routes, subdomain}
 		tunnelRouter.InitRouter()
 		return &tunnelRouter

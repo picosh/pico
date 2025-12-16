@@ -107,13 +107,18 @@ type WebRouter struct {
 }
 
 func NewWebRouter(cfg *PgsConfig) *WebRouter {
+	router := newWebRouter(cfg)
+	go router.WatchCacheClear()
+	return router
+}
+
+func newWebRouter(cfg *PgsConfig) *WebRouter {
 	router := &WebRouter{
 		Cfg:            cfg,
 		RedirectsCache: expirable.NewLRU[string, []*RedirectRule](2048, nil, cache.CacheTimeout),
 		HeadersCache:   expirable.NewLRU[string, []*HeaderRule](2048, nil, cache.CacheTimeout),
 	}
 	router.initRouters()
-	go router.WatchCacheClear()
 	return router
 }
 
