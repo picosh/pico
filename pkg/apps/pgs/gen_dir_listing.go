@@ -7,6 +7,7 @@ import (
 	"html/template"
 	"os"
 	"sort"
+	"strings"
 
 	sst "github.com/picosh/pico/pkg/pobj/storage"
 )
@@ -69,6 +70,9 @@ func toDisplayEntries(entries []os.FileInfo) []dirEntryDisplay {
 	displayEntries := make([]dirEntryDisplay, 0, len(entries))
 
 	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), ".") {
+			continue
+		}
 		display := dirEntryDisplay{
 			Href:    entry.Name(),
 			Display: entry.Name(),

@@ -94,6 +94,27 @@ func TestGenerateDirectoryHTML(t *testing.T) {
 	}
 }
 
+func TestHideDotFiles(t *testing.T) {
+	entries := []os.FileInfo{
+		&utils.VirtualFile{FName: ".hidden", FIsDir: false, FModTime: time.Date(2025, 1, 15, 10, 30, 0, 0, time.UTC)},
+		&utils.VirtualFile{FName: ".git", FIsDir: true, FModTime: time.Date(2025, 1, 15, 10, 30, 0, 0, time.UTC)},
+		&utils.VirtualFile{FName: "visible.txt", FIsDir: false, FModTime: time.Date(2025, 1, 15, 10, 30, 0, 0, time.UTC)},
+		&utils.VirtualFile{FName: "docs", FIsDir: true, FModTime: time.Date(2025, 1, 15, 10, 30, 0, 0, time.UTC)},
+	}
+
+	displayEntries := toDisplayEntries(entries)
+
+	if len(displayEntries) != 2 {
+		t.Errorf("expected 2 entries, got %d", len(displayEntries))
+	}
+
+	for _, entry := range displayEntries {
+		if strings.HasPrefix(entry.Display, ".") {
+			t.Errorf("dot file should be hidden: %s", entry.Display)
+		}
+	}
+}
+
 func TestSortEntries(t *testing.T) {
 	entries := []os.FileInfo{
 		&utils.VirtualFile{FName: "zebra.txt", FIsDir: false},
