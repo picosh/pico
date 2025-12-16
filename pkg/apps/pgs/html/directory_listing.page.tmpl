@@ -1,0 +1,30 @@
+{{template "base" .}}
+
+{{define "title"}}Index of {{.Path}}{{end}}
+
+{{define "meta"}}{{end}}
+
+{{define "attrs"}}class="container"{{end}}
+
+{{define "body"}}
+<header>
+  <h1 class="text-2xl">Index of {{.Path}}</h1>
+  <hr />
+</header>
+<main>
+  <table>
+    <thead>
+      <tr><th>Name</th><th>Size</th><th>Modified</th></tr>
+    </thead>
+    <tbody>
+{{- if .ShowParent}}
+      <tr><td><a href="../">../</a></td><td>-</td><td>-</td></tr>
+{{- end}}
+{{- range .Entries}}
+      <tr><td><a href="{{.Href}}">{{.Display}}</a></td><td>{{.Size}}</td><td>{{.ModTime}}</td></tr>
+{{- end}}
+    </tbody>
+  </table>
+</main>
+{{template "marketing-footer" .}}
+{{end}}

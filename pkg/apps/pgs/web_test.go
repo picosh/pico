@@ -358,6 +358,123 @@ func TestApiBasic(t *testing.T) {
 	}
 }
 
+func TestDirectoryListing(t *testing.T) {
+	logger := slog.Default()
+	dbpool := NewPgsDb(logger)
+	bucketName := shared.GetAssetBucketName(dbpool.Users[0].ID)
+
+	tt := []struct {
+		name        string
+		path        string
+		status      int
+		contentType string
+		contains    []string
+		notContains []string
+		storage     map[string]map[string]string
+	}{
+		{
+			name:        "directory-without-index-shows-listing",
+			path:        "/docs/",
+			status:      http.StatusOK,
+			contentType: "text/html",
+			contains: []string{
+				"Index of /docs/",
+				"readme.md",
+				"guide.md",
+			},
+			storage: map[string]map[string]string{
+				bucketName: {
+					"/test/docs/readme.md": "# Readme",
+					"/test/docs/guide.md":  "# Guide",
+				},
+			},
+		},
+		{
+			name:        "directory-with-index-serves-index",
+			path:        "/docs/",
+			status:      http.StatusOK,
+			contentType: "text/html",
+			contains:    []string{"hello world!"},
+			notContains: []string{"Index of"},
+			storage: map[string]map[string]string{
+				bucketName: {
+					"/test/docs/index.html": "hello world!",
+					"/test/docs/readme.md":  "# Readme",
+				},
+			},
+		},
+		{
+			name:        "root-directory-without-index-shows-listing",
+			path:        "/",
+			status:      http.StatusOK,
+			contentType: "text/html",
+			contains: []string{
+				"Index of /",
+				"style.css",
+			},
+			storage: map[string]map[string]string{
+				bucketName: {
+					"/test/style.css": "body {}",
+				},
+			},
+		},
+		{
+			name:        "nested-directory-shows-parent-link",
+			path:        "/assets/images/",
+			status:      http.StatusOK,
+			contentType: "text/html",
+			contains: []string{
+				"Index of /assets/images/",
+				`href="../"`,
+				"logo.png",
+			},
+			storage: map[string]map[string]string{
+				bucketName: {
+					"/test/assets/images/logo.png": "png data",
+				},
+			},
+		},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			request := httptest.NewRequest("GET", dbpool.mkpath(tc.path), strings.NewReader(""))
+			responseRecorder := httptest.NewRecorder()
+
+			st, _ := storage.NewStorageMemory(tc.storage)
+			pubsub := NewPubsubChan()
+			defer func() {
+				_ = pubsub.Close()
+			}()
+			cfg := NewPgsConfig(logger, dbpool, st, pubsub)
+			cfg.Domain = "pgs.test"
+			router := NewWebRouter(cfg)
+			router.ServeHTTP(responseRecorder, request)
+
+			if responseRecorder.Code != tc.status {
+				t.Errorf("Want status '%d', got '%d'", tc.status, responseRecorder.Code)
+			}
+
+			ct := responseRecorder.Header().Get("content-type")
+			if ct != tc.contentType {
+				t.Errorf("Want content type '%s', got '%s'", tc.contentType, ct)
+			}
+
+			body := responseRecorder.Body.String()
+			for _, want := range tc.contains {
+				if !strings.Contains(body, want) {
+					t.Errorf("Want body to contain '%s', got '%s'", want, body)
+				}
+			}
+			for _, notWant := range tc.notContains {
+				if strings.Contains(body, notWant) {
+					t.Errorf("Want body to NOT contain '%s', got '%s'", notWant, body)
+				}
+			}
+		})
+	}
+}
+
 type ImageStorageMemory struct {
 	*storage.StorageMemory
 	Opts  *storage.ImgProcessOpts

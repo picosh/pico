@@ -175,6 +175,27 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if assetFilepath == "" {
+		if shouldGenerateListing(h.Cfg.Storage, h.Bucket, h.ProjectDir, "/"+fpath) {
+			logger.Info(
+				"generating directory listing",
+				"path", fpath,
+			)
+			dirPath := h.ProjectDir + "/" + fpath
+			entries, err := h.Cfg.Storage.ListObjects(h.Bucket, dirPath, false)
+			if err == nil {
+				requestPath := "/" + fpath
+				if !strings.HasSuffix(requestPath, "/") {
+					requestPath += "/"
+				}
+
+				html := generateDirectoryHTML(requestPath, entries)
+				w.Header().Set("content-type", "text/html")
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(html))
+				return
+			}
+		}
+
 		logger.Info(
 			"asset not found in bucket",
 			"routes", strings.Join(attempts, ", "),
