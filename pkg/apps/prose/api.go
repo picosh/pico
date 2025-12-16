@@ -930,7 +930,9 @@ func imgRequest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
 		return
 	}
-	defer contents.Close()
+	defer func() {
+		_ = contents.Close()
+	}()
 
 	contentType := ""
 	if info != nil {
