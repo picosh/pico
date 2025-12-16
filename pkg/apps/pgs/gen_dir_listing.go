@@ -100,8 +100,12 @@ func shouldGenerateListing(st sst.ObjectStorage, bucket sst.Bucket, projectDir s
 	}
 
 	indexPath := dirPath + "index.html"
-	_, _, err = st.GetObject(bucket, indexPath)
-	return err != nil
+	obj, _, err := st.GetObject(bucket, indexPath)
+	if err != nil {
+		return true
+	}
+	_ = obj.Close()
+	return false
 }
 
 func generateDirectoryHTML(path string, entries []os.FileInfo) string {
