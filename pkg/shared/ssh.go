@@ -23,6 +23,7 @@ type AuthFindUser interface {
 	FindUserByPubkey(key string) (*db.User, error)
 	FindUserByName(name string) (*db.User, error)
 	FindFeature(userID, name string) (*db.FeatureFlag, error)
+	InsertAccessLog(log *db.AccessLog) error
 }
 
 func NewSshAuthHandler(dbh AuthFindUser, logger *slog.Logger, principal string) *SshAuthHandler {
@@ -33,11 +34,24 @@ func NewSshAuthHandler(dbh AuthFindUser, logger *slog.Logger, principal string) 
 	}
 }
 
-func PubkeyCertVerify(key ssh.PublicKey, srcPrincipal string) (string, error) {
+type AuthedPubkey struct {
+	OrigPubkey string
+	Pubkey     string
+	Identity   string
+}
+
+func PubkeyCertVerify(key ssh.PublicKey, srcPrincipal string) (*AuthedPubkey, error) {
+	origPubkey := utils.KeyForKeyText(key)
+	authed := &AuthedPubkey{
+		OrigPubkey: origPubkey,
+		Pubkey:     origPubkey,
+		Identity:   "pubkey",
+	}
+
 	cert, ok := key.(*ssh.Certificate)
 	if ok {
 		if cert.CertType != ssh.UserCert {
-			return "", fmt.Errorf("ssh-cert has type %d", cert.CertType)
+			return nil, fmt.Errorf("ssh-cert has type %d", cert.CertType)
 		}
 
 		found := false
@@ -48,34 +62,36 @@ func PubkeyCertVerify(key ssh.PublicKey, srcPrincipal string) (string, error) {
 			}
 		}
 		if !found {
-			return "", fmt.Errorf("ssh-cert principals not valid")
+			return nil, fmt.Errorf("ssh-cert principals not valid")
 		}
 
 		clock := time.Now
 		unixNow := clock().Unix()
 		if after := int64(cert.ValidAfter); after < 0 || unixNow < int64(cert.ValidAfter) {
-			return "", fmt.Errorf("ssh-cert is not yet valid")
+			return nil, fmt.Errorf("ssh-cert is not yet valid")
 		}
 		if before := int64(cert.ValidBefore); cert.ValidBefore != uint64(ssh.CertTimeInfinity) && (unixNow >= before || before < 0) {
-			return "", fmt.Errorf("ssh-cert has expired")
+			return nil, fmt.Errorf("ssh-cert has expired")
 		}
 
-		return utils.KeyForKeyText(cert.SignatureKey), nil
+		authed.Pubkey = utils.KeyForKeyText(cert.SignatureKey)
+		authed.Identity = cert.KeyId
+		return authed, nil
 	}
 
-	return utils.KeyForKeyText(key), nil
+	return authed, nil
 }
 
 func (r *SshAuthHandler) PubkeyAuthHandler(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
 	log := r.Logger
 	var user *db.User
 	var err error
-	pubkey, err := PubkeyCertVerify(key, r.Principal)
+	authed, err := PubkeyCertVerify(key, r.Principal)
 	if err != nil {
 		return nil, err
 	}
 
-	user, err = r.DB.FindUserByPubkey(pubkey)
+	user, err = r.DB.FindUserByPubkey(authed.Pubkey)
 	if err != nil {
 		log.Error(
 			"could not find user for key",
@@ -89,6 +105,16 @@ func (r *SshAuthHandler) PubkeyAuthHandler(conn ssh.ConnMetadata, key ssh.Public
 	if user.Name == "" {
 		log.Error("username is not set")
 		return nil, fmt.Errorf("username is not set")
+	}
+
+	err = r.DB.InsertAccessLog(&db.AccessLog{
+		UserID:   user.ID,
+		Service:  r.Principal,
+		Identity: authed.Identity,
+		Pubkey:   authed.OrigPubkey,
+	})
+	if err != nil {
+		log.Error("cannot insert access log", "err", err)
 	}
 
 	// impersonation
@@ -108,8 +134,9 @@ func (r *SshAuthHandler) PubkeyAuthHandler(conn ssh.ConnMetadata, key ssh.Public
 
 	perms := &ssh.Permissions{
 		Extensions: map[string]string{
-			"user_id": user.ID,
-			"pubkey":  pubkey,
+			"user_id":  user.ID,
+			"pubkey":   authed.Pubkey,
+			"identity": authed.Identity,
 		},
 	}
 

@@ -51,11 +51,14 @@ func LogMiddleware(getLogger GetLoggerInterface, database FindUserInterface) SSH
 					}
 
 					if found {
+						// identity provided by ssh-cert
+						identity := s.Permissions().Extensions["identity"]
 						if err == nil && user != nil {
 							logger = logger.With(
 								"user", user.Name,
 								"userId", user.ID,
 								"ip", s.RemoteAddr().String(),
+								"identity", identity,
 							)
 
 							SetUser(s, user)

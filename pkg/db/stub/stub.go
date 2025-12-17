@@ -288,3 +288,15 @@ func (me *StubDB) VisitUrlNotFound(opts *db.SummaryOpts) ([]*db.VisitUrl, error)
 func (me *StubDB) FindUsersWithPost(space string) ([]*db.User, error) {
 	return nil, errNotImpl
 }
+
+func (me *StubDB) FindAccessLogs(userID string, fromDate *time.Time) ([]*db.AccessLog, error) {
+	return nil, errNotImpl
+}
+
+func (me *StubDB) FindPubkeysInAccessLogs(userID string) ([]string, error) {
+	return []string{}, errNotImpl
+}
+
+func (me *StubDB) InsertAccessLog(log *db.AccessLog) error {
+	return errNotImpl
+}

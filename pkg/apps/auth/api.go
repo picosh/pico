@@ -262,14 +262,14 @@ func keyHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 			return
 		}
 
-		pubkey, err := shared.PubkeyCertVerify(key, space)
+		authed, err := shared.PubkeyCertVerify(key, space)
 		if err != nil {
 			log.Error("pubkey cert verify", "err", err)
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		user, err := apiConfig.Dbpool.FindUserForKey(data.Username, pubkey)
+		user, err := apiConfig.Dbpool.FindUserForKey(data.Username, authed.Pubkey)
 		if err != nil {
 			log.Error("find user for key", "err", err)
 			w.WriteHeader(http.StatusUnauthorized)
@@ -280,6 +280,16 @@ func keyHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 			log.Error("key handler unauthorized")
 			w.WriteHeader(http.StatusUnauthorized)
 			return
+		}
+
+		err = apiConfig.Dbpool.InsertAccessLog(&db.AccessLog{
+			UserID:   user.ID,
+			Service:  space,
+			Identity: authed.Identity,
+			Pubkey:   authed.OrigPubkey,
+		})
+		if err != nil {
+			log.Error("cannot insert access log", "err", err)
 		}
 
 		if !apiConfig.HasPrivilegedAccess(shared.GetApiToken(r)) {

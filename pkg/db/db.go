@@ -205,6 +205,15 @@ type AnalyticsVisits struct {
 	ContentType string `json:"content_type"`
 }
 
+type AccessLog struct {
+	ID        string     `json:"id"`
+	UserID    string     `json:"user_id"`
+	Service   string     `json:"service"`
+	Pubkey    string     `json:"pubkey"`
+	Identity  string     `json:"identity"`
+	CreatedAt *time.Time `json:"created_at"`
+}
+
 type Pager struct {
 	Num  int
 	Page int
@@ -453,6 +462,10 @@ type DB interface {
 	InsertTunsEventLog(log *TunsEventLog) error
 	FindTunsEventLogs(userID string) ([]*TunsEventLog, error)
 	FindTunsEventLogsByAddr(userID, addr string) ([]*TunsEventLog, error)
+
+	InsertAccessLog(log *AccessLog) error
+	FindAccessLogs(userID string, fromDate *time.Time) ([]*AccessLog, error)
+	FindPubkeysInAccessLogs(userID string) ([]string, error)
 
 	Close() error
 }

@@ -191,3 +191,7 @@ func (me *MemoryDB) UpdateProjectAcl(userID, name string, acl db.ProjectAcl) err
 func (me *MemoryDB) RegisterAdmin(username, pubkey, pubkeyName string) error {
 	return errNotImpl
 }
+
+func (me *MemoryDB) InsertAccessLog(*db.AccessLog) error {
+	return errNotImpl
+}

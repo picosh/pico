@@ -9,6 +9,7 @@ type PgsDB interface {
 	FindUsers() ([]*db.User, error)
 
 	FindFeature(userID string, name string) (*db.FeatureFlag, error)
+	InsertAccessLog(*db.AccessLog) error
 
 	InsertProject(userID, name, projectDir string) (string, error)
 	UpdateProject(userID, name string) error

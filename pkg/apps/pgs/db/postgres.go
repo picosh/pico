@@ -82,6 +82,17 @@ func (me *PgsPsqlDB) FindFeature(userID, name string) (*db.FeatureFlag, error) {
 	return &ff, err
 }
 
+func (me *PgsPsqlDB) InsertAccessLog(log *db.AccessLog) error {
+	_, err := me.Db.Exec(
+		`INSERT INTO access_logs (user_id, service, pubkey, identity) VALUES ($1, $2, $3, $4);`,
+		log.UserID,
+		log.Service,
+		log.Pubkey,
+		log.Identity,
+	)
+	return err
+}
+
 func (me *PgsPsqlDB) InsertProject(userID, name, projectDir string) (string, error) {
 	if !utils.IsValidSubdomain(name) {
 		return "", fmt.Errorf("'%s' is not a valid project name, must match /^[a-z0-9-]+$/", name)
