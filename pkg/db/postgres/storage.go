@@ -1479,7 +1479,7 @@ func (me *PsqlDB) FindUserStats(userID string) (*db.UserStats, error) {
 
 func (me *PsqlDB) FindAccessLogs(userID string, fromDate *time.Time) ([]*db.AccessLog, error) {
 	var logs []*db.AccessLog
-	err := me.Db.Select(&logs, `SELECT * FROM access_logs WHERE user_id=$1 AND created_at >= $2 ORDER BY created_at DESC`, userID, fromDate)
+	err := me.Db.Select(&logs, `SELECT * FROM access_logs WHERE user_id=$1 AND created_at >= $2 ORDER BY created_at ASC`, userID, fromDate)
 	if err != nil {
 		return nil, err
 	}
@@ -1488,7 +1488,7 @@ func (me *PsqlDB) FindAccessLogs(userID string, fromDate *time.Time) ([]*db.Acce
 
 func (me *PsqlDB) FindAccessLogsByPubkey(pubkey string, fromDate *time.Time) ([]*db.AccessLog, error) {
 	var logs []*db.AccessLog
-	err := me.Db.Select(&logs, `SELECT * FROM access_logs WHERE pubkey=$1 AND created_at >= $2 ORDER BY created_at DESC`, pubkey, fromDate)
+	err := me.Db.Select(&logs, `SELECT * FROM access_logs WHERE pubkey=$1 AND created_at >= $2 ORDER BY created_at ASC`, pubkey, fromDate)
 	if err != nil {
 		return nil, err
 	}

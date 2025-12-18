@@ -12,6 +12,7 @@ var menuChoices = []string{
 	"pubkeys",
 	"tokens",
 	"logs",
+	"access_logs",
 	"analytics",
 	"tuns",
 	"pico+",

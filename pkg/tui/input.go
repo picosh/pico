@@ -40,13 +40,6 @@ func (m *TextInput) FocusOut() (vxfw.Command, error) {
 }
 
 func (m *TextInput) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
-	switch msg := ev.(type) {
-	case vaxis.Key:
-		if msg.Matches(vaxis.KeyTab) {
-			m.focus = !m.focus
-			return vxfw.RedrawCmd{}, nil
-		}
-	}
 	return nil, nil
 }
 

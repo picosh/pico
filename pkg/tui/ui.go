@@ -343,17 +343,18 @@ func NewTui(opts vaxis.Options, shrd *SharedModel) error {
 
 	shrd.App = app
 	pages := map[string]vxfw.Widget{
-		HOME:         NewMenuPage(shrd),
-		"pubkeys":    NewPubkeysPage(shrd),
-		"add-pubkey": NewAddPubkeyPage(shrd),
-		"tokens":     NewTokensPage(shrd),
-		"add-token":  NewAddTokenPage(shrd),
-		"signup":     NewSignupPage(shrd),
-		"pico+":      NewPlusPage(shrd),
-		"logs":       NewLogsPage(shrd),
-		"analytics":  NewAnalyticsPage(shrd),
-		"chat":       NewChatPage(shrd),
-		"tuns":       NewTunsPage(shrd),
+		HOME:          NewMenuPage(shrd),
+		"pubkeys":     NewPubkeysPage(shrd),
+		"add-pubkey":  NewAddPubkeyPage(shrd),
+		"tokens":      NewTokensPage(shrd),
+		"add-token":   NewAddTokenPage(shrd),
+		"signup":      NewSignupPage(shrd),
+		"pico+":       NewPlusPage(shrd),
+		"logs":        NewLogsPage(shrd),
+		"analytics":   NewAnalyticsPage(shrd),
+		"chat":        NewChatPage(shrd),
+		"tuns":        NewTunsPage(shrd),
+		"access_logs": NewAccessLogsPage(shrd),
 	}
 	root := &App{
 		shared: shrd,
