@@ -293,6 +293,10 @@ func (me *StubDB) FindAccessLogs(userID string, fromDate *time.Time) ([]*db.Acce
 	return nil, errNotImpl
 }
 
+func (me *StubDB) FindAccessLogsByPubkey(pubkey string, fromDate *time.Time) ([]*db.AccessLog, error) {
+	return nil, errNotImpl
+}
+
 func (me *StubDB) FindPubkeysInAccessLogs(userID string) ([]string, error) {
 	return []string{}, errNotImpl
 }

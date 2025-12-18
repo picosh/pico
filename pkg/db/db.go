@@ -466,6 +466,7 @@ type DB interface {
 	InsertAccessLog(log *AccessLog) error
 	FindAccessLogs(userID string, fromDate *time.Time) ([]*AccessLog, error)
 	FindPubkeysInAccessLogs(userID string) ([]string, error)
+	FindAccessLogsByPubkey(pubkey string, fromDate *time.Time) ([]*AccessLog, error)
 
 	Close() error
 }

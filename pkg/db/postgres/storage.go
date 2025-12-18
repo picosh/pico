@@ -1967,6 +1967,32 @@ func (me *PsqlDB) FindAccessLogs(userID string, fromDate *time.Time) ([]*db.Acce
 	return logs, nil
 }
 
+func (me *PsqlDB) FindAccessLogsByPubkey(pubkey string, fromDate *time.Time) ([]*db.AccessLog, error) {
+	logs := []*db.AccessLog{}
+	rs, err := me.Db.Query(
+		`SELECT id, user_id, service, pubkey, identity, created_at FROM access_logs WHERE pubkey=$1 AND created_at >= $2 ORDER BY created_at DESC`, pubkey, fromDate)
+	if err != nil {
+		return nil, err
+	}
+
+	for rs.Next() {
+		log := db.AccessLog{}
+		err := rs.Scan(
+			&log.ID, &log.UserID, &log.Service, &log.Pubkey, &log.Identity, &log.CreatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		logs = append(logs, &log)
+	}
+
+	if rs.Err() != nil {
+		return nil, rs.Err()
+	}
+
+	return logs, nil
+}
+
 func (me *PsqlDB) FindPubkeysInAccessLogs(userID string) ([]string, error) {
 	pubkeys := []string{}
 	rs, err := me.Db.Query(
