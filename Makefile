@@ -162,3 +162,6 @@ restore:
 	$(DOCKER_CMD) exec -it $(DB_CONTAINER) /bin/bash
 	# psql postgres -U postgres -d pico < /backup.sql
 .PHONY: restore
+
+check: fmt lint test build
+.PHONY: check
