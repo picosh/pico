@@ -1,7 +1,6 @@
 package stub
 
 import (
-	"database/sql"
 	"fmt"
 	"log/slog"
 	"time"
@@ -29,27 +28,15 @@ func (me *StubDB) RegisterUser(username, pubkey, comment string) (*db.User, erro
 	return nil, errNotImpl
 }
 
-func (me *StubDB) RemoveUsers(userIDs []string) error {
-	return errNotImpl
-}
-
-func (me *StubDB) InsertPublicKey(userID, key, name string, tx *sql.Tx) error {
-	return errNotImpl
-}
-
 func (me *StubDB) UpdatePublicKey(pubkeyID, name string) (*db.PublicKey, error) {
 	return nil, errNotImpl
 }
 
-func (me *StubDB) FindPublicKeyForKey(key string) (*db.PublicKey, error) {
-	return nil, errNotImpl
+func (me *StubDB) InsertPublicKey(userID, key, name string) error {
+	return errNotImpl
 }
 
-func (me *StubDB) FindPublicKey(pubkeyID string) (*db.PublicKey, error) {
-	return nil, errNotImpl
-}
-
-func (me *StubDB) FindKeysForUser(user *db.User) ([]*db.PublicKey, error) {
+func (me *StubDB) FindKeysByUser(user *db.User) ([]*db.PublicKey, error) {
 	return []*db.PublicKey{}, errNotImpl
 }
 
@@ -57,11 +44,7 @@ func (me *StubDB) RemoveKeys(keyIDs []string) error {
 	return errNotImpl
 }
 
-func (me *StubDB) FindPostsBeforeDate(date *time.Time, space string) ([]*db.Post, error) {
-	return []*db.Post{}, errNotImpl
-}
-
-func (me *StubDB) FindUserForKey(username string, key string) (*db.User, error) {
+func (me *StubDB) FindUserByKey(username string, key string) (*db.User, error) {
 	return nil, errNotImpl
 }
 
@@ -73,24 +56,12 @@ func (me *StubDB) FindUser(userID string) (*db.User, error) {
 	return nil, errNotImpl
 }
 
-func (me *StubDB) ValidateName(name string) (bool, error) {
-	return false, errNotImpl
-}
-
 func (me *StubDB) FindUserByName(name string) (*db.User, error) {
 	return nil, errNotImpl
 }
 
-func (me *StubDB) FindUserForNameAndKey(name string, key string) (*db.User, error) {
+func (me *StubDB) FindUserByToken(token string) (*db.User, error) {
 	return nil, errNotImpl
-}
-
-func (me *StubDB) FindUserForToken(token string) (*db.User, error) {
-	return nil, errNotImpl
-}
-
-func (me *StubDB) SetUserName(userID string, name string) error {
-	return errNotImpl
 }
 
 func (me *StubDB) FindPostWithFilename(filename string, persona_id string, space string) (*db.Post, error) {
@@ -105,11 +76,7 @@ func (me *StubDB) FindPost(postID string) (*db.Post, error) {
 	return nil, errNotImpl
 }
 
-func (me *StubDB) FindPostsForFeed(page *db.Pager, space string) (*db.Paginate[*db.Post], error) {
-	return &db.Paginate[*db.Post]{}, errNotImpl
-}
-
-func (me *StubDB) FindAllUpdatedPosts(page *db.Pager, space string) (*db.Paginate[*db.Post], error) {
+func (me *StubDB) FindPostsByFeed(page *db.Pager, space string) (*db.Paginate[*db.Post], error) {
 	return &db.Paginate[*db.Post]{}, errNotImpl
 }
 
@@ -125,11 +92,11 @@ func (me *StubDB) RemovePosts(postIDs []string) error {
 	return errNotImpl
 }
 
-func (me *StubDB) FindPostsForUser(page *db.Pager, userID string, space string) (*db.Paginate[*db.Post], error) {
+func (me *StubDB) FindPostsByUser(page *db.Pager, userID string, space string) (*db.Paginate[*db.Post], error) {
 	return &db.Paginate[*db.Post]{}, errNotImpl
 }
 
-func (me *StubDB) FindAllPostsForUser(userID string, space string) ([]*db.Post, error) {
+func (me *StubDB) FindAllPostsByUser(userID string, space string) ([]*db.Post, error) {
 	return []*db.Post{}, errNotImpl
 }
 
@@ -138,10 +105,6 @@ func (me *StubDB) FindPosts() ([]*db.Post, error) {
 }
 
 func (me *StubDB) FindExpiredPosts(space string) ([]*db.Post, error) {
-	return []*db.Post{}, errNotImpl
-}
-
-func (me *StubDB) FindUpdatedPostsForUser(userID string, space string) ([]*db.Post, error) {
 	return []*db.Post{}, errNotImpl
 }
 
@@ -165,11 +128,11 @@ func (me *StubDB) FindUsers() ([]*db.User, error) {
 	return []*db.User{}, errNotImpl
 }
 
-func (me *StubDB) ReplaceTagsForPost(tags []string, postID string) error {
+func (me *StubDB) ReplaceTagsByPost(tags []string, postID string) error {
 	return errNotImpl
 }
 
-func (me *StubDB) ReplaceAliasesForPost(aliases []string, postID string) error {
+func (me *StubDB) ReplaceAliasesByPost(aliases []string, postID string) error {
 	return errNotImpl
 }
 
@@ -185,24 +148,16 @@ func (me *StubDB) FindPopularTags(space string) ([]string, error) {
 	return []string{}, errNotImpl
 }
 
-func (me *StubDB) FindTagsForPost(postID string) ([]string, error) {
-	return []string{}, errNotImpl
-}
-
 func (me *StubDB) FindFeature(userID string, feature string) (*db.FeatureFlag, error) {
 	return nil, errNotImpl
 }
 
-func (me *StubDB) FindFeaturesForUser(userID string) ([]*db.FeatureFlag, error) {
+func (me *StubDB) FindFeaturesByUser(userID string) ([]*db.FeatureFlag, error) {
 	return []*db.FeatureFlag{}, errNotImpl
 }
 
-func (me *StubDB) HasFeatureForUser(userID string, feature string) bool {
+func (me *StubDB) HasFeatureByUser(userID string, feature string) bool {
 	return false
-}
-
-func (me *StubDB) FindTotalSizeForUser(userID string) (int, error) {
-	return 0, errNotImpl
 }
 
 func (me *StubDB) InsertFeedItems(postID string, items []*db.FeedItem) error {
@@ -217,14 +172,6 @@ func (me *StubDB) UpsertProject(userID, name, projectDir string) (*db.Project, e
 	return nil, errNotImpl
 }
 
-func (me *StubDB) InsertProject(userID, name, projectDir string) (string, error) {
-	return "", errNotImpl
-}
-
-func (me *StubDB) UpdateProject(userID, name string) error {
-	return errNotImpl
-}
-
 func (me *StubDB) FindProjectByName(userID, name string) (*db.Project, error) {
 	return &db.Project{}, errNotImpl
 }
@@ -237,15 +184,11 @@ func (me *StubDB) UpsertToken(userID, name string) (string, error) {
 	return "", errNotImpl
 }
 
-func (me *StubDB) FindTokenByName(userID, name string) (string, error) {
-	return "", errNotImpl
-}
-
 func (me *StubDB) RemoveToken(tokenID string) error {
 	return errNotImpl
 }
 
-func (me *StubDB) FindTokensForUser(userID string) ([]*db.Token, error) {
+func (me *StubDB) FindTokensByUser(userID string) ([]*db.Token, error) {
 	return []*db.Token{}, errNotImpl
 }
 
@@ -259,10 +202,6 @@ func (me *StubDB) RemoveFeature(userID string, name string) error {
 
 func (me *StubDB) AddPicoPlusUser(username, email, paymentType, txId string) error {
 	return errNotImpl
-}
-
-func (me *StubDB) FindTagsForUser(userID string, tag string) ([]string, error) {
-	return []string{}, errNotImpl
 }
 
 func (me *StubDB) FindUserStats(userID string) (*db.UserStats, error) {

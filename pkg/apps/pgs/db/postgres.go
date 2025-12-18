@@ -53,7 +53,7 @@ func (me *PgsPsqlDB) FindUserByPubkey(key string) (*db.User, error) {
 	if len(pk) == 0 {
 		return nil, fmt.Errorf("pubkey not found in our database: [%s]", key)
 	}
-	// When we run PublicKeyForKey and there are multiple public keys returned from the database
+	// When we run PublicKeyByKey and there are multiple public keys returned from the database
 	// that should mean that we don't have the correct username for this public key.
 	// When that happens we need to reject the authentication and ask the user to provide the correct
 	// username when using ssh.  So instead of `ssh <domain>` it should be `ssh user@<domain>`

@@ -393,7 +393,7 @@ func (m *AnalyticsPage) fetchSiteStats(site string, interval string) {
 }
 
 func (m *AnalyticsPage) fetchFeatures() error {
-	features, err := m.shared.Dbpool.FindFeaturesForUser(m.shared.User.ID)
+	features, err := m.shared.Dbpool.FindFeaturesByUser(m.shared.User.ID)
 	m.features = features
 	return err
 }

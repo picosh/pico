@@ -85,7 +85,7 @@ func introspectHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 		token := r.FormValue("token")
 		apiConfig.Cfg.Logger.Info("introspect token", "token", token)
 
-		user, err := apiConfig.Dbpool.FindUserForToken(token)
+		user, err := apiConfig.Dbpool.FindUserByToken(token)
 		if err != nil {
 			apiConfig.Cfg.Logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusUnauthorized)
@@ -207,7 +207,7 @@ func tokenHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 			"grantType", grantType,
 		)
 
-		_, err := apiConfig.Dbpool.FindUserForToken(token)
+		_, err := apiConfig.Dbpool.FindUserByToken(token)
 		if err != nil {
 			apiConfig.Cfg.Logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusUnauthorized)
@@ -269,7 +269,7 @@ func keyHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 			return
 		}
 
-		user, err := apiConfig.Dbpool.FindUserForKey(data.Username, authed.Pubkey)
+		user, err := apiConfig.Dbpool.FindUserByKey(data.Username, authed.Pubkey)
 		if err != nil {
 			log.Error("find user for key", "err", err)
 			w.WriteHeader(http.StatusUnauthorized)
@@ -337,7 +337,7 @@ func userHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 			return
 		}
 
-		keys, err := apiConfig.Dbpool.FindKeysForUser(user)
+		keys, err := apiConfig.Dbpool.FindKeysByUser(user)
 		if err != nil {
 			apiConfig.Cfg.Logger.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusNotFound)
@@ -357,7 +357,7 @@ func userHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 func rssHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		apiToken := r.PathValue("token")
-		user, err := apiConfig.Dbpool.FindUserForToken(apiToken)
+		user, err := apiConfig.Dbpool.FindUserByToken(apiToken)
 		if err != nil {
 			apiConfig.Cfg.Logger.Error(
 				"could not find user for token",
@@ -545,7 +545,7 @@ func paymentWebhookHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 
 func AddPlusFeedForUser(dbpool db.DB, userID, email string) error {
 	// check if they already have a post grepping for the auth rss url
-	posts, err := dbpool.FindPostsForUser(&db.Pager{Num: 1000, Page: 0}, userID, "feeds")
+	posts, err := dbpool.FindPostsByUser(&db.Pager{Num: 1000, Page: 0}, userID, "feeds")
 	if err != nil {
 		return err
 	}

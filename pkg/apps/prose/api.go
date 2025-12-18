@@ -171,7 +171,7 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	var posts []*db.Post
 	var p *db.Paginate[*db.Post]
 	if tag == "" {
-		p, err = dbpool.FindPostsForUser(pager, user.ID, cfg.Space)
+		p, err = dbpool.FindPostsByUser(pager, user.ID, cfg.Space)
 	} else {
 		p, err = dbpool.FindUserPostsByTag(pager, tag, user.ID, cfg.Space)
 	}
@@ -548,7 +548,7 @@ func readHandler(w http.ResponseWriter, r *http.Request) {
 	var pager *db.Paginate[*db.Post]
 	var err error
 	if tag == "" {
-		pager, err = dbpool.FindPostsForFeed(&db.Pager{Num: 30, Page: page}, cfg.Space)
+		pager, err = dbpool.FindPostsByFeed(&db.Pager{Num: 30, Page: page}, cfg.Space)
 	} else {
 		pager, err = dbpool.FindPostsByTag(&db.Pager{Num: 30, Page: page}, tag, cfg.Space)
 	}
@@ -639,7 +639,7 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 	var posts []*db.Post
 	var p *db.Paginate[*db.Post]
 	if tag == "" {
-		p, err = dbpool.FindPostsForUser(pager, user.ID, cfg.Space)
+		p, err = dbpool.FindPostsByUser(pager, user.ID, cfg.Space)
 	} else {
 		p, err = dbpool.FindUserPostsByTag(pager, tag, user.ID, cfg.Space)
 	}
@@ -762,7 +762,7 @@ func rssHandler(w http.ResponseWriter, r *http.Request) {
 	logger := shared.GetLogger(r)
 	cfg := shared.GetCfg(r)
 
-	pager, err := dbpool.FindPostsForFeed(&db.Pager{Num: 25, Page: 0}, cfg.Space)
+	pager, err := dbpool.FindPostsByFeed(&db.Pager{Num: 25, Page: 0}, cfg.Space)
 	if err != nil {
 		logger.Error("find all posts", "err", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)

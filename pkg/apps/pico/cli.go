@@ -24,7 +24,7 @@ func getUser(s *pssh.SSHServerConnSession, dbpool db.DB) (*db.User, error) {
 
 	key := utils.KeyForKeyText(s.PublicKey())
 
-	user, err := dbpool.FindUserForKey(s.User(), key)
+	user, err := dbpool.FindUserByKey(s.User(), key)
 	if err != nil {
 		return nil, err
 	}

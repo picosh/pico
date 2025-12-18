@@ -77,15 +77,15 @@ type ApiConfig struct {
 }
 
 func (hc *ApiConfig) HasPrivilegedAccess(apiToken string) bool {
-	user, err := hc.Dbpool.FindUserForToken(apiToken)
+	user, err := hc.Dbpool.FindUserByToken(apiToken)
 	if err != nil {
 		return false
 	}
-	return hc.Dbpool.HasFeatureForUser(user.ID, "auth")
+	return hc.Dbpool.HasFeatureByUser(user.ID, "auth")
 }
 
 func (hc *ApiConfig) HasPlusOrSpace(user *db.User, space string) bool {
-	return hc.Dbpool.HasFeatureForUser(user.ID, "plus") || hc.Dbpool.HasFeatureForUser(user.ID, space)
+	return hc.Dbpool.HasFeatureByUser(user.ID, "plus") || hc.Dbpool.HasFeatureByUser(user.ID, space)
 }
 
 func (hc *ApiConfig) CreateCtx(prevCtx context.Context, subdomain string) context.Context {

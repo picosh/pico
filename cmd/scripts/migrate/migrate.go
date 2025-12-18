@@ -7,12 +7,13 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/db/postgres"
 	"github.com/picosh/pico/pkg/shared"
 )
 
-func findPosts(dbpool *sql.DB) ([]*db.Post, error) {
+func findPosts(dbpool *sqlx.DB) ([]*db.Post, error) {
 	var posts []*db.Post
 	rs, err := dbpool.Query(`SELECT
 		posts.id, user_id, filename, title, text, description,
@@ -147,7 +148,7 @@ func main() {
 			panic(err)
 		}
 
-		proseKeys, err := proseDb.FindKeysForUser(proseUser)
+		proseKeys, err := proseDb.FindKeysByUser(proseUser)
 		if err != nil {
 			panic(err)
 		}
@@ -165,7 +166,7 @@ func main() {
 	updateIDs := []*ConflictData{}
 	logger.Info("Finding conflicts")
 	for _, listUser := range listUsers {
-		listKeys, err := listsDb.FindKeysForUser(listUser)
+		listKeys, err := listsDb.FindKeysByUser(listUser)
 		if err != nil {
 			panic(err)
 		}
@@ -180,7 +181,7 @@ func main() {
 			continue
 		} else {
 			proseUser := userMap[listUser.Name]
-			proseKeys, err := proseDb.FindKeysForUser(proseUser)
+			proseKeys, err := proseDb.FindKeysByUser(proseUser)
 			if err != nil {
 				panic(err)
 			}

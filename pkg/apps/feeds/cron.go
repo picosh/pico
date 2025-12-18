@@ -332,7 +332,7 @@ Also, we have centralized logs in our pico.sh TUI that will display realtime fee
 func (f *Fetcher) RunUser(user *db.User, now time.Time) error {
 	logger := shared.LoggerWithUser(f.cfg.Logger, user)
 	logger.Info("run user")
-	posts, err := f.db.FindPostsForUser(&db.Pager{Num: 100}, user.ID, "feeds")
+	posts, err := f.db.FindPostsByUser(&db.Pager{Num: 100}, user.ID, "feeds")
 	if err != nil {
 		return err
 	}

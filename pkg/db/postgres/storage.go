@@ -1,7 +1,6 @@
 package postgres
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -12,6 +11,7 @@ import (
 
 	"slices"
 
+	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/utils"
@@ -23,275 +23,16 @@ var SelectPost = `
 	posts.id, user_id, app_users.name, filename, slug, title, text, description,
 	posts.created_at, publish_at, posts.updated_at, hidden, file_size, mime_type, shasum, data, expires_at, views`
 
-var (
-	sqlSelectPosts = fmt.Sprintf(`
-	SELECT %s
-	FROM posts
-	LEFT JOIN app_users ON app_users.id = posts.user_id`, SelectPost)
-
-	sqlSelectPostsBeforeDate = fmt.Sprintf(`
-	SELECT %s
-	FROM posts
-	LEFT JOIN app_users ON app_users.id = posts.user_id
-	WHERE publish_at::date <= $1 AND cur_space = $2`, SelectPost)
-
-	sqlSelectPostWithFilename = fmt.Sprintf(`
-	SELECT %s, STRING_AGG(coalesce(post_tags.name, ''), ',') tags
-	FROM posts
-	LEFT JOIN app_users ON app_users.id = posts.user_id
-	LEFT JOIN post_tags ON post_tags.post_id = posts.id
-	WHERE filename = $1 AND user_id = $2 AND cur_space = $3
-	GROUP BY %s`, SelectPost, SelectPost)
-
-	sqlSelectPostWithSlug = fmt.Sprintf(`
-	SELECT %s, STRING_AGG(coalesce(post_tags.name, ''), ',') tags
-	FROM posts
-	LEFT JOIN app_users ON app_users.id = posts.user_id
-	LEFT JOIN post_tags ON post_tags.post_id = posts.id
-	WHERE slug = $1 AND user_id = $2 AND cur_space = $3
-	GROUP BY %s`, SelectPost, SelectPost)
-
-	sqlSelectPost = fmt.Sprintf(`
-	SELECT %s
-	FROM posts
-	LEFT JOIN app_users ON app_users.id = posts.user_id
-	WHERE posts.id = $1`, SelectPost)
-
-	sqlSelectUpdatedPostsForUser = fmt.Sprintf(`
-	SELECT %s
-	FROM posts
-	LEFT JOIN app_users ON app_users.id = posts.user_id
-	WHERE user_id = $1 AND publish_at::date <= CURRENT_DATE AND cur_space = $2
-	ORDER BY posts.updated_at DESC`, SelectPost)
-
-	sqlSelectExpiredPosts = fmt.Sprintf(`
-		SELECT %s
-		FROM posts
-		LEFT JOIN app_users ON app_users.id = posts.user_id
-		WHERE
-			cur_space = $1 AND
-			expires_at <= now();
-	`, SelectPost)
-
-	sqlSelectPostsForUser = fmt.Sprintf(`
-	SELECT %s, STRING_AGG(coalesce(post_tags.name, ''), ',') tags
-	FROM posts
-	LEFT JOIN app_users ON app_users.id = posts.user_id
-	LEFT JOIN post_tags ON post_tags.post_id = posts.id
-	WHERE
-		hidden = FALSE AND
-		user_id = $1 AND
-		publish_at::date <= CURRENT_DATE AND
-		cur_space = $2
-	GROUP BY %s
-	ORDER BY publish_at DESC, slug DESC
-	LIMIT $3 OFFSET $4`, SelectPost, SelectPost)
-
-	sqlSelectAllPostsForUser = fmt.Sprintf(`
-	SELECT %s
-	FROM posts
-	LEFT JOIN app_users ON app_users.id = posts.user_id
-	WHERE
-		user_id = $1 AND
-		cur_space = $2
-	ORDER BY publish_at DESC`, SelectPost)
-
-	sqlSelectPostsByTag = `
-	SELECT
-		posts.id,
-		user_id,
-		filename,
-		slug,
-		title,
-		text,
-		description,
-		publish_at,
-		app_users.name as username,
-		posts.updated_at,
-		posts.mime_type
-	FROM posts
-	LEFT JOIN app_users ON app_users.id = posts.user_id
-	LEFT JOIN post_tags ON post_tags.post_id = posts.id
-	WHERE
-		post_tags.name = $3 AND
-		publish_at::date <= CURRENT_DATE AND
-		cur_space = $4
-	ORDER BY publish_at DESC
-	LIMIT $1 OFFSET $2`
-
-	sqlSelectUserPostsByTag = fmt.Sprintf(`
-	SELECT %s
-	FROM posts
-	LEFT JOIN app_users ON app_users.id = posts.user_id
-	LEFT JOIN post_tags ON post_tags.post_id = posts.id
-	WHERE
-		hidden = FALSE AND
-		user_id = $1 AND
-		(post_tags.name = $2 OR hidden = true) AND
-		publish_at::date <= CURRENT_DATE AND
-		cur_space = $3
-	ORDER BY publish_at DESC
-	LIMIT $4 OFFSET $5`, SelectPost)
-)
-
-const (
-	sqlSelectPublicKey         = `SELECT id, user_id, name, public_key, created_at FROM public_keys WHERE public_key = $1`
-	sqlSelectPublicKeys        = `SELECT id, user_id, name, public_key, created_at FROM public_keys WHERE user_id = $1 ORDER BY created_at ASC`
-	sqlSelectUser              = `SELECT id, name, created_at FROM app_users WHERE id = $1`
-	sqlSelectUserForName       = `SELECT id, name, created_at FROM app_users WHERE name = $1`
-	sqlSelectUserForNameAndKey = `SELECT app_users.id, app_users.name, app_users.created_at, public_keys.id as pk_id, public_keys.public_key, public_keys.created_at as pk_created_at FROM app_users LEFT JOIN public_keys ON public_keys.user_id = app_users.id WHERE app_users.name = $1 AND public_keys.public_key = $2`
-	sqlSelectUsers             = `SELECT id, name, created_at FROM app_users ORDER BY name ASC`
-
-	sqlSelectUserForToken = `
-	SELECT app_users.id, app_users.name, app_users.created_at
-	FROM app_users
-	LEFT JOIN tokens ON tokens.user_id = app_users.id
-	WHERE tokens.token = $1 AND tokens.expires_at > NOW()`
-	sqlInsertToken              = `INSERT INTO tokens (user_id, name) VALUES($1, $2) RETURNING token;`
-	sqlRemoveToken              = `DELETE FROM tokens WHERE id = $1`
-	sqlSelectTokensForUser      = `SELECT id, user_id, name, created_at, expires_at FROM tokens WHERE user_id = $1`
-	sqlSelectTokenByNameForUser = `SELECT token FROM tokens WHERE user_id = $1 AND name = $2`
-
-	sqlSelectFeatureForUser = `SELECT id, user_id, payment_history_id, name, data, created_at, expires_at FROM feature_flags WHERE user_id = $1 AND name = $2 ORDER BY expires_at DESC LIMIT 1`
-	sqlSelectSizeForUser    = `SELECT COALESCE(sum(file_size), 0) FROM posts WHERE user_id = $1`
-
-	sqlSelectPostIdByAliasSlug = `SELECT post_id FROM post_aliases WHERE slug = $1`
-	sqlSelectTagPostCount      = `
-	SELECT count(posts.id)
-	FROM posts
-	LEFT JOIN post_tags ON post_tags.post_id = posts.id
-	WHERE hidden = FALSE AND cur_space=$1 and post_tags.name = $2`
-	sqlSelectPostCount       = `SELECT count(id) FROM posts WHERE hidden = FALSE AND cur_space=$1`
-	sqlSelectAllUpdatedPosts = `
-	SELECT
-		posts.id,
-		user_id,
-		filename,
-		slug,
-		title,
-		text,
-		description,
-		publish_at,
-		app_users.name as username,
-		posts.updated_at,
-		posts.mime_type
-	FROM posts
-	LEFT JOIN app_users ON app_users.id = posts.user_id
-	WHERE hidden = FALSE AND publish_at::date <= CURRENT_DATE AND cur_space = $3
-	ORDER BY updated_at DESC
-	LIMIT $1 OFFSET $2`
-	// add some users to deny list since they are robogenerating a bunch of posts
-	// per day and are creating a lot of noise.
-	sqlSelectPostsByRank = `
-	SELECT *
-	FROM (
-	    SELECT DISTINCT ON (posts.user_id)
-	        posts.id,
-	        posts.user_id,
-	        posts.filename,
-	        posts.slug,
-	        posts.title,
-	        posts.text,
-	        posts.description,
-	        posts.publish_at,
-	        app_users.name AS username,
-	        posts.updated_at,
-	        posts.mime_type
-	    FROM posts
-	    LEFT JOIN app_users ON app_users.id = posts.user_id
-	    WHERE
-	        hidden = FALSE
-	        AND publish_at::date <= CURRENT_DATE
-	        AND cur_space = $3
-	    ORDER BY posts.user_id, publish_at DESC
-	) AS latest_posts
-	ORDER BY publish_at DESC
-	LIMIT $1 OFFSET $2`
-
-	sqlSelectPopularTags = `
-	SELECT name, count(post_id) as "tally"
-	FROM post_tags
-	LEFT JOIN posts ON posts.id = post_id
-	WHERE posts.cur_space = $1
-	GROUP BY name
-	ORDER BY tally DESC
-	LIMIT 5`
-	sqlSelectTagsForUser = `
-	SELECT name
-	FROM post_tags
-	LEFT JOIN posts ON posts.id = post_id
-	WHERE posts.user_id = $1 AND posts.cur_space = $2
-	GROUP BY name`
-	sqlSelectTagsForPost     = `SELECT name FROM post_tags WHERE post_id=$1`
-	sqlSelectFeedItemsByPost = `SELECT id, post_id, guid, data, created_at FROM feed_items WHERE post_id=$1`
-
-	sqlInsertPost = `
-	INSERT INTO posts
-		(user_id, filename, slug, title, text, description, publish_at, hidden, cur_space,
-		file_size, mime_type, shasum, data, expires_at, updated_at)
-	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-	RETURNING id`
-	sqlInsertUser      = `INSERT INTO app_users (name) VALUES($1) returning id`
-	sqlInsertTag       = `INSERT INTO post_tags (post_id, name) VALUES($1, $2) RETURNING id;`
-	sqlInsertAliases   = `INSERT INTO post_aliases (post_id, slug) VALUES($1, $2) RETURNING id;`
-	sqlInsertFeedItems = `INSERT INTO feed_items (post_id, guid, data) VALUES ($1, $2, $3) RETURNING id;`
-
-	sqlUpdatePost = `
-	UPDATE posts
-	SET slug = $1, title = $2, text = $3, description = $4, updated_at = $5, publish_at = $6,
-		file_size = $7, shasum = $8, data = $9, hidden = $11, expires_at = $12
-	WHERE id = $10`
-	sqlUpdateUserName = `UPDATE app_users SET name = $1 WHERE id = $2`
-
-	sqlRemoveAliasesByPost = `DELETE FROM post_aliases WHERE post_id = $1`
-	sqlRemoveTagsByPost    = `DELETE FROM post_tags WHERE post_id = $1`
-	sqlRemovePosts         = `DELETE FROM posts WHERE id = ANY($1::uuid[])`
-	sqlRemoveKeys          = `DELETE FROM public_keys WHERE id = ANY($1::uuid[])`
-	sqlRemoveUsers         = `DELETE FROM app_users WHERE id = ANY($1::uuid[])`
-
-	sqlInsertProject     = `INSERT INTO projects (user_id, name, project_dir) VALUES ($1, $2, $3) RETURNING id;`
-	sqlUpdateProject     = `UPDATE projects SET updated_at = $3 WHERE user_id = $1 AND name = $2;`
-	sqlFindProjectByName = `SELECT id, user_id, name, project_dir, acl, blocked, created_at, updated_at FROM projects WHERE user_id = $1 AND name = $2;`
-)
-
 type PsqlDB struct {
 	Logger *slog.Logger
-	Db     *sql.DB
+	Db     *sqlx.DB
 }
 
 type RowScanner interface {
 	Scan(dest ...any) error
 }
 
-func CreatePostFromRow(r RowScanner) (*db.Post, error) {
-	post := &db.Post{}
-	err := r.Scan(
-		&post.ID,
-		&post.UserID,
-		&post.Username,
-		&post.Filename,
-		&post.Slug,
-		&post.Title,
-		&post.Text,
-		&post.Description,
-		&post.CreatedAt,
-		&post.PublishAt,
-		&post.UpdatedAt,
-		&post.Hidden,
-		&post.FileSize,
-		&post.MimeType,
-		&post.Shasum,
-		&post.Data,
-		&post.ExpiresAt,
-		&post.Views,
-	)
-	if err != nil {
-		return nil, err
-	}
-	return post, nil
-}
-
-func CreatePostWithTagsFromRow(r RowScanner) (*db.Post, error) {
+func CreatePostWithTagsByRow(r RowScanner) (*db.Post, error) {
 	post := &db.Post{}
 	tagStr := ""
 	err := r.Scan(
@@ -338,7 +79,7 @@ func NewDB(databaseUrl string, logger *slog.Logger) *PsqlDB {
 	}
 	d.Logger.Info("Connecting to postgres", "databaseUrl", databaseUrl)
 
-	db, err := sql.Open("postgres", databaseUrl)
+	db, err := sqlx.Connect("postgres", databaseUrl)
 	if err != nil {
 		d.Logger.Error(err.Error())
 	}
@@ -348,35 +89,26 @@ func NewDB(databaseUrl string, logger *slog.Logger) *PsqlDB {
 
 func (me *PsqlDB) RegisterUser(username, pubkey, comment string) (*db.User, error) {
 	lowerName := strings.ToLower(username)
-	valid, err := me.ValidateName(lowerName)
+	valid, err := me.validateName(lowerName)
 	if !valid {
 		return nil, err
 	}
 
-	ctx := context.Background()
-	tx, err := me.Db.BeginTx(ctx, nil)
+	tx, err := me.Db.Beginx()
 	if err != nil {
 		return nil, err
 	}
 	defer func() {
-		err = tx.Rollback()
-	}()
-
-	stmt, err := tx.Prepare(sqlInsertUser)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		_ = stmt.Close()
+		_ = tx.Rollback()
 	}()
 
 	var id string
-	err = stmt.QueryRow(lowerName).Scan(&id)
+	err = tx.QueryRow(`INSERT INTO app_users (name) VALUES($1) returning id`, lowerName).Scan(&id)
 	if err != nil {
 		return nil, err
 	}
 
-	err = me.InsertPublicKey(id, pubkey, comment, tx)
+	err = me.insertPublicKeyWithTx(id, pubkey, comment, tx)
 	if err != nil {
 		return nil, err
 	}
@@ -386,36 +118,31 @@ func (me *PsqlDB) RegisterUser(username, pubkey, comment string) (*db.User, erro
 		return nil, err
 	}
 
-	return me.FindUserForKey(username, pubkey)
+	return me.FindUserByKey(username, pubkey)
 }
 
-func (me *PsqlDB) RemoveUsers(userIDs []string) error {
-	param := "{" + strings.Join(userIDs, ",") + "}"
-	_, err := me.Db.Exec(sqlRemoveUsers, param)
-	return err
-}
-
-func (me *PsqlDB) InsertPublicKey(userID, key, name string, tx *sql.Tx) error {
-	pk, _ := me.FindPublicKeyForKey(key)
+func (me *PsqlDB) insertPublicKeyWithTx(userID, key, name string, tx *sqlx.Tx) error {
+	pk, _ := me.findPublicKeyByKey(key)
 	if pk != nil {
 		return db.ErrPublicKeyTaken
 	}
 	query := `INSERT INTO public_keys (user_id, public_key, name) VALUES ($1, $2, $3)`
-	var err error
-	if tx != nil {
-		_, err = tx.Exec(query, userID, key, name)
-	} else {
-		_, err = me.Db.Exec(query, userID, key, name)
-	}
-	if err != nil {
-		return err
-	}
+	_, err := tx.Exec(query, userID, key, name)
+	return err
+}
 
-	return nil
+func (me *PsqlDB) InsertPublicKey(userID, key, name string) error {
+	pk, _ := me.findPublicKeyByKey(key)
+	if pk != nil {
+		return db.ErrPublicKeyTaken
+	}
+	query := `INSERT INTO public_keys (user_id, public_key, name) VALUES ($1, $2, $3)`
+	_, err := me.Db.Exec(query, userID, key, name)
+	return err
 }
 
 func (me *PsqlDB) UpdatePublicKey(pubkeyID, name string) (*db.PublicKey, error) {
-	pk, err := me.FindPublicKey(pubkeyID)
+	pk, err := me.findPublicKey(pubkeyID)
 	if err != nil {
 		return nil, err
 	}
@@ -426,19 +153,20 @@ func (me *PsqlDB) UpdatePublicKey(pubkeyID, name string) (*db.PublicKey, error) 
 		return nil, err
 	}
 
-	pk, err = me.FindPublicKey(pubkeyID)
+	pk, err = me.findPublicKey(pubkeyID)
 	if err != nil {
 		return nil, err
 	}
 	return pk, nil
 }
 
-func (me *PsqlDB) FindPublicKeyForKey(key string) (*db.PublicKey, error) {
+func (me *PsqlDB) findPublicKeyByKey(key string) (*db.PublicKey, error) {
 	var keys []*db.PublicKey
-	rs, err := me.Db.Query(sqlSelectPublicKey, key)
+	rs, err := me.Db.Queryx(`SELECT id, user_id, name, public_key, created_at FROM public_keys WHERE public_key = $1`, key)
 	if err != nil {
 		return nil, err
 	}
+	defer func() { _ = rs.Close() }()
 
 	for rs.Next() {
 		pk := &db.PublicKey{}
@@ -458,7 +186,7 @@ func (me *PsqlDB) FindPublicKeyForKey(key string) (*db.PublicKey, error) {
 		return nil, fmt.Errorf("pubkey not found in our database: [%s]", key)
 	}
 
-	// When we run PublicKeyForKey and there are multiple public keys returned from the database
+	// When we run PublicKeyByKey and there are multiple public keys returned from the database
 	// that should mean that we don't have the correct username for this public key.
 	// When that happens we need to reject the authentication and ask the user to provide the correct
 	// username when using ssh.  So instead of `ssh <domain>` it should be `ssh user@<domain>`
@@ -469,86 +197,33 @@ func (me *PsqlDB) FindPublicKeyForKey(key string) (*db.PublicKey, error) {
 	return keys[0], nil
 }
 
-func (me *PsqlDB) FindPublicKey(pubkeyID string) (*db.PublicKey, error) {
-	var keys []*db.PublicKey
-	rs, err := me.Db.Query(`SELECT id, user_id, name, public_key, created_at FROM public_keys WHERE id = $1`, pubkeyID)
+func (me *PsqlDB) findPublicKey(pubkeyID string) (*db.PublicKey, error) {
+	pk := &db.PublicKey{}
+	err := me.Db.Get(pk, `SELECT * FROM public_keys WHERE id = $1`, pubkeyID)
 	if err != nil {
 		return nil, err
 	}
-
-	for rs.Next() {
-		pk := &db.PublicKey{}
-		err := rs.Scan(&pk.ID, &pk.UserID, &pk.Name, &pk.Key, &pk.CreatedAt)
-		if err != nil {
-			return nil, err
-		}
-
-		keys = append(keys, pk)
-	}
-
-	if rs.Err() != nil {
-		return nil, rs.Err()
-	}
-
-	if len(keys) == 0 {
-		return nil, errors.New("no public keys found for key provided")
-	}
-
-	return keys[0], nil
+	return pk, nil
 }
 
-func (me *PsqlDB) FindKeysForUser(user *db.User) ([]*db.PublicKey, error) {
+func (me *PsqlDB) FindKeysByUser(user *db.User) ([]*db.PublicKey, error) {
 	var keys []*db.PublicKey
-	rs, err := me.Db.Query(sqlSelectPublicKeys, user.ID)
+	err := me.Db.Select(&keys, `SELECT * FROM public_keys WHERE user_id = $1 ORDER BY created_at ASC`, user.ID)
 	if err != nil {
-		return keys, err
-	}
-	for rs.Next() {
-		pk := &db.PublicKey{}
-		err := rs.Scan(&pk.ID, &pk.UserID, &pk.Name, &pk.Key, &pk.CreatedAt)
-		if err != nil {
-			return keys, err
-		}
-
-		keys = append(keys, pk)
-	}
-	if rs.Err() != nil {
-		return keys, rs.Err()
+		return nil, err
 	}
 	return keys, nil
 }
 
 func (me *PsqlDB) RemoveKeys(keyIDs []string) error {
 	param := "{" + strings.Join(keyIDs, ",") + "}"
-	_, err := me.Db.Exec(sqlRemoveKeys, param)
+	_, err := me.Db.Exec(`DELETE FROM public_keys WHERE id = ANY($1::uuid[])`, param)
 	return err
-}
-
-func (me *PsqlDB) FindPostsBeforeDate(date *time.Time, space string) ([]*db.Post, error) {
-	// now := time.Now()
-	// expired := now.AddDate(0, 0, -3)
-	var posts []*db.Post
-	rs, err := me.Db.Query(sqlSelectPostsBeforeDate, date, space)
-	if err != nil {
-		return posts, err
-	}
-	for rs.Next() {
-		post, err := CreatePostFromRow(rs)
-		if err != nil {
-			return nil, err
-		}
-
-		posts = append(posts, post)
-	}
-	if rs.Err() != nil {
-		return posts, rs.Err()
-	}
-	return posts, nil
 }
 
 func (me *PsqlDB) FindUsersWithPost(space string) ([]*db.User, error) {
 	var users []*db.User
-	rs, err := me.Db.Query(
+	rs, err := me.Db.Queryx(
 		`SELECT u.id, u.name, u.created_at
 		FROM app_users u
 		INNER JOIN posts ON u.id=posts.user_id
@@ -559,6 +234,7 @@ func (me *PsqlDB) FindUsersWithPost(space string) ([]*db.User, error) {
 	if err != nil {
 		return users, err
 	}
+	defer func() { _ = rs.Close() }()
 	for rs.Next() {
 		var name sql.NullString
 		user := &db.User{}
@@ -580,9 +256,9 @@ func (me *PsqlDB) FindUsersWithPost(space string) ([]*db.User, error) {
 	return users, nil
 }
 
-func (me *PsqlDB) FindUserForKey(username string, key string) (*db.User, error) {
+func (me *PsqlDB) FindUserByKey(username string, key string) (*db.User, error) {
 	me.Logger.Info("attempting to find user with only public key", "key", key)
-	pk, err := me.FindPublicKeyForKey(key)
+	pk, err := me.findPublicKeyByKey(key)
 	if err == nil {
 		me.Logger.Info("found pubkey, looking for user", "key", key, "userId", pk.UserID)
 		user, err := me.FindUser(pk.UserID)
@@ -595,7 +271,7 @@ func (me *PsqlDB) FindUserForKey(username string, key string) (*db.User, error) 
 
 	if errors.Is(err, &db.ErrMultiplePublicKeys{}) {
 		me.Logger.Info("detected multiple users with same public key", "user", username)
-		user, err := me.FindUserForNameAndKey(username, key)
+		user, err := me.findUserForNameAndKey(username, key)
 		if err != nil {
 			me.Logger.Info("could not find user by username and public key", "user", username, "key", key)
 			// this is a little hacky but if we cannot find a user by name and public key
@@ -611,7 +287,7 @@ func (me *PsqlDB) FindUserForKey(username string, key string) (*db.User, error) 
 
 func (me *PsqlDB) FindUserByPubkey(key string) (*db.User, error) {
 	me.Logger.Info("attempting to find user with only public key", "key", key)
-	pk, err := me.FindPublicKeyForKey(key)
+	pk, err := me.findPublicKeyByKey(key)
 	if err != nil {
 		return nil, err
 	}
@@ -627,19 +303,14 @@ func (me *PsqlDB) FindUserByPubkey(key string) (*db.User, error) {
 
 func (me *PsqlDB) FindUser(userID string) (*db.User, error) {
 	user := &db.User{}
-	var un sql.NullString
-	r := me.Db.QueryRow(sqlSelectUser, userID)
-	err := r.Scan(&user.ID, &un, &user.CreatedAt)
+	err := me.Db.Get(user, `SELECT id, COALESCE(name, '') as name, created_at FROM app_users WHERE id = $1`, userID)
 	if err != nil {
 		return nil, err
-	}
-	if un.Valid {
-		user.Name = un.String
 	}
 	return user, nil
 }
 
-func (me *PsqlDB) ValidateName(name string) (bool, error) {
+func (me *PsqlDB) validateName(name string) (bool, error) {
 	lower := strings.ToLower(name)
 	if slices.Contains(db.DenyList, lower) {
 		return false, fmt.Errorf("%s is on deny list: %w", lower, db.ErrNameDenied)
@@ -657,19 +328,18 @@ func (me *PsqlDB) ValidateName(name string) (bool, error) {
 
 func (me *PsqlDB) FindUserByName(name string) (*db.User, error) {
 	user := &db.User{}
-	r := me.Db.QueryRow(sqlSelectUserForName, strings.ToLower(name))
-	err := r.Scan(&user.ID, &user.Name, &user.CreatedAt)
+	err := me.Db.Get(user, `SELECT * FROM app_users WHERE name = $1`, strings.ToLower(name))
 	if err != nil {
 		return nil, err
 	}
 	return user, nil
 }
 
-func (me *PsqlDB) FindUserForNameAndKey(name string, key string) (*db.User, error) {
+func (me *PsqlDB) findUserForNameAndKey(name string, key string) (*db.User, error) {
 	user := &db.User{}
 	pk := &db.PublicKey{}
 
-	r := me.Db.QueryRow(sqlSelectUserForNameAndKey, strings.ToLower(name), key)
+	r := me.Db.QueryRow(`SELECT app_users.id, app_users.name, app_users.created_at, public_keys.id as pk_id, public_keys.public_key, public_keys.created_at as pk_created_at FROM app_users LEFT JOIN public_keys ON public_keys.user_id = app_users.id WHERE app_users.name = $1 AND public_keys.public_key = $2`, strings.ToLower(name), key)
 	err := r.Scan(&user.ID, &user.Name, &user.CreatedAt, &pk.ID, &pk.Key, &pk.CreatedAt)
 	if err != nil {
 		return nil, err
@@ -679,32 +349,29 @@ func (me *PsqlDB) FindUserForNameAndKey(name string, key string) (*db.User, erro
 	return user, nil
 }
 
-func (me *PsqlDB) FindUserForToken(token string) (*db.User, error) {
+func (me *PsqlDB) FindUserByToken(token string) (*db.User, error) {
 	user := &db.User{}
-
-	r := me.Db.QueryRow(sqlSelectUserForToken, token)
-	err := r.Scan(&user.ID, &user.Name, &user.CreatedAt)
+	err := me.Db.Get(user, `
+	SELECT app_users.id, app_users.name, app_users.created_at
+	FROM app_users
+	LEFT JOIN tokens ON tokens.user_id = app_users.id
+	WHERE tokens.token = $1 AND tokens.expires_at > NOW()`, token)
 	if err != nil {
 		return nil, err
 	}
-
 	return user, nil
 }
 
-func (me *PsqlDB) SetUserName(userID string, name string) error {
-	lowerName := strings.ToLower(name)
-	valid, err := me.ValidateName(lowerName)
-	if !valid {
-		return err
-	}
-
-	_, err = me.Db.Exec(sqlUpdateUserName, lowerName, userID)
-	return err
-}
-
 func (me *PsqlDB) FindPostWithFilename(filename string, persona_id string, space string) (*db.Post, error) {
-	r := me.Db.QueryRow(sqlSelectPostWithFilename, filename, persona_id, space)
-	post, err := CreatePostWithTagsFromRow(r)
+	query := fmt.Sprintf(`
+	SELECT %s, STRING_AGG(coalesce(post_tags.name, ''), ',') tags
+	FROM posts
+	LEFT JOIN app_users ON app_users.id = posts.user_id
+	LEFT JOIN post_tags ON post_tags.post_id = posts.id
+	WHERE filename = $1 AND user_id = $2 AND cur_space = $3
+	GROUP BY %s`, SelectPost, SelectPost)
+	r := me.Db.QueryRow(query, filename, persona_id, space)
+	post, err := CreatePostWithTagsByRow(r)
 	if err != nil {
 		return nil, err
 	}
@@ -713,11 +380,18 @@ func (me *PsqlDB) FindPostWithFilename(filename string, persona_id string, space
 }
 
 func (me *PsqlDB) FindPostWithSlug(slug string, user_id string, space string) (*db.Post, error) {
-	r := me.Db.QueryRow(sqlSelectPostWithSlug, slug, user_id, space)
-	post, err := CreatePostWithTagsFromRow(r)
+	query := fmt.Sprintf(`
+	SELECT %s, STRING_AGG(coalesce(post_tags.name, ''), ',') tags
+	FROM posts
+	LEFT JOIN app_users ON app_users.id = posts.user_id
+	LEFT JOIN post_tags ON post_tags.post_id = posts.id
+	WHERE slug = $1 AND user_id = $2 AND cur_space = $3
+	GROUP BY %s`, SelectPost, SelectPost)
+	r := me.Db.QueryRow(query, slug, user_id, space)
+	post, err := CreatePostWithTagsByRow(r)
 	if err != nil {
 		// attempt to find post inside post_aliases
-		alias := me.Db.QueryRow(sqlSelectPostIdByAliasSlug, slug)
+		alias := me.Db.QueryRow(`SELECT post_id FROM post_aliases WHERE slug = $1`, slug)
 		postID := ""
 		err := alias.Scan(&postID)
 		if err != nil {
@@ -731,16 +405,20 @@ func (me *PsqlDB) FindPostWithSlug(slug string, user_id string, space string) (*
 }
 
 func (me *PsqlDB) FindPost(postID string) (*db.Post, error) {
-	r := me.Db.QueryRow(sqlSelectPost, postID)
-	post, err := CreatePostFromRow(r)
+	post := &db.Post{}
+	query := fmt.Sprintf(`
+	SELECT %s
+	FROM posts
+	LEFT JOIN app_users ON app_users.id = posts.user_id
+	WHERE posts.id = $1`, SelectPost)
+	err := me.Db.Get(post, query, postID)
 	if err != nil {
 		return nil, err
 	}
-
 	return post, nil
 }
 
-func (me *PsqlDB) postPager(rs *sql.Rows, pageNum int, space string, tag string) (*db.Paginate[*db.Post], error) {
+func (me *PsqlDB) postPager(rs *sqlx.Rows, pageNum int, space string, tag string) (*db.Paginate[*db.Post], error) {
 	var posts []*db.Post
 	for rs.Next() {
 		post := &db.Post{}
@@ -770,9 +448,13 @@ func (me *PsqlDB) postPager(rs *sql.Rows, pageNum int, space string, tag string)
 	var count int
 	var err error
 	if tag == "" {
-		err = me.Db.QueryRow(sqlSelectPostCount, space).Scan(&count)
+		err = me.Db.QueryRow(`SELECT count(id) FROM posts WHERE hidden = FALSE AND cur_space=$1`, space).Scan(&count)
 	} else {
-		err = me.Db.QueryRow(sqlSelectTagPostCount, space, tag).Scan(&count)
+		err = me.Db.QueryRow(`
+	SELECT count(posts.id)
+	FROM posts
+	LEFT JOIN post_tags ON post_tags.post_id = posts.id
+	WHERE hidden = FALSE AND cur_space=$1 and post_tags.name = $2`, space, tag).Scan(&count)
 	}
 	if err != nil {
 		return nil, err
@@ -786,26 +468,50 @@ func (me *PsqlDB) postPager(rs *sql.Rows, pageNum int, space string, tag string)
 	return pager, nil
 }
 
-func (me *PsqlDB) FindPostsForFeed(page *db.Pager, space string) (*db.Paginate[*db.Post], error) {
-	rs, err := me.Db.Query(sqlSelectPostsByRank, page.Num, page.Num*page.Page, space)
+func (me *PsqlDB) FindPostsByFeed(page *db.Pager, space string) (*db.Paginate[*db.Post], error) {
+	query := `
+	SELECT *
+	FROM (
+	    SELECT DISTINCT ON (posts.user_id)
+	        posts.id,
+	        posts.user_id,
+	        posts.filename,
+	        posts.slug,
+	        posts.title,
+	        posts.text,
+	        posts.description,
+	        posts.publish_at,
+	        app_users.name AS username,
+	        posts.updated_at,
+	        posts.mime_type
+	    FROM posts
+	    LEFT JOIN app_users ON app_users.id = posts.user_id
+	    WHERE
+	        hidden = FALSE
+	        AND publish_at::date <= CURRENT_DATE
+	        AND cur_space = $3
+	    ORDER BY posts.user_id, publish_at DESC
+	) AS latest_posts
+	ORDER BY publish_at DESC
+	LIMIT $1 OFFSET $2`
+	rs, err := me.Db.Queryx(query, page.Num, page.Num*page.Page, space)
 	if err != nil {
 		return nil, err
 	}
-	return me.postPager(rs, page.Num, space, "")
-}
-
-func (me *PsqlDB) FindAllUpdatedPosts(page *db.Pager, space string) (*db.Paginate[*db.Post], error) {
-	rs, err := me.Db.Query(sqlSelectAllUpdatedPosts, page.Num, page.Num*page.Page, space)
-	if err != nil {
-		return nil, err
-	}
+	defer func() { _ = rs.Close() }()
 	return me.postPager(rs, page.Num, space, "")
 }
 
 func (me *PsqlDB) InsertPost(post *db.Post) (*db.Post, error) {
 	var id string
+	query := `
+	INSERT INTO posts
+		(user_id, filename, slug, title, text, description, publish_at, hidden, cur_space,
+		file_size, mime_type, shasum, data, expires_at, updated_at)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+	RETURNING id`
 	err := me.Db.QueryRow(
-		sqlInsertPost,
+		query,
 		post.UserID,
 		post.Filename,
 		post.Slug,
@@ -830,8 +536,13 @@ func (me *PsqlDB) InsertPost(post *db.Post) (*db.Post, error) {
 }
 
 func (me *PsqlDB) UpdatePost(post *db.Post) (*db.Post, error) {
+	query := `
+	UPDATE posts
+	SET slug = $1, title = $2, text = $3, description = $4, updated_at = $5, publish_at = $6,
+		file_size = $7, shasum = $8, data = $9, hidden = $11, expires_at = $12
+	WHERE id = $10`
 	_, err := me.Db.Exec(
-		sqlUpdatePost,
+		query,
 		post.Slug,
 		post.Title,
 		post.Text,
@@ -854,14 +565,27 @@ func (me *PsqlDB) UpdatePost(post *db.Post) (*db.Post, error) {
 
 func (me *PsqlDB) RemovePosts(postIDs []string) error {
 	param := "{" + strings.Join(postIDs, ",") + "}"
-	_, err := me.Db.Exec(sqlRemovePosts, param)
+	_, err := me.Db.Exec(`DELETE FROM posts WHERE id = ANY($1::uuid[])`, param)
 	return err
 }
 
-func (me *PsqlDB) FindPostsForUser(page *db.Pager, userID string, space string) (*db.Paginate[*db.Post], error) {
+func (me *PsqlDB) FindPostsByUser(page *db.Pager, userID string, space string) (*db.Paginate[*db.Post], error) {
 	var posts []*db.Post
-	rs, err := me.Db.Query(
-		sqlSelectPostsForUser,
+	query := fmt.Sprintf(`
+	SELECT %s, STRING_AGG(coalesce(post_tags.name, ''), ',') tags
+	FROM posts
+	LEFT JOIN app_users ON app_users.id = posts.user_id
+	LEFT JOIN post_tags ON post_tags.post_id = posts.id
+	WHERE
+		hidden = FALSE AND
+		user_id = $1 AND
+		publish_at::date <= CURRENT_DATE AND
+		cur_space = $2
+	GROUP BY %s
+	ORDER BY publish_at DESC, slug DESC
+	LIMIT $3 OFFSET $4`, SelectPost, SelectPost)
+	rs, err := me.Db.Queryx(
+		query,
 		userID,
 		space,
 		page.Num,
@@ -870,8 +594,9 @@ func (me *PsqlDB) FindPostsForUser(page *db.Pager, userID string, space string) 
 	if err != nil {
 		return nil, err
 	}
+	defer func() { _ = rs.Close() }()
 	for rs.Next() {
-		post, err := CreatePostWithTagsFromRow(rs)
+		post, err := CreatePostWithTagsByRow(rs)
 		if err != nil {
 			return nil, err
 		}
@@ -884,7 +609,7 @@ func (me *PsqlDB) FindPostsForUser(page *db.Pager, userID string, space string) 
 	}
 
 	var count int
-	err = me.Db.QueryRow(sqlSelectPostCount, space).Scan(&count)
+	err = me.Db.QueryRow(`SELECT count(id) FROM posts WHERE hidden = FALSE AND cur_space=$1`, space).Scan(&count)
 	if err != nil {
 		return nil, err
 	}
@@ -896,82 +621,49 @@ func (me *PsqlDB) FindPostsForUser(page *db.Pager, userID string, space string) 
 	return pager, nil
 }
 
-func (me *PsqlDB) FindAllPostsForUser(userID string, space string) ([]*db.Post, error) {
+func (me *PsqlDB) FindAllPostsByUser(userID string, space string) ([]*db.Post, error) {
 	var posts []*db.Post
-	rs, err := me.Db.Query(sqlSelectAllPostsForUser, userID, space)
+	query := fmt.Sprintf(`
+	SELECT %s
+	FROM posts
+	LEFT JOIN app_users ON app_users.id = posts.user_id
+	WHERE
+		user_id = $1 AND
+		cur_space = $2
+	ORDER BY publish_at DESC`, SelectPost)
+	err := me.Db.Select(&posts, query, userID, space)
 	if err != nil {
-		return posts, err
-	}
-	for rs.Next() {
-		post, err := CreatePostFromRow(rs)
-		if err != nil {
-			return nil, err
-		}
-
-		posts = append(posts, post)
-	}
-	if rs.Err() != nil {
-		return posts, rs.Err()
+		return nil, err
 	}
 	return posts, nil
 }
 
 func (me *PsqlDB) FindPosts() ([]*db.Post, error) {
 	var posts []*db.Post
-	rs, err := me.Db.Query(sqlSelectPosts)
+	query := fmt.Sprintf(`
+	SELECT %s
+	FROM posts
+	LEFT JOIN app_users ON app_users.id = posts.user_id`, SelectPost)
+	err := me.Db.Select(&posts, query)
 	if err != nil {
-		return posts, err
-	}
-	for rs.Next() {
-		post, err := CreatePostFromRow(rs)
-		if err != nil {
-			return nil, err
-		}
-
-		posts = append(posts, post)
-	}
-	if rs.Err() != nil {
-		return posts, rs.Err()
+		return nil, err
 	}
 	return posts, nil
 }
 
 func (me *PsqlDB) FindExpiredPosts(space string) ([]*db.Post, error) {
 	var posts []*db.Post
-	rs, err := me.Db.Query(sqlSelectExpiredPosts, space)
+	query := fmt.Sprintf(`
+		SELECT %s
+		FROM posts
+		LEFT JOIN app_users ON app_users.id = posts.user_id
+		WHERE
+			cur_space = $1 AND
+			expires_at <= now();
+	`, SelectPost)
+	err := me.Db.Select(&posts, query, space)
 	if err != nil {
-		return posts, err
-	}
-	for rs.Next() {
-		post, err := CreatePostFromRow(rs)
-		if err != nil {
-			return nil, err
-		}
-
-		posts = append(posts, post)
-	}
-	if rs.Err() != nil {
-		return posts, rs.Err()
-	}
-	return posts, nil
-}
-
-func (me *PsqlDB) FindUpdatedPostsForUser(userID string, space string) ([]*db.Post, error) {
-	var posts []*db.Post
-	rs, err := me.Db.Query(sqlSelectUpdatedPostsForUser, userID, space)
-	if err != nil {
-		return posts, err
-	}
-	for rs.Next() {
-		post, err := CreatePostFromRow(rs)
-		if err != nil {
-			return nil, err
-		}
-
-		posts = append(posts, post)
-	}
-	if rs.Err() != nil {
-		return posts, rs.Err()
+		return nil, err
 	}
 	return posts, nil
 }
@@ -1033,10 +725,11 @@ func (me *PsqlDB) visitUnique(opts *db.SummaryOpts) ([]*db.VisitInterval, error)
 	GROUP BY interval_start`, opts.Interval, where)
 
 	intervals := []*db.VisitInterval{}
-	rs, err := me.Db.Query(uniqueVisitors, opts.Origin, with, opts.UserID)
+	rs, err := me.Db.Queryx(uniqueVisitors, opts.Origin, with, opts.UserID)
 	if err != nil {
 		return nil, err
 	}
+	defer func() { _ = rs.Close() }()
 
 	for rs.Next() {
 		interval := &db.VisitInterval{}
@@ -1068,10 +761,11 @@ func (me *PsqlDB) visitReferer(opts *db.SummaryOpts) ([]*db.VisitUrl, error) {
 	LIMIT 10`, where)
 
 	intervals := []*db.VisitUrl{}
-	rs, err := me.Db.Query(topUrls, opts.Origin, with, opts.UserID)
+	rs, err := me.Db.Queryx(topUrls, opts.Origin, with, opts.UserID)
 	if err != nil {
 		return nil, err
 	}
+	defer func() { _ = rs.Close() }()
 
 	for rs.Next() {
 		interval := &db.VisitUrl{}
@@ -1103,10 +797,11 @@ func (me *PsqlDB) visitUrl(opts *db.SummaryOpts) ([]*db.VisitUrl, error) {
 	LIMIT 10`, where)
 
 	intervals := []*db.VisitUrl{}
-	rs, err := me.Db.Query(topUrls, opts.Origin, with, opts.UserID)
+	rs, err := me.Db.Queryx(topUrls, opts.Origin, with, opts.UserID)
 	if err != nil {
 		return nil, err
 	}
+	defer func() { _ = rs.Close() }()
 
 	for rs.Next() {
 		interval := &db.VisitUrl{}
@@ -1142,10 +837,11 @@ func (me *PsqlDB) VisitUrlNotFound(opts *db.SummaryOpts) ([]*db.VisitUrl, error)
 	LIMIT %d`, where, limit)
 
 	intervals := []*db.VisitUrl{}
-	rs, err := me.Db.Query(topUrls, opts.Origin, with, opts.UserID)
+	rs, err := me.Db.Queryx(topUrls, opts.Origin, with, opts.UserID)
 	if err != nil {
 		return nil, err
 	}
+	defer func() { _ = rs.Close() }()
 
 	for rs.Next() {
 		interval := &db.VisitUrl{}
@@ -1175,10 +871,11 @@ func (me *PsqlDB) visitHost(opts *db.SummaryOpts) ([]*db.VisitUrl, error) {
 	ORDER BY host_count DESC`
 
 	intervals := []*db.VisitUrl{}
-	rs, err := me.Db.Query(topUrls, opts.UserID)
+	rs, err := me.Db.Queryx(topUrls, opts.UserID)
 	if err != nil {
 		return nil, err
 	}
+	defer func() { _ = rs.Close() }()
 
 	for rs.Next() {
 		interval := &db.VisitUrl{}
@@ -1233,41 +930,23 @@ func (me *PsqlDB) FindVisitSiteList(opts *db.SummaryOpts) ([]*db.VisitUrl, error
 
 func (me *PsqlDB) FindUsers() ([]*db.User, error) {
 	var users []*db.User
-	rs, err := me.Db.Query(sqlSelectUsers)
+	err := me.Db.Select(&users, `SELECT id, COALESCE(name, '') as name, created_at FROM app_users ORDER BY name ASC`)
 	if err != nil {
-		return users, err
-	}
-	for rs.Next() {
-		var name sql.NullString
-		user := &db.User{}
-		err := rs.Scan(
-			&user.ID,
-			&name,
-			&user.CreatedAt,
-		)
-		if err != nil {
-			return users, err
-		}
-		user.Name = name.String
-
-		users = append(users, user)
-	}
-	if rs.Err() != nil {
-		return users, rs.Err()
+		return nil, err
 	}
 	return users, nil
 }
 
-func (me *PsqlDB) removeTagsForPost(tx *sql.Tx, postID string) error {
-	_, err := tx.Exec(sqlRemoveTagsByPost, postID)
+func (me *PsqlDB) removeTagsByPost(tx *sqlx.Tx, postID string) error {
+	_, err := tx.Exec(`DELETE FROM post_tags WHERE post_id = $1`, postID)
 	return err
 }
 
-func (me *PsqlDB) insertTagsForPost(tx *sql.Tx, tags []string, postID string) ([]string, error) {
+func (me *PsqlDB) insertTagsByPost(tx *sqlx.Tx, tags []string, postID string) ([]string, error) {
 	ids := make([]string, 0)
 	for _, tag := range tags {
 		id := ""
-		err := tx.QueryRow(sqlInsertTag, postID, tag).Scan(&id)
+		err := tx.QueryRow(`INSERT INTO post_tags (post_id, name) VALUES($1, $2) RETURNING id;`, postID, tag).Scan(&id)
 		if err != nil {
 			return nil, err
 		}
@@ -1277,22 +956,21 @@ func (me *PsqlDB) insertTagsForPost(tx *sql.Tx, tags []string, postID string) ([
 	return ids, nil
 }
 
-func (me *PsqlDB) ReplaceTagsForPost(tags []string, postID string) error {
-	ctx := context.Background()
-	tx, err := me.Db.BeginTx(ctx, nil)
+func (me *PsqlDB) ReplaceTagsByPost(tags []string, postID string) error {
+	tx, err := me.Db.Beginx()
 	if err != nil {
 		return err
 	}
 	defer func() {
-		err = tx.Rollback()
+		_ = tx.Rollback()
 	}()
 
-	err = me.removeTagsForPost(tx, postID)
+	err = me.removeTagsByPost(tx, postID)
 	if err != nil {
 		return err
 	}
 
-	_, err = me.insertTagsForPost(tx, tags, postID)
+	_, err = me.insertTagsByPost(tx, tags, postID)
 	if err != nil {
 		return err
 	}
@@ -1301,12 +979,12 @@ func (me *PsqlDB) ReplaceTagsForPost(tags []string, postID string) error {
 	return err
 }
 
-func (me *PsqlDB) removeAliasesForPost(tx *sql.Tx, postID string) error {
-	_, err := tx.Exec(sqlRemoveAliasesByPost, postID)
+func (me *PsqlDB) removeAliasesByPost(tx *sqlx.Tx, postID string) error {
+	_, err := tx.Exec(`DELETE FROM post_aliases WHERE post_id = $1`, postID)
 	return err
 }
 
-func (me *PsqlDB) insertAliasesForPost(tx *sql.Tx, aliases []string, postID string) ([]string, error) {
+func (me *PsqlDB) insertAliasesByPost(tx *sqlx.Tx, aliases []string, postID string) ([]string, error) {
 	// hardcoded
 	denyList := []string{
 		"rss",
@@ -1337,7 +1015,7 @@ func (me *PsqlDB) insertAliasesForPost(tx *sql.Tx, aliases []string, postID stri
 			continue
 		}
 		id := ""
-		err := tx.QueryRow(sqlInsertAliases, postID, alias).Scan(&id)
+		err := tx.QueryRow(`INSERT INTO post_aliases (post_id, slug) VALUES($1, $2) RETURNING id;`, postID, alias).Scan(&id)
 		if err != nil {
 			return nil, err
 		}
@@ -1347,22 +1025,21 @@ func (me *PsqlDB) insertAliasesForPost(tx *sql.Tx, aliases []string, postID stri
 	return ids, nil
 }
 
-func (me *PsqlDB) ReplaceAliasesForPost(aliases []string, postID string) error {
-	ctx := context.Background()
-	tx, err := me.Db.BeginTx(ctx, nil)
+func (me *PsqlDB) ReplaceAliasesByPost(aliases []string, postID string) error {
+	tx, err := me.Db.Beginx()
 	if err != nil {
 		return err
 	}
 	defer func() {
-		err = tx.Rollback()
+		_ = tx.Rollback()
 	}()
 
-	err = me.removeAliasesForPost(tx, postID)
+	err = me.removeAliasesByPost(tx, postID)
 	if err != nil {
 		return err
 	}
 
-	_, err = me.insertAliasesForPost(tx, aliases, postID)
+	_, err = me.insertAliasesByPost(tx, aliases, postID)
 	if err != nil {
 		return err
 	}
@@ -1373,8 +1050,22 @@ func (me *PsqlDB) ReplaceAliasesForPost(aliases []string, postID string) error {
 
 func (me *PsqlDB) FindUserPostsByTag(page *db.Pager, tag, userID, space string) (*db.Paginate[*db.Post], error) {
 	var posts []*db.Post
-	rs, err := me.Db.Query(
-		sqlSelectUserPostsByTag,
+	query := fmt.Sprintf(`
+	SELECT %s
+	FROM posts
+	LEFT JOIN app_users ON app_users.id = posts.user_id
+	LEFT JOIN post_tags ON post_tags.post_id = posts.id
+	WHERE
+		hidden = FALSE AND
+		user_id = $1 AND
+		(post_tags.name = $2 OR hidden = true) AND
+		publish_at::date <= CURRENT_DATE AND
+		cur_space = $3
+	ORDER BY publish_at DESC
+	LIMIT $4 OFFSET $5`, SelectPost)
+	err := me.Db.Select(
+		&posts,
+		query,
 		userID,
 		tag,
 		space,
@@ -1384,21 +1075,9 @@ func (me *PsqlDB) FindUserPostsByTag(page *db.Pager, tag, userID, space string) 
 	if err != nil {
 		return nil, err
 	}
-	for rs.Next() {
-		post, err := CreatePostFromRow(rs)
-		if err != nil {
-			return nil, err
-		}
-
-		posts = append(posts, post)
-	}
-
-	if rs.Err() != nil {
-		return nil, rs.Err()
-	}
 
 	var count int
-	err = me.Db.QueryRow(sqlSelectPostCount, space).Scan(&count)
+	err = me.Db.QueryRow(`SELECT count(id) FROM posts WHERE hidden = FALSE AND cur_space=$1`, space).Scan(&count)
 	if err != nil {
 		return nil, err
 	}
@@ -1411,8 +1090,30 @@ func (me *PsqlDB) FindUserPostsByTag(page *db.Pager, tag, userID, space string) 
 }
 
 func (me *PsqlDB) FindPostsByTag(pager *db.Pager, tag, space string) (*db.Paginate[*db.Post], error) {
-	rs, err := me.Db.Query(
-		sqlSelectPostsByTag,
+	query := `
+	SELECT
+		posts.id,
+		user_id,
+		filename,
+		slug,
+		title,
+		text,
+		description,
+		publish_at,
+		app_users.name as username,
+		posts.updated_at,
+		posts.mime_type
+	FROM posts
+	LEFT JOIN app_users ON app_users.id = posts.user_id
+	LEFT JOIN post_tags ON post_tags.post_id = posts.id
+	WHERE
+		post_tags.name = $3 AND
+		publish_at::date <= CURRENT_DATE AND
+		cur_space = $4
+	ORDER BY publish_at DESC
+	LIMIT $1 OFFSET $2`
+	rs, err := me.Db.Queryx(
+		query,
 		pager.Num,
 		pager.Num*pager.Page,
 		tag,
@@ -1421,16 +1122,26 @@ func (me *PsqlDB) FindPostsByTag(pager *db.Pager, tag, space string) (*db.Pagina
 	if err != nil {
 		return nil, err
 	}
+	defer func() { _ = rs.Close() }()
 
 	return me.postPager(rs, pager.Num, space, tag)
 }
 
 func (me *PsqlDB) FindPopularTags(space string) ([]string, error) {
 	tags := make([]string, 0)
-	rs, err := me.Db.Query(sqlSelectPopularTags, space)
+	query := `
+	SELECT name, count(post_id) as "tally"
+	FROM post_tags
+	LEFT JOIN posts ON posts.id = post_id
+	WHERE posts.cur_space = $1
+	GROUP BY name
+	ORDER BY tally DESC
+	LIMIT 5`
+	rs, err := me.Db.Queryx(query, space)
 	if err != nil {
 		return tags, err
 	}
+	defer func() { _ = rs.Close() }()
 	for rs.Next() {
 		name := ""
 		tally := 0
@@ -1447,112 +1158,30 @@ func (me *PsqlDB) FindPopularTags(space string) ([]string, error) {
 	return tags, nil
 }
 
-func (me *PsqlDB) FindTagsForUser(userID string, space string) ([]string, error) {
-	tags := []string{}
-	rs, err := me.Db.Query(sqlSelectTagsForUser, userID, space)
-	if err != nil {
-		return tags, err
-	}
-	for rs.Next() {
-		name := ""
-		err := rs.Scan(&name)
-		if err != nil {
-			return tags, err
-		}
-
-		tags = append(tags, name)
-	}
-	if rs.Err() != nil {
-		return tags, rs.Err()
-	}
-	return tags, nil
-}
-
-func (me *PsqlDB) FindTagsForPost(postID string) ([]string, error) {
-	tags := make([]string, 0)
-	rs, err := me.Db.Query(sqlSelectTagsForPost, postID)
-	if err != nil {
-		return tags, err
-	}
-
-	for rs.Next() {
-		name := ""
-		err := rs.Scan(&name)
-		if err != nil {
-			return tags, err
-		}
-
-		tags = append(tags, name)
-	}
-
-	if rs.Err() != nil {
-		return tags, rs.Err()
-	}
-
-	return tags, nil
-}
-
 func (me *PsqlDB) FindFeature(userID string, feature string) (*db.FeatureFlag, error) {
 	ff := &db.FeatureFlag{}
-	// payment history is allowed to be null
-	// https://devtidbits.com/2020/08/03/go-sql-error-converting-null-to-string-is-unsupported/
-	var paymentHistoryID sql.NullString
-	err := me.Db.QueryRow(sqlSelectFeatureForUser, userID, feature).Scan(
-		&ff.ID,
-		&ff.UserID,
-		&paymentHistoryID,
-		&ff.Name,
-		&ff.Data,
-		&ff.CreatedAt,
-		&ff.ExpiresAt,
-	)
+	err := me.Db.Get(ff, `SELECT * FROM feature_flags WHERE user_id = $1 AND name = $2 ORDER BY expires_at DESC LIMIT 1`, userID, feature)
 	if err != nil {
 		return nil, err
 	}
-
-	ff.PaymentHistoryID = paymentHistoryID
-
 	return ff, nil
 }
 
-func (me *PsqlDB) FindFeaturesForUser(userID string) ([]*db.FeatureFlag, error) {
+func (me *PsqlDB) FindFeaturesByUser(userID string) ([]*db.FeatureFlag, error) {
 	var features []*db.FeatureFlag
 	// https://stackoverflow.com/a/16920077
-	query := `SELECT DISTINCT ON (name)
-			id, user_id, payment_history_id, name, data, created_at, expires_at
+	query := `SELECT DISTINCT ON (name) *
 		FROM feature_flags
 		WHERE user_id=$1
 		ORDER BY name, expires_at DESC;`
-	rs, err := me.Db.Query(query, userID)
+	err := me.Db.Select(&features, query, userID)
 	if err != nil {
-		return features, err
-	}
-	for rs.Next() {
-		var paymentHistoryID sql.NullString
-		ff := &db.FeatureFlag{}
-		err := rs.Scan(
-			&ff.ID,
-			&ff.UserID,
-			&paymentHistoryID,
-			&ff.Name,
-			&ff.Data,
-			&ff.CreatedAt,
-			&ff.ExpiresAt,
-		)
-		if err != nil {
-			return features, err
-		}
-		ff.PaymentHistoryID = paymentHistoryID
-
-		features = append(features, ff)
-	}
-	if rs.Err() != nil {
-		return features, rs.Err()
+		return nil, err
 	}
 	return features, nil
 }
 
-func (me *PsqlDB) HasFeatureForUser(userID string, feature string) bool {
+func (me *PsqlDB) HasFeatureByUser(userID string, feature string) bool {
 	ff, err := me.FindFeature(userID, feature)
 	if err != nil {
 		return false
@@ -1560,28 +1189,18 @@ func (me *PsqlDB) HasFeatureForUser(userID string, feature string) bool {
 	return ff.IsValid()
 }
 
-func (me *PsqlDB) FindTotalSizeForUser(userID string) (int, error) {
-	var fileSize int
-	err := me.Db.QueryRow(sqlSelectSizeForUser, userID).Scan(&fileSize)
-	if err != nil {
-		return 0, err
-	}
-	return fileSize, nil
-}
-
 func (me *PsqlDB) InsertFeedItems(postID string, items []*db.FeedItem) error {
-	ctx := context.Background()
-	tx, err := me.Db.BeginTx(ctx, nil)
+	tx, err := me.Db.Beginx()
 	if err != nil {
 		return err
 	}
 	defer func() {
-		err = tx.Rollback()
+		_ = tx.Rollback()
 	}()
 
 	for _, item := range items {
 		_, err := tx.Exec(
-			sqlInsertFeedItems,
+			`INSERT INTO feed_items (post_id, guid, data) VALUES ($1, $2, $3) RETURNING id;`,
 			item.PostID,
 			item.GUID,
 			item.Data,
@@ -1599,33 +1218,11 @@ func (me *PsqlDB) InsertFeedItems(postID string, items []*db.FeedItem) error {
 }
 
 func (me *PsqlDB) FindFeedItemsByPostID(postID string) ([]*db.FeedItem, error) {
-	// sqlSelectFeedItemsByPost
-	items := make([]*db.FeedItem, 0)
-	rs, err := me.Db.Query(sqlSelectFeedItemsByPost, postID)
+	var items []*db.FeedItem
+	err := me.Db.Select(&items, `SELECT * FROM feed_items WHERE post_id=$1`, postID)
 	if err != nil {
-		return items, err
+		return nil, err
 	}
-
-	for rs.Next() {
-		item := &db.FeedItem{}
-		err := rs.Scan(
-			&item.ID,
-			&item.PostID,
-			&item.GUID,
-			&item.Data,
-			&item.CreatedAt,
-		)
-		if err != nil {
-			return items, err
-		}
-
-		items = append(items, item)
-	}
-
-	if rs.Err() != nil {
-		return items, rs.Err()
-	}
-
 	return items, nil
 }
 
@@ -1635,7 +1232,7 @@ func (me *PsqlDB) InsertProject(userID, name, projectDir string) (string, error)
 	}
 
 	var id string
-	err := me.Db.QueryRow(sqlInsertProject, userID, name, projectDir).Scan(&id)
+	err := me.Db.QueryRow(`INSERT INTO projects (user_id, name, project_dir) VALUES ($1, $2, $3) RETURNING id;`, userID, name, projectDir).Scan(&id)
 	if err != nil {
 		return "", err
 	}
@@ -1643,33 +1240,22 @@ func (me *PsqlDB) InsertProject(userID, name, projectDir string) (string, error)
 }
 
 func (me *PsqlDB) UpdateProject(userID, name string) error {
-	_, err := me.Db.Exec(sqlUpdateProject, userID, name, time.Now())
+	_, err := me.Db.Exec(`UPDATE projects SET updated_at = $3 WHERE user_id = $1 AND name = $2;`, userID, name, time.Now())
 	return err
 }
 
 func (me *PsqlDB) FindProjectByName(userID, name string) (*db.Project, error) {
 	project := &db.Project{}
-	r := me.Db.QueryRow(sqlFindProjectByName, userID, name)
-	err := r.Scan(
-		&project.ID,
-		&project.UserID,
-		&project.Name,
-		&project.ProjectDir,
-		&project.Acl,
-		&project.Blocked,
-		&project.CreatedAt,
-		&project.UpdatedAt,
-	)
+	err := me.Db.Get(project, `SELECT * FROM projects WHERE user_id = $1 AND name = $2;`, userID, name)
 	if err != nil {
 		return nil, err
 	}
-
 	return project, nil
 }
 
 func (me *PsqlDB) InsertToken(userID, name string) (string, error) {
 	var token string
-	err := me.Db.QueryRow(sqlInsertToken, userID, name).Scan(&token)
+	err := me.Db.QueryRow(`INSERT INTO tokens (user_id, name) VALUES($1, $2) RETURNING token;`, userID, name).Scan(&token)
 	if err != nil {
 		return "", err
 	}
@@ -1677,7 +1263,7 @@ func (me *PsqlDB) InsertToken(userID, name string) (string, error) {
 }
 
 func (me *PsqlDB) UpsertToken(userID, name string) (string, error) {
-	token, _ := me.FindTokenByName(userID, name)
+	token, _ := me.findTokenByName(userID, name)
 	if token != "" {
 		return token, nil
 	}
@@ -1686,9 +1272,9 @@ func (me *PsqlDB) UpsertToken(userID, name string) (string, error) {
 	return token, err
 }
 
-func (me *PsqlDB) FindTokenByName(userID, name string) (string, error) {
+func (me *PsqlDB) findTokenByName(userID, name string) (string, error) {
 	var token string
-	err := me.Db.QueryRow(sqlSelectTokenByNameForUser, userID, name).Scan(&token)
+	err := me.Db.QueryRow(`SELECT token FROM tokens WHERE user_id = $1 AND name = $2`, userID, name).Scan(&token)
 	if err != nil {
 		return "", err
 	}
@@ -1696,29 +1282,17 @@ func (me *PsqlDB) FindTokenByName(userID, name string) (string, error) {
 }
 
 func (me *PsqlDB) RemoveToken(tokenID string) error {
-	_, err := me.Db.Exec(sqlRemoveToken, tokenID)
+	_, err := me.Db.Exec(`DELETE FROM tokens WHERE id = $1`, tokenID)
 	return err
 }
 
-func (me *PsqlDB) FindTokensForUser(userID string) ([]*db.Token, error) {
-	var keys []*db.Token
-	rs, err := me.Db.Query(sqlSelectTokensForUser, userID)
+func (me *PsqlDB) FindTokensByUser(userID string) ([]*db.Token, error) {
+	var tokens []*db.Token
+	err := me.Db.Select(&tokens, `SELECT * FROM tokens WHERE user_id = $1`, userID)
 	if err != nil {
-		return keys, err
+		return nil, err
 	}
-	for rs.Next() {
-		pk := &db.Token{}
-		err := rs.Scan(&pk.ID, &pk.UserID, &pk.Name, &pk.CreatedAt, &pk.ExpiresAt)
-		if err != nil {
-			return keys, err
-		}
-
-		keys = append(keys, pk)
-	}
-	if rs.Err() != nil {
-		return keys, rs.Err()
-	}
-	return keys, nil
+	return tokens, nil
 }
 
 func (me *PsqlDB) InsertFeature(userID, name string, expiresAt time.Time) (*db.FeatureFlag, error) {
@@ -1763,13 +1337,12 @@ func (me *PsqlDB) AddPicoPlusUser(username, email, paymentType, txId string) err
 		return err
 	}
 
-	ctx := context.Background()
-	tx, err := me.Db.BeginTx(ctx, nil)
+	tx, err := me.Db.Beginx()
 	if err != nil {
 		return err
 	}
 	defer func() {
-		err = tx.Rollback()
+		_ = tx.Rollback()
 	}()
 
 	var paymentHistoryId sql.NullString
@@ -1849,69 +1422,32 @@ func (me *PsqlDB) InsertTunsEventLog(log *db.TunsEventLog) error {
 }
 
 func (me *PsqlDB) FindTunsEventLogsByAddr(userID, addr string) ([]*db.TunsEventLog, error) {
-	logs := []*db.TunsEventLog{}
-	rs, err := me.Db.Query(
-		`SELECT id, user_id, server_id, remote_addr, event_type, tunnel_type, connection_type, tunnel_id, created_at
-		FROM tuns_event_logs WHERE user_id=$1 AND tunnel_id=$2 ORDER BY created_at DESC`, userID, addr)
+	var logs []*db.TunsEventLog
+	err := me.Db.Select(&logs,
+		`SELECT * FROM tuns_event_logs WHERE user_id=$1 AND tunnel_id=$2 ORDER BY created_at DESC`, userID, addr)
 	if err != nil {
 		return nil, err
 	}
-
-	for rs.Next() {
-		log := db.TunsEventLog{}
-		err := rs.Scan(
-			&log.ID, &log.UserId, &log.ServerID, &log.RemoteAddr,
-			&log.EventType, &log.TunnelType, &log.ConnectionType,
-			&log.TunnelID, &log.CreatedAt,
-		)
-		if err != nil {
-			return nil, err
-		}
-		logs = append(logs, &log)
-	}
-
-	if rs.Err() != nil {
-		return nil, rs.Err()
-	}
-
 	return logs, nil
 }
 
 func (me *PsqlDB) FindTunsEventLogs(userID string) ([]*db.TunsEventLog, error) {
-	logs := []*db.TunsEventLog{}
-	rs, err := me.Db.Query(
-		`SELECT id, user_id, server_id, remote_addr, event_type, tunnel_type, connection_type, tunnel_id, created_at
-		FROM tuns_event_logs WHERE user_id=$1 ORDER BY created_at DESC`, userID)
+	var logs []*db.TunsEventLog
+	err := me.Db.Select(&logs,
+		`SELECT * FROM tuns_event_logs WHERE user_id=$1 ORDER BY created_at DESC`, userID)
 	if err != nil {
 		return nil, err
 	}
-
-	for rs.Next() {
-		log := db.TunsEventLog{}
-		err := rs.Scan(
-			&log.ID, &log.UserId, &log.ServerID, &log.RemoteAddr,
-			&log.EventType, &log.TunnelType, &log.ConnectionType,
-			&log.TunnelID, &log.CreatedAt,
-		)
-		if err != nil {
-			return nil, err
-		}
-		logs = append(logs, &log)
-	}
-
-	if rs.Err() != nil {
-		return nil, rs.Err()
-	}
-
 	return logs, nil
 }
 
 func (me *PsqlDB) FindUserStats(userID string) (*db.UserStats, error) {
 	stats := db.UserStats{}
-	rs, err := me.Db.Query(`SELECT cur_space, count(id), min(created_at), max(created_at), max(updated_at) FROM posts WHERE user_id=$1 GROUP BY cur_space`, userID)
+	rs, err := me.Db.Queryx(`SELECT cur_space, count(id), min(created_at), max(created_at), max(updated_at) FROM posts WHERE user_id=$1 GROUP BY cur_space`, userID)
 	if err != nil {
 		return nil, err
 	}
+	defer func() { _ = rs.Close() }()
 
 	for rs.Next() {
 		stat := db.UserServiceStats{}
@@ -1942,79 +1478,29 @@ func (me *PsqlDB) FindUserStats(userID string) (*db.UserStats, error) {
 }
 
 func (me *PsqlDB) FindAccessLogs(userID string, fromDate *time.Time) ([]*db.AccessLog, error) {
-	logs := []*db.AccessLog{}
-	rs, err := me.Db.Query(
-		`SELECT id, user_id, service, pubkey, identity, created_at FROM access_logs WHERE user_id=$1 AND created_at >= $2 ORDER BY created_at DESC`, userID, fromDate)
+	var logs []*db.AccessLog
+	err := me.Db.Select(&logs, `SELECT * FROM access_logs WHERE user_id=$1 AND created_at >= $2 ORDER BY created_at DESC`, userID, fromDate)
 	if err != nil {
 		return nil, err
 	}
-
-	for rs.Next() {
-		log := db.AccessLog{}
-		err := rs.Scan(
-			&log.ID, &log.UserID, &log.Service, &log.Pubkey, &log.Identity, &log.CreatedAt,
-		)
-		if err != nil {
-			return nil, err
-		}
-		logs = append(logs, &log)
-	}
-
-	if rs.Err() != nil {
-		return nil, rs.Err()
-	}
-
 	return logs, nil
 }
 
 func (me *PsqlDB) FindAccessLogsByPubkey(pubkey string, fromDate *time.Time) ([]*db.AccessLog, error) {
-	logs := []*db.AccessLog{}
-	rs, err := me.Db.Query(
-		`SELECT id, user_id, service, pubkey, identity, created_at FROM access_logs WHERE pubkey=$1 AND created_at >= $2 ORDER BY created_at DESC`, pubkey, fromDate)
+	var logs []*db.AccessLog
+	err := me.Db.Select(&logs, `SELECT * FROM access_logs WHERE pubkey=$1 AND created_at >= $2 ORDER BY created_at DESC`, pubkey, fromDate)
 	if err != nil {
 		return nil, err
 	}
-
-	for rs.Next() {
-		log := db.AccessLog{}
-		err := rs.Scan(
-			&log.ID, &log.UserID, &log.Service, &log.Pubkey, &log.Identity, &log.CreatedAt,
-		)
-		if err != nil {
-			return nil, err
-		}
-		logs = append(logs, &log)
-	}
-
-	if rs.Err() != nil {
-		return nil, rs.Err()
-	}
-
 	return logs, nil
 }
 
 func (me *PsqlDB) FindPubkeysInAccessLogs(userID string) ([]string, error) {
-	pubkeys := []string{}
-	rs, err := me.Db.Query(
-		`SELECT DISTINCT(pubkey) FROM access_logs WHERE user_id=$1`, userID,
-	)
+	var pubkeys []string
+	err := me.Db.Select(&pubkeys, `SELECT DISTINCT(pubkey) FROM access_logs WHERE user_id=$1`, userID)
 	if err != nil {
 		return nil, err
 	}
-
-	for rs.Next() {
-		pubkey := ""
-		err := rs.Scan(&pubkey)
-		if err != nil {
-			return nil, err
-		}
-		pubkeys = append(pubkeys, pubkey)
-	}
-
-	if rs.Err() != nil {
-		return nil, rs.Err()
-	}
-
 	return pubkeys, nil
 }
 

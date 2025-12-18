@@ -41,7 +41,7 @@ func (m *TokensPage) Footer() []Shortcut {
 }
 
 func (m *TokensPage) fetchTokens() error {
-	tokens, err := m.shared.Dbpool.FindTokensForUser(m.shared.User.ID)
+	tokens, err := m.shared.Dbpool.FindTokensByUser(m.shared.User.ID)
 	if err != nil {
 		return err
 

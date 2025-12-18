@@ -151,7 +151,7 @@ func BaseList(s *pssh.SSHServerConnSession, fpath string, isDir bool, recursive 
 		})
 
 		for _, space := range spaces {
-			curPosts, e := dbpool.FindAllPostsForUser(user.ID, space)
+			curPosts, e := dbpool.FindAllPostsByUser(user.ID, space)
 			if e != nil {
 				err = e
 				break

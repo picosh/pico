@@ -127,29 +127,29 @@ func (p *FeedItemData) Scan(value any) error {
 }
 
 type Post struct {
-	ID          string     `json:"id"`
-	UserID      string     `json:"user_id"`
-	Filename    string     `json:"filename"`
-	Slug        string     `json:"slug"`
-	Title       string     `json:"title"`
-	Text        string     `json:"text"`
-	Description string     `json:"description"`
-	CreatedAt   *time.Time `json:"created_at"`
-	PublishAt   *time.Time `json:"publish_at"`
-	Username    string     `json:"username"`
-	UpdatedAt   *time.Time `json:"updated_at"`
-	ExpiresAt   *time.Time `json:"expires_at"`
-	Hidden      bool       `json:"hidden"`
-	Views       int        `json:"views"`
-	Space       string     `json:"space"`
-	Shasum      string     `json:"shasum"`
-	FileSize    int        `json:"file_size"`
-	MimeType    string     `json:"mime_type"`
-	Data        PostData   `json:"data"`
-	Tags        []string   `json:"tags"`
+	ID          string     `json:"id" db:"id"`
+	UserID      string     `json:"user_id" db:"user_id"`
+	Filename    string     `json:"filename" db:"filename"`
+	Slug        string     `json:"slug" db:"slug"`
+	Title       string     `json:"title" db:"title"`
+	Text        string     `json:"text" db:"text"`
+	Description string     `json:"description" db:"description"`
+	CreatedAt   *time.Time `json:"created_at" db:"created_at"`
+	PublishAt   *time.Time `json:"publish_at" db:"publish_at"`
+	Username    string     `json:"username" db:"name"`
+	UpdatedAt   *time.Time `json:"updated_at" db:"updated_at"`
+	ExpiresAt   *time.Time `json:"expires_at" db:"expires_at"`
+	Hidden      bool       `json:"hidden" db:"hidden"`
+	Views       int        `json:"views" db:"views"`
+	Space       string     `json:"space" db:"cur_space"`
+	Shasum      string     `json:"shasum" db:"shasum"`
+	FileSize    int        `json:"file_size" db:"file_size"`
+	MimeType    string     `json:"mime_type" db:"mime_type"`
+	Data        PostData   `json:"data" db:"data"`
+	Tags        []string   `json:"tags" db:"-"`
 
 	// computed
-	IsVirtual bool
+	IsVirtual bool `db:"-"`
 }
 
 type Paginate[T any] struct {
@@ -158,13 +158,13 @@ type Paginate[T any] struct {
 }
 
 type VisitInterval struct {
-	Interval *time.Time `json:"interval"`
-	Visitors int        `json:"visitors"`
+	Interval *time.Time `json:"interval" db:"interval"`
+	Visitors int        `json:"visitors" db:"visitors"`
 }
 
 type VisitUrl struct {
-	Url   string `json:"url"`
-	Count int    `json:"count"`
+	Url   string `json:"url" db:"url"`
+	Count int    `json:"count" db:"count"`
 }
 
 type SummaryOpts struct {
@@ -184,34 +184,46 @@ type SummaryVisits struct {
 }
 
 type PostAnalytics struct {
-	ID       string
-	PostID   string
-	Views    int
-	UpdateAt *time.Time
+	ID       string     `json:"id" db:"id"`
+	PostID   string     `json:"post_id" db:"post_id"`
+	Views    int        `json:"views" db:"views"`
+	UpdateAt *time.Time `json:"updated_at" db:"updated_at"`
 }
 
 type AnalyticsVisits struct {
-	ID          string `json:"id"`
-	UserID      string `json:"user_id"`
-	ProjectID   string `json:"project_id"`
-	PostID      string `json:"post_id"`
-	Namespace   string `json:"namespace"`
-	Host        string `json:"host"`
-	Path        string `json:"path"`
-	IpAddress   string `json:"ip_address"`
-	UserAgent   string `json:"user_agent"`
-	Referer     string `json:"referer"`
-	Status      int    `json:"status"`
-	ContentType string `json:"content_type"`
+	ID          string `json:"id" db:"id"`
+	UserID      string `json:"user_id" db:"user_id"`
+	ProjectID   string `json:"project_id" db:"project_id"`
+	PostID      string `json:"post_id" db:"post_id"`
+	Namespace   string `json:"namespace" db:"namespace"`
+	Host        string `json:"host" db:"host"`
+	Path        string `json:"path" db:"path"`
+	IpAddress   string `json:"ip_address" db:"ip_address"`
+	UserAgent   string `json:"user_agent" db:"user_agent"`
+	Referer     string `json:"referer" db:"referer"`
+	Status      int    `json:"status" db:"status"`
+	ContentType string `json:"content_type" db:"content_type"`
+}
+
+type AccessLogData struct{}
+
+func (p *AccessLogData) Scan(value any) error {
+	b, err := tcast(value)
+	if err != nil {
+		return err
+	}
+
+	return json.Unmarshal(b, &p)
 }
 
 type AccessLog struct {
-	ID        string     `json:"id"`
-	UserID    string     `json:"user_id"`
-	Service   string     `json:"service"`
-	Pubkey    string     `json:"pubkey"`
-	Identity  string     `json:"identity"`
-	CreatedAt *time.Time `json:"created_at"`
+	ID        string        `json:"id" db:"id"`
+	UserID    string        `json:"user_id" db:"user_id"`
+	Service   string        `json:"service" db:"service"`
+	Pubkey    string        `json:"pubkey" db:"pubkey"`
+	Identity  string        `json:"identity" db:"identity"`
+	Data      AccessLogData `json:"data" db:"data"`
+	CreatedAt *time.Time    `json:"created_at" db:"created_at"`
 }
 
 type Pager struct {
@@ -220,19 +232,20 @@ type Pager struct {
 }
 
 type FeedItem struct {
-	ID        string
-	PostID    string
-	GUID      string
-	Data      FeedItemData
-	CreatedAt *time.Time
+	ID        string       `json:"id" db:"id"`
+	PostID    string       `json:"post_id" db:"post_id"`
+	GUID      string       `json:"guid" db:"guid"`
+	Data      FeedItemData `json:"data" db:"data"`
+	CreatedAt *time.Time   `json:"created_at" db:"created_at"`
 }
 
 type Token struct {
-	ID        string     `json:"id"`
-	UserID    string     `json:"user_id"`
-	Name      string     `json:"name"`
-	CreatedAt *time.Time `json:"created_at"`
-	ExpiresAt *time.Time `json:"expires_at"`
+	ID        string     `json:"id" db:"id"`
+	UserID    string     `json:"user_id" db:"user_id"`
+	Name      string     `json:"name" db:"name"`
+	Token     string     `json:"token" db:"token"`
+	CreatedAt *time.Time `json:"created_at" db:"created_at"`
+	ExpiresAt *time.Time `json:"expires_at" db:"expires_at"`
 }
 
 type FeatureFlag struct {
@@ -352,17 +365,17 @@ type UserServiceStats struct {
 }
 
 type TunsEventLog struct {
-	ID             string     `json:"id"`
-	ServerID       string     `json:"server_id"`
-	Time           *time.Time `json:"time"`
-	User           string     `json:"user"`
-	UserId         string     `json:"user_id"`
-	RemoteAddr     string     `json:"remote_addr"`
-	EventType      string     `json:"event_type"`
-	TunnelID       string     `json:"tunnel_id"`
-	TunnelType     string     `json:"tunnel_type"`
-	ConnectionType string     `json:"connection_type"`
-	CreatedAt      *time.Time `json:"created_at"`
+	ID             string     `json:"id" db:"id"`
+	ServerID       string     `json:"server_id" db:"server_id"`
+	Time           *time.Time `json:"time" db:"time"`
+	User           string     `json:"user" db:"user"`
+	UserId         string     `json:"user_id" db:"user_id"`
+	RemoteAddr     string     `json:"remote_addr" db:"remote_addr"`
+	EventType      string     `json:"event_type" db:"event_type"`
+	TunnelID       string     `json:"tunnel_id" db:"tunnel_id"`
+	TunnelType     string     `json:"tunnel_type" db:"tunnel_type"`
+	ConnectionType string     `json:"connection_type" db:"connection_type"`
+	CreatedAt      *time.Time `json:"created_at" db:"created_at"`
 }
 
 var NameValidator = regexp.MustCompile("^[a-zA-Z0-9]{1,50}$")
@@ -389,54 +402,41 @@ var DenyList = []string{
 
 type DB interface {
 	RegisterUser(name, pubkey, comment string) (*User, error)
-	RemoveUsers(userIDs []string) error
 	UpdatePublicKey(pubkeyID, name string) (*PublicKey, error)
-	InsertPublicKey(userID, pubkey, name string, tx *sql.Tx) error
-	FindPublicKeyForKey(pubkey string) (*PublicKey, error)
-	FindPublicKey(pubkeyID string) (*PublicKey, error)
-	FindKeysForUser(user *User) ([]*PublicKey, error)
+	InsertPublicKey(userID, pubkey, name string) error
+	FindKeysByUser(user *User) ([]*PublicKey, error)
 	RemoveKeys(pubkeyIDs []string) error
 
 	FindUsers() ([]*User, error)
 	FindUserByName(name string) (*User, error)
-	FindUserForNameAndKey(name string, pubkey string) (*User, error)
-	FindUserForKey(name string, pubkey string) (*User, error)
+	FindUserByKey(name string, pubkey string) (*User, error)
 	FindUserByPubkey(pubkey string) (*User, error)
 	FindUser(userID string) (*User, error)
-	ValidateName(name string) (bool, error)
-	SetUserName(userID string, name string) error
 
-	FindUserForToken(token string) (*User, error)
-	FindTokensForUser(userID string) ([]*Token, error)
+	FindUserByToken(token string) (*User, error)
+	FindTokensByUser(userID string) ([]*Token, error)
 	InsertToken(userID, name string) (string, error)
 	UpsertToken(userID, name string) (string, error)
-	FindTokenByName(userID, name string) (string, error)
 	RemoveToken(tokenID string) error
 
 	FindPosts() ([]*Post, error)
 	FindPost(postID string) (*Post, error)
-	FindPostsForUser(pager *Pager, userID string, space string) (*Paginate[*Post], error)
-	FindAllPostsForUser(userID string, space string) ([]*Post, error)
+	FindPostsByUser(pager *Pager, userID string, space string) (*Paginate[*Post], error)
+	FindAllPostsByUser(userID string, space string) ([]*Post, error)
 	FindUsersWithPost(space string) ([]*User, error)
-	FindPostsBeforeDate(date *time.Time, space string) ([]*Post, error)
 	FindExpiredPosts(space string) ([]*Post, error)
-	FindUpdatedPostsForUser(userID string, space string) ([]*Post, error)
 	FindPostWithFilename(filename string, userID string, space string) (*Post, error)
 	FindPostWithSlug(slug string, userID string, space string) (*Post, error)
-	FindPostsForFeed(pager *Pager, space string) (*Paginate[*Post], error)
-	FindAllUpdatedPosts(pager *Pager, space string) (*Paginate[*Post], error)
+	FindPostsByFeed(pager *Pager, space string) (*Paginate[*Post], error)
 	InsertPost(post *Post) (*Post, error)
 	UpdatePost(post *Post) (*Post, error)
 	RemovePosts(postIDs []string) error
 
-	ReplaceTagsForPost(tags []string, postID string) error
+	ReplaceTagsByPost(tags []string, postID string) error
 	FindUserPostsByTag(pager *Pager, tag, userID, space string) (*Paginate[*Post], error)
 	FindPostsByTag(pager *Pager, tag, space string) (*Paginate[*Post], error)
 	FindPopularTags(space string) ([]string, error)
-	FindTagsForPost(postID string) ([]string, error)
-	FindTagsForUser(userID string, space string) ([]string, error)
-
-	ReplaceAliasesForPost(aliases []string, postID string) error
+	ReplaceAliasesByPost(aliases []string, postID string) error
 
 	InsertVisit(view *AnalyticsVisits) error
 	VisitSummary(opts *SummaryOpts) (*SummaryVisits, error)
@@ -445,9 +445,9 @@ type DB interface {
 
 	AddPicoPlusUser(username, email, paymentType, txId string) error
 	FindFeature(userID string, feature string) (*FeatureFlag, error)
-	FindFeaturesForUser(userID string) ([]*FeatureFlag, error)
-	HasFeatureForUser(userID string, feature string) bool
-	FindTotalSizeForUser(userID string) (int, error)
+	FindFeaturesByUser(userID string) ([]*FeatureFlag, error)
+	HasFeatureByUser(userID string, feature string) bool
+
 	InsertFeature(userID, name string, expiresAt time.Time) (*FeatureFlag, error)
 	RemoveFeature(userID, names string) error
 

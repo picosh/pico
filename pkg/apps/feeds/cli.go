@@ -64,7 +64,7 @@ func Middleware(dbpool db.DB, cfg *shared.ConfigSite) pssh.SSHServerMiddleware {
 				)
 				return writer.Flush()
 			case "ls":
-				posts, err := dbpool.FindPostsForUser(&db.Pager{Page: 0, Num: 1000}, user.ID, "feeds")
+				posts, err := dbpool.FindPostsByUser(&db.Pager{Page: 0, Num: 1000}, user.ID, "feeds")
 				if err != nil {
 					_, _ = fmt.Fprintln(sesh.Stderr(), err)
 					return err

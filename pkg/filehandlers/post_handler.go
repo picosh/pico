@@ -197,7 +197,7 @@ func (h *ScpUploadHandler) Write(s *pssh.SSHServerConnSession, entry *sendutils.
 				"aliases",
 				strings.Join(metadata.Aliases, ","),
 			)
-			err = h.DBPool.ReplaceAliasesForPost(metadata.Aliases, post.ID)
+			err = h.DBPool.ReplaceAliasesByPost(metadata.Aliases, post.ID)
 			if err != nil {
 				logger.Error("post could not replace aliases", "err", err.Error())
 				return "", fmt.Errorf("error for %s: %v", filename, err)
@@ -209,7 +209,7 @@ func (h *ScpUploadHandler) Write(s *pssh.SSHServerConnSession, entry *sendutils.
 				"found post tags, replacing with old tags",
 				"tags", strings.Join(metadata.Tags, ","),
 			)
-			err = h.DBPool.ReplaceTagsForPost(metadata.Tags, post.ID)
+			err = h.DBPool.ReplaceTagsByPost(metadata.Tags, post.ID)
 			if err != nil {
 				logger.Error("post could not replace tags", "err", err.Error())
 				return "", fmt.Errorf("error for %s: %v", filename, err)
@@ -249,7 +249,7 @@ func (h *ScpUploadHandler) Write(s *pssh.SSHServerConnSession, entry *sendutils.
 			"found post tags, replacing with old tags",
 			"tags", strings.Join(metadata.Tags, ","),
 		)
-		err = h.DBPool.ReplaceTagsForPost(metadata.Tags, post.ID)
+		err = h.DBPool.ReplaceTagsByPost(metadata.Tags, post.ID)
 		if err != nil {
 			logger.Error("post could not replace tags", "err", err.Error())
 			return "", fmt.Errorf("error for %s: %v", filename, err)
@@ -259,7 +259,7 @@ func (h *ScpUploadHandler) Write(s *pssh.SSHServerConnSession, entry *sendutils.
 			"found post aliases, replacing with old aliases",
 			"aliases", strings.Join(metadata.Aliases, ","),
 		)
-		err = h.DBPool.ReplaceAliasesForPost(metadata.Aliases, post.ID)
+		err = h.DBPool.ReplaceAliasesByPost(metadata.Aliases, post.ID)
 		if err != nil {
 			logger.Error("post could not replace aliases", "err", err.Error())
 			return "", fmt.Errorf("error for %s: %v", filename, err)

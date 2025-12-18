@@ -87,7 +87,7 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	logger = shared.LoggerWithUser(blogger, user)
 
-	pager, err := dbpool.FindPostsForUser(&db.Pager{Num: 1000, Page: 0}, user.ID, cfg.Space)
+	pager, err := dbpool.FindPostsByUser(&db.Pager{Num: 1000, Page: 0}, user.ID, cfg.Space)
 	if err != nil {
 		logger.Error("could not find posts for user", "err", err.Error())
 		http.Error(w, "could not fetch posts for blog", http.StatusInternalServerError)

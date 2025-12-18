@@ -1,16 +1,16 @@
 package main
 
 import (
-	"database/sql"
 	"log/slog"
 	"os"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/db/postgres"
 	"github.com/picosh/pico/pkg/shared"
 )
 
-func findPosts(dbpool *sql.DB) ([]*db.Post, error) {
+func findPosts(dbpool *sqlx.DB) ([]*db.Post, error) {
 	var posts []*db.Post
 	rs, err := dbpool.Query(`SELECT
 		posts.id, user_id, filename, title, text, description,
@@ -69,7 +69,7 @@ func main() {
 			continue
 		}
 		if len(parsed.Tags) > 0 {
-			err := picoDb.ReplaceTagsForPost(parsed.Tags, post.ID)
+			err := picoDb.ReplaceTagsByPost(parsed.Tags, post.ID)
 			panic(err)
 		}
 	}

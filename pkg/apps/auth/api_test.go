@@ -53,7 +53,7 @@ func TestPaymentWebhook(t *testing.T) {
 
 	testResponse(t, responseRecorder, 200, "text/plain")
 
-	posts, err := apiConfig.Dbpool.FindPostsForUser(&db.Pager{Num: 1000, Page: 0}, testUserID, "feeds")
+	posts, err := apiConfig.Dbpool.FindPostsByUser(&db.Pager{Num: 1000, Page: 0}, testUserID, "feeds")
 	if err != nil {
 		t.Error("could not find posts for user")
 	}
@@ -224,22 +224,22 @@ func (a *AuthDb) FindUserByName(username string) (*db.User, error) {
 	return &db.User{ID: testUserID, Name: username}, nil
 }
 
-func (a *AuthDb) FindUserForKey(username string, pubkey string) (*db.User, error) {
+func (a *AuthDb) FindUserByKey(username string, pubkey string) (*db.User, error) {
 	return &db.User{ID: testUserID, Name: username}, nil
 }
 
-func (a *AuthDb) FindUserForToken(token string) (*db.User, error) {
+func (a *AuthDb) FindUserByToken(token string) (*db.User, error) {
 	if token != "123" {
 		return nil, fmt.Errorf("invalid token")
 	}
 	return &db.User{ID: testUserID, Name: testUsername}, nil
 }
 
-func (a *AuthDb) HasFeatureForUser(userID string, feature string) bool {
+func (a *AuthDb) HasFeatureByUser(userID string, feature string) bool {
 	return true
 }
 
-func (a *AuthDb) FindKeysForUser(user *db.User) ([]*db.PublicKey, error) {
+func (a *AuthDb) FindKeysByUser(user *db.User) ([]*db.PublicKey, error) {
 	return []*db.PublicKey{{ID: "1", UserID: user.ID, Name: "my-key", Key: "nice-pubkey", CreatedAt: &time.Time{}}}, nil
 }
 
@@ -254,7 +254,7 @@ func (a *AuthDb) InsertPost(post *db.Post) (*db.Post, error) {
 	return post, nil
 }
 
-func (a *AuthDb) FindPostsForUser(pager *db.Pager, userID, space string) (*db.Paginate[*db.Post], error) {
+func (a *AuthDb) FindPostsByUser(pager *db.Pager, userID, space string) (*db.Paginate[*db.Post], error) {
 	return &db.Paginate[*db.Post]{
 		Data: a.Posts,
 	}, nil

@@ -32,7 +32,7 @@ func NewUploadHandler(dbpool db.DB, cfg *shared.ConfigSite) *UploadHandler {
 }
 
 func (h *UploadHandler) getAuthorizedKeyFile(user *db.User) (*sendutils.VirtualFile, string, error) {
-	keys, err := h.DBPool.FindKeysForUser(user)
+	keys, err := h.DBPool.FindKeysByUser(user)
 	text := ""
 	var modTime time.Time
 	for _, pk := range keys {
@@ -137,7 +137,7 @@ func (h *UploadHandler) Validate(s *pssh.SSHServerConnSession) error {
 		return fmt.Errorf("key not found")
 	}
 
-	user, err := h.DBPool.FindUserForKey(s.User(), key)
+	user, err := h.DBPool.FindUserByKey(s.User(), key)
 	if err != nil {
 		return err
 	}
@@ -215,7 +215,7 @@ func (h *UploadHandler) ProcessAuthorizedKeys(text []byte, logger *slog.Logger, 
 	logger.Info("processing new authorized_keys")
 	dbpool := h.DBPool
 
-	curKeysStr, err := dbpool.FindKeysForUser(user)
+	curKeysStr, err := dbpool.FindKeysByUser(user)
 	if err != nil {
 		return err
 	}
@@ -247,7 +247,7 @@ func (h *UploadHandler) ProcessAuthorizedKeys(text []byte, logger *slog.Logger, 
 		_, _ = fmt.Fprintf(s.Stderr(), "adding pubkey (%s)\n", key)
 		logger.Info("adding pubkey", "pubkey", key)
 
-		err = dbpool.InsertPublicKey(user.ID, key, pk.Comment, nil)
+		err = dbpool.InsertPublicKey(user.ID, key, pk.Comment)
 		if err != nil {
 			_, _ = fmt.Fprintf(s.Stderr(), "error: could not insert pubkey: %s (%s)\n", err.Error(), key)
 			logger.Error("could not insert pubkey", "err", err.Error())

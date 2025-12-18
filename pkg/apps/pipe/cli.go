@@ -173,7 +173,7 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 			isAdmin := false
 			impersonate := false
 			if user != nil {
-				isAdmin = handler.DBPool.HasFeatureForUser(user.ID, "admin")
+				isAdmin = handler.DBPool.HasFeatureByUser(user.ID, "admin")
 				if isAdmin && strings.HasPrefix(sesh.User(), "admin__") {
 					impersonate = true
 				}

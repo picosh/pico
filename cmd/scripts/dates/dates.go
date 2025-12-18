@@ -7,12 +7,13 @@ import (
 	"os"
 	"time"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/db/postgres"
 	"github.com/picosh/pico/pkg/shared"
 )
 
-func findPosts(dbpool *sql.DB) ([]*db.Post, error) {
+func findPosts(dbpool *sqlx.DB) ([]*db.Post, error) {
 	var posts []*db.Post
 	rs, err := dbpool.Query(`SELECT
 		id, user_id, filename, title, text, description,

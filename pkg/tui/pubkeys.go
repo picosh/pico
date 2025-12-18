@@ -43,7 +43,7 @@ func (m *PubkeysPage) Footer() []Shortcut {
 }
 
 func (m *PubkeysPage) fetchKeys() error {
-	keys, err := m.shared.Dbpool.FindKeysForUser(m.shared.User)
+	keys, err := m.shared.Dbpool.FindKeysByUser(m.shared.User)
 	if err != nil {
 		return err
 
@@ -256,7 +256,7 @@ func (m *AddKeyPage) addPubkey(pubkey string) error {
 	key := utils.KeyForKeyText(pk)
 
 	return m.shared.Dbpool.InsertPublicKey(
-		m.shared.User.ID, key, comment, nil,
+		m.shared.User.ID, key, comment,
 	)
 }
 

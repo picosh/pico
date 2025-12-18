@@ -289,7 +289,7 @@ func FindUser(shrd *SharedModel) (*db.User, error) {
 
 	key := utils.KeyForKeyText(shrd.Session.PublicKey())
 
-	user, err := shrd.Dbpool.FindUserForKey(usr, key)
+	user, err := shrd.Dbpool.FindUserByKey(usr, key)
 	if err != nil {
 		logger.Error("no user found for public key", "err", err.Error())
 		// we only want to throw an error for specific cases
@@ -304,7 +304,7 @@ func FindUser(shrd *SharedModel) (*db.User, error) {
 
 	// impersonation
 	if strings.HasPrefix(usr, adminPrefix) {
-		hasFeature := shrd.Dbpool.HasFeatureForUser(user.ID, "admin")
+		hasFeature := shrd.Dbpool.HasFeatureByUser(user.ID, "admin")
 		if hasFeature {
 			impersonate := strings.TrimPrefix(usr, adminPrefix)
 			user, err = shrd.Dbpool.FindUserByName(impersonate)
