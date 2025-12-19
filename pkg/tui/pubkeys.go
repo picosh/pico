@@ -137,7 +137,7 @@ func (m *PubkeysPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	root := vxfw.NewSurface(w, h, m)
 	ah := 0
 
-	info := text.New("Pubkeys are SSH public keys which grant access to your pico account.  You can have many pubkeys associated with your account and they all have the same level of access. You cannot delete all pubkeys since it will revoke all access to the account.")
+	info := text.New("Pubkeys are SSH public keys which grant access to your pico account.  You can have many pubkeys associated with your account and they all have the same level of access. You cannot delete all pubkeys since it will revoke all access to the account.  We also support SSH certificate pubkeys which enables better access control: https://pico.sh/access-control")
 	brd := NewBorder(info)
 	brd.Label = "desc"
 	brdSurf, _ := brd.Draw(ctx)
