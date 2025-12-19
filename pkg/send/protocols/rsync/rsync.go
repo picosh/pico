@@ -153,6 +153,14 @@ func (h *handler) Remove(willReceive []*rsyncutils.ReceiverFile) error {
 		}
 	}
 
+	// Sort by path depth descending so children are deleted before parents.
+	// This ensures directories are empty before we try to remove them.
+	slices.SortFunc(toDelete, func(a, b string) int {
+		depthA := strings.Count(a, "/")
+		depthB := strings.Count(b, "/")
+		return depthB - depthA
+	})
+
 	var errs []error
 
 	for _, file := range toDelete {
