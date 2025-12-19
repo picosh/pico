@@ -148,7 +148,7 @@ func (h *handler) Remove(willReceive []*rsyncutils.ReceiverFile) error {
 			return rf.Name == entry.Name()
 		})
 
-		if !exists && entry.Name() != "._pico_keep_dir" {
+		if !exists && path.Base(entry.Name()) != "._pico_keep_dir" {
 			toDelete = append(toDelete, entry.Name())
 		}
 	}
