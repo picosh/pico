@@ -72,7 +72,7 @@ func (m *AccessLogsPage) filterLogs() {
 	m.filtered = filtered
 
 	if len(filtered) > 0 {
-		m.list.SetCursor(uint(len(filtered) - 1))
+		m.list.SetCursor(0)
 	}
 }
 
