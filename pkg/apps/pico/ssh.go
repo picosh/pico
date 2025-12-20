@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"git.sr.ht/~rockorager/vaxis"
+	pgsdb "github.com/picosh/pico/pkg/apps/pgs/db"
 	"github.com/picosh/pico/pkg/db/postgres"
 	"github.com/picosh/pico/pkg/pssh"
 	"github.com/picosh/pico/pkg/send/auth"
@@ -53,6 +54,8 @@ func StartSshServer() {
 	defer func() {
 		_ = dbpool.Close()
 	}()
+
+	pgsDB := pgsdb.NewDBWithConn(dbpool.Db, cfg.Logger)
 
 	handler := NewUploadHandler(
 		dbpool,
@@ -100,6 +103,7 @@ func StartSshServer() {
 						Session: sesh,
 						Cfg:     cfg,
 						Dbpool:  handler.DBPool,
+						PgsDB:   pgsDB,
 						Logger:  pssh.GetLogger(sesh),
 					}
 					return pssh.PtyMdw(createTui(shrd), 200*time.Millisecond)(next)(sesh)

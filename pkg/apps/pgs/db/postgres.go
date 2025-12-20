@@ -34,6 +34,13 @@ func NewDB(databaseUrl string, logger *slog.Logger) (*PgsPsqlDB, error) {
 	return d, nil
 }
 
+func NewDBWithConn(db *sqlx.DB, logger *slog.Logger) *PgsPsqlDB {
+	return &PgsPsqlDB{
+		Logger: logger,
+		Db:     db,
+	}
+}
+
 func (me *PgsPsqlDB) Close() error {
 	return me.Db.Close()
 }

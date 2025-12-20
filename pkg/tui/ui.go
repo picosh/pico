@@ -10,6 +10,7 @@ import (
 	"git.sr.ht/~rockorager/vaxis"
 	"git.sr.ht/~rockorager/vaxis/vxfw"
 	"git.sr.ht/~rockorager/vaxis/vxfw/richtext"
+	pgsdb "github.com/picosh/pico/pkg/apps/pgs/db"
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/pssh"
 	"github.com/picosh/pico/pkg/shared"
@@ -26,6 +27,7 @@ type SharedModel struct {
 	Session            *pssh.SSHServerConnSession
 	Cfg                *shared.ConfigSite
 	Dbpool             db.DB
+	PgsDB              pgsdb.PgsDB
 	User               *db.User
 	PlusFeatureFlag    *db.FeatureFlag
 	BouncerFeatureFlag *db.FeatureFlag
@@ -355,6 +357,7 @@ func NewTui(opts vaxis.Options, shrd *SharedModel) error {
 		"chat":        NewChatPage(shrd),
 		"tuns":        NewTunsPage(shrd),
 		"access_logs": NewAccessLogsPage(shrd),
+		"pages":       NewPagesPage(shrd),
 	}
 	root := &App{
 		shared: shrd,

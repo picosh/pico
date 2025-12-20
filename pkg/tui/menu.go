@@ -14,6 +14,7 @@ var menuChoices = []string{
 	"logs",
 	"access_logs",
 	"analytics",
+	"pages",
 	"tuns",
 	"pico+",
 	"chat",
