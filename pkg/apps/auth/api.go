@@ -589,7 +589,8 @@ func AddPlusFeedForUser(dbpool db.DB, userID, email string) error {
 func checkoutHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		username := r.PathValue("username")
-		link := "https://checkout.pico.sh/buy/73c26cf9-3fac-44c3-b744-298b3032a96b"
+		// link := "https://checkout.pico.sh/buy/73c26cf9-3fac-44c3-b744-298b3032a96b"
+		link := "https://picosh.lemonsqueezy.com/buy/73c26cf9-3fac-44c3-b744-298b3032a96b"
 		url := fmt.Sprintf(
 			"%s?discount=0&checkout[custom][username]=%s",
 			link,
