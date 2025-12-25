@@ -203,9 +203,11 @@ func TestRegisterUser_Success(t *testing.T) {
 	user, err := testDB.RegisterUser("testuser", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI testkey", "test comment")
 	if err != nil {
 		t.Fatalf("RegisterUser failed: %v", err)
+		return
 	}
 	if user == nil {
 		t.Fatal("expected user, got nil")
+		return
 	}
 	if user.Name != "testuser" {
 		t.Errorf("expected name 'testuser', got '%s'", user.Name)

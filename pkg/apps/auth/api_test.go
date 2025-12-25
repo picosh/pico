@@ -124,7 +124,7 @@ func TestCheckout(t *testing.T) {
 	mux.ServeHTTP(responseRecorder, request)
 
 	loc := responseRecorder.Header().Get("Location")
-	if loc != "https://checkout.pico.sh/buy/73c26cf9-3fac-44c3-b744-298b3032a96b?discount=0&checkout[custom][username]=user-a" {
+	if loc != "https://picosh.lemonsqueezy.com/buy/73c26cf9-3fac-44c3-b744-298b3032a96b?discount=0&checkout[custom][username]=user-a" {
 		t.Errorf("Have Location %s, want checkout", loc)
 	}
 	if responseRecorder.Code != http.StatusMovedPermanently {
