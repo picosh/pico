@@ -144,7 +144,7 @@ func NewTestSSHServer(t *testing.T) *TestSSHServer {
 		"pipe-ssh-test",
 		"localhost",
 		cfg.Port,
-		"9222",
+		"9223",
 		"../../ssh_data/term_info_ed25519",
 		func(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
 			perms, _ := sshAuth.PubkeyAuthHandler(conn, key)

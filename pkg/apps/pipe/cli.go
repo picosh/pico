@@ -52,25 +52,6 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 
 			pipeCtx, cancel := context.WithCancel(ctx)
 
-			go func() {
-				defer cancel()
-
-				for {
-					select {
-					case <-pipeCtx.Done():
-						return
-					default:
-						_, err := sesh.SendRequest("ping@pico.sh", false, nil)
-						if err != nil {
-							logger.Error("error sending ping", "err", err)
-							return
-						}
-
-						time.Sleep(5 * time.Second)
-					}
-				}
-			}()
-
 			cliCmd := &CliCmd{
 				sesh:     sesh,
 				args:     args,
@@ -117,6 +98,26 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 				userNameAddition,
 				sesh.RemoteAddr().String(),
 			)
+
+			go func() {
+				defer cancel()
+
+				ticker := time.NewTicker(5 * time.Second)
+				defer ticker.Stop()
+
+				for {
+					select {
+					case <-pipeCtx.Done():
+						return
+					case <-ticker.C:
+						_, err := sesh.SendRequest("ping@pico.sh", false, nil)
+						if err != nil {
+							logger.Error("error sending ping", "err", err)
+							return
+						}
+					}
+				}
+			}()
 
 			switch cmd {
 			case "pub":
