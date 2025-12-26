@@ -701,13 +701,34 @@ func TestPubSub_BlockingWaitsForSubscriber(t *testing.T) {
 		t.Fatalf("failed to start pub: %v", err)
 	}
 
-	// Read initial output - should indicate waiting for subscribers
-	initialOutput := make([]byte, 500)
-	n, err := pubStdout.Read(initialOutput)
-	if err != nil && err != io.EOF {
-		t.Fatalf("failed to read initial output: %v", err)
+	// Read output until we see "waiting" message or timeout
+	// Need to read in a loop because Read() may return partial data
+	var output string
+	readDone := make(chan struct{})
+	go func() {
+		buf := make([]byte, 1024)
+		for {
+			n, err := pubStdout.Read(buf)
+			if n > 0 {
+				output += string(buf[:n])
+				if strings.Contains(output, "waiting") {
+					close(readDone)
+					return
+				}
+			}
+			if err != nil {
+				close(readDone)
+				return
+			}
+		}
+	}()
+
+	select {
+	case <-readDone:
+	case <-time.After(2 * time.Second):
+		t.Fatalf("timeout waiting for 'waiting' message, got: %q", output)
 	}
-	output := string(initialOutput[:n])
+
 	if !strings.Contains(output, "waiting") {
 		t.Errorf("expected 'waiting' message for blocking pub, got: %q", output)
 	}
@@ -740,13 +761,13 @@ func TestPubSub_BlockingWaitsForSubscriber(t *testing.T) {
 
 	// Subscriber should receive the message
 	received := make([]byte, 100)
-	n, err = subStdout.Read(received)
+	nRead, err := subStdout.Read(received)
 	if err != nil && err != io.EOF {
 		t.Logf("read error: %v", err)
 	}
 
-	if !strings.Contains(string(received[:n]), testMessage) {
-		t.Errorf("subscriber did not receive blocking message, got: %q, want: %q", string(received[:n]), testMessage)
+	if !strings.Contains(string(received[:nRead]), testMessage) {
+		t.Errorf("subscriber did not receive blocking message, got: %q, want: %q", string(received[:nRead]), testMessage)
 	}
 }
 
