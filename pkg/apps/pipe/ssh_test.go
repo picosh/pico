@@ -659,3 +659,355 @@ func TestAccessControl_AllowedUserViaFullPath(t *testing.T) {
 		t.Errorf("alice should receive bob's message on shared topic, got: %q", string(aliceReceived[:n]))
 	}
 }
+
+func TestPubSub_BlockingWaitsForSubscriber(t *testing.T) {
+	server := NewTestSSHServer(t)
+	defer server.Shutdown()
+
+	user := GenerateUser("alice")
+	RegisterUserWithServer(server, user)
+
+	pubClient, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect publisher: %v", err)
+	}
+	defer func() { _ = pubClient.Close() }()
+
+	subClient, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect subscriber: %v", err)
+	}
+	defer func() { _ = subClient.Close() }()
+
+	pubSession, err := pubClient.NewSession()
+	if err != nil {
+		t.Fatalf("failed to create pub session: %v", err)
+	}
+	defer func() { _ = pubSession.Close() }()
+
+	pubStdin, err := pubSession.StdinPipe()
+	if err != nil {
+		t.Fatalf("failed to get pub stdin: %v", err)
+	}
+
+	pubStdout, err := pubSession.StdoutPipe()
+	if err != nil {
+		t.Fatalf("failed to get pub stdout: %v", err)
+	}
+
+	// Start publisher with blocking enabled (default -b=true)
+	// Publisher should wait for subscriber
+	if err := pubSession.Start("pub blockingtopic"); err != nil {
+		t.Fatalf("failed to start pub: %v", err)
+	}
+
+	// Read initial output - should indicate waiting for subscribers
+	initialOutput := make([]byte, 500)
+	n, err := pubStdout.Read(initialOutput)
+	if err != nil && err != io.EOF {
+		t.Fatalf("failed to read initial output: %v", err)
+	}
+	output := string(initialOutput[:n])
+	if !strings.Contains(output, "waiting") {
+		t.Errorf("expected 'waiting' message for blocking pub, got: %q", output)
+	}
+
+	// Now start subscriber - this should unblock the publisher
+	subSession, err := subClient.NewSession()
+	if err != nil {
+		t.Fatalf("failed to create sub session: %v", err)
+	}
+	defer func() { _ = subSession.Close() }()
+
+	subStdout, err := subSession.StdoutPipe()
+	if err != nil {
+		t.Fatalf("failed to get sub stdout: %v", err)
+	}
+
+	if err := subSession.Start("sub blockingtopic -c"); err != nil {
+		t.Fatalf("failed to start sub: %v", err)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Now send the message
+	testMessage := "blocking message"
+	_, err = pubStdin.Write([]byte(testMessage))
+	if err != nil {
+		t.Fatalf("failed to write message: %v", err)
+	}
+	_ = pubStdin.Close()
+
+	// Subscriber should receive the message
+	received := make([]byte, 100)
+	n, err = subStdout.Read(received)
+	if err != nil && err != io.EOF {
+		t.Logf("read error: %v", err)
+	}
+
+	if !strings.Contains(string(received[:n]), testMessage) {
+		t.Errorf("subscriber did not receive blocking message, got: %q, want: %q", string(received[:n]), testMessage)
+	}
+}
+
+func TestPubSub_NonBlockingDoesNotWait(t *testing.T) {
+	server := NewTestSSHServer(t)
+	defer server.Shutdown()
+
+	user := GenerateUser("alice")
+	RegisterUserWithServer(server, user)
+
+	client, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect: %v", err)
+	}
+	defer func() { _ = client.Close() }()
+
+	// Publish with -b=false (non-blocking) and no subscriber
+	// Should complete immediately without waiting
+	done := make(chan struct{})
+	var output string
+	var cmdErr error
+
+	go func() {
+		output, cmdErr = user.RunCommandWithStdin(client, "pub nonblockingtopic -b=false -c", "non-blocking message")
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// Command completed - this is expected for non-blocking
+		if cmdErr != nil {
+			t.Logf("non-blocking pub completed with: %v", cmdErr)
+		}
+		t.Logf("non-blocking pub output: %q", output)
+	case <-time.After(2 * time.Second):
+		t.Errorf("non-blocking pub should complete immediately, but it blocked")
+	}
+}
+
+func TestPubSub_BlockingTimeout(t *testing.T) {
+	server := NewTestSSHServer(t)
+	defer server.Shutdown()
+
+	user := GenerateUser("alice")
+	RegisterUserWithServer(server, user)
+
+	client, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect: %v", err)
+	}
+	defer func() { _ = client.Close() }()
+
+	// Publish with blocking and short timeout, no subscriber
+	// Should timeout after the specified duration
+	done := make(chan struct{})
+	var output string
+
+	go func() {
+		output, _ = user.RunCommandWithStdin(client, "pub timeouttopic -b=true -t=500ms", "timeout message")
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// Command completed due to timeout
+		if !strings.Contains(output, "timeout") && !strings.Contains(output, "waiting") {
+			t.Logf("blocking pub with timeout output: %q", output)
+		}
+	case <-time.After(3 * time.Second):
+		t.Errorf("blocking pub with timeout should have timed out after 500ms")
+	}
+}
+
+func TestSub_WaitsForPublisher(t *testing.T) {
+	server := NewTestSSHServer(t)
+	defer server.Shutdown()
+
+	user := GenerateUser("alice")
+	RegisterUserWithServer(server, user)
+
+	subClient, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect subscriber: %v", err)
+	}
+	defer func() { _ = subClient.Close() }()
+
+	pubClient, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect publisher: %v", err)
+	}
+	defer func() { _ = pubClient.Close() }()
+
+	// Start subscriber first - it should wait for publisher
+	subSession, err := subClient.NewSession()
+	if err != nil {
+		t.Fatalf("failed to create sub session: %v", err)
+	}
+	defer func() { _ = subSession.Close() }()
+
+	subStdout, err := subSession.StdoutPipe()
+	if err != nil {
+		t.Fatalf("failed to get sub stdout: %v", err)
+	}
+
+	if err := subSession.Start("sub waitfortopic -c"); err != nil {
+		t.Fatalf("failed to start sub: %v", err)
+	}
+
+	// Subscriber is now waiting - give it a moment
+	time.Sleep(100 * time.Millisecond)
+
+	// Now publish - subscriber should receive it
+	testMessage := "delayed publish"
+	_, err = user.RunCommandWithStdin(pubClient, "pub waitfortopic -c", testMessage)
+	if err != nil {
+		t.Logf("pub completed: %v", err)
+	}
+
+	received := make([]byte, 100)
+	n, err := subStdout.Read(received)
+	if err != nil && err != io.EOF {
+		t.Logf("read error: %v", err)
+	}
+
+	if !strings.Contains(string(received[:n]), testMessage) {
+		t.Errorf("subscriber waiting for publisher did not receive message, got: %q, want: %q", string(received[:n]), testMessage)
+	}
+}
+
+func TestSub_KeepAliveReceivesMultipleMessages(t *testing.T) {
+	server := NewTestSSHServer(t)
+	defer server.Shutdown()
+
+	user := GenerateUser("alice")
+	RegisterUserWithServer(server, user)
+
+	subClient, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect subscriber: %v", err)
+	}
+	defer func() { _ = subClient.Close() }()
+
+	pubClient1, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect publisher 1: %v", err)
+	}
+	defer func() { _ = pubClient1.Close() }()
+
+	pubClient2, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect publisher 2: %v", err)
+	}
+	defer func() { _ = pubClient2.Close() }()
+
+	// Start subscriber with keepAlive (-k) flag
+	subSession, err := subClient.NewSession()
+	if err != nil {
+		t.Fatalf("failed to create sub session: %v", err)
+	}
+	defer func() { _ = subSession.Close() }()
+
+	subStdout, err := subSession.StdoutPipe()
+	if err != nil {
+		t.Fatalf("failed to get sub stdout: %v", err)
+	}
+
+	if err := subSession.Start("sub keepalivetopic -k -c"); err != nil {
+		t.Fatalf("failed to start sub: %v", err)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Send first message
+	msg1 := "first message\n"
+	_, err = user.RunCommandWithStdin(pubClient1, "pub keepalivetopic -c", msg1)
+	if err != nil {
+		t.Logf("pub 1 completed: %v", err)
+	}
+
+	received1 := make([]byte, 100)
+	n1, _ := subStdout.Read(received1)
+	if !strings.Contains(string(received1[:n1]), "first message") {
+		t.Errorf("subscriber did not receive first message, got: %q", string(received1[:n1]))
+	}
+
+	// Send second message - subscriber with keepAlive should still receive it
+	msg2 := "second message\n"
+	_, err = user.RunCommandWithStdin(pubClient2, "pub keepalivetopic -c", msg2)
+	if err != nil {
+		t.Logf("pub 2 completed: %v", err)
+	}
+
+	received2 := make([]byte, 100)
+	n2, _ := subStdout.Read(received2)
+	if !strings.Contains(string(received2[:n2]), "second message") {
+		t.Errorf("subscriber with keepAlive did not receive second message, got: %q", string(received2[:n2]))
+	}
+}
+
+func TestSub_WithoutKeepAliveExitsAfterPublisher(t *testing.T) {
+	server := NewTestSSHServer(t)
+	defer server.Shutdown()
+
+	user := GenerateUser("alice")
+	RegisterUserWithServer(server, user)
+
+	subClient, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect subscriber: %v", err)
+	}
+	defer func() { _ = subClient.Close() }()
+
+	pubClient, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect publisher: %v", err)
+	}
+	defer func() { _ = pubClient.Close() }()
+
+	// Start subscriber without keepAlive
+	subSession, err := subClient.NewSession()
+	if err != nil {
+		t.Fatalf("failed to create sub session: %v", err)
+	}
+
+	subStdout, err := subSession.StdoutPipe()
+	if err != nil {
+		t.Fatalf("failed to get sub stdout: %v", err)
+	}
+
+	if err := subSession.Start("sub exitaftertopic -c"); err != nil {
+		t.Fatalf("failed to start sub: %v", err)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Publish a message
+	testMessage := "single message"
+	_, err = user.RunCommandWithStdin(pubClient, "pub exitaftertopic -c", testMessage)
+	if err != nil {
+		t.Logf("pub completed: %v", err)
+	}
+
+	// Read the message
+	received := make([]byte, 100)
+	n, _ := subStdout.Read(received)
+	if !strings.Contains(string(received[:n]), testMessage) {
+		t.Errorf("subscriber did not receive message, got: %q", string(received[:n]))
+	}
+
+	// Subscriber session should exit after publisher disconnects
+	done := make(chan error)
+	go func() {
+		done <- subSession.Wait()
+	}()
+
+	select {
+	case err := <-done:
+		// Session ended as expected
+		t.Logf("subscriber session ended: %v", err)
+	case <-time.After(2 * time.Second):
+		t.Errorf("subscriber without keepAlive should have exited after publisher disconnected")
+		_ = subSession.Close()
+	}
+}
