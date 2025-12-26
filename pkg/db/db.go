@@ -5,6 +5,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"regexp"
 	"time"
 )
@@ -378,6 +379,36 @@ type TunsEventLog struct {
 	CreatedAt      *time.Time `json:"created_at" db:"created_at"`
 }
 
+type PipeMonitor struct {
+	ID        string        `json:"id" db:"id"`
+	UserId    string        `json:"user_id" db:"user_id"`
+	Topic     string        `json:"topic" db:"topic"`
+	WindowDur time.Duration `json:"window_dur" db:"window_dur"`
+	WindowEnd *time.Time    `json:"window_end" db:"window_end"`
+	LastPing  *time.Time    `json:"last_ping" db:"last_ping"`
+	CreatedAt *time.Time    `json:"created_at" db:"created_at"`
+	UpdatedAt *time.Time    `json:"updated_at" db:"updated_at"`
+}
+
+func (m *PipeMonitor) Status() error {
+	windowStart := m.WindowEnd.Add(-m.WindowDur)
+	lastPingAfterStart := m.LastPing.After(windowStart)
+	if !lastPingAfterStart {
+		return fmt.Errorf("last ping before window start: last_ping=%s window_start=%s", m.LastPing, windowStart)
+	}
+	lastPingBeforeEnd := m.LastPing.Before(*m.WindowEnd)
+	if !lastPingBeforeEnd {
+		// should not happen but just for data validity we add it
+		return fmt.Errorf("last ping after window end: last_ping=%s window_end=%s", m.LastPing, m.WindowEnd)
+	}
+	return nil
+}
+
+func (m *PipeMonitor) GetNextWindow() *time.Time {
+	win := m.WindowEnd.Add(m.WindowDur)
+	return &win
+}
+
 var NameValidator = regexp.MustCompile("^[a-zA-Z0-9]{1,50}$")
 var DenyList = []string{
 	"admin",
@@ -467,6 +498,11 @@ type DB interface {
 	FindAccessLogs(userID string, fromDate *time.Time) ([]*AccessLog, error)
 	FindPubkeysInAccessLogs(userID string) ([]string, error)
 	FindAccessLogsByPubkey(pubkey string, fromDate *time.Time) ([]*AccessLog, error)
+
+	UpsertPipeMonitor(userID, topic string, dur time.Duration, winEnd *time.Time) error
+	UpdatePipeMonitorLastPing(userID, topic string, lastPing *time.Time) error
+	RemovePipeMonitor(userID, topic string) error
+	FindPipeMonitorByTopic(userID, topic string) (*PipeMonitor, error)
 
 	Close() error
 }
