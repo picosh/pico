@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"slices"
 	"strings"
-	"text/tabwriter"
 	"time"
 
 	"github.com/antoniomika/syncmap"
@@ -321,22 +320,19 @@ func (handler *CliHandler) pub(cmd *CliCmd, topic string, clientID string) error
 		topic = uuid.NewString()
 	}
 
-	var withoutUser string
-	var name string
 	msgFlag := ""
-
-	if cmd.isAdmin && strings.HasPrefix(topic, "/") {
-		name = strings.TrimPrefix(topic, "/")
-	} else {
-		name = toTopic(cmd.userName, topic)
-		if *public {
-			name = toPublicTopic(topic)
-			msgFlag = "-p "
-			withoutUser = name
-		} else {
-			withoutUser = topic
-		}
+	if *public {
+		msgFlag = "-p "
 	}
+
+	// Initial resolution to get the topic name for access storage
+	initialResult := resolveTopic(TopicResolveInput{
+		UserName: cmd.userName,
+		Topic:    topic,
+		IsAdmin:  cmd.isAdmin,
+		IsPublic: *public,
+	})
+	name := initialResult.Name
 
 	var accessListCreator bool
 	_, loaded := handler.Access.LoadOrStore(name, accessList)
@@ -344,19 +340,26 @@ func (handler *CliHandler) pub(cmd *CliCmd, topic string, clientID string) error
 		defer func() {
 			handler.Access.Delete(name)
 		}()
-
 		accessListCreator = true
 	}
 
-	if accessList, ok := handler.Access.Load(withoutUser); ok && len(accessList) > 0 && !cmd.isAdmin {
-		if checkAccess(accessList, cmd.userName, cmd.sesh) || accessListCreator {
-			name = withoutUser
-		} else if !*public {
-			name = toTopic(cmd.userName, withoutUser)
-		} else {
-			topic = uuid.NewString()
-			name = toPublicTopic(topic)
-		}
+	// Check for existing access list and resolve final topic name
+	existingAccessList, hasExistingAccess := handler.Access.Load(initialResult.WithoutUser)
+	result := resolveTopic(TopicResolveInput{
+		UserName:           cmd.userName,
+		Topic:              topic,
+		IsAdmin:            cmd.isAdmin,
+		IsPublic:           *public,
+		ExistingAccessList: existingAccessList,
+		HasExistingAccess:  hasExistingAccess,
+		IsAccessCreator:    accessListCreator,
+		HasUserAccess:      checkAccess(existingAccessList, cmd.userName, cmd.sesh),
+	})
+	name = result.Name
+
+	if result.GenerateNewTopic {
+		topic = uuid.NewString()
+		name = toPublicTopic(topic)
 	}
 
 	if !*clean {
@@ -524,20 +527,14 @@ func (handler *CliHandler) sub(cmd *CliCmd, topic string, clientID string) error
 		accessList = parseArgList(*access)
 	}
 
-	var withoutUser string
-	var name string
-
-	if cmd.isAdmin && strings.HasPrefix(topic, "/") {
-		name = strings.TrimPrefix(topic, "/")
-	} else {
-		name = toTopic(cmd.userName, topic)
-		if *public {
-			name = toPublicTopic(topic)
-			withoutUser = name
-		} else {
-			withoutUser = topic
-		}
-	}
+	// Initial resolution to get the topic name for access storage
+	initialResult := resolveTopic(TopicResolveInput{
+		UserName: cmd.userName,
+		Topic:    topic,
+		IsAdmin:  cmd.isAdmin,
+		IsPublic: *public,
+	})
+	name := initialResult.Name
 
 	var accessListCreator bool
 
@@ -549,14 +546,22 @@ func (handler *CliHandler) sub(cmd *CliCmd, topic string, clientID string) error
 		accessListCreator = true
 	}
 
-	if accessList, ok := handler.Access.Load(withoutUser); ok && len(accessList) > 0 && !cmd.isAdmin {
-		if checkAccess(accessList, cmd.userName, cmd.sesh) || accessListCreator {
-			name = withoutUser
-		} else if !*public {
-			name = toTopic(cmd.userName, withoutUser)
-		} else {
-			return fmt.Errorf("access denied")
-		}
+	// Check for existing access list and resolve final topic name
+	existingAccessList, hasExistingAccess := handler.Access.Load(initialResult.WithoutUser)
+	result := resolveTopic(TopicResolveInput{
+		UserName:           cmd.userName,
+		Topic:              topic,
+		IsAdmin:            cmd.isAdmin,
+		IsPublic:           *public,
+		ExistingAccessList: existingAccessList,
+		HasExistingAccess:  hasExistingAccess,
+		IsAccessCreator:    accessListCreator,
+		HasUserAccess:      checkAccess(existingAccessList, cmd.userName, cmd.sesh),
+	})
+	name = result.Name
+
+	if result.AccessDenied {
+		return fmt.Errorf("access denied")
 	}
 
 	err := handler.PubSub.Sub(
@@ -612,22 +617,19 @@ func (handler *CliHandler) pipe(cmd *CliCmd, topic string, clientID string) erro
 		topic = uuid.NewString()
 	}
 
-	var withoutUser string
-	var name string
 	flagMsg := ""
-
-	if cmd.isAdmin && strings.HasPrefix(topic, "/") {
-		name = strings.TrimPrefix(topic, "/")
-	} else {
-		name = toTopic(cmd.userName, topic)
-		if *public {
-			name = toPublicTopic(topic)
-			flagMsg = "-p "
-			withoutUser = name
-		} else {
-			withoutUser = topic
-		}
+	if *public {
+		flagMsg = "-p "
 	}
+
+	// Initial resolution to get the topic name for access storage
+	initialResult := resolveTopic(TopicResolveInput{
+		UserName: cmd.userName,
+		Topic:    topic,
+		IsAdmin:  cmd.isAdmin,
+		IsPublic: *public,
+	})
+	name := initialResult.Name
 
 	var accessListCreator bool
 
@@ -639,15 +641,23 @@ func (handler *CliHandler) pipe(cmd *CliCmd, topic string, clientID string) erro
 		accessListCreator = true
 	}
 
-	if accessList, ok := handler.Access.Load(withoutUser); ok && len(accessList) > 0 && !cmd.isAdmin {
-		if checkAccess(accessList, cmd.userName, cmd.sesh) || accessListCreator {
-			name = withoutUser
-		} else if !*public {
-			name = toTopic(cmd.userName, withoutUser)
-		} else {
-			topic = uuid.NewString()
-			name = toPublicTopic(topic)
-		}
+	// Check for existing access list and resolve final topic name
+	existingAccessList, hasExistingAccess := handler.Access.Load(initialResult.WithoutUser)
+	result := resolveTopic(TopicResolveInput{
+		UserName:           cmd.userName,
+		Topic:              topic,
+		IsAdmin:            cmd.isAdmin,
+		IsPublic:           *public,
+		ExistingAccessList: existingAccessList,
+		HasExistingAccess:  hasExistingAccess,
+		IsAccessCreator:    accessListCreator,
+		HasUserAccess:      checkAccess(existingAccessList, cmd.userName, cmd.sesh),
+	})
+	name = result.Name
+
+	if result.GenerateNewTopic {
+		topic = uuid.NewString()
+		name = toPublicTopic(topic)
 	}
 
 	if isCreator && !*clean {
@@ -738,82 +748,6 @@ func flagCheck(cmd *flag.FlagSet, posArg string, cmdArgs []string) bool {
 		return false
 	}
 	return true
-}
-
-func NewTabWriter(out io.Writer) *tabwriter.Writer {
-	return tabwriter.NewWriter(out, 0, 0, 1, ' ', tabwriter.TabIndent)
-}
-
-// scope topic to user by prefixing name.
-func toTopic(userName, topic string) string {
-	if strings.HasPrefix(topic, userName+"/") {
-		return topic
-	}
-	return fmt.Sprintf("%s/%s", userName, topic)
-}
-
-func toPublicTopic(topic string) string {
-	if strings.HasPrefix(topic, "public/") {
-		return topic
-	}
-	return fmt.Sprintf("public/%s", topic)
-}
-
-// TopicResolveInput contains all inputs needed for topic resolution.
-type TopicResolveInput struct {
-	UserName           string
-	Topic              string
-	IsAdmin            bool
-	IsPublic           bool
-	AccessList         []string
-	ExistingAccessList []string
-	HasExistingAccess  bool
-	IsAccessCreator    bool
-	HasUserAccess      bool
-}
-
-// TopicResolveOutput contains the resolved topic name and any error.
-type TopicResolveOutput struct {
-	Name             string
-	WithoutUser      string
-	AccessDenied     bool
-	GenerateNewTopic bool
-}
-
-// resolveTopic determines the final topic name based on user, flags, and access control.
-func resolveTopic(input TopicResolveInput) TopicResolveOutput {
-	var name string
-	var withoutUser string
-
-	if input.IsAdmin && strings.HasPrefix(input.Topic, "/") {
-		name = strings.TrimPrefix(input.Topic, "/")
-		return TopicResolveOutput{Name: name, WithoutUser: withoutUser}
-	}
-
-	name = toTopic(input.UserName, input.Topic)
-	if input.IsPublic {
-		name = toPublicTopic(input.Topic)
-		withoutUser = name
-	} else {
-		withoutUser = input.Topic
-	}
-
-	if input.HasExistingAccess && len(input.ExistingAccessList) > 0 && !input.IsAdmin {
-		if input.HasUserAccess || input.IsAccessCreator {
-			name = withoutUser
-		} else if !input.IsPublic {
-			name = toTopic(input.UserName, withoutUser)
-		} else {
-			return TopicResolveOutput{
-				Name:             name,
-				WithoutUser:      withoutUser,
-				AccessDenied:     true,
-				GenerateNewTopic: true,
-			}
-		}
-	}
-
-	return TopicResolveOutput{Name: name, WithoutUser: withoutUser}
 }
 
 func clientInfo(clients []*psub.Client, isAdmin bool, clientType string) string {
