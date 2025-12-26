@@ -243,3 +243,19 @@ func (me *StubDB) FindPubkeysInAccessLogs(userID string) ([]string, error) {
 func (me *StubDB) InsertAccessLog(log *db.AccessLog) error {
 	return errNotImpl
 }
+
+func (me *StubDB) UpsertPipeMonitor(userID, topic string, dur time.Duration, winEnd *time.Time) error {
+	return errNotImpl
+}
+
+func (me *StubDB) UpdatePipeMonitorLastPing(userID, topic string, lastPing *time.Time) error {
+	return errNotImpl
+}
+
+func (me *StubDB) RemovePipeMonitor(userID, topic string) error {
+	return errNotImpl
+}
+
+func (me *StubDB) FindPipeMonitorByTopic(userID, topic string) (*db.PipeMonitor, error) {
+	return nil, errNotImpl
+}
