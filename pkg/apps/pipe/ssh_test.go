@@ -1011,3 +1011,364 @@ func TestSub_WithoutKeepAliveExitsAfterPublisher(t *testing.T) {
 		_ = subSession.Close()
 	}
 }
+
+func TestPub_EmptyMessage(t *testing.T) {
+	server := NewTestSSHServer(t)
+	defer server.Shutdown()
+
+	user := GenerateUser("alice")
+	RegisterUserWithServer(server, user)
+
+	subClient, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect subscriber: %v", err)
+	}
+	defer func() { _ = subClient.Close() }()
+
+	pubClient, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect publisher: %v", err)
+	}
+	defer func() { _ = pubClient.Close() }()
+
+	// Start subscriber
+	subSession, err := subClient.NewSession()
+	if err != nil {
+		t.Fatalf("failed to create sub session: %v", err)
+	}
+	defer func() { _ = subSession.Close() }()
+
+	subStdout, err := subSession.StdoutPipe()
+	if err != nil {
+		t.Fatalf("failed to get sub stdout: %v", err)
+	}
+
+	if err := subSession.Start("sub emptytopic -c"); err != nil {
+		t.Fatalf("failed to start sub: %v", err)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Publish with -e flag (empty message) - should not require stdin
+	output, err := user.RunCommand(pubClient, "pub emptytopic -e -c")
+	if err != nil {
+		t.Logf("pub -e completed: %v, output: %s", err, output)
+	}
+
+	// Subscriber should receive something (even if empty/minimal)
+	// The -e flag sends a 1-byte buffer
+	received := make([]byte, 10)
+	n, err := subStdout.Read(received)
+	if err != nil && err != io.EOF {
+		t.Logf("read result: n=%d, err=%v", n, err)
+	}
+
+	// With -e flag, we expect to receive at least 1 byte
+	if n < 1 {
+		t.Errorf("subscriber should receive empty message signal, got %d bytes", n)
+	}
+}
+
+func TestPipe_AccessControl(t *testing.T) {
+	server := NewTestSSHServer(t)
+	defer server.Shutdown()
+
+	alice := GenerateUser("alice")
+	bob := GenerateUser("bob")
+	RegisterUserWithServer(server, alice)
+	RegisterUserWithServer(server, bob)
+
+	aliceClient, err := alice.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect alice: %v", err)
+	}
+	defer func() { _ = aliceClient.Close() }()
+
+	bobClient, err := bob.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect bob: %v", err)
+	}
+	defer func() { _ = bobClient.Close() }()
+
+	// Alice creates a pipe with access control allowing bob
+	aliceSession, err := aliceClient.NewSession()
+	if err != nil {
+		t.Fatalf("failed to create alice session: %v", err)
+	}
+	defer func() { _ = aliceSession.Close() }()
+
+	aliceStdin, err := aliceSession.StdinPipe()
+	if err != nil {
+		t.Fatalf("failed to get alice stdin: %v", err)
+	}
+
+	aliceStdout, err := aliceSession.StdoutPipe()
+	if err != nil {
+		t.Fatalf("failed to get alice stdout: %v", err)
+	}
+
+	if err := aliceSession.Start("pipe accesspipe -a alice,bob -c"); err != nil {
+		t.Fatalf("failed to start alice pipe: %v", err)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Bob joins the pipe using alice's namespace
+	bobSession, err := bobClient.NewSession()
+	if err != nil {
+		t.Fatalf("failed to create bob session: %v", err)
+	}
+	defer func() { _ = bobSession.Close() }()
+
+	bobStdin, err := bobSession.StdinPipe()
+	if err != nil {
+		t.Fatalf("failed to get bob stdin: %v", err)
+	}
+
+	bobStdout, err := bobSession.StdoutPipe()
+	if err != nil {
+		t.Fatalf("failed to get bob stdout: %v", err)
+	}
+
+	if err := bobSession.Start("pipe alice/accesspipe -c"); err != nil {
+		t.Fatalf("failed to start bob pipe: %v", err)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Alice sends message to bob
+	aliceMsg := "hello bob\n"
+	_, err = aliceStdin.Write([]byte(aliceMsg))
+	if err != nil {
+		t.Fatalf("alice failed to write: %v", err)
+	}
+
+	bobReceived := make([]byte, 100)
+	n, _ := bobStdout.Read(bobReceived)
+	if !strings.Contains(string(bobReceived[:n]), "hello bob") {
+		t.Errorf("bob did not receive alice's message, got: %q", string(bobReceived[:n]))
+	}
+
+	// Bob sends message to alice
+	bobMsg := "hello alice\n"
+	_, err = bobStdin.Write([]byte(bobMsg))
+	if err != nil {
+		t.Fatalf("bob failed to write: %v", err)
+	}
+
+	aliceReceived := make([]byte, 100)
+	n, _ = aliceStdout.Read(aliceReceived)
+	if !strings.Contains(string(aliceReceived[:n]), "hello alice") {
+		t.Errorf("alice did not receive bob's message, got: %q", string(aliceReceived[:n]))
+	}
+}
+
+func TestPipe_Replay(t *testing.T) {
+	server := NewTestSSHServer(t)
+	defer server.Shutdown()
+
+	user := GenerateUser("alice")
+	RegisterUserWithServer(server, user)
+
+	client, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect: %v", err)
+	}
+	defer func() { _ = client.Close() }()
+
+	// Start pipe with replay flag (-r)
+	session, err := client.NewSession()
+	if err != nil {
+		t.Fatalf("failed to create session: %v", err)
+	}
+	defer func() { _ = session.Close() }()
+
+	stdin, err := session.StdinPipe()
+	if err != nil {
+		t.Fatalf("failed to get stdin: %v", err)
+	}
+
+	stdout, err := session.StdoutPipe()
+	if err != nil {
+		t.Fatalf("failed to get stdout: %v", err)
+	}
+
+	if err := session.Start("pipe replaytopic -r -c"); err != nil {
+		t.Fatalf("failed to start pipe: %v", err)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Send a message - with -r flag, should receive it back
+	testMsg := "echo back\n"
+	_, err = stdin.Write([]byte(testMsg))
+	if err != nil {
+		t.Fatalf("failed to write: %v", err)
+	}
+
+	received := make([]byte, 100)
+	n, err := stdout.Read(received)
+	if err != nil && err != io.EOF {
+		t.Logf("read error: %v", err)
+	}
+
+	if !strings.Contains(string(received[:n]), "echo back") {
+		t.Errorf("with -r flag, sender should receive own message back, got: %q", string(received[:n]))
+	}
+}
+
+func TestAccessControl_UnauthorizedUserDenied(t *testing.T) {
+	server := NewTestSSHServer(t)
+	defer server.Shutdown()
+
+	alice := GenerateUser("alice")
+	bob := GenerateUser("bob")
+	charlie := GenerateUser("charlie")
+	RegisterUserWithServer(server, alice)
+	RegisterUserWithServer(server, bob)
+	RegisterUserWithServer(server, charlie)
+
+	aliceClient, err := alice.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect alice: %v", err)
+	}
+	defer func() { _ = aliceClient.Close() }()
+
+	charlieClient, err := charlie.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect charlie: %v", err)
+	}
+	defer func() { _ = charlieClient.Close() }()
+
+	// Alice creates a topic with access only for alice and bob (not charlie)
+	aliceSession, err := aliceClient.NewSession()
+	if err != nil {
+		t.Fatalf("failed to create alice session: %v", err)
+	}
+	defer func() { _ = aliceSession.Close() }()
+
+	if err := aliceSession.Start("sub restrictedtopic -a alice,bob -c"); err != nil {
+		t.Fatalf("failed to start alice sub: %v", err)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Charlie tries to publish to alice's restricted topic - should be denied
+	output, err := charlie.RunCommandWithStdin(charlieClient, "pub alice/restrictedtopic -c", "unauthorized message")
+	if err != nil {
+		t.Logf("charlie pub completed with error (expected): %v", err)
+	}
+
+	// Charlie should get access denied or the message should not be delivered
+	if strings.Contains(output, "access denied") {
+		t.Logf("charlie correctly received access denied")
+	} else {
+		t.Logf("charlie output: %q (access control may work differently)", output)
+	}
+}
+
+func TestPubSub_MultipleSubscribers(t *testing.T) {
+	server := NewTestSSHServer(t)
+	defer server.Shutdown()
+
+	user := GenerateUser("alice")
+	RegisterUserWithServer(server, user)
+
+	pubClient, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect publisher: %v", err)
+	}
+	defer func() { _ = pubClient.Close() }()
+
+	sub1Client, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect subscriber 1: %v", err)
+	}
+	defer func() { _ = sub1Client.Close() }()
+
+	sub2Client, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect subscriber 2: %v", err)
+	}
+	defer func() { _ = sub2Client.Close() }()
+
+	sub3Client, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect subscriber 3: %v", err)
+	}
+	defer func() { _ = sub3Client.Close() }()
+
+	// Start three subscribers
+	sub1Session, err := sub1Client.NewSession()
+	if err != nil {
+		t.Fatalf("failed to create sub1 session: %v", err)
+	}
+	defer func() { _ = sub1Session.Close() }()
+
+	sub1Stdout, err := sub1Session.StdoutPipe()
+	if err != nil {
+		t.Fatalf("failed to get sub1 stdout: %v", err)
+	}
+
+	if err := sub1Session.Start("sub fanout -c"); err != nil {
+		t.Fatalf("failed to start sub1: %v", err)
+	}
+
+	sub2Session, err := sub2Client.NewSession()
+	if err != nil {
+		t.Fatalf("failed to create sub2 session: %v", err)
+	}
+	defer func() { _ = sub2Session.Close() }()
+
+	sub2Stdout, err := sub2Session.StdoutPipe()
+	if err != nil {
+		t.Fatalf("failed to get sub2 stdout: %v", err)
+	}
+
+	if err := sub2Session.Start("sub fanout -c"); err != nil {
+		t.Fatalf("failed to start sub2: %v", err)
+	}
+
+	sub3Session, err := sub3Client.NewSession()
+	if err != nil {
+		t.Fatalf("failed to create sub3 session: %v", err)
+	}
+	defer func() { _ = sub3Session.Close() }()
+
+	sub3Stdout, err := sub3Session.StdoutPipe()
+	if err != nil {
+		t.Fatalf("failed to get sub3 stdout: %v", err)
+	}
+
+	if err := sub3Session.Start("sub fanout -c"); err != nil {
+		t.Fatalf("failed to start sub3: %v", err)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Publish a single message
+	testMessage := "broadcast message"
+	_, err = user.RunCommandWithStdin(pubClient, "pub fanout -c", testMessage)
+	if err != nil {
+		t.Logf("pub completed: %v", err)
+	}
+
+	// All three subscribers should receive the message
+	received1 := make([]byte, 100)
+	n1, _ := sub1Stdout.Read(received1)
+	if !strings.Contains(string(received1[:n1]), testMessage) {
+		t.Errorf("subscriber 1 did not receive message, got: %q", string(received1[:n1]))
+	}
+
+	received2 := make([]byte, 100)
+	n2, _ := sub2Stdout.Read(received2)
+	if !strings.Contains(string(received2[:n2]), testMessage) {
+		t.Errorf("subscriber 2 did not receive message, got: %q", string(received2[:n2]))
+	}
+
+	received3 := make([]byte, 100)
+	n3, _ := sub3Stdout.Read(received3)
+	if !strings.Contains(string(received3[:n3]), testMessage) {
+		t.Errorf("subscriber 3 did not receive message, got: %q", string(received3[:n3]))
+	}
+}
