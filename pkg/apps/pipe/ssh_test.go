@@ -115,8 +115,8 @@ func NewTestSSHServer(t *testing.T) *TestSSHServer {
 
 	cfg := &shared.ConfigSite{
 		Domain:       "pipe.test",
-		Port:         "2222",
-		PortOverride: "2222",
+		Port:         "2225",
+		PortOverride: "2225",
 		Protocol:     "ssh",
 		Logger:       logger,
 		Space:        "pipe",
@@ -143,7 +143,7 @@ func NewTestSSHServer(t *testing.T) *TestSSHServer {
 		logger,
 		"pipe-ssh-test",
 		"localhost",
-		"2222",
+		cfg.Port,
 		"9222",
 		"../../ssh_data/term_info_ed25519",
 		func(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
@@ -231,7 +231,7 @@ func (u UserSSH) NewClient() (*ssh.Client, error) {
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 
-	return ssh.Dial("tcp", "localhost:2222", config)
+	return ssh.Dial("tcp", "localhost:2225", config)
 }
 
 func (u UserSSH) RunCommand(client *ssh.Client, cmd string) (string, error) {
