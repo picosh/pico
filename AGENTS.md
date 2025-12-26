@@ -12,7 +12,7 @@ make build # build all go binaries
 make check # runs all the commands above
 ```
 
-Before telling me a task is complete, you **must** run `make verify` before notifying me.
+Before telling me a task is complete, you **must** run `make check` before notifying me.
 
 # Task management
 
