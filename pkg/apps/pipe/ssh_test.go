@@ -1505,8 +1505,8 @@ func TestMonitor_CreateMonitor(t *testing.T) {
 		t.Errorf("authenticated user should not get access denied, got: %s", output)
 	}
 
-	// Verify monitor was created in DB
-	monitor, err := server.DBPool.FindPipeMonitorByTopic("alice-id", "pico-uptime")
+	// Verify monitor was created in DB (topic is stored with user prefix)
+	monitor, err := server.DBPool.FindPipeMonitorByTopic("alice-id", "alice/pico-uptime")
 	if err != nil {
 		t.Fatalf("monitor should exist in DB: %v", err)
 	}
@@ -1515,7 +1515,7 @@ func TestMonitor_CreateMonitor(t *testing.T) {
 		t.Errorf("expected window duration 24h, got: %v", monitor.WindowDur)
 	}
 
-	if !strings.Contains(output, "pico-uptime") || !strings.Contains(output, "24h") {
+	if !strings.Contains(output, "alice/pico-uptime") || !strings.Contains(output, "24h") {
 		t.Errorf("output should confirm monitor creation, got: %s", output)
 	}
 }
@@ -1545,8 +1545,8 @@ func TestMonitor_UpdateMonitor(t *testing.T) {
 		t.Logf("update command completed: %v", err)
 	}
 
-	// Verify monitor was updated
-	monitor, err := server.DBPool.FindPipeMonitorByTopic("alice-id", "my-cron")
+	// Verify monitor was updated (topic is stored with user prefix)
+	monitor, err := server.DBPool.FindPipeMonitorByTopic("alice-id", "alice/my-cron")
 	if err != nil {
 		t.Fatalf("monitor should exist in DB: %v", err)
 	}
@@ -1579,8 +1579,8 @@ func TestMonitor_DeleteMonitor(t *testing.T) {
 		t.Logf("create command completed: %v", err)
 	}
 
-	// Verify it exists
-	_, err = server.DBPool.FindPipeMonitorByTopic("alice-id", "to-delete")
+	// Verify it exists (topic is stored with user prefix)
+	_, err = server.DBPool.FindPipeMonitorByTopic("alice-id", "alice/to-delete")
 	if err != nil {
 		t.Fatalf("monitor should exist before deletion: %v", err)
 	}
@@ -1591,8 +1591,8 @@ func TestMonitor_DeleteMonitor(t *testing.T) {
 		t.Logf("delete command completed: %v", err)
 	}
 
-	// Verify it's gone
-	_, err = server.DBPool.FindPipeMonitorByTopic("alice-id", "to-delete")
+	// Verify it's gone (topic is stored with user prefix)
+	_, err = server.DBPool.FindPipeMonitorByTopic("alice-id", "alice/to-delete")
 	if err == nil {
 		t.Errorf("monitor should be deleted from DB")
 	}
@@ -1873,10 +1873,10 @@ func TestPub_UpdatesMonitorLastPing(t *testing.T) {
 	user := GenerateUser("alice")
 	RegisterUserWithServer(server, user)
 
-	// Create a monitor first
+	// Create a monitor first (topic is stored with user prefix)
 	now := time.Now()
 	windowEnd := now.Add(1 * time.Hour)
-	_ = server.DBPool.UpsertPipeMonitor("alice-id", "ping-test", 1*time.Hour, &windowEnd)
+	_ = server.DBPool.UpsertPipeMonitor("alice-id", "alice/ping-test", 1*time.Hour, &windowEnd)
 
 	subClient, err := user.NewClient()
 	if err != nil {
@@ -1909,8 +1909,8 @@ func TestPub_UpdatesMonitorLastPing(t *testing.T) {
 		t.Logf("pub command completed: %v", err)
 	}
 
-	// Verify last_ping was updated
-	monitor, err := server.DBPool.FindPipeMonitorByTopic("alice-id", "ping-test")
+	// Verify last_ping was updated (topic is stored with user prefix)
+	monitor, err := server.DBPool.FindPipeMonitorByTopic("alice-id", "alice/ping-test")
 	if err != nil {
 		t.Fatalf("monitor should exist: %v", err)
 	}

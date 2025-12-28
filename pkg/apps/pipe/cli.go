@@ -60,6 +60,7 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 				isAdmin:  isAdmin,
 				pipeCtx:  pipeCtx,
 				cancel:   cancel,
+				user:     user,
 			}
 
 			cmd := strings.TrimSpace(args[0])
@@ -181,6 +182,7 @@ type CliCmd struct {
 	isAdmin  bool
 	pipeCtx  context.Context
 	cancel   context.CancelFunc
+	user     *db.User
 }
 
 func help(cfg *shared.ConfigSite, sesh *pssh.SSHServerConnSession) {
@@ -320,12 +322,21 @@ func (handler *CliHandler) monitor(cmd *CliCmd, user *db.User) error {
 		return fmt.Errorf("topic is required")
 	}
 
+	// Resolve to fully qualified topic name
+	result := resolveTopic(TopicResolveInput{
+		UserName: cmd.userName,
+		Topic:    topic,
+		IsAdmin:  cmd.isAdmin,
+		IsPublic: false,
+	})
+	resolvedTopic := result.Name
+
 	if *del {
-		err := handler.DBPool.RemovePipeMonitor(user.ID, topic)
+		err := handler.DBPool.RemovePipeMonitor(user.ID, resolvedTopic)
 		if err != nil {
 			return fmt.Errorf("failed to delete monitor: %w", err)
 		}
-		_, _ = fmt.Fprintf(cmd.sesh, "monitor deleted: %s\r\n", topic)
+		_, _ = fmt.Fprintf(cmd.sesh, "monitor deleted: %s\r\n", resolvedTopic)
 		return nil
 	}
 
@@ -348,12 +359,12 @@ func (handler *CliHandler) monitor(cmd *CliCmd, user *db.User) error {
 	}
 
 	winEnd := time.Now().Add(dur)
-	err = handler.DBPool.UpsertPipeMonitor(user.ID, topic, dur, &winEnd)
+	err = handler.DBPool.UpsertPipeMonitor(user.ID, resolvedTopic, dur, &winEnd)
 	if err != nil {
 		return fmt.Errorf("failed to create monitor: %w", err)
 	}
 
-	_, _ = fmt.Fprintf(cmd.sesh, "monitor created: %s (window: %s)\r\n", topic, dur)
+	_, _ = fmt.Fprintf(cmd.sesh, "monitor created: %s (window: %s)\r\n", resolvedTopic, dur)
 	return nil
 }
 
@@ -672,7 +683,33 @@ func (handler *CliHandler) pub(cmd *CliCmd, topic string, clientID string) error
 		return err
 	}
 
+	handler.updateMonitor(cmd, name)
+
 	return nil
+}
+
+func (handler *CliHandler) updateMonitor(cmd *CliCmd, topic string) {
+	if cmd.user == nil {
+		return
+	}
+
+	monitor, err := handler.DBPool.FindPipeMonitorByTopic(cmd.user.ID, topic)
+	if err != nil || monitor == nil {
+		return
+	}
+
+	now := time.Now()
+	if err := handler.DBPool.UpdatePipeMonitorLastPing(cmd.user.ID, topic, &now); err != nil {
+		handler.Logger.Error("failed to update monitor last_ping", "err", err, "topic", topic)
+	}
+
+	// Advance window if current time is past window_end
+	if monitor.WindowEnd != nil && now.After(*monitor.WindowEnd) {
+		nextWindow := monitor.GetNextWindow()
+		if err := handler.DBPool.UpsertPipeMonitor(cmd.user.ID, topic, monitor.WindowDur, nextWindow); err != nil {
+			handler.Logger.Error("failed to advance monitor window", "err", err, "topic", topic)
+		}
+	}
 }
 
 func (handler *CliHandler) sub(cmd *CliCmd, topic string, clientID string) error {
@@ -871,6 +908,8 @@ func (handler *CliHandler) pipe(cmd *CliCmd, topic string, clientID string) erro
 	if writeErr != nil && !*clean {
 		return writeErr
 	}
+
+	handler.updateMonitor(cmd, name)
 
 	return nil
 }
