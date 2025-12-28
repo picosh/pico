@@ -391,6 +391,12 @@ type PipeMonitor struct {
 }
 
 func (m *PipeMonitor) Status() error {
+	if m.LastPing == nil {
+		return fmt.Errorf("no ping received yet")
+	}
+	if m.WindowEnd == nil {
+		return fmt.Errorf("window end not set")
+	}
 	windowStart := m.WindowEnd.Add(-m.WindowDur)
 	lastPingAfterStart := m.LastPing.After(windowStart)
 	if !lastPingAfterStart {

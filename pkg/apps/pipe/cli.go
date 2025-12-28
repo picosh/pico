@@ -9,10 +9,12 @@ import (
 	"log/slog"
 	"slices"
 	"strings"
+	"text/tabwriter"
 	"time"
 
 	"github.com/antoniomika/syncmap"
 	"github.com/google/uuid"
+	"github.com/gorilla/feeds"
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/pssh"
 	"github.com/picosh/pico/pkg/shared"
@@ -73,6 +75,18 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 				return next(sesh)
 			case "monitor":
 				err := handler.monitor(cliCmd, user)
+				if err != nil {
+					sesh.Fatal(err)
+				}
+				return next(sesh)
+			case "status":
+				err := handler.status(cliCmd, user)
+				if err != nil {
+					sesh.Fatal(err)
+				}
+				return next(sesh)
+			case "rss":
+				err := handler.rss(cliCmd, user)
 				if err != nil {
 					sesh.Fatal(err)
 				}
@@ -340,6 +354,102 @@ func (handler *CliHandler) monitor(cmd *CliCmd, user *db.User) error {
 	}
 
 	_, _ = fmt.Fprintf(cmd.sesh, "monitor created: %s (window: %s)\r\n", topic, dur)
+	return nil
+}
+
+func (handler *CliHandler) status(cmd *CliCmd, user *db.User) error {
+	if user == nil {
+		return fmt.Errorf("access denied")
+	}
+
+	monitors, err := handler.DBPool.FindPipeMonitorsByUser(user.ID)
+	if err != nil {
+		return fmt.Errorf("failed to fetch monitors: %w", err)
+	}
+
+	if len(monitors) == 0 {
+		_, _ = fmt.Fprintln(cmd.sesh, "no monitors found")
+		return nil
+	}
+
+	writer := tabwriter.NewWriter(cmd.sesh, 0, 0, 2, ' ', tabwriter.TabIndent)
+	_, _ = fmt.Fprintln(writer, "Topic\tStatus\tReason\tWindow\tLast Ping\tCreated")
+
+	for _, m := range monitors {
+		status := "healthy"
+		reason := ""
+		if err := m.Status(); err != nil {
+			status = "unhealthy"
+			reason = err.Error()
+		}
+
+		lastPing := "never"
+		if m.LastPing != nil {
+			lastPing = m.LastPing.Format("2006-01-02 15:04:05")
+		}
+
+		createdAt := ""
+		if m.CreatedAt != nil {
+			createdAt = m.CreatedAt.Format("2006-01-02 15:04:05")
+		}
+
+		_, _ = fmt.Fprintf(
+			writer,
+			"%s\t%s\t%s\t%s\t%s\t%s\r\n",
+			m.Topic,
+			status,
+			reason,
+			m.WindowDur.String(),
+			lastPing,
+			createdAt,
+		)
+	}
+	_ = writer.Flush()
+	return nil
+}
+
+func (handler *CliHandler) rss(cmd *CliCmd, user *db.User) error {
+	if user == nil {
+		return fmt.Errorf("access denied")
+	}
+
+	monitors, err := handler.DBPool.FindPipeMonitorsByUser(user.ID)
+	if err != nil {
+		return fmt.Errorf("failed to fetch monitors: %w", err)
+	}
+
+	now := time.Now()
+	feed := &feeds.Feed{
+		Title:       fmt.Sprintf("Pipe Monitors for %s", user.Name),
+		Link:        &feeds.Link{Href: fmt.Sprintf("https://%s", handler.Cfg.Domain)},
+		Description: "Alerts for pipe monitor status changes",
+		Author:      &feeds.Author{Name: user.Name},
+		Created:     now,
+	}
+
+	var feedItems []*feeds.Item
+	for _, m := range monitors {
+		if err := m.Status(); err != nil {
+			item := &feeds.Item{
+				Id:          fmt.Sprintf("%s-%s-%d", user.ID, m.Topic, now.Unix()),
+				Title:       fmt.Sprintf("ALERT: %s is unhealthy", m.Topic),
+				Link:        &feeds.Link{Href: fmt.Sprintf("https://%s", handler.Cfg.Domain)},
+				Description: err.Error(),
+				Created:     now,
+				Updated:     now,
+				Author:      &feeds.Author{Name: user.Name},
+			}
+			feedItems = append(feedItems, item)
+		}
+	}
+	feed.Items = feedItems
+
+	rss, err := feed.ToRss()
+	if err != nil {
+		return fmt.Errorf("failed to generate RSS: %w", err)
+	}
+
+	_, _ = fmt.Fprint(cmd.sesh, rss)
 	return nil
 }
 
