@@ -1556,3 +1556,12 @@ func (me *PsqlDB) FindPipeMonitorByTopic(userID, topic string) (*db.PipeMonitor,
 	}
 	return monitor, nil
 }
+
+func (me *PsqlDB) FindPipeMonitorsByUser(userID string) ([]*db.PipeMonitor, error) {
+	var monitors []*db.PipeMonitor
+	err := me.Db.Select(&monitors, `SELECT id, user_id, topic, (EXTRACT(EPOCH FROM window_dur) * 1000000000)::bigint as window_dur, window_end, last_ping, created_at, updated_at FROM pipe_monitors WHERE user_id = $1 ORDER BY topic;`, userID)
+	if err != nil {
+		return nil, err
+	}
+	return monitors, nil
+}

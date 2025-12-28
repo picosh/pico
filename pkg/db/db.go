@@ -503,6 +503,7 @@ type DB interface {
 	UpdatePipeMonitorLastPing(userID, topic string, lastPing *time.Time) error
 	RemovePipeMonitor(userID, topic string) error
 	FindPipeMonitorByTopic(userID, topic string) (*PipeMonitor, error)
+	FindPipeMonitorsByUser(userID string) ([]*PipeMonitor, error)
 
 	Close() error
 }

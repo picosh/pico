@@ -71,6 +71,12 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 					sesh.Fatal(err)
 				}
 				return next(sesh)
+			case "monitor":
+				err := handler.monitor(cliCmd, user)
+				if err != nil {
+					sesh.Fatal(err)
+				}
+				return next(sesh)
 			}
 
 			topic := ""
@@ -271,6 +277,69 @@ func (handler *CliHandler) ls(cmd *CliCmd) error {
 		_, _ = cmd.sesh.Write([]byte(outputData))
 	}
 
+	return nil
+}
+
+func (handler *CliHandler) monitor(cmd *CliCmd, user *db.User) error {
+	if user == nil {
+		return fmt.Errorf("access denied")
+	}
+
+	args := cmd.sesh.Command()
+	topic := ""
+	cmdArgs := args[1:]
+	if len(args) > 1 && !strings.HasPrefix(args[1], "-") {
+		topic = strings.TrimSpace(args[1])
+		cmdArgs = args[2:]
+	}
+
+	monitorCmd := flagSet("monitor", cmd.sesh)
+	del := monitorCmd.Bool("d", false, "Delete the monitor")
+
+	if !flagCheck(monitorCmd, topic, cmdArgs) {
+		return nil
+	}
+
+	if topic == "" {
+		_, _ = fmt.Fprintln(cmd.sesh, "Usage: monitor <topic> <duration>")
+		_, _ = fmt.Fprintln(cmd.sesh, "       monitor <topic> -d")
+		return fmt.Errorf("topic is required")
+	}
+
+	if *del {
+		err := handler.DBPool.RemovePipeMonitor(user.ID, topic)
+		if err != nil {
+			return fmt.Errorf("failed to delete monitor: %w", err)
+		}
+		_, _ = fmt.Fprintf(cmd.sesh, "monitor deleted: %s\r\n", topic)
+		return nil
+	}
+
+	// Create/update monitor - need duration argument
+	durStr := ""
+	if monitorCmd.NArg() > 0 {
+		durStr = monitorCmd.Arg(0)
+	} else if len(cmdArgs) > 0 {
+		durStr = cmdArgs[0]
+	}
+
+	if durStr == "" {
+		_, _ = fmt.Fprintln(cmd.sesh, "Usage: monitor <topic> <duration>")
+		return fmt.Errorf("duration is required")
+	}
+
+	dur, err := time.ParseDuration(durStr)
+	if err != nil {
+		return fmt.Errorf("invalid duration %q: %w", durStr, err)
+	}
+
+	winEnd := time.Now().Add(dur)
+	err = handler.DBPool.UpsertPipeMonitor(user.ID, topic, dur, &winEnd)
+	if err != nil {
+		return fmt.Errorf("failed to create monitor: %w", err)
+	}
+
+	_, _ = fmt.Fprintf(cmd.sesh, "monitor created: %s (window: %s)\r\n", topic, dur)
 	return nil
 }
 

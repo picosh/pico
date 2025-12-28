@@ -259,3 +259,7 @@ func (me *StubDB) RemovePipeMonitor(userID, topic string) error {
 func (me *StubDB) FindPipeMonitorByTopic(userID, topic string) (*db.PipeMonitor, error) {
 	return nil, errNotImpl
 }
+
+func (me *StubDB) FindPipeMonitorsByUser(userID string) ([]*db.PipeMonitor, error) {
+	return nil, errNotImpl
+}
