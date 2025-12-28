@@ -186,7 +186,7 @@ type CliCmd struct {
 }
 
 func help(cfg *shared.ConfigSite, sesh *pssh.SSHServerConnSession) {
-	data := fmt.Sprintf(`Command: ssh %s <help | ls | pub | sub | pipe> <topic> [-h | args...]
+	data := fmt.Sprintf(`Command: ssh %s <command> [args...]
 
 The simplest authenticated pubsub system.  Send messages through
 user-defined topics.  Topics are private to the authenticated
@@ -197,13 +197,21 @@ at least one event to be sent or received. Pipe ("pipe") allows
 for bidirectional messages to be sent between any clients connected
 to a pipe.
 
-Think of these different commands in terms of the direction the
-data is being sent:
+Commands:
+  help                        Show this help message
+  ls                          List active pubsub channels
+  pub <topic> [flags]         Publish messages to a topic
+  sub <topic> [flags]         Subscribe to messages from a topic
+  pipe <topic> [flags]        Bidirectional messaging between clients
 
-- pub => writes to client
-- sub => reads from client
-- pipe => read and write between clients
-`, toSshCmd(cfg))
+Monitoring commands:
+  monitor <topic> <duration>  Create/update a health monitor for a topic
+  monitor <topic> -d          Delete a monitor
+  status                      Show health status of all monitors
+  rss                         Get RSS feed of monitor alerts
+
+Use "ssh %s <command> -h" for help on a specific command.
+`, toSshCmd(cfg), toSshCmd(cfg))
 
 	data = strings.ReplaceAll(data, "\n", "\r\n")
 	_, _ = fmt.Fprintln(sesh, data)
