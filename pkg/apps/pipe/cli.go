@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"text/tabwriter"
 	"time"
 
@@ -673,10 +674,12 @@ func (handler *CliHandler) pub(cmd *CliCmd, topic string, clientID string) error
 		_, _ = fmt.Fprintln(cmd.sesh, "sending msg ...")
 	}
 
+	throttledRW := newThrottledMonitorRW(rw, handler, cmd, name)
+
 	err := handler.PubSub.Pub(
 		cmd.pipeCtx,
 		clientID,
-		rw,
+		throttledRW,
 		[]*psub.Channel{
 			psub.NewChannel(name),
 		},
@@ -718,6 +721,53 @@ func (handler *CliHandler) updateMonitor(cmd *CliCmd, topic string) {
 			handler.Logger.Error("failed to advance monitor window", "err", err, "topic", topic)
 		}
 	}
+}
+
+const monitorThrottleInterval = 15 * time.Second
+
+type throttledMonitorRW struct {
+	rw       io.ReadWriter
+	handler  *CliHandler
+	cmd      *CliCmd
+	topic    string
+	lastPing atomic.Int64 // Unix nanoseconds
+}
+
+func newThrottledMonitorRW(rw io.ReadWriter, handler *CliHandler, cmd *CliCmd, topic string) *throttledMonitorRW {
+	return &throttledMonitorRW{
+		rw:      rw,
+		handler: handler,
+		cmd:     cmd,
+		topic:   topic,
+	}
+}
+
+func (t *throttledMonitorRW) throttledUpdate() {
+	now := time.Now().UnixNano()
+	last := t.lastPing.Load()
+
+	// First ping (last == 0) or interval elapsed
+	if last == 0 || now-last >= int64(monitorThrottleInterval) {
+		if t.lastPing.CompareAndSwap(last, now) {
+			t.handler.updateMonitor(t.cmd, t.topic)
+		}
+	}
+}
+
+func (t *throttledMonitorRW) Read(p []byte) (int, error) {
+	n, err := t.rw.Read(p)
+	if n > 0 {
+		t.throttledUpdate()
+	}
+	return n, err
+}
+
+func (t *throttledMonitorRW) Write(p []byte) (int, error) {
+	n, err := t.rw.Write(p)
+	if n > 0 {
+		t.throttledUpdate()
+	}
+	return n, err
 }
 
 func (handler *CliHandler) sub(cmd *CliCmd, topic string, clientID string) error {
@@ -899,10 +949,12 @@ func (handler *CliHandler) pipe(cmd *CliCmd, topic string, clientID string) erro
 		)
 	}
 
+	throttledRW := newThrottledMonitorRW(cmd.sesh, handler, cmd, name)
+
 	readErr, writeErr := handler.PubSub.Pipe(
 		cmd.pipeCtx,
 		clientID,
-		cmd.sesh,
+		throttledRW,
 		[]*psub.Channel{
 			psub.NewChannel(name),
 		},
