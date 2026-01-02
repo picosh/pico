@@ -106,10 +106,10 @@ func (m *PagesPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	pagesLen := len(m.pages)
 	err := m.err
 
-	info := text.New("Pages deployed to pgs.  Each page is accessible via https://{user}-{project}.pgs.sh.  We do not have access to custom domains so those cannot be shown.")
+	info := text.New("Sites deployed to pgs.  Each page is accessible via https://{user}-{project}.pgs.sh.  We do not have access to custom domains so those cannot be shown.")
 	brd := NewBorder(info)
 	brd.Label = "desc"
-	brdSurf, _ := brd.Draw(ctx)
+	brdSurf, _ := brd.Draw(createDrawCtx(ctx, 5))
 	root.AddChild(0, ah, brdSurf)
 	ah += int(brdSurf.Size.Height)
 
