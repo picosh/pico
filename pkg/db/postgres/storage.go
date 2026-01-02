@@ -391,7 +391,12 @@ func (me *PsqlDB) FindPostWithSlug(slug string, user_id string, space string) (*
 	post, err := CreatePostWithTagsByRow(r)
 	if err != nil {
 		// attempt to find post inside post_aliases
-		alias := me.Db.QueryRow(`SELECT post_id FROM post_aliases WHERE slug = $1`, slug)
+		alias := me.Db.QueryRow(
+			`SELECT post_aliases.post_id FROM post_aliases
+			INNER JOIN posts ON posts.id = post_aliases.post_id
+			WHERE post_aliases.slug = $1 AND posts.user_id = $2`,
+			slug, user_id,
+		)
 		postID := ""
 		err := alias.Scan(&postID)
 		if err != nil {
