@@ -397,15 +397,20 @@ func (m *PipeMonitor) Status() error {
 	if m.WindowEnd == nil {
 		return fmt.Errorf("window end not set")
 	}
-	windowStart := m.WindowEnd.Add(-m.WindowDur)
-	lastPingAfterStart := m.LastPing.After(windowStart)
-	if !lastPingAfterStart {
-		return fmt.Errorf("last ping before window start: last_ping=%s window_start=%s", m.LastPing, windowStart)
+	now := time.Now().UTC()
+	if now.After(*m.WindowEnd) {
+		return fmt.Errorf(
+			"window expired at %s",
+			m.WindowEnd.UTC().Format("2006-01-02 15:04:05Z"),
+		)
 	}
-	lastPingBeforeEnd := m.LastPing.Before(*m.WindowEnd)
-	if !lastPingBeforeEnd {
-		// should not happen but just for data validity we add it
-		return fmt.Errorf("last ping after window end: last_ping=%s window_end=%s", m.LastPing, m.WindowEnd)
+	windowStart := m.WindowEnd.Add(-m.WindowDur)
+	lastPingAfterStart := !m.LastPing.Before(windowStart)
+	if !lastPingAfterStart {
+		return fmt.Errorf(
+			"last ping before window start: %s",
+			windowStart.UTC().Format("2006-01-02 15:04:05Z"),
+		)
 	}
 	return nil
 }

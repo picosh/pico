@@ -367,7 +367,7 @@ func (handler *CliHandler) monitor(cmd *CliCmd, user *db.User) error {
 		return fmt.Errorf("invalid duration %q: %w", durStr, err)
 	}
 
-	winEnd := time.Now().Add(dur)
+	winEnd := time.Now().UTC().Add(dur)
 	err = handler.DBPool.UpsertPipeMonitor(user.ID, resolvedTopic, dur, &winEnd)
 	if err != nil {
 		return fmt.Errorf("failed to create monitor: %w", err)
@@ -393,7 +393,7 @@ func (handler *CliHandler) status(cmd *CliCmd, user *db.User) error {
 	}
 
 	writer := tabwriter.NewWriter(cmd.sesh, 0, 0, 2, ' ', tabwriter.TabIndent)
-	_, _ = fmt.Fprintln(writer, "Topic\tStatus\tReason\tWindow\tLast Ping\tCreated")
+	_, _ = fmt.Fprintln(writer, "Topic\tStatus\tWindow\tLast Ping\tWindow End\tReason")
 
 	for _, m := range monitors {
 		status := "healthy"
@@ -405,12 +405,12 @@ func (handler *CliHandler) status(cmd *CliCmd, user *db.User) error {
 
 		lastPing := "never"
 		if m.LastPing != nil {
-			lastPing = m.LastPing.Format("2006-01-02 15:04:05")
+			lastPing = m.LastPing.UTC().Format("2006-01-02 15:04:05Z")
 		}
 
-		createdAt := ""
-		if m.CreatedAt != nil {
-			createdAt = m.CreatedAt.Format("2006-01-02 15:04:05")
+		windowEnd := ""
+		if m.WindowEnd != nil {
+			windowEnd = m.WindowEnd.UTC().Format("2006-01-02 15:04:05Z")
 		}
 
 		_, _ = fmt.Fprintf(
@@ -418,10 +418,10 @@ func (handler *CliHandler) status(cmd *CliCmd, user *db.User) error {
 			"%s\t%s\t%s\t%s\t%s\t%s\r\n",
 			m.Topic,
 			status,
-			reason,
 			m.WindowDur.String(),
 			lastPing,
-			createdAt,
+			windowEnd,
+			reason,
 		)
 	}
 	_ = writer.Flush()
@@ -709,17 +709,15 @@ func (handler *CliHandler) updateMonitor(cmd *CliCmd, topic string) {
 		return
 	}
 
-	now := time.Now()
+	now := time.Now().UTC()
 	if err := handler.DBPool.UpdatePipeMonitorLastPing(cmd.user.ID, topic, &now); err != nil {
 		handler.Logger.Error("failed to update monitor last_ping", "err", err, "topic", topic)
 	}
 
-	// Advance window if current time is past window_end
-	if monitor.WindowEnd != nil && now.After(*monitor.WindowEnd) {
-		nextWindow := monitor.GetNextWindow()
-		if err := handler.DBPool.UpsertPipeMonitor(cmd.user.ID, topic, monitor.WindowDur, nextWindow); err != nil {
-			handler.Logger.Error("failed to advance monitor window", "err", err, "topic", topic)
-		}
+	// Always reset the window to now + duration on ping
+	newWindowEnd := now.Add(monitor.WindowDur)
+	if err := handler.DBPool.UpsertPipeMonitor(cmd.user.ID, topic, monitor.WindowDur, &newWindowEnd); err != nil {
+		handler.Logger.Error("failed to reset monitor window", "err", err, "topic", topic)
 	}
 }
 
