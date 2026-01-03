@@ -1921,3 +1921,175 @@ func TestPub_UpdatesMonitorLastPing(t *testing.T) {
 		t.Errorf("last_ping should be recent, got: %v", monitor.LastPing)
 	}
 }
+
+// Tests for monitor status edge cases
+
+func TestStatus_PingAtExactWindowStart(t *testing.T) {
+	// Bug fix: Status() should use >= for windowStart comparison
+	// A ping exactly at windowStart should be healthy
+	now := time.Now().UTC()
+	windowEnd := now.Add(1 * time.Hour)
+	windowStart := windowEnd.Add(-1 * time.Hour) // equals now
+
+	monitor := &db.PipeMonitor{
+		LastPing:  &windowStart, // ping exactly at window start
+		WindowEnd: &windowEnd,
+		WindowDur: 1 * time.Hour,
+	}
+
+	err := monitor.Status()
+	if err != nil {
+		t.Errorf("ping at exact window start should be healthy, got: %v", err)
+	}
+}
+
+func TestStatus_WindowExpired(t *testing.T) {
+	// Bug fix: Status() should check if current time is past windowEnd
+	now := time.Now().UTC()
+	windowEnd := now.Add(-1 * time.Minute) // window ended 1 minute ago
+	lastPing := now.Add(-30 * time.Second) // ping was 30 seconds ago
+
+	monitor := &db.PipeMonitor{
+		LastPing:  &lastPing,
+		WindowEnd: &windowEnd,
+		WindowDur: 1 * time.Hour,
+	}
+
+	err := monitor.Status()
+	if err == nil {
+		t.Error("expired window should be unhealthy")
+	}
+	if !strings.Contains(err.Error(), "window expired") {
+		t.Errorf("error should mention window expired, got: %v", err)
+	}
+}
+
+func TestStatus_PingResetsWindow(t *testing.T) {
+	// Bug fix: Every ping should reset window to now + duration
+	server := NewTestSSHServer(t)
+	defer server.Shutdown()
+
+	user := GenerateUser("alice")
+	RegisterUserWithServer(server, user)
+
+	// Create a monitor with an expired window
+	expiredWindowEnd := time.Now().UTC().Add(-10 * time.Minute)
+	_ = server.DBPool.UpsertPipeMonitor("alice-id", "alice/reset-test", 5*time.Minute, &expiredWindowEnd)
+
+	client, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect: %v", err)
+	}
+	defer func() { _ = client.Close() }()
+
+	// Start a subscriber first so pub doesn't block
+	subClient, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect subscriber: %v", err)
+	}
+	defer func() { _ = subClient.Close() }()
+
+	subSession, err := subClient.NewSession()
+	if err != nil {
+		t.Fatalf("failed to create sub session: %v", err)
+	}
+	defer func() { _ = subSession.Close() }()
+
+	if err := subSession.Start("sub reset-test -c"); err != nil {
+		t.Fatalf("failed to start sub: %v", err)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Pub to trigger monitor update
+	_, err = user.RunCommandWithStdin(client, "pub reset-test -c", "ping")
+	if err != nil {
+		t.Logf("pub command completed: %v", err)
+	}
+
+	// Check that window was reset
+	monitor, err := server.DBPool.FindPipeMonitorByTopic("alice-id", "alice/reset-test")
+	if err != nil {
+		t.Fatalf("monitor should exist: %v", err)
+	}
+
+	if monitor.WindowEnd == nil {
+		t.Fatal("window_end should be set")
+	}
+
+	// Window end should now be in the future
+	if !monitor.WindowEnd.After(time.Now().UTC()) {
+		t.Errorf("window_end should be in the future after ping, got: %v", monitor.WindowEnd)
+	}
+}
+
+func TestStatus_HealthyImmediatelyAfterPing(t *testing.T) {
+	// Bug fix: After a ping, status should immediately show healthy
+	server := NewTestSSHServer(t)
+	defer server.Shutdown()
+
+	user := GenerateUser("alice")
+	RegisterUserWithServer(server, user)
+
+	client, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect: %v", err)
+	}
+	defer func() { _ = client.Close() }()
+
+	// Create monitor
+	_, err = user.RunCommand(client, "monitor health-test 5m")
+	if err != nil {
+		t.Fatalf("failed to create monitor: %v", err)
+	}
+
+	// Start subscriber
+	subClient, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect subscriber: %v", err)
+	}
+	defer func() { _ = subClient.Close() }()
+
+	subSession, err := subClient.NewSession()
+	if err != nil {
+		t.Fatalf("failed to create sub session: %v", err)
+	}
+	defer func() { _ = subSession.Close() }()
+
+	if err := subSession.Start("sub health-test -c"); err != nil {
+		t.Fatalf("failed to start sub: %v", err)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Pub to trigger ping
+	pubClient, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect publisher: %v", err)
+	}
+	defer func() { _ = pubClient.Close() }()
+
+	_, err = user.RunCommandWithStdin(pubClient, "pub health-test -c", "ping")
+	if err != nil {
+		t.Logf("pub completed: %v", err)
+	}
+
+	// Immediately check status
+	statusClient, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect for status: %v", err)
+	}
+	defer func() { _ = statusClient.Close() }()
+
+	output, err := user.RunCommand(statusClient, "status")
+	if err != nil {
+		t.Logf("status completed: %v", err)
+	}
+
+	if strings.Contains(output, "unhealthy") {
+		t.Errorf("status should be healthy immediately after ping, got: %s", output)
+	}
+	if !strings.Contains(output, "healthy") {
+		t.Errorf("status should show healthy, got: %s", output)
+	}
+}
