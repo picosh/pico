@@ -5,6 +5,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"regexp"
 	"time"
 )
@@ -378,6 +379,47 @@ type TunsEventLog struct {
 	CreatedAt      *time.Time `json:"created_at" db:"created_at"`
 }
 
+type PipeMonitor struct {
+	ID        string        `json:"id" db:"id"`
+	UserId    string        `json:"user_id" db:"user_id"`
+	Topic     string        `json:"topic" db:"topic"`
+	WindowDur time.Duration `json:"window_dur" db:"window_dur"`
+	WindowEnd *time.Time    `json:"window_end" db:"window_end"`
+	LastPing  *time.Time    `json:"last_ping" db:"last_ping"`
+	CreatedAt *time.Time    `json:"created_at" db:"created_at"`
+	UpdatedAt *time.Time    `json:"updated_at" db:"updated_at"`
+}
+
+func (m *PipeMonitor) Status() error {
+	if m.LastPing == nil {
+		return fmt.Errorf("no ping received yet")
+	}
+	if m.WindowEnd == nil {
+		return fmt.Errorf("window end not set")
+	}
+	now := time.Now().UTC()
+	if now.After(*m.WindowEnd) {
+		return fmt.Errorf(
+			"window expired at %s",
+			m.WindowEnd.UTC().Format("2006-01-02 15:04:05Z"),
+		)
+	}
+	windowStart := m.WindowEnd.Add(-m.WindowDur)
+	lastPingAfterStart := !m.LastPing.Before(windowStart)
+	if !lastPingAfterStart {
+		return fmt.Errorf(
+			"last ping before window start: %s",
+			windowStart.UTC().Format("2006-01-02 15:04:05Z"),
+		)
+	}
+	return nil
+}
+
+func (m *PipeMonitor) GetNextWindow() *time.Time {
+	win := m.WindowEnd.Add(m.WindowDur)
+	return &win
+}
+
 var NameValidator = regexp.MustCompile("^[a-zA-Z0-9]{1,50}$")
 var DenyList = []string{
 	"admin",
@@ -467,6 +509,12 @@ type DB interface {
 	FindAccessLogs(userID string, fromDate *time.Time) ([]*AccessLog, error)
 	FindPubkeysInAccessLogs(userID string) ([]string, error)
 	FindAccessLogsByPubkey(pubkey string, fromDate *time.Time) ([]*AccessLog, error)
+
+	UpsertPipeMonitor(userID, topic string, dur time.Duration, winEnd *time.Time) error
+	UpdatePipeMonitorLastPing(userID, topic string, lastPing *time.Time) error
+	RemovePipeMonitor(userID, topic string) error
+	FindPipeMonitorByTopic(userID, topic string) (*PipeMonitor, error)
+	FindPipeMonitorsByUser(userID string) ([]*PipeMonitor, error)
 
 	Close() error
 }

@@ -9,10 +9,13 @@ import (
 	"log/slog"
 	"slices"
 	"strings"
+	"sync/atomic"
+	"text/tabwriter"
 	"time"
 
 	"github.com/antoniomika/syncmap"
 	"github.com/google/uuid"
+	"github.com/gorilla/feeds"
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/pssh"
 	"github.com/picosh/pico/pkg/shared"
@@ -58,6 +61,7 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 				isAdmin:  isAdmin,
 				pipeCtx:  pipeCtx,
 				cancel:   cancel,
+				user:     user,
 			}
 
 			cmd := strings.TrimSpace(args[0])
@@ -67,6 +71,24 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 				return next(sesh)
 			case "ls":
 				err := handler.ls(cliCmd)
+				if err != nil {
+					sesh.Fatal(err)
+				}
+				return next(sesh)
+			case "monitor":
+				err := handler.monitor(cliCmd, user)
+				if err != nil {
+					sesh.Fatal(err)
+				}
+				return next(sesh)
+			case "status":
+				err := handler.status(cliCmd, user)
+				if err != nil {
+					sesh.Fatal(err)
+				}
+				return next(sesh)
+			case "rss":
+				err := handler.rss(cliCmd, user)
 				if err != nil {
 					sesh.Fatal(err)
 				}
@@ -161,10 +183,11 @@ type CliCmd struct {
 	isAdmin  bool
 	pipeCtx  context.Context
 	cancel   context.CancelFunc
+	user     *db.User
 }
 
 func help(cfg *shared.ConfigSite, sesh *pssh.SSHServerConnSession) {
-	data := fmt.Sprintf(`Command: ssh %s <help | ls | pub | sub | pipe> <topic> [-h | args...]
+	data := fmt.Sprintf(`Command: ssh %s <command> [args...]
 
 The simplest authenticated pubsub system.  Send messages through
 user-defined topics.  Topics are private to the authenticated
@@ -175,13 +198,21 @@ at least one event to be sent or received. Pipe ("pipe") allows
 for bidirectional messages to be sent between any clients connected
 to a pipe.
 
-Think of these different commands in terms of the direction the
-data is being sent:
+Commands:
+  help                        Show this help message
+  ls                          List active pubsub channels
+  pub <topic> [flags]         Publish messages to a topic
+  sub <topic> [flags]         Subscribe to messages from a topic
+  pipe <topic> [flags]        Bidirectional messaging between clients
 
-- pub => writes to client
-- sub => reads from client
-- pipe => read and write between clients
-`, toSshCmd(cfg))
+Monitoring commands:
+  monitor <topic> <duration>  Create/update a health monitor for a topic
+  monitor <topic> -d          Delete a monitor
+  status                      Show health status of all monitors
+  rss                         Get RSS feed of monitor alerts
+
+Use "ssh %s <command> -h" for help on a specific command.
+`, toSshCmd(cfg), toSshCmd(cfg))
 
 	data = strings.ReplaceAll(data, "\n", "\r\n")
 	_, _ = fmt.Fprintln(sesh, data)
@@ -271,6 +302,174 @@ func (handler *CliHandler) ls(cmd *CliCmd) error {
 		_, _ = cmd.sesh.Write([]byte(outputData))
 	}
 
+	return nil
+}
+
+func (handler *CliHandler) monitor(cmd *CliCmd, user *db.User) error {
+	if user == nil {
+		return fmt.Errorf("access denied")
+	}
+
+	args := cmd.sesh.Command()
+	topic := ""
+	cmdArgs := args[1:]
+	if len(args) > 1 && !strings.HasPrefix(args[1], "-") {
+		topic = strings.TrimSpace(args[1])
+		cmdArgs = args[2:]
+	}
+
+	monitorCmd := flagSet("monitor", cmd.sesh)
+	del := monitorCmd.Bool("d", false, "Delete the monitor")
+
+	if !flagCheck(monitorCmd, topic, cmdArgs) {
+		return nil
+	}
+
+	if topic == "" {
+		_, _ = fmt.Fprintln(cmd.sesh, "Usage: monitor <topic> <duration>")
+		_, _ = fmt.Fprintln(cmd.sesh, "       monitor <topic> -d")
+		return fmt.Errorf("topic is required")
+	}
+
+	// Resolve to fully qualified topic name
+	result := resolveTopic(TopicResolveInput{
+		UserName: cmd.userName,
+		Topic:    topic,
+		IsAdmin:  cmd.isAdmin,
+		IsPublic: false,
+	})
+	resolvedTopic := result.Name
+
+	if *del {
+		err := handler.DBPool.RemovePipeMonitor(user.ID, resolvedTopic)
+		if err != nil {
+			return fmt.Errorf("failed to delete monitor: %w", err)
+		}
+		_, _ = fmt.Fprintf(cmd.sesh, "monitor deleted: %s\r\n", resolvedTopic)
+		return nil
+	}
+
+	// Create/update monitor - need duration argument
+	durStr := ""
+	if monitorCmd.NArg() > 0 {
+		durStr = monitorCmd.Arg(0)
+	} else if len(cmdArgs) > 0 {
+		durStr = cmdArgs[0]
+	}
+
+	if durStr == "" {
+		_, _ = fmt.Fprintln(cmd.sesh, "Usage: monitor <topic> <duration>")
+		return fmt.Errorf("duration is required")
+	}
+
+	dur, err := time.ParseDuration(durStr)
+	if err != nil {
+		return fmt.Errorf("invalid duration %q: %w", durStr, err)
+	}
+
+	winEnd := time.Now().UTC().Add(dur)
+	err = handler.DBPool.UpsertPipeMonitor(user.ID, resolvedTopic, dur, &winEnd)
+	if err != nil {
+		return fmt.Errorf("failed to create monitor: %w", err)
+	}
+
+	_, _ = fmt.Fprintf(cmd.sesh, "monitor created: %s (window: %s)\r\n", resolvedTopic, dur)
+	return nil
+}
+
+func (handler *CliHandler) status(cmd *CliCmd, user *db.User) error {
+	if user == nil {
+		return fmt.Errorf("access denied")
+	}
+
+	monitors, err := handler.DBPool.FindPipeMonitorsByUser(user.ID)
+	if err != nil {
+		return fmt.Errorf("failed to fetch monitors: %w", err)
+	}
+
+	if len(monitors) == 0 {
+		_, _ = fmt.Fprintln(cmd.sesh, "no monitors found")
+		return nil
+	}
+
+	writer := tabwriter.NewWriter(cmd.sesh, 0, 0, 2, ' ', tabwriter.TabIndent)
+	_, _ = fmt.Fprintln(writer, "Topic\tStatus\tWindow\tLast Ping\tWindow End\tReason")
+
+	for _, m := range monitors {
+		status := "healthy"
+		reason := ""
+		if err := m.Status(); err != nil {
+			status = "unhealthy"
+			reason = err.Error()
+		}
+
+		lastPing := "never"
+		if m.LastPing != nil {
+			lastPing = m.LastPing.UTC().Format("2006-01-02 15:04:05Z")
+		}
+
+		windowEnd := ""
+		if m.WindowEnd != nil {
+			windowEnd = m.WindowEnd.UTC().Format("2006-01-02 15:04:05Z")
+		}
+
+		_, _ = fmt.Fprintf(
+			writer,
+			"%s\t%s\t%s\t%s\t%s\t%s\r\n",
+			m.Topic,
+			status,
+			m.WindowDur.String(),
+			lastPing,
+			windowEnd,
+			reason,
+		)
+	}
+	_ = writer.Flush()
+	return nil
+}
+
+func (handler *CliHandler) rss(cmd *CliCmd, user *db.User) error {
+	if user == nil {
+		return fmt.Errorf("access denied")
+	}
+
+	monitors, err := handler.DBPool.FindPipeMonitorsByUser(user.ID)
+	if err != nil {
+		return fmt.Errorf("failed to fetch monitors: %w", err)
+	}
+
+	now := time.Now()
+	feed := &feeds.Feed{
+		Title:       fmt.Sprintf("Pipe Monitors for %s", user.Name),
+		Link:        &feeds.Link{Href: fmt.Sprintf("https://%s", handler.Cfg.Domain)},
+		Description: "Alerts for pipe monitor status changes",
+		Author:      &feeds.Author{Name: user.Name},
+		Created:     now,
+	}
+
+	var feedItems []*feeds.Item
+	for _, m := range monitors {
+		if err := m.Status(); err != nil {
+			item := &feeds.Item{
+				Id:          fmt.Sprintf("%s-%s-%d", user.ID, m.Topic, now.Unix()),
+				Title:       fmt.Sprintf("ALERT: %s is unhealthy", m.Topic),
+				Link:        &feeds.Link{Href: fmt.Sprintf("https://%s", handler.Cfg.Domain)},
+				Description: err.Error(),
+				Created:     now,
+				Updated:     now,
+				Author:      &feeds.Author{Name: user.Name},
+			}
+			feedItems = append(feedItems, item)
+		}
+	}
+	feed.Items = feedItems
+
+	rss, err := feed.ToRss()
+	if err != nil {
+		return fmt.Errorf("failed to generate RSS: %w", err)
+	}
+
+	_, _ = fmt.Fprint(cmd.sesh, rss)
 	return nil
 }
 
@@ -475,10 +674,12 @@ func (handler *CliHandler) pub(cmd *CliCmd, topic string, clientID string) error
 		_, _ = fmt.Fprintln(cmd.sesh, "sending msg ...")
 	}
 
+	throttledRW := newThrottledMonitorRW(rw, handler, cmd, name)
+
 	err := handler.PubSub.Pub(
 		cmd.pipeCtx,
 		clientID,
-		rw,
+		throttledRW,
 		[]*psub.Channel{
 			psub.NewChannel(name),
 		},
@@ -493,7 +694,78 @@ func (handler *CliHandler) pub(cmd *CliCmd, topic string, clientID string) error
 		return err
 	}
 
+	handler.updateMonitor(cmd, name)
+
 	return nil
+}
+
+func (handler *CliHandler) updateMonitor(cmd *CliCmd, topic string) {
+	if cmd.user == nil {
+		return
+	}
+
+	monitor, err := handler.DBPool.FindPipeMonitorByTopic(cmd.user.ID, topic)
+	if err != nil || monitor == nil {
+		return
+	}
+
+	now := time.Now().UTC()
+	if err := handler.DBPool.UpdatePipeMonitorLastPing(cmd.user.ID, topic, &now); err != nil {
+		handler.Logger.Error("failed to update monitor last_ping", "err", err, "topic", topic)
+	}
+
+	// Always reset the window to now + duration on ping
+	newWindowEnd := now.Add(monitor.WindowDur)
+	if err := handler.DBPool.UpsertPipeMonitor(cmd.user.ID, topic, monitor.WindowDur, &newWindowEnd); err != nil {
+		handler.Logger.Error("failed to reset monitor window", "err", err, "topic", topic)
+	}
+}
+
+const monitorThrottleInterval = 15 * time.Second
+
+type throttledMonitorRW struct {
+	rw       io.ReadWriter
+	handler  *CliHandler
+	cmd      *CliCmd
+	topic    string
+	lastPing atomic.Int64 // Unix nanoseconds
+}
+
+func newThrottledMonitorRW(rw io.ReadWriter, handler *CliHandler, cmd *CliCmd, topic string) *throttledMonitorRW {
+	return &throttledMonitorRW{
+		rw:      rw,
+		handler: handler,
+		cmd:     cmd,
+		topic:   topic,
+	}
+}
+
+func (t *throttledMonitorRW) throttledUpdate() {
+	now := time.Now().UnixNano()
+	last := t.lastPing.Load()
+
+	// First ping (last == 0) or interval elapsed
+	if last == 0 || now-last >= int64(monitorThrottleInterval) {
+		if t.lastPing.CompareAndSwap(last, now) {
+			t.handler.updateMonitor(t.cmd, t.topic)
+		}
+	}
+}
+
+func (t *throttledMonitorRW) Read(p []byte) (int, error) {
+	n, err := t.rw.Read(p)
+	if n > 0 {
+		t.throttledUpdate()
+	}
+	return n, err
+}
+
+func (t *throttledMonitorRW) Write(p []byte) (int, error) {
+	n, err := t.rw.Write(p)
+	if n > 0 {
+		t.throttledUpdate()
+	}
+	return n, err
 }
 
 func (handler *CliHandler) sub(cmd *CliCmd, topic string, clientID string) error {
@@ -675,10 +947,12 @@ func (handler *CliHandler) pipe(cmd *CliCmd, topic string, clientID string) erro
 		)
 	}
 
+	throttledRW := newThrottledMonitorRW(cmd.sesh, handler, cmd, name)
+
 	readErr, writeErr := handler.PubSub.Pipe(
 		cmd.pipeCtx,
 		clientID,
-		cmd.sesh,
+		throttledRW,
 		[]*psub.Channel{
 			psub.NewChannel(name),
 		},
@@ -692,6 +966,8 @@ func (handler *CliHandler) pipe(cmd *CliCmd, topic string, clientID string) erro
 	if writeErr != nil && !*clean {
 		return writeErr
 	}
+
+	handler.updateMonitor(cmd, name)
 
 	return nil
 }
