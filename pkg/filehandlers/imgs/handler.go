@@ -288,12 +288,6 @@ func (h *UploadImgHandler) metaImg(data *PostMetaData) error {
 		return err
 	}
 
-	// make sure we have a prose project to upload to
-	_, err = h.DBPool.UpsertProject(data.User.ID, "prose", "prose")
-	if err != nil {
-		return err
-	}
-
 	reader := bytes.NewReader([]byte(data.Text))
 	_, _, err = h.Storage.PutObject(
 		bucket,
