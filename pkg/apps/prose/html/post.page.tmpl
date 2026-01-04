@@ -65,7 +65,11 @@
 </header>
 <main>
     <article class="md">
-        {{.Contents}}
+        {{if .List}}
+          {{template "list" .List}}
+        {{else}}
+          {{.Contents}}
+        {{end}}
 
         <div class="tags">
           {{range .Tags}}

@@ -55,6 +55,7 @@ func StartSshServer() {
 		".md":      filehandlers.NewScpPostHandler(dbh, cfg, hooks),
 		".txt":     filehandlers.NewScpPostHandler(dbh, cfg, hooks),
 		".css":     filehandlers.NewScpPostHandler(dbh, cfg, hooks),
+		".lxt":     filehandlers.NewScpPostHandler(dbh, cfg, hooks),
 		"fallback": uploadimgs.NewUploadImgHandler(dbh, cfg, st),
 	}
 	handler := filehandlers.NewFileHandlerRouter(cfg, dbh, fileMap)

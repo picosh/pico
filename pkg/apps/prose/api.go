@@ -90,6 +90,7 @@ type PostPageData struct {
 	Diff         template.HTML
 	UpdatedAtISO string
 	UpdatedAt    string
+	List         *shared.ListParsedText
 }
 
 type HeaderTxt struct {
@@ -427,22 +428,43 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	post, err := dbpool.FindPostWithSlug(slug, user.ID, cfg.Space)
 	if err == nil {
 		logger.Info("post found", "id", post.ID, "filename", post.FileSize)
-		parsedText, err := shared.ParseText(post.Text)
-		if err != nil {
-			logger.Error("find post with slug", "err", err.Error())
-		}
-
-		if parsedText.Image != "" {
-			ogImage = parsedText.Image
-		}
-
-		if parsedText.ImageCard != "" {
-			ogImageCard = parsedText.ImageCard
-		}
-
+		ext := filepath.Ext(post.Filename)
+		contents := template.HTML("")
+		tags := []string{}
 		unlisted := false
-		if post.Hidden || post.PublishAt.After(time.Now()) {
-			unlisted = true
+		var list *shared.ListParsedText
+
+		switch ext {
+		case ".lxt":
+			list = shared.ListParseText(post.Text)
+
+			tags = list.Tags
+			if list.Image != "" {
+				ogImage = list.Image
+			}
+			if list.ImageCard != "" {
+				ogImageCard = list.ImageCard
+			}
+			if post.Hidden || post.PublishAt.After(time.Now()) {
+				unlisted = true
+			}
+		case ".md":
+			parsedText, err := shared.ParseText(post.Text)
+			if err != nil {
+				logger.Error("could not parse md text", "err", err.Error())
+			}
+
+			tags = parsedText.Tags
+			if parsedText.Image != "" {
+				ogImage = parsedText.Image
+			}
+			if parsedText.ImageCard != "" {
+				ogImageCard = parsedText.ImageCard
+			}
+			if post.Hidden || post.PublishAt.After(time.Now()) {
+				unlisted = true
+			}
+			contents = template.HTML(parsedText.Html)
 		}
 
 		data = PostPageData{
@@ -459,10 +481,10 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			UpdatedAtISO: post.UpdatedAt.Format(time.RFC3339),
 			Username:     username,
 			BlogName:     blogName,
-			Contents:     template.HTML(parsedText.Html),
+			Contents:     contents,
 			HasCSS:       hasCSS,
 			CssURL:       template.URL(cfg.CssURL(username)),
-			Tags:         parsedText.Tags,
+			Tags:         tags,
 			Image:        template.URL(ogImage),
 			ImageCard:    ogImageCard,
 			Favicon:      template.URL(favicon),
@@ -470,6 +492,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			Unlisted:     unlisted,
 			Diff:         template.HTML(diff),
 			WithStyles:   withStyles,
+			List:         list,
 		}
 	} else {
 		logger.Info("post not found")
@@ -522,6 +545,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ts, err := shared.RenderTemplate(cfg, []string{
+		cfg.StaticPath("html/list.partial.tmpl"),
 		cfg.StaticPath("html/post.page.tmpl"),
 	})
 
@@ -651,7 +675,10 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ts, err := template.ParseFiles(cfg.StaticPath("html/rss.page.tmpl"))
+	ts, err := template.New("rss.page.tmpl").Funcs(shared.FuncMap).ParseFiles(
+		cfg.StaticPath("html/list.partial.tmpl"),
+		cfg.StaticPath("html/rss.page.tmpl"),
+	)
 	if err != nil {
 		logger.Error("template parse file", "err", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -700,27 +727,48 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 		if slices.Contains(cfg.HiddenPosts, post.Filename) {
 			continue
 		}
-		parsed, err := shared.ParseText(post.Text)
-		if err != nil {
-			logger.Error("parse post text", "err", err.Error())
-		}
 
-		footer, err := dbpool.FindPostWithFilename("_footer.md", user.ID, cfg.Space)
-		var footerHTML string
-		if err == nil {
-			footerParsed, err := shared.ParseText(footer.Text)
+		content := ""
+		ext := filepath.Ext(post.Filename)
+		fmt.Println("HERE", post.Filename, ext)
+		switch ext {
+		case ".md":
+			parsed, err := shared.ParseText(post.Text)
 			if err != nil {
-				logger.Error("parse footer text", "err", err.Error())
+				logger.Error("parse post text", "err", err.Error())
 			}
-			footerHTML = footerParsed.Html
-		}
 
-		var tpl bytes.Buffer
-		data := &PostPageData{
-			Contents: template.HTML(parsed.Html + footerHTML),
-		}
-		if err := ts.Execute(&tpl, data); err != nil {
-			continue
+			footer, err := dbpool.FindPostWithFilename("_footer.md", user.ID, cfg.Space)
+			var footerHTML string
+			if err == nil {
+				footerParsed, err := shared.ParseText(footer.Text)
+				if err != nil {
+					logger.Error("parse footer text", "err", err.Error())
+				}
+				footerHTML = footerParsed.Html
+			}
+
+			var tpl bytes.Buffer
+			data := &PostPageData{
+				Contents: template.HTML(parsed.Html + footerHTML),
+			}
+			if err := ts.Execute(&tpl, data); err != nil {
+				logger.Error("md template", "err", err)
+				continue
+			}
+			content = tpl.String()
+		case ".lxt":
+			parsed := shared.ListParseText(post.Text)
+			var tpl bytes.Buffer
+			data := &PostPageData{
+				List: parsed,
+			}
+			if err := ts.Execute(&tpl, data); err != nil {
+				logger.Error("lxt template", "err", err)
+				continue
+			}
+			content = tpl.String()
+
 		}
 
 		realUrl := cfg.FullPostURL(curl, post.Username, post.Slug)
@@ -730,7 +778,7 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 			Id:          feedId,
 			Title:       utils.FilenameToTitle(post.Filename, post.Title),
 			Link:        &feeds.Link{Href: realUrl},
-			Content:     tpl.String(),
+			Content:     content,
 			Updated:     *post.PublishAt,
 			Created:     *post.PublishAt,
 			Description: post.Description,
@@ -769,7 +817,10 @@ func rssHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ts, err := template.ParseFiles(cfg.StaticPath("html/rss.page.tmpl"))
+	ts, err := template.New("rss.page.tmpl").Funcs(shared.FuncMap).ParseFiles(
+		cfg.StaticPath("html/list.partial.tmpl"),
+		cfg.StaticPath("html/rss.page.tmpl"),
+	)
 	if err != nil {
 		logger.Error("template parse file", "err", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -788,17 +839,34 @@ func rssHandler(w http.ResponseWriter, r *http.Request) {
 
 	var feedItems []*feeds.Item
 	for _, post := range pager.Data {
-		parsed, err := shared.ParseText(post.Text)
-		if err != nil {
-			logger.Error(err.Error())
-		}
+		content := ""
+		ext := filepath.Ext(post.Filename)
+		switch ext {
+		case ".md":
+			parsed, err := shared.ParseText(post.Text)
+			if err != nil {
+				logger.Error(err.Error())
+			}
 
-		var tpl bytes.Buffer
-		data := &PostPageData{
-			Contents: template.HTML(parsed.Html),
-		}
-		if err := ts.Execute(&tpl, data); err != nil {
-			continue
+			var tpl bytes.Buffer
+			data := &PostPageData{
+				Contents: template.HTML(parsed.Html),
+			}
+			if err := ts.Execute(&tpl, data); err != nil {
+				continue
+			}
+			content = tpl.String()
+		case ".lxt":
+			parsed := shared.ListParseText(post.Text)
+			var tpl bytes.Buffer
+			data := &PostPageData{
+				List: parsed,
+			}
+			if err := ts.Execute(&tpl, data); err != nil {
+				continue
+			}
+			content = tpl.String()
+
 		}
 
 		realUrl := cfg.FullPostURL(curl, post.Username, post.Slug)
@@ -810,7 +878,7 @@ func rssHandler(w http.ResponseWriter, r *http.Request) {
 			Id:          realUrl,
 			Title:       post.Title,
 			Link:        &feeds.Link{Href: realUrl},
-			Content:     tpl.String(),
+			Content:     content,
 			Created:     *post.PublishAt,
 			Updated:     *post.UpdatedAt,
 			Description: post.Description,

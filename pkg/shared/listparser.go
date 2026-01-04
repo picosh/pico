@@ -34,12 +34,19 @@ type ListItem struct {
 }
 
 type ListMetaData struct {
-	PublishAt      *time.Time
-	Title          string
-	Description    string
-	Layout         string
-	Tags           []string
-	ListType       string // https://developer.mozilla.org/en-US/docs/Web/CSS/list-style-type
+	// prose
+	Aliases     []string
+	Description string
+	Hidden      bool
+	Image       string
+	ImageCard   string
+	Layout      string
+	ListType    string // https://developer.mozilla.org/en-US/docs/Web/CSS/list-style-type
+	PublishAt   *time.Time
+	Tags        []string
+	Title       string
+
+	// feeds
 	DigestInterval string
 	Cron           string
 	Email          string
@@ -101,13 +108,29 @@ func TokenToMetaField(meta *ListMetaData, token *SplitToken) error {
 		meta.Title = token.Value
 	case "description":
 		meta.Description = token.Value
+	case "image":
+		meta.Image = token.Value
+	case "image_card":
+		meta.ImageCard = token.Value
 	case "list_type":
 		meta.ListType = token.Value
+	case "hidden":
+		if token.Value == "true" {
+			meta.Hidden = true
+		} else {
+			meta.Hidden = false
+		}
 	case "tags":
 		tags := strings.Split(token.Value, ",")
 		meta.Tags = make([]string, 0)
 		for _, tag := range tags {
 			meta.Tags = append(meta.Tags, strings.TrimSpace(tag))
+		}
+	case "aliases":
+		aliases := strings.Split(token.Value, ",")
+		meta.Aliases = make([]string, 0)
+		for _, alias := range aliases {
+			meta.Aliases = append(meta.Aliases, strings.TrimSpace(alias))
 		}
 	case "layout":
 		meta.Layout = token.Value
@@ -206,10 +229,12 @@ func ListParseText(text string) *ListParsedText {
 	textItems := SplitByNewline(text)
 	items := []*ListItem{}
 	meta := ListMetaData{
-		ListType:      "disc",
-		Tags:          []string{},
-		Layout:        "default",
+		Aliases:       []string{},
 		InlineContent: true,
+		Layout:        "default",
+		ListType:      "disc",
+		PublishAt:     &time.Time{},
+		Tags:          []string{},
 	}
 	pre := false
 	skip := false

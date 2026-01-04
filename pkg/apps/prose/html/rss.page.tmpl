@@ -1,1 +1,5 @@
-{{.Contents}}
+{{if .List}}
+  {{template "list" .List}}
+{{else}}
+  {{.Contents}}
+{{end}}

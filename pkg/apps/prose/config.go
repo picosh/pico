@@ -28,6 +28,7 @@ func NewConfigSite(service string) *shared.ConfigSite {
 		Space:    "prose",
 		AllowedExt: []string{
 			".md",
+			".lxt",
 			".jpg",
 			".jpeg",
 			".png",

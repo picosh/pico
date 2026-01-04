@@ -2,6 +2,7 @@ package prose
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"slices"
@@ -62,7 +63,28 @@ func (p *MarkdownHooks) FileValidate(s *pssh.SSHServerConnSession, data *filehan
 	return true, nil
 }
 
-func (p *MarkdownHooks) FileMeta(s *pssh.SSHServerConnSession, data *filehandlers.PostMetaData) error {
+func (p *MarkdownHooks) metaLxt(data *filehandlers.PostMetaData) error {
+	parsedText := shared.ListParseText(data.Text)
+
+	if parsedText.Title == "" {
+		data.Title = utils.ToUpper(data.Slug)
+	} else {
+		data.Title = parsedText.Title
+	}
+
+	data.Aliases = parsedText.Aliases
+	data.Tags = parsedText.Tags
+	data.Description = parsedText.Description
+
+	if parsedText.PublishAt != nil && !parsedText.PublishAt.IsZero() {
+		data.PublishAt = parsedText.PublishAt
+	}
+	data.Hidden = parsedText.Hidden
+
+	return nil
+}
+
+func (p *MarkdownHooks) metaMd(data *filehandlers.PostMetaData) error {
 	parsedText, err := shared.ParseText(data.Text)
 	if err != nil {
 		return fmt.Errorf("%s: %w", data.Filename, err)
@@ -81,9 +103,28 @@ func (p *MarkdownHooks) FileMeta(s *pssh.SSHServerConnSession, data *filehandler
 	if parsedText.PublishAt != nil && !parsedText.PublishAt.IsZero() {
 		data.PublishAt = parsedText.PublishAt
 	}
+	data.Hidden = parsedText.Hidden
+
+	return nil
+}
+
+func (p *MarkdownHooks) FileMeta(s *pssh.SSHServerConnSession, data *filehandlers.PostMetaData) error {
+	ext := filepath.Ext(data.Filename)
+	switch ext {
+	case ".lxt":
+		err := p.metaLxt(data)
+		if err != nil {
+			return fmt.Errorf("%s: %w", data.Filename, err)
+		}
+	case ".md":
+		err := p.metaMd(data)
+		if err != nil {
+			return fmt.Errorf("%s: %w", data.Filename, err)
+		}
+	}
 
 	isHiddenFilename := slices.Contains(p.Cfg.HiddenPosts, data.Filename)
-	data.Hidden = parsedText.Hidden || isHiddenFilename
+	data.Hidden = data.Hidden || isHiddenFilename
 
 	return nil
 }
