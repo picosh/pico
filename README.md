@@ -98,8 +98,8 @@ Create a blogs.txt file:
 ```
 =: email rss@myemail.com
 =: cron 0 13 * * *
-=> https://blog.pico.sh/rss
-=> https://bower.sh/rss
+https://blog.pico.sh/rss
+https://bower.sh/rss
 ```
 
 Then upload it to us:
