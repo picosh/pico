@@ -72,24 +72,28 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 			case "ls":
 				err := handler.ls(cliCmd)
 				if err != nil {
+					logger.Error("ls cmd", "err", err)
 					sesh.Fatal(err)
 				}
 				return next(sesh)
 			case "monitor":
 				err := handler.monitor(cliCmd, user)
 				if err != nil {
+					logger.Error("monitor cmd", "err", err)
 					sesh.Fatal(err)
 				}
 				return next(sesh)
 			case "status":
 				err := handler.status(cliCmd, user)
 				if err != nil {
+					logger.Error("status cmd", "err", err)
 					sesh.Fatal(err)
 				}
 				return next(sesh)
 			case "rss":
 				err := handler.rss(cliCmd, user)
 				if err != nil {
+					logger.Error("rss cmd", "err", err)
 					sesh.Fatal(err)
 				}
 				return next(sesh)
@@ -144,16 +148,19 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 			case "pub":
 				err := handler.pub(cliCmd, topic, clientID)
 				if err != nil {
+					logger.Error("pub cmd", "err", err)
 					sesh.Fatal(err)
 				}
 			case "sub":
 				err := handler.sub(cliCmd, topic, clientID)
 				if err != nil {
+					logger.Error("sub cmd", "err", err)
 					sesh.Fatal(err)
 				}
 			case "pipe":
 				err := handler.pipe(cliCmd, topic, clientID)
 				if err != nil {
+					logger.Error("pipe cmd", "err", err)
 					sesh.Fatal(err)
 				}
 			}
@@ -341,6 +348,7 @@ func (handler *CliHandler) monitor(cmd *CliCmd, user *db.User) error {
 	resolvedTopic := result.Name
 
 	if *del {
+		handler.Logger.Info("removing pipe monitor", "topic", resolvedTopic)
 		err := handler.DBPool.RemovePipeMonitor(user.ID, resolvedTopic)
 		if err != nil {
 			return fmt.Errorf("failed to delete monitor: %w", err)
@@ -368,6 +376,12 @@ func (handler *CliHandler) monitor(cmd *CliCmd, user *db.User) error {
 	}
 
 	winEnd := time.Now().UTC().Add(dur)
+	handler.Logger.Info(
+		"upserting pipe monitor",
+		"topic", resolvedTopic,
+		"dur", dur,
+		"window", winEnd.UTC().Format(time.RFC3339),
+	)
 	err = handler.DBPool.UpsertPipeMonitor(user.ID, resolvedTopic, dur, &winEnd)
 	if err != nil {
 		return fmt.Errorf("failed to create monitor: %w", err)
@@ -405,12 +419,12 @@ func (handler *CliHandler) status(cmd *CliCmd, user *db.User) error {
 
 		lastPing := "never"
 		if m.LastPing != nil {
-			lastPing = m.LastPing.UTC().Format("2006-01-02 15:04:05Z")
+			lastPing = m.LastPing.UTC().Format(time.RFC3339)
 		}
 
 		windowEnd := ""
 		if m.WindowEnd != nil {
-			windowEnd = m.WindowEnd.UTC().Format("2006-01-02 15:04:05Z")
+			windowEnd = m.WindowEnd.UTC().Format(time.RFC3339)
 		}
 
 		_, _ = fmt.Fprintf(
@@ -704,8 +718,10 @@ func (handler *CliHandler) updateMonitor(cmd *CliCmd, topic string) {
 		return
 	}
 
+	handler.Logger.Info("update monitor", "topic", topic)
 	monitor, err := handler.DBPool.FindPipeMonitorByTopic(cmd.user.ID, topic)
 	if err != nil || monitor == nil {
+		handler.Logger.Info("no monitor found", "topic", topic)
 		return
 	}
 
@@ -713,12 +729,14 @@ func (handler *CliHandler) updateMonitor(cmd *CliCmd, topic string) {
 	if err := handler.DBPool.UpdatePipeMonitorLastPing(cmd.user.ID, topic, &now); err != nil {
 		handler.Logger.Error("failed to update monitor last_ping", "err", err, "topic", topic)
 	}
+	handler.Logger.Info("update monitor ping", "topic", topic)
 
 	// Always reset the window to now + duration on ping
 	newWindowEnd := now.Add(monitor.WindowDur)
 	if err := handler.DBPool.UpsertPipeMonitor(cmd.user.ID, topic, monitor.WindowDur, &newWindowEnd); err != nil {
 		handler.Logger.Error("failed to reset monitor window", "err", err, "topic", topic)
 	}
+	handler.Logger.Info("updated monitor window", "topic", topic, "window", newWindowEnd.UTC().Format(time.RFC3339))
 }
 
 const monitorThrottleInterval = 15 * time.Second
