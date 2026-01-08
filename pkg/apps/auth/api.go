@@ -581,6 +581,7 @@ func AddPlusFeedForUser(dbpool db.DB, userID, email string) error {
 		Slug:      "pico-plus",
 		Filename:  "pico-plus",
 		PublishAt: &now,
+		UpdatedAt: &now,
 	})
 	return err
 }
