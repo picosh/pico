@@ -25,9 +25,10 @@ import (
 
 type TestDB struct {
 	*stub.StubDB
-	Users    []*db.User
-	Pubkeys  []*db.PublicKey
-	Features []*db.FeatureFlag
+	Users        []*db.User
+	Pubkeys      []*db.PublicKey
+	Features     []*db.FeatureFlag
+	PipeMonitors []*db.PipeMonitor
 }
 
 func NewTestDB(logger *slog.Logger) *TestDB {
@@ -96,10 +97,83 @@ func (t *TestDB) AddPubkey(pubkey *db.PublicKey) {
 	t.Pubkeys = append(t.Pubkeys, pubkey)
 }
 
+func (t *TestDB) UpsertPipeMonitor(userID, topic string, dur time.Duration, winEnd *time.Time) error {
+	for _, m := range t.PipeMonitors {
+		if m.UserId == userID && m.Topic == topic {
+			m.WindowDur = dur
+			m.WindowEnd = winEnd
+			now := time.Now()
+			m.UpdatedAt = &now
+			return nil
+		}
+	}
+	now := time.Now()
+	t.PipeMonitors = append(t.PipeMonitors, &db.PipeMonitor{
+		ID:        fmt.Sprintf("monitor-%s-%s", userID, topic),
+		UserId:    userID,
+		Topic:     topic,
+		WindowDur: dur,
+		WindowEnd: winEnd,
+		CreatedAt: &now,
+		UpdatedAt: &now,
+	})
+	return nil
+}
+
+func (t *TestDB) UpdatePipeMonitorLastPing(userID, topic string, lastPing *time.Time) error {
+	for _, m := range t.PipeMonitors {
+		if m.UserId == userID && m.Topic == topic {
+			m.LastPing = lastPing
+			now := time.Now()
+			m.UpdatedAt = &now
+			return nil
+		}
+	}
+	return fmt.Errorf("monitor not found")
+}
+
+func (t *TestDB) RemovePipeMonitor(userID, topic string) error {
+	for i, m := range t.PipeMonitors {
+		if m.UserId == userID && m.Topic == topic {
+			t.PipeMonitors = append(t.PipeMonitors[:i], t.PipeMonitors[i+1:]...)
+			return nil
+		}
+	}
+	return fmt.Errorf("monitor not found")
+}
+
+func (t *TestDB) FindPipeMonitorByTopic(userID, topic string) (*db.PipeMonitor, error) {
+	for _, m := range t.PipeMonitors {
+		if m.UserId == userID && m.Topic == topic {
+			return m, nil
+		}
+	}
+	return nil, fmt.Errorf("monitor not found")
+}
+
+func (t *TestDB) FindPipeMonitorsByUser(userID string) ([]*db.PipeMonitor, error) {
+	var monitors []*db.PipeMonitor
+	for _, m := range t.PipeMonitors {
+		if m.UserId == userID {
+			monitors = append(monitors, m)
+		}
+	}
+	return monitors, nil
+}
+
+func (t *TestDB) InsertPipeMonitorHistory(monitorID string, windowDur time.Duration, windowEnd, lastPing *time.Time) error {
+	return nil
+}
+
+func (t *TestDB) FindPipeMonitorHistory(monitorID string, from, to time.Time) ([]*db.PipeMonitorHistory, error) {
+	return nil, nil
+}
+
 type TestSSHServer struct {
-	Cfg    *shared.ConfigSite
-	DBPool *TestDB
-	Cancel context.CancelFunc
+	Cfg         *shared.ConfigSite
+	DBPool      *TestDB
+	PipeHandler *CliHandler
+	Cancel      context.CancelFunc
 }
 
 func NewTestSSHServer(t *testing.T) *TestSSHServer {
@@ -178,9 +252,10 @@ func NewTestSSHServer(t *testing.T) *TestSSHServer {
 	time.Sleep(100 * time.Millisecond)
 
 	return &TestSSHServer{
-		Cfg:    cfg,
-		DBPool: dbpool,
-		Cancel: cancel,
+		Cfg:         cfg,
+		DBPool:      dbpool,
+		PipeHandler: handler,
+		Cancel:      cancel,
 	}
 }
 
@@ -1391,5 +1466,738 @@ func TestPubSub_MultipleSubscribers(t *testing.T) {
 	n3, _ := sub3Stdout.Read(received3)
 	if !strings.Contains(string(received3[:n3]), testMessage) {
 		t.Errorf("subscriber 3 did not receive message, got: %q", string(received3[:n3]))
+	}
+}
+
+// Monitor CLI Tests
+
+func TestMonitor_UnauthenticatedUserDenied(t *testing.T) {
+	server := NewTestSSHServer(t)
+	defer server.Shutdown()
+
+	user := GenerateUser("anonymous")
+
+	client, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect: %v", err)
+	}
+	defer func() { _ = client.Close() }()
+
+	output, err := user.RunCommand(client, "monitor my-service 1h")
+	if err != nil {
+		t.Logf("command error (expected): %v", err)
+	}
+
+	if !strings.Contains(output, "access denied") {
+		t.Errorf("expected 'access denied', got: %s", output)
+	}
+}
+
+func TestMonitor_CreateMonitor(t *testing.T) {
+	server := NewTestSSHServer(t)
+	defer server.Shutdown()
+
+	user := GenerateUser("alice")
+	RegisterUserWithServer(server, user)
+
+	client, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect: %v", err)
+	}
+	defer func() { _ = client.Close() }()
+
+	output, err := user.RunCommand(client, "monitor pico-uptime 24h")
+	if err != nil {
+		t.Logf("command completed: %v", err)
+	}
+
+	if strings.Contains(output, "access denied") {
+		t.Errorf("authenticated user should not get access denied, got: %s", output)
+	}
+
+	// Verify monitor was created in DB (topic is stored with user prefix)
+	monitor, err := server.DBPool.FindPipeMonitorByTopic("alice-id", "alice/pico-uptime")
+	if err != nil {
+		t.Fatalf("monitor should exist in DB: %v", err)
+	}
+
+	if monitor.WindowDur != 24*time.Hour {
+		t.Errorf("expected window duration 24h, got: %v", monitor.WindowDur)
+	}
+
+	if !strings.Contains(output, "alice/pico-uptime") || !strings.Contains(output, "24h") {
+		t.Errorf("output should confirm monitor creation, got: %s", output)
+	}
+}
+
+func TestMonitor_UpdateMonitor(t *testing.T) {
+	server := NewTestSSHServer(t)
+	defer server.Shutdown()
+
+	user := GenerateUser("alice")
+	RegisterUserWithServer(server, user)
+
+	client, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect: %v", err)
+	}
+	defer func() { _ = client.Close() }()
+
+	// Create initial monitor
+	_, err = user.RunCommand(client, "monitor my-cron 1h")
+	if err != nil {
+		t.Logf("create command completed: %v", err)
+	}
+
+	// Upsert with new duration
+	output, err := user.RunCommand(client, "monitor my-cron 6h")
+	if err != nil {
+		t.Logf("update command completed: %v", err)
+	}
+
+	// Verify monitor was updated (topic is stored with user prefix)
+	monitor, err := server.DBPool.FindPipeMonitorByTopic("alice-id", "alice/my-cron")
+	if err != nil {
+		t.Fatalf("monitor should exist in DB: %v", err)
+	}
+
+	if monitor.WindowDur != 6*time.Hour {
+		t.Errorf("expected window duration 6h after update, got: %v", monitor.WindowDur)
+	}
+
+	if !strings.Contains(output, "6h") {
+		t.Errorf("output should confirm updated duration, got: %s", output)
+	}
+}
+
+func TestMonitor_DeleteMonitor(t *testing.T) {
+	server := NewTestSSHServer(t)
+	defer server.Shutdown()
+
+	user := GenerateUser("alice")
+	RegisterUserWithServer(server, user)
+
+	client, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect: %v", err)
+	}
+	defer func() { _ = client.Close() }()
+
+	// Create monitor first
+	_, err = user.RunCommand(client, "monitor to-delete 1h")
+	if err != nil {
+		t.Logf("create command completed: %v", err)
+	}
+
+	// Verify it exists (topic is stored with user prefix)
+	_, err = server.DBPool.FindPipeMonitorByTopic("alice-id", "alice/to-delete")
+	if err != nil {
+		t.Fatalf("monitor should exist before deletion: %v", err)
+	}
+
+	// Delete it
+	output, err := user.RunCommand(client, "monitor to-delete -d")
+	if err != nil {
+		t.Logf("delete command completed: %v", err)
+	}
+
+	// Verify it's gone (topic is stored with user prefix)
+	_, err = server.DBPool.FindPipeMonitorByTopic("alice-id", "alice/to-delete")
+	if err == nil {
+		t.Errorf("monitor should be deleted from DB")
+	}
+
+	if !strings.Contains(output, "deleted") && !strings.Contains(output, "removed") {
+		t.Logf("output should confirm deletion, got: %s", output)
+	}
+}
+
+func TestMonitor_InvalidDuration(t *testing.T) {
+	server := NewTestSSHServer(t)
+	defer server.Shutdown()
+
+	user := GenerateUser("alice")
+	RegisterUserWithServer(server, user)
+
+	client, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect: %v", err)
+	}
+	defer func() { _ = client.Close() }()
+
+	output, err := user.RunCommand(client, "monitor my-service invaliduration")
+	if err != nil {
+		t.Logf("command error (expected): %v", err)
+	}
+
+	if !strings.Contains(output, "invalid") && !strings.Contains(output, "duration") && !strings.Contains(output, "error") {
+		t.Errorf("expected error about invalid duration, got: %s", output)
+	}
+}
+
+func TestMonitor_MissingTopic(t *testing.T) {
+	server := NewTestSSHServer(t)
+	defer server.Shutdown()
+
+	user := GenerateUser("alice")
+	RegisterUserWithServer(server, user)
+
+	client, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect: %v", err)
+	}
+	defer func() { _ = client.Close() }()
+
+	output, err := user.RunCommand(client, "monitor")
+	if err != nil {
+		t.Logf("command error (expected): %v", err)
+	}
+
+	// Should show usage or error about missing topic
+	if !strings.Contains(output, "Usage") && !strings.Contains(output, "topic") && !strings.Contains(output, "error") {
+		t.Errorf("expected usage info or error about missing topic, got: %s", output)
+	}
+}
+
+// Status CLI Tests
+
+func TestStatus_UnauthenticatedUserDenied(t *testing.T) {
+	server := NewTestSSHServer(t)
+	defer server.Shutdown()
+
+	user := GenerateUser("anonymous")
+
+	client, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect: %v", err)
+	}
+	defer func() { _ = client.Close() }()
+
+	output, err := user.RunCommand(client, "status")
+	if err != nil {
+		t.Logf("command error (expected): %v", err)
+	}
+
+	if !strings.Contains(output, "access denied") {
+		t.Errorf("expected 'access denied', got: %s", output)
+	}
+}
+
+func TestStatus_NoMonitors(t *testing.T) {
+	server := NewTestSSHServer(t)
+	defer server.Shutdown()
+
+	user := GenerateUser("alice")
+	RegisterUserWithServer(server, user)
+
+	client, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect: %v", err)
+	}
+	defer func() { _ = client.Close() }()
+
+	output, err := user.RunCommand(client, "status")
+	if err != nil {
+		t.Logf("command completed: %v", err)
+	}
+
+	if !strings.Contains(output, "no monitors") && !strings.Contains(output, "empty") {
+		t.Errorf("expected message about no monitors, got: %s", output)
+	}
+}
+
+func TestStatus_ShowsMonitorStatus(t *testing.T) {
+	server := NewTestSSHServer(t)
+	defer server.Shutdown()
+
+	user := GenerateUser("alice")
+	RegisterUserWithServer(server, user)
+
+	client, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect: %v", err)
+	}
+	defer func() { _ = client.Close() }()
+
+	// Create a monitor
+	_, err = user.RunCommand(client, "monitor web-check 1h")
+	if err != nil {
+		t.Logf("create monitor completed: %v", err)
+	}
+
+	// Check status
+	output, err := user.RunCommand(client, "status")
+	if err != nil {
+		t.Logf("status command completed: %v", err)
+	}
+
+	if !strings.Contains(output, "web-check") {
+		t.Errorf("status should list the monitor topic, got: %s", output)
+	}
+}
+
+func TestStatus_ShowsHealthyUnhealthy(t *testing.T) {
+	server := NewTestSSHServer(t)
+	defer server.Shutdown()
+
+	user := GenerateUser("alice")
+	RegisterUserWithServer(server, user)
+
+	// Create monitors directly in DB with different states
+	now := time.Now()
+	windowEnd := now.Add(1 * time.Hour)
+	recentPing := now.Add(-30 * time.Minute) // within window - healthy
+	oldPing := now.Add(-2 * time.Hour)       // outside window - unhealthy
+
+	_ = server.DBPool.UpsertPipeMonitor("alice-id", "healthy-service", 1*time.Hour, &windowEnd)
+	_ = server.DBPool.UpdatePipeMonitorLastPing("alice-id", "healthy-service", &recentPing)
+
+	_ = server.DBPool.UpsertPipeMonitor("alice-id", "unhealthy-service", 1*time.Hour, &windowEnd)
+	_ = server.DBPool.UpdatePipeMonitorLastPing("alice-id", "unhealthy-service", &oldPing)
+
+	client, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect: %v", err)
+	}
+	defer func() { _ = client.Close() }()
+
+	output, err := user.RunCommand(client, "status")
+	if err != nil {
+		t.Logf("status command completed: %v", err)
+	}
+
+	if !strings.Contains(output, "healthy-service") {
+		t.Errorf("status should list healthy-service, got: %s", output)
+	}
+
+	if !strings.Contains(output, "unhealthy-service") {
+		t.Errorf("status should list unhealthy-service, got: %s", output)
+	}
+
+	// Should indicate different health states
+	if !strings.Contains(strings.ToLower(output), "healthy") && !strings.Contains(strings.ToLower(output), "ok") && !strings.Contains(output, "✓") {
+		t.Logf("status output should indicate health state: %s", output)
+	}
+}
+
+// RSS CLI Tests
+
+func TestRss_UnauthenticatedUserDenied(t *testing.T) {
+	server := NewTestSSHServer(t)
+	defer server.Shutdown()
+
+	user := GenerateUser("anonymous")
+
+	client, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect: %v", err)
+	}
+	defer func() { _ = client.Close() }()
+
+	output, err := user.RunCommand(client, "rss")
+	if err != nil {
+		t.Logf("command error (expected): %v", err)
+	}
+
+	if !strings.Contains(output, "access denied") {
+		t.Errorf("expected 'access denied', got: %s", output)
+	}
+}
+
+func TestRss_GeneratesValidRSS(t *testing.T) {
+	server := NewTestSSHServer(t)
+	defer server.Shutdown()
+
+	user := GenerateUser("alice")
+	RegisterUserWithServer(server, user)
+
+	// Create a monitor
+	now := time.Now()
+	windowEnd := now.Add(1 * time.Hour)
+	_ = server.DBPool.UpsertPipeMonitor("alice-id", "rss-test-service", 1*time.Hour, &windowEnd)
+
+	client, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect: %v", err)
+	}
+	defer func() { _ = client.Close() }()
+
+	output, err := user.RunCommand(client, "rss")
+	if err != nil {
+		t.Logf("rss command completed: %v", err)
+	}
+
+	// Should output valid RSS XML
+	if !strings.Contains(output, "<?xml") || !strings.Contains(output, "<rss") {
+		t.Errorf("expected RSS XML output, got: %s", output)
+	}
+
+	if !strings.Contains(output, "rss-test-service") {
+		t.Errorf("RSS should contain monitor topic, got: %s", output)
+	}
+}
+
+func TestRss_AlertsOnStaleMonitor(t *testing.T) {
+	server := NewTestSSHServer(t)
+	defer server.Shutdown()
+
+	user := GenerateUser("alice")
+	RegisterUserWithServer(server, user)
+
+	// Create a stale monitor (last ping outside window)
+	now := time.Now()
+	windowEnd := now.Add(-30 * time.Minute) // window already ended
+	oldPing := now.Add(-2 * time.Hour)
+
+	_ = server.DBPool.UpsertPipeMonitor("alice-id", "stale-service", 1*time.Hour, &windowEnd)
+	_ = server.DBPool.UpdatePipeMonitorLastPing("alice-id", "stale-service", &oldPing)
+
+	client, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect: %v", err)
+	}
+	defer func() { _ = client.Close() }()
+
+	output, err := user.RunCommand(client, "rss")
+	if err != nil {
+		t.Logf("rss command completed: %v", err)
+	}
+
+	// Should contain alert item for stale service
+	if !strings.Contains(output, "stale-service") {
+		t.Errorf("RSS should contain stale-service alert, got: %s", output)
+	}
+
+	// Should have item element for the alert
+	if !strings.Contains(output, "<item>") {
+		t.Errorf("RSS should contain item element for alert, got: %s", output)
+	}
+}
+
+// Pub integration with Monitor
+
+func TestPub_UpdatesMonitorLastPing(t *testing.T) {
+	server := NewTestSSHServer(t)
+	defer server.Shutdown()
+
+	user := GenerateUser("alice")
+	RegisterUserWithServer(server, user)
+
+	// Create a monitor first (topic is stored with user prefix)
+	now := time.Now()
+	windowEnd := now.Add(1 * time.Hour)
+	_ = server.DBPool.UpsertPipeMonitor("alice-id", "alice/ping-test", 1*time.Hour, &windowEnd)
+
+	subClient, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect subscriber: %v", err)
+	}
+	defer func() { _ = subClient.Close() }()
+
+	pubClient, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect publisher: %v", err)
+	}
+	defer func() { _ = pubClient.Close() }()
+
+	// Start subscriber
+	subSession, err := subClient.NewSession()
+	if err != nil {
+		t.Fatalf("failed to create sub session: %v", err)
+	}
+	defer func() { _ = subSession.Close() }()
+
+	if err := subSession.Start("sub ping-test -c"); err != nil {
+		t.Fatalf("failed to start sub: %v", err)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Publish to the monitored topic
+	_, err = user.RunCommandWithStdin(pubClient, "pub ping-test -c", "health check")
+	if err != nil {
+		t.Logf("pub command completed: %v", err)
+	}
+
+	// Verify last_ping was updated (topic is stored with user prefix)
+	monitor, err := server.DBPool.FindPipeMonitorByTopic("alice-id", "alice/ping-test")
+	if err != nil {
+		t.Fatalf("monitor should exist: %v", err)
+	}
+
+	if monitor.LastPing == nil {
+		t.Errorf("last_ping should be set after pub")
+	} else if time.Since(*monitor.LastPing) > 5*time.Second {
+		t.Errorf("last_ping should be recent, got: %v", monitor.LastPing)
+	}
+}
+
+// Tests for monitor status edge cases
+
+func TestStatus_PingAtExactWindowStart(t *testing.T) {
+	// Bug fix: Status() should use >= for windowStart comparison
+	// A ping exactly at windowStart should be healthy
+	now := time.Now().UTC()
+	windowEnd := now.Add(1 * time.Hour)
+	windowStart := windowEnd.Add(-1 * time.Hour) // equals now
+
+	monitor := &db.PipeMonitor{
+		LastPing:  &windowStart, // ping exactly at window start
+		WindowEnd: &windowEnd,
+		WindowDur: 1 * time.Hour,
+	}
+
+	err := monitor.Status()
+	if err != nil {
+		t.Errorf("ping at exact window start should be healthy, got: %v", err)
+	}
+}
+
+func TestStatus_WindowExpired(t *testing.T) {
+	// Bug fix: Status() should check if current time is past windowEnd
+	now := time.Now().UTC()
+	windowEnd := now.Add(-1 * time.Minute) // window ended 1 minute ago
+	lastPing := now.Add(-30 * time.Second) // ping was 30 seconds ago
+
+	monitor := &db.PipeMonitor{
+		LastPing:  &lastPing,
+		WindowEnd: &windowEnd,
+		WindowDur: 1 * time.Hour,
+	}
+
+	err := monitor.Status()
+	if err == nil {
+		t.Error("expired window should be unhealthy")
+	}
+	if !strings.Contains(err.Error(), "window expired") {
+		t.Errorf("error should mention window expired, got: %v", err)
+	}
+}
+
+func TestStatus_PingResetsWindow(t *testing.T) {
+	// Bug fix: Every ping should reset window to now + duration
+	server := NewTestSSHServer(t)
+	defer server.Shutdown()
+
+	user := GenerateUser("alice")
+	RegisterUserWithServer(server, user)
+
+	// Create a monitor with an expired window
+	expiredWindowEnd := time.Now().UTC().Add(-10 * time.Minute)
+	_ = server.DBPool.UpsertPipeMonitor("alice-id", "alice/reset-test", 5*time.Minute, &expiredWindowEnd)
+
+	client, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect: %v", err)
+	}
+	defer func() { _ = client.Close() }()
+
+	// Start a subscriber first so pub doesn't block
+	subClient, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect subscriber: %v", err)
+	}
+	defer func() { _ = subClient.Close() }()
+
+	subSession, err := subClient.NewSession()
+	if err != nil {
+		t.Fatalf("failed to create sub session: %v", err)
+	}
+	defer func() { _ = subSession.Close() }()
+
+	if err := subSession.Start("sub reset-test -c"); err != nil {
+		t.Fatalf("failed to start sub: %v", err)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Pub to trigger monitor update
+	_, err = user.RunCommandWithStdin(client, "pub reset-test -c", "ping")
+	if err != nil {
+		t.Logf("pub command completed: %v", err)
+	}
+
+	// Check that window was reset
+	monitor, err := server.DBPool.FindPipeMonitorByTopic("alice-id", "alice/reset-test")
+	if err != nil {
+		t.Fatalf("monitor should exist: %v", err)
+	}
+
+	if monitor.WindowEnd == nil {
+		t.Fatal("window_end should be set")
+	}
+
+	// Window end should now be in the future
+	if !monitor.WindowEnd.After(time.Now().UTC()) {
+		t.Errorf("window_end should be in the future after ping, got: %v", monitor.WindowEnd)
+	}
+}
+
+func TestStatus_HealthyImmediatelyAfterPing(t *testing.T) {
+	// Bug fix: After a ping, status should immediately show healthy
+	server := NewTestSSHServer(t)
+	defer server.Shutdown()
+
+	user := GenerateUser("alice")
+	RegisterUserWithServer(server, user)
+
+	client, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect: %v", err)
+	}
+	defer func() { _ = client.Close() }()
+
+	// Create monitor
+	_, err = user.RunCommand(client, "monitor health-test 5m")
+	if err != nil {
+		t.Fatalf("failed to create monitor: %v", err)
+	}
+
+	// Start subscriber
+	subClient, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect subscriber: %v", err)
+	}
+	defer func() { _ = subClient.Close() }()
+
+	subSession, err := subClient.NewSession()
+	if err != nil {
+		t.Fatalf("failed to create sub session: %v", err)
+	}
+	defer func() { _ = subSession.Close() }()
+
+	if err := subSession.Start("sub health-test -c"); err != nil {
+		t.Fatalf("failed to start sub: %v", err)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Pub to trigger ping
+	pubClient, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect publisher: %v", err)
+	}
+	defer func() { _ = pubClient.Close() }()
+
+	_, err = user.RunCommandWithStdin(pubClient, "pub health-test -c", "ping")
+	if err != nil {
+		t.Logf("pub completed: %v", err)
+	}
+
+	// Immediately check status
+	statusClient, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect for status: %v", err)
+	}
+	defer func() { _ = statusClient.Close() }()
+
+	output, err := user.RunCommand(statusClient, "status")
+	if err != nil {
+		t.Logf("status completed: %v", err)
+	}
+
+	if strings.Contains(output, "unhealthy") {
+		t.Errorf("status should be healthy immediately after ping, got: %s", output)
+	}
+	if !strings.Contains(output, "healthy") {
+		t.Errorf("status should show healthy, got: %s", output)
+	}
+}
+
+// TestMonitor_FixedWindowNonSliding verifies that pings within the same window
+// do not slide the window forward. This is a regression test for a bug where
+// each ping reset window_end to now+dur, creating a sliding window that never fails.
+//
+// Expected behavior:
+//   - last_ping: always updated to show most recent activity (user visibility).
+//   - window_end: only advances when current time exceeds it (health scheduling).
+func TestMonitor_FixedWindowNonSliding(t *testing.T) {
+	server := NewTestSSHServer(t)
+	defer server.Shutdown()
+
+	user := GenerateUser("alice")
+	RegisterUserWithServer(server, user)
+
+	client, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect: %v", err)
+	}
+	defer func() { _ = client.Close() }()
+
+	// Create a monitor with 1 hour window
+	_, err = user.RunCommand(client, "monitor fixed-window-test 1h")
+	if err != nil {
+		t.Logf("create command completed: %v", err)
+	}
+
+	// Get the initial window_end
+	monitor, err := server.DBPool.FindPipeMonitorByTopic("alice-id", "alice/fixed-window-test")
+	if err != nil {
+		t.Fatalf("monitor should exist: %v", err)
+	}
+	initialWindowEnd := *monitor.WindowEnd
+
+	// Simulate a ping by calling updateMonitor directly
+	handler := server.PipeHandler
+
+	// Create a mock CliCmd
+	mockUser := &db.User{ID: "alice-id", Name: "alice"}
+	cmd := &CliCmd{
+		userName: "alice",
+		user:     mockUser,
+	}
+
+	// First ping - should record last_ping but NOT change window_end
+	handler.updateMonitor(cmd, "alice/fixed-window-test")
+
+	monitor, err = server.DBPool.FindPipeMonitorByTopic("alice-id", "alice/fixed-window-test")
+	if err != nil {
+		t.Fatalf("monitor should exist after first ping: %v", err)
+	}
+
+	if monitor.LastPing == nil {
+		t.Fatalf("last_ping should be set after first ping")
+	}
+	firstPingTime := *monitor.LastPing
+	windowEndAfterFirstPing := *monitor.WindowEnd
+
+	// BUG CHECK: With the bug, window_end would have slid forward to now+1h
+	// With the fix, window_end should remain at the original scheduled time
+	if !windowEndAfterFirstPing.Equal(initialWindowEnd) {
+		t.Errorf("BUG DETECTED: window_end should NOT change after first ping within window\n"+
+			"initial window_end: %v\n"+
+			"window_end after ping: %v\n"+
+			"Window slid forward by: %v",
+			initialWindowEnd.Format(time.RFC3339),
+			windowEndAfterFirstPing.Format(time.RFC3339),
+			windowEndAfterFirstPing.Sub(initialWindowEnd))
+	}
+
+	// Second ping - last_ping SHOULD be updated (for user visibility)
+	// but window_end should NOT change
+	time.Sleep(10 * time.Millisecond) // Small delay to get different timestamp
+	handler.updateMonitor(cmd, "alice/fixed-window-test")
+
+	monitor, err = server.DBPool.FindPipeMonitorByTopic("alice-id", "alice/fixed-window-test")
+	if err != nil {
+		t.Fatalf("monitor should exist after second ping: %v", err)
+	}
+
+	// last_ping SHOULD be updated to show most recent activity
+	if monitor.LastPing.Equal(firstPingTime) {
+		t.Errorf("last_ping SHOULD be updated for user visibility\n"+
+			"first ping time: %v\n"+
+			"last_ping after second call: %v",
+			firstPingTime.Format(time.RFC3339Nano),
+			monitor.LastPing.Format(time.RFC3339Nano))
+	}
+
+	// But window_end should still be the original value (not sliding)
+	if !monitor.WindowEnd.Equal(initialWindowEnd) {
+		t.Errorf("BUG DETECTED: window_end should remain at original value\n"+
+			"initial: %v\n"+
+			"current: %v",
+			initialWindowEnd.Format(time.RFC3339),
+			monitor.WindowEnd.Format(time.RFC3339))
 	}
 }

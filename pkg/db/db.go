@@ -5,6 +5,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"regexp"
 	"time"
 )
@@ -378,6 +379,137 @@ type TunsEventLog struct {
 	CreatedAt      *time.Time `json:"created_at" db:"created_at"`
 }
 
+type PipeMonitor struct {
+	ID        string        `json:"id" db:"id"`
+	UserId    string        `json:"user_id" db:"user_id"`
+	Topic     string        `json:"topic" db:"topic"`
+	WindowDur time.Duration `json:"window_dur" db:"window_dur"`
+	WindowEnd *time.Time    `json:"window_end" db:"window_end"`
+	LastPing  *time.Time    `json:"last_ping" db:"last_ping"`
+	CreatedAt *time.Time    `json:"created_at" db:"created_at"`
+	UpdatedAt *time.Time    `json:"updated_at" db:"updated_at"`
+}
+
+type PipeMonitorHistory struct {
+	ID        string        `json:"id" db:"id"`
+	MonitorID string        `json:"monitor_id" db:"monitor_id"`
+	WindowDur time.Duration `json:"window_dur" db:"window_dur"`
+	WindowEnd *time.Time    `json:"window_end" db:"window_end"`
+	LastPing  *time.Time    `json:"last_ping" db:"last_ping"`
+	CreatedAt *time.Time    `json:"created_at" db:"created_at"`
+	UpdatedAt *time.Time    `json:"updated_at" db:"updated_at"`
+}
+
+type UptimeResult struct {
+	TotalDuration  time.Duration
+	UptimeDuration time.Duration
+	UptimePercent  float64
+}
+
+func ComputeUptime(history []*PipeMonitorHistory, from, to time.Time) UptimeResult {
+	totalDuration := to.Sub(from)
+	if totalDuration <= 0 {
+		return UptimeResult{}
+	}
+
+	if len(history) == 0 {
+		return UptimeResult{TotalDuration: totalDuration}
+	}
+
+	type interval struct {
+		start, end time.Time
+	}
+
+	var intervals []interval
+	for _, h := range history {
+		if h.WindowEnd == nil {
+			continue
+		}
+		windowStart := h.WindowEnd.Add(-h.WindowDur)
+		windowEnd := *h.WindowEnd
+
+		if windowStart.Before(from) {
+			windowStart = from
+		}
+		if windowEnd.After(to) {
+			windowEnd = to
+		}
+
+		if windowStart.Before(windowEnd) {
+			intervals = append(intervals, interval{start: windowStart, end: windowEnd})
+		}
+	}
+
+	if len(intervals) == 0 {
+		return UptimeResult{TotalDuration: totalDuration}
+	}
+
+	// Sort by start time
+	for i := range intervals {
+		for j := i + 1; j < len(intervals); j++ {
+			if intervals[j].start.Before(intervals[i].start) {
+				intervals[i], intervals[j] = intervals[j], intervals[i]
+			}
+		}
+	}
+
+	// Merge overlapping intervals
+	merged := []interval{intervals[0]}
+	for _, curr := range intervals[1:] {
+		last := &merged[len(merged)-1]
+		if !curr.start.After(last.end) {
+			if curr.end.After(last.end) {
+				last.end = curr.end
+			}
+		} else {
+			merged = append(merged, curr)
+		}
+	}
+
+	var uptimeDuration time.Duration
+	for _, iv := range merged {
+		uptimeDuration += iv.end.Sub(iv.start)
+	}
+
+	uptimePercent := float64(uptimeDuration) / float64(totalDuration) * 100
+
+	return UptimeResult{
+		TotalDuration:  totalDuration,
+		UptimeDuration: uptimeDuration,
+		UptimePercent:  uptimePercent,
+	}
+}
+
+func (m *PipeMonitor) Status() error {
+	if m.LastPing == nil {
+		return fmt.Errorf("no ping received yet")
+	}
+	if m.WindowEnd == nil {
+		return fmt.Errorf("window end not set")
+	}
+	now := time.Now().UTC()
+	if now.After(*m.WindowEnd) {
+		return fmt.Errorf(
+			"window expired at %s",
+			m.WindowEnd.UTC().Format("2006-01-02 15:04:05Z"),
+		)
+	}
+	windowStart := m.WindowEnd.Add(-m.WindowDur)
+	lastPingAfterStart := !m.LastPing.Before(windowStart)
+	if !lastPingAfterStart {
+		return fmt.Errorf(
+			"last ping before window start: %s",
+			windowStart.UTC().Format("2006-01-02 15:04:05Z"),
+		)
+	}
+	return nil
+}
+
+func (m *PipeMonitor) GetNextWindow() *time.Time {
+	win := m.WindowEnd.Add(m.WindowDur)
+	return &win
+}
+
 var NameValidator = regexp.MustCompile("^[a-zA-Z0-9]{1,50}$")
 var DenyList = []string{
 	"admin",
@@ -467,6 +599,15 @@ type DB interface {
 	FindAccessLogs(userID string, fromDate *time.Time) ([]*AccessLog, error)
 	FindPubkeysInAccessLogs(userID string) ([]string, error)
 	FindAccessLogsByPubkey(pubkey string, fromDate *time.Time) ([]*AccessLog, error)
+
+	UpsertPipeMonitor(userID, topic string, dur time.Duration, winEnd *time.Time) error
+	UpdatePipeMonitorLastPing(userID, topic string, lastPing *time.Time) error
+	RemovePipeMonitor(userID, topic string) error
+	FindPipeMonitorByTopic(userID, topic string) (*PipeMonitor, error)
+	FindPipeMonitorsByUser(userID string) ([]*PipeMonitor, error)
+
+	InsertPipeMonitorHistory(monitorID string, windowDur time.Duration, windowEnd, lastPing *time.Time) error
+	FindPipeMonitorHistory(monitorID string, from, to time.Time) ([]*PipeMonitorHistory, error)
 
 	Close() error
 }
