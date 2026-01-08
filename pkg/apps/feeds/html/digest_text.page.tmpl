@@ -1,3 +1,9 @@
+{{if .IsPicoPlus}}
+{{else}}
+  > Our email digest service is moving to our paid **pico+** plan on **2026-01-22** at which point we will stop sending you email digests.
+  > read our announcement: https://blog.pico.sh/ann-033-moving-rss-to-email-pico-plus
+{{end}}
+
 {{if .ShowBanner}}
 > In order to keep this digest email active you must click the link below. You have {{.DaysLeft}} days left.
 > {{.KeepAliveURL}}

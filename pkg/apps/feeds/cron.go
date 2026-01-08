@@ -70,6 +70,7 @@ type DigestFeed struct {
 	DaysLeft     string
 	ShowBanner   bool
 	SizeWarning  bool
+	IsPicoPlus   bool
 }
 
 type DigestOptions struct {
@@ -195,7 +196,7 @@ func (f *Fetcher) Validate(logger *slog.Logger, post *db.Post, parsed *shared.Li
 	return nil
 }
 
-func (f *Fetcher) RunPost(logger *slog.Logger, user *db.User, post *db.Post, skipValidation bool, now time.Time) error {
+func (f *Fetcher) RunPost(logger *slog.Logger, user *db.User, isPicoPlus bool, post *db.Post, skipValidation bool, now time.Time) error {
 	logger = logger.With("filename", post.Filename)
 	logger.Info("running feed post")
 
@@ -260,7 +261,7 @@ func (f *Fetcher) RunPost(logger *slog.Logger, user *db.User, post *db.Post, ski
 	subject := fmt.Sprintf("%s feed digest", post.Filename)
 	unsubURL := getUnsubURL(post)
 
-	msgBody, err := f.FetchAll(logger, urls, parsed.InlineContent, user.Name, post)
+	msgBody, err := f.FetchAll(logger, urls, parsed.InlineContent, user.Name, isPicoPlus, post)
 	if err != nil {
 		errForUser := err
 
@@ -336,13 +337,20 @@ func (f *Fetcher) RunUser(user *db.User, now time.Time) error {
 	if err != nil {
 		return err
 	}
+	isPicoPlus := false
+	ff, _ := f.db.FindFeature(user.ID, "plus")
+	if ff != nil {
+		if ff.IsValid() {
+			isPicoPlus = true
+		}
+	}
 
 	if len(posts.Data) > 0 {
 		logger.Info("found feed posts", "len", len(posts.Data))
 	}
 
 	for _, post := range posts.Data {
-		err = f.RunPost(logger, user, post, false, now)
+		err = f.RunPost(logger, user, isPicoPlus, post, false, now)
 		if err != nil {
 			logger.Error("run post failed", "err", err)
 		}
@@ -471,7 +479,7 @@ func getUnsubURL(post *db.Post) string {
 	return fmt.Sprintf("https://feeds.pico.sh/unsub/%s", post.ID)
 }
 
-func (f *Fetcher) FetchAll(logger *slog.Logger, urls []string, inlineContent bool, username string, post *db.Post) (*MsgBody, error) {
+func (f *Fetcher) FetchAll(logger *slog.Logger, urls []string, inlineContent bool, username string, isPicoPlus bool, post *db.Post) (*MsgBody, error) {
 	logger.Info("fetching feeds", "inlineContent", inlineContent)
 	fp := gofeed.NewParser()
 	daysLeft := ""
@@ -490,6 +498,7 @@ func (f *Fetcher) FetchAll(logger *slog.Logger, urls []string, inlineContent boo
 		DaysLeft:     daysLeft,
 		ShowBanner:   showBanner,
 		Options:      DigestOptions{InlineContent: inlineContent},
+		IsPicoPlus:   isPicoPlus,
 	}
 	feedItems, err := f.db.FindFeedItemsByPostID(post.ID)
 	if err != nil {

@@ -159,7 +159,16 @@ func Middleware(dbpool db.DB, cfg *shared.ConfigSite) pssh.SSHServerMiddleware {
 				_, _ = fmt.Fprintf(sesh, "running feed post: %s\r\n", filename)
 				logger.Info("run cmd", "filename", filename)
 				fetcher := NewFetcher(dbpool, cfg)
-				err = fetcher.RunPost(logger, user, post, true, time.Now().UTC())
+
+				isPicoPlus := false
+				ff, _ := dbpool.FindFeature(user.ID, "plus")
+				if ff != nil {
+					if ff.IsValid() {
+						isPicoPlus = true
+					}
+				}
+
+				err = fetcher.RunPost(logger, user, isPicoPlus, post, true, time.Now().UTC())
 				if err != nil {
 					_, _ = fmt.Fprintln(sesh.Stderr(), err)
 				}

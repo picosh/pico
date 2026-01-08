@@ -9,11 +9,21 @@ img {
 }
 </style>
 
+{{if .IsPicoPlus}}
+{{else}}
+<blockquote>
+  <strong>NOTICE:</strong> Our email digest service is moving to our paid <strong>pico+</strong> plan on <strong>2026-01-22</strong> at which point we will stop sending you email digests.
+ 	<a href="https://blog.pico.sh/ann-033-moving-rss-to-email-pico-plus">read out annoucement</a>.
+</blockquote>
+<br />
+{{end}}
+
 {{if .SizeWarning}}
 <blockquote>
-  <strong>NOTICE:</strong> This email is over the size limit (5MB). Inline content has been enabled to avoid email delivery issues.
+  <strong>NOTICE:</strong> This email is over the size limit (5MB). Inline content has been disabled to avoid email delivery issues.
   We recommend splitting your RSS feeds into multiple digests.
 </blockquote>
+<br />
 {{end}}
 
 {{if .ShowBanner}}
@@ -21,6 +31,7 @@ img {
   <strong>NOTICE:</strong> In order to keep this digest email active you must <a href="{{.KeepAliveURL}}">click this link</a>.
   You have {{.DaysLeft}} days left.
 </blockquote>
+</br />
 {{end}}
 
 <div class="feeds">
