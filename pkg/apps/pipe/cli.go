@@ -93,7 +93,8 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 				}
 				return next(sesh)
 			case "rss":
-				err := handler.rss(cliCmd, user)
+				rss, err := MonitorRss(handler.DBPool, user, handler.Cfg.Domain)
+				_, _ = fmt.Fprintln(sesh, rss)
 				if err != nil {
 					logger.Error("rss cmd", "err", err)
 					sesh.Fatal(err)
@@ -542,20 +543,20 @@ func parseDuration(s string) (time.Duration, error) {
 	return time.ParseDuration(s)
 }
 
-func (handler *CliHandler) rss(cmd *CliCmd, user *db.User) error {
+func MonitorRss(dbpool db.DB, user *db.User, domain string) (string, error) {
 	if user == nil {
-		return fmt.Errorf("access denied")
+		return "", fmt.Errorf("access denied")
 	}
 
-	monitors, err := handler.DBPool.FindPipeMonitorsByUser(user.ID)
+	monitors, err := dbpool.FindPipeMonitorsByUser(user.ID)
 	if err != nil {
-		return fmt.Errorf("failed to fetch monitors: %w", err)
+		return "", fmt.Errorf("failed to fetch monitors: %w", err)
 	}
 
 	now := time.Now()
 	feed := &feeds.Feed{
 		Title:       fmt.Sprintf("Pipe Monitors for %s", user.Name),
-		Link:        &feeds.Link{Href: fmt.Sprintf("https://%s", handler.Cfg.Domain)},
+		Link:        &feeds.Link{Href: fmt.Sprintf("https://%s", domain)},
 		Description: "Alerts for pipe monitor status changes",
 		Author:      &feeds.Author{Name: user.Name},
 		Created:     now,
@@ -567,7 +568,7 @@ func (handler *CliHandler) rss(cmd *CliCmd, user *db.User) error {
 			item := &feeds.Item{
 				Id:          fmt.Sprintf("%s-%s-%d", user.ID, m.Topic, now.Unix()),
 				Title:       fmt.Sprintf("ALERT: %s is unhealthy", m.Topic),
-				Link:        &feeds.Link{Href: fmt.Sprintf("https://%s", handler.Cfg.Domain)},
+				Link:        &feeds.Link{Href: fmt.Sprintf("https://%s", domain)},
 				Description: err.Error(),
 				Created:     now,
 				Updated:     now,
@@ -580,11 +581,10 @@ func (handler *CliHandler) rss(cmd *CliCmd, user *db.User) error {
 
 	rss, err := feed.ToRss()
 	if err != nil {
-		return fmt.Errorf("failed to generate RSS: %w", err)
+		return "", fmt.Errorf("failed to generate RSS: %w", err)
 	}
 
-	_, _ = fmt.Fprint(cmd.sesh, rss)
-	return nil
+	return rss, nil
 }
 
 func (handler *CliHandler) pub(cmd *CliCmd, topic string, clientID string) error {

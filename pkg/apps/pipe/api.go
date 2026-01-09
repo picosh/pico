@@ -16,6 +16,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/db/postgres"
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/utils/pipe"
@@ -386,10 +387,48 @@ func handlePipe() http.HandlerFunc {
 	}
 }
 
-func createMainRoutes(staticRoutes []shared.Route) []shared.Route {
+func rssHandler(cfg *shared.ConfigSite, dbpool db.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		apiToken, _ := url.PathUnescape(shared.GetField(r, 0))
+		user, err := dbpool.FindUserByToken(apiToken)
+		if err != nil {
+			cfg.Logger.Error(
+				"could not find user for token",
+				"err", err.Error(),
+				"token", apiToken,
+			)
+			http.Error(w, "invalid token", http.StatusNotFound)
+			return
+		}
+		rss, err := MonitorRss(dbpool, user, cfg.Domain)
+		if err != nil {
+			cfg.Logger.Error(
+				"error generating monitor rss feed",
+				"err", err,
+				"token", apiToken,
+			)
+			http.Error(w, "error generating monitor rss feed", http.StatusInternalServerError)
+			return
+		}
+
+		_, err = w.Write([]byte(rss))
+		if err != nil {
+			cfg.Logger.Error(
+				"error with rss response writer",
+				"err", err,
+				"token", apiToken,
+			)
+			http.Error(w, "error generating monitor rss feederror with rss response writer", http.StatusInternalServerError)
+			return
+		}
+	}
+}
+
+func createMainRoutes(staticRoutes []shared.Route, cfg *shared.ConfigSite, dbpool db.DB) []shared.Route {
 	routes := []shared.Route{
 		shared.NewRoute("GET", "/", shared.CreatePageHandler("html/marketing.page.tmpl")),
 		shared.NewRoute("GET", "/check", shared.CheckHandler),
+		shared.NewRoute("GET", "/rss/(.+)", rssHandler(cfg, dbpool)),
 		shared.NewRoute("GET", "/_metrics", promhttp.Handler().ServeHTTP),
 	}
 
@@ -428,7 +467,7 @@ func StartApiServer() {
 		staticRoutes = shared.CreatePProfRoutes(staticRoutes)
 	}
 
-	mainRoutes := createMainRoutes(staticRoutes)
+	mainRoutes := createMainRoutes(staticRoutes, cfg, db)
 	subdomainRoutes := staticRoutes
 
 	info := shared.NewPicoPipeClient()
