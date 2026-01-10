@@ -730,7 +730,6 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 
 		content := ""
 		ext := filepath.Ext(post.Filename)
-		fmt.Println("HERE", post.Filename, ext)
 		switch ext {
 		case ".md":
 			parsed, err := shared.ParseText(post.Text)
