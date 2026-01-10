@@ -1059,6 +1059,7 @@ func createSubdomainRoutes(staticRoutes []shared.Route) []shared.Route {
 		routes,
 		shared.NewRoute("GET", "/raw/(.+)", postRawHandler),
 		shared.NewRoute("GET", "/(.+).md", postRawHandler),
+		shared.NewRoute("GET", "/(.+).lxt", postRawHandler),
 		shared.NewRoute("GET", `/(.+\.(?:jpg|jpeg|png|gif|webp|svg|ico))/(.+)`, imgRequest),
 		shared.NewRoute("GET", `/(.+\.(?:jpg|jpeg|png|gif|webp|svg|ico))$`, imgRequest),
 		shared.NewRoute("GET", "/(.+).html", postHandler),
