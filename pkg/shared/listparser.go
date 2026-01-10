@@ -12,6 +12,15 @@ import (
 	"github.com/araddon/dateparse"
 )
 
+/*
+=> https://www.youtube.com/watch?v=HxaD_trXwRE Lexical Scanning in Go - Rob Pike
+func run() {
+	for state := startState; state != nil {
+		state = stateFn(lexer);
+	}
+}
+*/
+
 var reIndent = regexp.MustCompile(`^[[:blank:]]+`)
 
 type ListParsedText struct {
@@ -99,7 +108,7 @@ func PublishAtDate(date string) (*time.Time, error) {
 
 func TokenToMetaField(meta *ListMetaData, token *SplitToken) error {
 	switch token.Key {
-	case "publish_at":
+	case "date":
 		publishAt, err := PublishAtDate(token.Value)
 		if err == nil {
 			meta.PublishAt = publishAt
