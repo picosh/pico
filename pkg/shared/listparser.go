@@ -123,7 +123,7 @@ func TokenToMetaField(meta *ListMetaData, token *SplitToken) error {
 		meta.ImageCard = token.Value
 	case "list_type":
 		meta.ListType = token.Value
-	case "hidden":
+	case "draft":
 		if token.Value == "true" {
 			meta.Hidden = true
 		} else {
@@ -244,6 +244,7 @@ func ListParseText(text string) *ListParsedText {
 		ListType:      "disc",
 		PublishAt:     &time.Time{},
 		Tags:          []string{},
+		Hidden:        false,
 	}
 	pre := false
 	skip := false
