@@ -70,7 +70,7 @@ func (m *LogsPage) filterLogs() {
 	filtered := []int{}
 	for idx, ll := range m.logs {
 		if m.filterLogLine(match, ll) {
-			filtered = append(m.filtered, idx)
+			filtered = append(filtered, idx)
 		}
 	}
 	m.filtered = filtered
