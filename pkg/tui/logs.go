@@ -31,6 +31,7 @@ type LogsPage struct {
 	logs     []*LogLine
 	ctx      context.Context
 	done     context.CancelFunc
+	focus    string
 }
 
 func NewLogsPage(shrd *SharedModel) *LogsPage {
@@ -38,12 +39,16 @@ func NewLogsPage(shrd *SharedModel) *LogsPage {
 		shared: shrd,
 		input:  NewTextInput("filter logs"),
 	}
-	page.list = &list.Dynamic{Builder: page.getWidget, DisableEventHandlers: true}
+	page.list = &list.Dynamic{Builder: page.getWidget, DrawCursor: true}
 	return page
 }
 
 func (m *LogsPage) Footer() []Shortcut {
-	return []Shortcut{}
+	return []Shortcut{
+		{Shortcut: "tab", Text: "toggle focus"},
+		{Shortcut: "↑↓", Text: "scroll"},
+		{Shortcut: "G", Text: "bottom"},
+	}
 }
 
 func (m *LogsPage) filterLogLine(match string, ll *LogLine) bool {
@@ -73,19 +78,28 @@ func (m *LogsPage) filterLogs() {
 			filtered = append(filtered, idx)
 		}
 	}
+
+	// Check if cursor is at the last position before filtering
+	isAtBottom := len(m.filtered) == 0 || int(m.list.Cursor()) == len(m.filtered)-1
+
 	m.filtered = filtered
 
-	// scroll to bottom
-	if len(m.filtered) > 0 {
+	// scroll to bottom only if we were already at the bottom
+	if isAtBottom && len(m.filtered) > 0 {
 		m.list.SetCursor(uint(len(m.filtered) - 1))
 	}
 }
 
 func (m *LogsPage) CaptureEvent(ev vaxis.Event) (vxfw.Command, error) {
-	switch ev.(type) {
+	switch msg := ev.(type) {
 	case vaxis.Key:
-		m.filterLogs()
-		return vxfw.RedrawCmd{}, nil
+		if msg.Matches(vaxis.KeyTab) {
+			return nil, nil
+		}
+		if m.focus == "input" {
+			m.filterLogs()
+			return vxfw.RedrawCmd{}, nil
+		}
 	}
 	return nil, nil
 }
@@ -96,9 +110,35 @@ func (m *LogsPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Comm
 		go func() {
 			_ = m.connectToLogs()
 		}()
+		m.focus = "input"
 		return m.input.FocusIn()
 	case PageOut:
 		m.done()
+	case vaxis.Key:
+		if msg.Matches(vaxis.KeyTab) {
+			if m.focus == "input" {
+				m.focus = "list"
+				m.filterLogs()
+				cmd, _ := m.input.FocusOut()
+				return vxfw.BatchCmd([]vxfw.Command{
+					vxfw.FocusWidgetCmd(m.list),
+					cmd,
+				}), nil
+			}
+			m.focus = "input"
+			cmd, _ := m.input.FocusIn()
+			return vxfw.BatchCmd([]vxfw.Command{
+				cmd,
+				vxfw.RedrawCmd{},
+			}), nil
+		}
+		if msg.Matches('G') {
+			// Scroll to bottom
+			if len(m.filtered) > 0 {
+				m.list.SetCursor(uint(len(m.filtered) - 1))
+				return vxfw.RedrawCmd{}, nil
+			}
+		}
 	case LogLineLoaded:
 		ll := NewLogLine(msg.Line)
 		m.logs = append(m.logs, ll)
@@ -116,7 +156,10 @@ func (m *LogsPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 		txtSurf, _ := txt.Draw(ctx)
 		root.AddChild(0, 0, txtSurf)
 	} else {
-		listSurf, _ := m.list.Draw(createDrawCtx(ctx, ctx.Max.Height-4))
+		listPane := NewBorder(m.list)
+		listPane.Label = "logs"
+		m.focusBorder(listPane)
+		listSurf, _ := listPane.Draw(createDrawCtx(ctx, ctx.Max.Height-4))
 		root.AddChild(0, 0, listSurf)
 	}
 
@@ -124,6 +167,14 @@ func (m *LogsPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	root.AddChild(0, int(ctx.Max.Height)-3, inp)
 
 	return root, nil
+}
+
+func (m *LogsPage) focusBorder(border *Border) {
+	if m.focus == "list" {
+		border.Style = vaxis.Style{Foreground: oj}
+	} else {
+		border.Style = vaxis.Style{Foreground: purp}
+	}
 }
 
 func (m *LogsPage) getWidget(i uint, cursor uint) vxfw.Widget {

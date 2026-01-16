@@ -39,6 +39,10 @@ func (m *TextInput) FocusOut() (vxfw.Command, error) {
 	return vxfw.RedrawCmd{}, nil
 }
 
+func (m *TextInput) Focused() bool {
+	return m.focus
+}
+
 func (m *TextInput) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
 	return nil, nil
 }
