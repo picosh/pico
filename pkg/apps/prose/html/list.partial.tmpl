@@ -1,51 +1,72 @@
 {{define "list"}}
-{{$indent := 0}}
-{{$mod := 0}}
-<ul style="list-style-type: {{.ListType}};">
-    {{range .Items}}
-        {{if lt $indent .Indent}}
-        <ul>
-        {{else if gt $indent .Indent}}
+	{{$indent := 0}}
+	{{$mod := 0}}
 
-        {{$mod = minus $indent .Indent}}
-        {{range $y := intRange 1 $mod}}
-        </li></ul>
-        {{end}}
+	<div role="list">
+		{{range .Items}}
+	    {{if lt $indent .Indent}}
+	    	<div role="list">
+	    {{else if gt $indent .Indent}}
+	    	{{$mod = minus $indent .Indent}}
+	    	{{range $y := intRange 1 $mod}}
+	    		</div>
+	    	{{end}}
+	    {{end}}
 
-        {{else}}
-        </li>
-        {{end}}
-        {{$indent = .Indent}}
+	    {{$indent = .Indent}}
 
-        {{if .IsText}}
-            {{if .Value}}
-            <li>{{.Value}}
-            {{end}}
-        {{end}}
+			{{if .IsText}}
+				<div role="listitem">
+					<div class="listitem-bullet">•</div>
+					<div class="listitem-text">{{.Value}}</div>
+				</div>
+			{{end}}
 
-        {{if .IsURL}}
-        <li><a href="{{.URL}}">{{.Value}}</a>
-        {{end}}
+			{{if .IsURL}}
+				<div role="listitem">
+					<div class="listitem-bullet">•</div>
+					<a class="listitem-text" href="{{.URL}}">{{.Value}}</a>
+				</div>
+			{{end}}
 
-        {{if .IsImg}}
-        <li><img src="{{.URL}}" alt="{{.Value}}" />
-        {{end}}
+	    {{if .IsImg}}
+	    	<div role="listitem">
+					<div class="listitem-bullet">•</div>
+		    	<img class="listeitem-text" src="{{.URL}}" alt="{{.Value}}" />
+		    </div>
+	    {{end}}
 
-        {{if .IsBlock}}
-        <li><blockquote>{{.Value}}</blockquote>
-        {{end}}
+	    {{if .IsBlock}}
+	    	<div role="listitem">
+					<div class="listitem-bullet">•</div>
+		    	<blockquote class="listitem-text">{{.Value}}</blockquote>
+		    </div>
+	    {{end}}
 
-        {{if .IsHeaderOne}}
-        </ul><h2 class="text-xl font-bold">{{.Value}}</h2><ul style="list-style-type: {{$.ListType}};">
-        {{end}}
+	    {{if .IsPre}}
+	    	<div role="listitem">
+					<div class="listitem-bullet">•</div>
+		    	<pre class="listitem-text">{{.Value}}</pre>
+		    </div>
+	    {{end}}
 
-        {{if .IsHeaderTwo}}
-        </ul><h3 class="text-lg font-bold">{{.Value}}</h3><ul style="list-style-type: {{$.ListType}};">
-        {{end}}
+	    {{if .IsHeaderOne}}
+	    	</div>
+	    	<h2 class="text-xl font-bold">{{.Value}}</h2>
+	    	<div role="list" aria-label="{{.Value}}">
+	    {{end}}
 
-        {{if .IsPre}}
-        <li><pre>{{.Value}}</pre>
-        {{end}}
-    {{end}}
-</ul>
+	    {{if .IsHeaderTwo}}
+	    	</div>
+	    	<h3 class="text-lg font-bold">{{.Value}}</h3>
+	    	<div role="list" aria-label="{{.Value}}">
+	    {{end}}
+
+	    {{if .IsHr}}
+	    	</div>
+	    	<hr />
+	    	<div role="list" aria-label="{{.Value}}">
+	    {{end}}
+		{{end}}
+	</div>
 {{end}}

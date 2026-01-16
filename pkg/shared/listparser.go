@@ -39,6 +39,7 @@ type ListItem struct {
 	IsHeaderTwo bool
 	IsImg       bool
 	IsPre       bool
+	IsHr        bool
 	Indent      int
 }
 
@@ -50,7 +51,6 @@ type ListMetaData struct {
 	Image       string
 	ImageCard   string
 	Layout      string
-	ListType    string // https://developer.mozilla.org/en-US/docs/Web/CSS/list-style-type
 	PublishAt   *time.Time
 	Tags        []string
 	Title       string
@@ -69,6 +69,7 @@ var imgToken = "=<"
 var headerOneToken = "#"
 var headerTwoToken = "##"
 var preToken = "```"
+var hrToken = "=="
 
 type SplitToken struct {
 	Key   string
@@ -121,8 +122,6 @@ func TokenToMetaField(meta *ListMetaData, token *SplitToken) error {
 		meta.Image = token.Value
 	case "image_card":
 		meta.ImageCard = token.Value
-	case "list_type":
-		meta.ListType = token.Value
 	case "draft":
 		if token.Value == "true" {
 			meta.Hidden = true
@@ -210,6 +209,9 @@ func parseItem(meta *ListMetaData, li *ListItem, prevItem *ListItem, pre bool, m
 	} else if strings.HasPrefix(li.Value, headerOneToken) {
 		li.IsHeaderOne = true
 		li.Value = strings.Replace(li.Value, headerOneToken, "", 1)
+	} else if strings.HasPrefix(li.Value, hrToken) {
+		li.IsHr = true
+		li.Value = ""
 	} else if reIndent.MatchString(li.Value) {
 		trim := reIndent.ReplaceAllString(li.Value, "")
 		old := len(li.Value)
@@ -241,7 +243,6 @@ func ListParseText(text string) *ListParsedText {
 		Aliases:       []string{},
 		InlineContent: true,
 		Layout:        "default",
-		ListType:      "disc",
 		PublishAt:     &time.Time{},
 		Tags:          []string{},
 		Hidden:        false,
