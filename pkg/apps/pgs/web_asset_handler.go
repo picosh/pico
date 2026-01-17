@@ -267,6 +267,9 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Default cache: short TTL then must revalidate using ETag
+	w.Header().Set("cache-control", "max-age=60, must-revalidate")
+
 	for _, hdr := range userHeaders {
 		w.Header().Add(hdr.Name, hdr.Value)
 	}
