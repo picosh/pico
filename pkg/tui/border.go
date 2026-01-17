@@ -90,11 +90,25 @@ func (b *Border) HandleEvent(vaxis.Event, vxfw.EventPhase) (vxfw.Command, error)
 }
 
 func (b *Border) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
+	// Ensure minimum bounds for child widget
+	maxWidth := ctx.Max.Width
+	maxHeight := ctx.Max.Height
+	if maxWidth > 2 {
+		maxWidth = maxWidth - 2
+	} else {
+		maxWidth = 1
+	}
+	if maxHeight > 3 {
+		maxHeight = maxHeight - 3
+	} else if maxHeight > 0 {
+		maxHeight = 1
+	}
+
 	surf, _ := b.w.Draw(vxfw.DrawContext{
 		Characters: ctx.Characters,
 		Max: vxfw.Size{
-			Width:  ctx.Max.Width - 2,
-			Height: ctx.Max.Height - 3,
+			Width:  maxWidth,
+			Height: maxHeight,
 		},
 	})
 
