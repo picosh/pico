@@ -1,20 +1,20 @@
 {{template "base" .}}
 
-{{define "title"}}{{.Site.Domain}} -- A zero-install static site hosting service for hackers{{end}}
+{{define "title"}}{{.Site.Domain}} -- Deploy static sites with a single command. rsync and you're live.{{end}}
 
 {{define "meta"}}
-<meta name="description" content="A zero-install static site hosting service for hackers" />
+<meta name="description" content="Deploy static sites with a single command. rsync and you're live." />
 
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="{{.Site.Domain}}">
 <meta property="og:url" content="https://{{.Site.Domain}}">
 <meta property="og:title" content="{{.Site.Domain}}">
-<meta property="og:description" content="A zero-install static site hosting service for hackers">
+<meta property="og:description" content="Deploy static sites with a single command. rsync and you're live.">
 
 <meta name="twitter:card" content="summary" />
 <meta property="twitter:url" content="https://{{.Site.Domain}}">
 <meta property="twitter:title" content="{{.Site.Domain}}">
-<meta property="twitter:description" content="A zero-install static site hosting service for hackers">
+<meta property="twitter:description" content="Deploy static sites with a single command. rsync and you're live.">
 <meta name="twitter:image" content="https://{{.Site.Domain}}/card.png" />
 <meta name="twitter:image:src" content="https://{{.Site.Domain}}/card.png" />
 
@@ -29,7 +29,7 @@
 {{define "body"}}
 <header>
   <h1 class="text-2xl font-bold">{{.Site.Domain}}</h1>
-  <p class="text-lg">A zero-install static site hosting service for hackers</p>
+  <p class="text-lg">Deploy static sites with a single command. rsync and you're live.</p>
   <div class="flex gap my">
     <a href="https://pico.sh/getting-started" class="btn-link">GET STARTED</a>
     <a href="https://pico.sh/pgs" class="btn-link">DOCS</a>
@@ -38,43 +38,19 @@
   <hr />
   <div class="group">
     <div class="box">
-      <h2 class="text-xl">Features</h2>
-      <ul>
-        <li>Fully manage static sites using <code>ssh</code></li>
-        <li>Unlimited projects, created instantly upon upload</li>
-        <li>Deploy using <a href="https://pico.sh/file-uploads">rsync, sftp, sshfs, or scp</a></li>
-        <li>Github Action</li>
-        <li>Automatic TLS for all projects</li>
-        <li>Promotion and rollback support</li>
-        <li>Site <a href="https://pico.sh/analytics">analytics</a></li>
-        <li>Custom domains for projects</li>
-        <li>Custom Redirects & Rewrites</a></li>
-        <li>Custom Headers</li>
-        <li>SPA support</li>
-        <li>Image manipulation API</li>
-        <li>Multiple regions</li>
-      </ul>
-    </div>
-
-    <div class="box">
       <h2 class="text-xl">Publish your site with one command</h2>
 
       <p>
-        When your site is ready to be published, copy the files to our server with a
-        familiar command:
+	      Deploy static sites with a single command. No passwords. No config files. No CI setup.
+	      Just your SSH key and rsync.
       </p>
 
       <pre>rsync -rv public/ pgs.sh:/myproj/</pre>
 
       <p>
         That's it! There's no need to formally create a project, we create them
-        on-the-fly. Further, we provide TLS for every project automatically.
+        on-the-fly. Further, we provide TLS for every site automatically.
       </p>
-    </div>
-
-    <div class="flex gap my">
-      <a href="https://pico.sh/getting-started" class="btn-link">GET STARTED</a>
-      <a href="https://pico.sh/pgs" class="btn-link">DOCS</a>
     </div>
   </div>
 </header>
