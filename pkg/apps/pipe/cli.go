@@ -52,7 +52,7 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 				if user.PublicKey != nil && user.PublicKey.Name != "" {
 					addition := user.PublicKey.Name
 					identity := sesh.Permissions().Extensions["identity"]
-					if identity != "" {
+					if identity != "" && identity != "pubkey" {
 						addition = identity
 					}
 					userNameAddition = fmt.Sprintf("-%s", addition)
