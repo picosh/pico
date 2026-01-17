@@ -69,8 +69,7 @@ func (f *handler) Filelist(r *sftp.Request) (sftp.ListerAt, error) {
 			return nil, err
 		}
 
-		// an empty string from minio or exact match from filepath base name is what we want
-
+		// an empty string or exact match from filepath base name is what we want
 		if !list {
 			listData = slices.DeleteFunc(listData, func(f os.FileInfo) bool {
 				return f.Name() != "" && f.Name() != filepath.Base(r.Filepath)

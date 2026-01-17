@@ -21,16 +21,6 @@ func EnvDriverDetector(logger *slog.Logger) (storage.ObjectStorage, error) {
 	switch driver {
 	case "memory":
 		return storage.NewStorageMemory(map[string]map[string]string{})
-	case "minio":
-		url := GetEnv("MINIO_URL", "")
-		user := GetEnv("MINIO_ROOT_USER", "")
-		pass := GetEnv("MINIO_ROOT_PASSWORD", "")
-		logger.Info(
-			"object config detected",
-			"url", url,
-			"user", user,
-		)
-		return storage.NewStorageMinio(logger, url, user, pass)
 	}
 
 	// implied driver == "fs"

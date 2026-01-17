@@ -7,29 +7,6 @@ services:
     ports:
       - "5432:5432"
     command: -N 1024 -B 4096MB
-  minio-caddy:
-    image: ghcr.io/picosh/pico/caddy:latest
-    restart: always
-    env_file:
-      - .env.prod
-    environment:
-      APP_DOMAIN: pico.sh
-      APP_EMAIL: ${MINIO_EMAIL:-hello@pico.sh}
-    volumes:
-      - ${MINIO_CADDYFILE}:/etc/caddy/Caddyfile
-      - ./data/minio-caddy/data:/data
-      - ./data/minio-caddy/config:/config
-    ports:
-      - "80:80"
-      - "443:443"
-    profiles:
-      - minio
-      - all
-  minio:
-    env_file:
-      - .env.prod
-    volumes:
-      - ./data/minio-data:/data
   pipemgr:
     env_file:
       - .env.prod

@@ -5,12 +5,6 @@ services:
     ports:
       - "5432:5432"
     command: -c log_statement=all -c log_destination=stderr
-  minio:
-    env_file:
-      - .env.example
-    ports:
-      - "9000:9000"
-      - "9001:9001"
   imgproxy:
     env_file:
       - .env.example

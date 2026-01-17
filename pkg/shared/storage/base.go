@@ -8,18 +8,12 @@ import (
 )
 
 func GetStorageTypeFromEnv() string {
-	return utils.GetEnv("STORAGE_ADAPTER", "minio")
+	return utils.GetEnv("STORAGE_ADAPTER", "fs")
 }
 
 func NewStorage(logger *slog.Logger, adapter string) (StorageServe, error) {
 	logger.Info("storage adapter", "adapter", adapter)
 	switch adapter {
-	case "minio":
-		minioURL := utils.GetEnv("MINIO_URL", "")
-		minioUser := utils.GetEnv("MINIO_ROOT_USER", "")
-		minioPass := utils.GetEnv("MINIO_ROOT_PASSWORD", "")
-		logger.Info("using minio storage", "url", minioURL, "user", minioUser)
-		return NewStorageMinio(logger, minioURL, minioUser, minioPass)
 	case "fs":
 		fsPath := utils.GetEnv("FS_STORAGE_DIR", "/tmp/pico_storage")
 		logger.Info("using filesystem storage", "path", fsPath)

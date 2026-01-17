@@ -7,7 +7,7 @@
 cp ./.env.example .env
 ```
 
-If you are running apps outside of docker, remember to change the postgres, minio, and imgproxy hostnames to "localhost" in `.env`.
+If you are running apps outside of docker, remember to change the postgres, and imgproxy hostnames to "localhost" in `.env`.
 
 Initialize local env variables using direnv
 

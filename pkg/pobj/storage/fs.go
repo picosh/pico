@@ -96,7 +96,6 @@ func (s *StorageFS) GetBucketQuota(bucket Bucket) (uint64, error) {
 }
 
 // DeleteBucket will delete all contents regardless if files exist inside of it.
-// This is different from minio impl which requires all files be deleted first.
 func (s *StorageFS) DeleteBucket(bucket Bucket) error {
 	return os.RemoveAll(bucket.Path)
 }

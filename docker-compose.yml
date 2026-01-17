@@ -5,18 +5,10 @@ services:
     profiles:
       - db
       - all
-  minio:
-    image: quay.io/minio/minio
-    command: server /data --console-address ":9001"
-    restart: always
-    profiles:
-      - minio
-      - all
   imgproxy:
     image: darthsim/imgproxy:latest
     restart: always
     profiles:
-      - minio
       - all
       - prose
       - pgs
