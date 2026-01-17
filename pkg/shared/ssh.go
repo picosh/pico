@@ -107,7 +107,7 @@ func (r *SshAuthHandler) PubkeyAuthHandler(conn ssh.ConnMetadata, key ssh.Public
 		return nil, fmt.Errorf("username is not set")
 	}
 
-	if user.PublicKey != nil && user.PublicKey.Name != "" {
+	if authed.Identity == "public" && user.PublicKey != nil && user.PublicKey.Name != "" {
 		authed.Identity = user.PublicKey.Name
 	}
 
