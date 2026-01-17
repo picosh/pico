@@ -40,6 +40,8 @@ func (m *AccessLogsPage) Footer() []Shortcut {
 	return []Shortcut{
 		{Shortcut: "tab", Text: "focus"},
 		{Shortcut: "^r", Text: "refresh"},
+		{Shortcut: "g", Text: "top"},
+		{Shortcut: "G", Text: "bottom"},
 	}
 }
 
@@ -72,7 +74,7 @@ func (m *AccessLogsPage) filterLogs() {
 	m.filtered = filtered
 
 	if len(filtered) > 0 {
-		m.list.SetCursor(0)
+		m.list.SetCursor(uint(len(filtered) - 1))
 	}
 }
 
@@ -120,6 +122,20 @@ func (m *AccessLogsPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxf
 			m.loading = true
 			go m.fetchLogs()
 			return vxfw.RedrawCmd{}, nil
+		}
+		if msg.Matches('g') {
+			// Go to top
+			if len(m.filtered) > 0 {
+				m.list.SetCursor(0)
+				return vxfw.RedrawCmd{}, nil
+			}
+		}
+		if msg.Matches('G') {
+			// Go to bottom
+			if len(m.filtered) > 0 {
+				m.list.SetCursor(uint(len(m.filtered) - 1))
+				return vxfw.RedrawCmd{}, nil
+			}
 		}
 	}
 	return nil, nil
