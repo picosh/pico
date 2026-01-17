@@ -107,6 +107,11 @@ func (r *SshAuthHandler) PubkeyAuthHandler(conn ssh.ConnMetadata, key ssh.Public
 		return nil, fmt.Errorf("username is not set")
 	}
 
+	if user.PublicKey != nil && user.PublicKey.Name != "" {
+		authed.Identity = user.PublicKey.Name
+	}
+
+	log.Info("inserting access log", "principal", r.Principal, "identity", authed.Identity)
 	err = r.DB.InsertAccessLog(&db.AccessLog{
 		UserID:   user.ID,
 		Service:  r.Principal,

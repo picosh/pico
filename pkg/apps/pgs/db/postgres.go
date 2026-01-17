@@ -68,7 +68,13 @@ func (me *PgsPsqlDB) FindUserByPubkey(key string) (*db.User, error) {
 		return nil, &db.ErrMultiplePublicKeys{}
 	}
 
-	return me.FindUser(pk[0].UserID)
+	user, err := me.FindUser(pk[0].UserID)
+	if err != nil {
+		return nil, err
+	}
+
+	user.PublicKey = &pk[0]
+	return user, nil
 }
 
 func (me *PgsPsqlDB) FindUser(userID string) (*db.User, error) {
