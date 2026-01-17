@@ -12,6 +12,7 @@ services:
       - .env.prod
     volumes:
       - ./data/pipemgr/data/term_info_ed25519:/key:ro
+      - ./data/pipemgr/data/term_info_ed25519-cert.pub:/key-cert.pub:ro
     logging:
       driver: "json-file"
       options:
