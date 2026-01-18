@@ -50,10 +50,11 @@ func (c *Cmd) output(out string) {
 }
 
 func (c *Cmd) help() {
-	helpStr := "Commands: [help, user, logs, chat, not-found]\n"
+	helpStr := "Commands: [help, user, logs, access_logs, chat, not-found]\n"
 	helpStr += "help - this message\n"
 	helpStr += "user - display user information (returns name, id, account created, pico+ expiration)\n"
 	helpStr += "logs - stream user logs\n"
+	helpStr += "access_logs - fetch access logs from the last 30 days\n"
 	helpStr += "chat - IRC chat (must enable pty with `-t` to the SSH command)\n"
 	helpStr += "not-found - return all status 404 requests for a host (hostname.com [year|month])\n"
 	c.output(helpStr)
@@ -92,6 +93,24 @@ func (c *Cmd) notFound(host, interval string) error {
 	}
 	for _, url := range urls {
 		c.output(fmt.Sprintf("%d %s", url.Count, url.Url))
+	}
+	return nil
+}
+
+func (c *Cmd) access_logs(ctx context.Context) error {
+	fromDate := time.Now().AddDate(0, 0, -30)
+	logs, err := c.Dbpool.FindAccessLogs(c.User.ID, &fromDate)
+	if err != nil {
+		return err
+	}
+
+	for _, log := range logs {
+		jsonData, err := json.Marshal(log)
+		if err != nil {
+			c.Log.Error("json marshall", "err", err)
+			continue
+		}
+		c.output(string(jsonData))
 	}
 	return nil
 }
@@ -242,6 +261,12 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 					return nil
 				case "logs":
 					err = opts.logs(sesh.Context())
+					if err != nil {
+						sesh.Fatal(err)
+					}
+					return nil
+				case "access_logs":
+					err = opts.access_logs(sesh.Context())
 					if err != nil {
 						sesh.Fatal(err)
 					}
