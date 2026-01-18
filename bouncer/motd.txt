@@ -11,6 +11,9 @@ IRC networks are independent entities which are not affiliated with pico.
 
 The recommended network for pico users is Libera Chat: https://libera.chat
 
+Once this bouncer is configured, it will keep your IRC user online permanently.
+So even after quitting this chat app it'll keep your user online.
+
 To connect to Libera Chat now, enter the following commands:
 
 /msg BouncerServ help
@@ -19,7 +22,7 @@ To connect to Libera Chat now, enter the following commands:
 network create -addr irc.libera.chat -nick <user> -enabled false
 
 # if you don't have an account skip this step
-sasl set-plain -network libera <user> <sasl-pass>
+sasl set-plain -network irc.libera.chat <user> <sasl-pass>
 
 network update libera -enabled true
 /j #pico.sh
