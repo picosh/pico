@@ -268,7 +268,7 @@ func (m *AddTokenPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 		ah += int(btnSurf.Size.Height)
 	} else {
 		header := text.New(
-			"After you exit this screen you will *not* be able to see it again.  Use shift+click to select and copy text. If your terminal supports OSC52 then we will copy to your host clipboard upon exit of this screen.\n\n",
+			"After you exit this screen you will *not* be able to see it again.  Use shift+click to select and copy text. If you are using Apple Terminal you might need to enable Mouse Reporting in order to select token: View->Allow Mouse Reporting. If your terminal supports OSC52 then we will copy to your host clipboard upon exit of this screen.\n\n",
 		)
 		headerSurf, _ := header.Draw(ctx)
 		root.AddChild(0, ah, headerSurf)
@@ -283,8 +283,8 @@ func (m *AddTokenPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 			Characters: ctx.Characters,
 			Max:        vxfw.Size{Width: 4, Height: 1},
 		})
-		root.AddChild(0, ah, btnSurf)
-		ah += int(btnSurf.Size.Height)
+		root.AddChild(0, ah+1, btnSurf)
+		ah += int(btnSurf.Size.Height) + 1
 	}
 
 	if m.err != nil {
