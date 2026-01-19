@@ -518,7 +518,7 @@ func (web *WebRouter) ServeAsset(fname string, opts *storage.ImgProcessOpts, has
 	hasPicoPlus := false
 	ff, _ := web.Cfg.DB.FindFeature(user.ID, "plus")
 	if ff != nil {
-		if ff.ExpiresAt.Before(time.Now()) {
+		if ff.ExpiresAt.After(time.Now()) {
 			hasPicoPlus = true
 		}
 	}
