@@ -69,7 +69,7 @@ func wellKnownHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 		w.WriteHeader(http.StatusOK)
 		err := json.NewEncoder(w).Encode(p)
 		if err != nil {
-			apiConfig.Cfg.Logger.Error(err.Error())
+			apiConfig.Cfg.Logger.Error("cannot json encode", "err", err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	}
@@ -108,7 +108,7 @@ func introspectHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 		w.WriteHeader(http.StatusOK)
 		err = json.NewEncoder(w).Encode(p)
 		if err != nil {
-			apiConfig.Cfg.Logger.Error(err.Error())
+			apiConfig.Cfg.Logger.Error("cannot json encode", "err", err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	}
@@ -151,7 +151,7 @@ func authorizeHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 		})
 
 		if err != nil {
-			apiConfig.Cfg.Logger.Error(err.Error())
+			apiConfig.Cfg.Logger.Error("cannot execture template", "err", err.Error())
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
 		}
@@ -221,7 +221,7 @@ func tokenHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 		w.WriteHeader(http.StatusOK)
 		err = json.NewEncoder(w).Encode(p)
 		if err != nil {
-			apiConfig.Cfg.Logger.Error(err.Error())
+			apiConfig.Cfg.Logger.Error("cannot json encode", "err", err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	}
@@ -348,7 +348,7 @@ func userHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 		w.WriteHeader(http.StatusOK)
 		err = json.NewEncoder(w).Encode(keys)
 		if err != nil {
-			apiConfig.Cfg.Logger.Error(err.Error())
+			apiConfig.Cfg.Logger.Error("cannot json encode", "err", err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	}
@@ -382,7 +382,45 @@ func rssHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 		w.Header().Add("Content-Type", "application/atom+xml")
 		_, err = w.Write([]byte(rss))
 		if err != nil {
-			apiConfig.Cfg.Logger.Error(err.Error())
+			apiConfig.Cfg.Logger.Error("cannot write to http handler", "err", err.Error())
+		}
+	}
+}
+
+func pubkeysHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userName := r.PathValue("user")
+		user, err := apiConfig.Dbpool.FindUserByName(userName)
+		if err != nil {
+			apiConfig.Cfg.Logger.Error(
+				"could not find user by name",
+				"err", err.Error(),
+				"user", userName,
+			)
+			http.Error(w, "user not found", http.StatusNotFound)
+			return
+		}
+
+		pubkeys, err := apiConfig.Dbpool.FindKeysByUser(user)
+		if err != nil {
+			apiConfig.Cfg.Logger.Error(
+				"could not find pubkeys for user",
+				"err", err.Error(),
+				"user", userName,
+			)
+			http.Error(w, "user pubkeys not found", http.StatusNotFound)
+			return
+		}
+
+		keys := []string{}
+		for _, pubkeys := range pubkeys {
+			keys = append(keys, pubkeys.Key)
+		}
+
+		w.Header().Add("Content-Type", "text/plain")
+		_, err = w.Write([]byte(strings.Join(keys, "\n")))
+		if err != nil {
+			apiConfig.Cfg.Logger.Error("cannot write to http handler", "err", err.Error())
 		}
 	}
 }
@@ -815,6 +853,7 @@ func authMux(apiConfig *shared.ApiConfig) *http.ServeMux {
 	mux.Handle("POST /key", keyHandler(apiConfig))
 	mux.Handle("POST /user", userHandler(apiConfig))
 	mux.Handle("GET /rss/{token}", rssHandler(apiConfig))
+	mux.Handle("GET /pubkeys/{user}", pubkeysHandler(apiConfig))
 	mux.Handle("POST /redirect", redirectHandler(apiConfig))
 	mux.Handle("POST /webhook", paymentWebhookHandler(apiConfig))
 	mux.HandleFunc("GET /main.css", fileServer.ServeHTTP)
