@@ -21,7 +21,6 @@ import (
 	"github.com/mmcdole/gofeed"
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/shared"
-	"github.com/picosh/utils"
 )
 
 var ErrNoRecentArticles = errors.New("no recent articles")
@@ -564,7 +563,7 @@ func (f *Fetcher) FetchAll(logger *slog.Logger, urls []string, inlineContent boo
 	}
 
 	// cap body size to prevent abuse
-	if len(html)+len(text) > 5*utils.MB {
+	if len(html)+len(text) > 5*shared.MB {
 		feeds.Options.InlineContent = false
 		feeds.SizeWarning = true
 		html, err = f.PrintHtml(feeds)

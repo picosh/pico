@@ -1,4 +1,4 @@
-package shared
+package router
 
 import (
 	"context"
@@ -11,9 +11,9 @@ import (
 	"strings"
 
 	"github.com/hashicorp/golang-lru/v2/expirable"
-	"github.com/picosh/pico/pkg/cache"
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/pssh"
+	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/pico/pkg/shared/storage"
 )
 
@@ -71,7 +71,7 @@ func CreatePProfRoutesMux(mux *http.ServeMux) {
 }
 
 type ApiConfig struct {
-	Cfg     *ConfigSite
+	Cfg     *shared.ConfigSite
 	Dbpool  db.DB
 	Storage storage.StorageServe
 }
@@ -147,7 +147,7 @@ func GetSubdomainFromRequest(r *http.Request, domain, space string) string {
 	return ""
 }
 
-func findRouteConfig(r *http.Request, routes []Route, subdomainRoutes []Route, cfg *ConfigSite) ([]Route, string) {
+func findRouteConfig(r *http.Request, routes []Route, subdomainRoutes []Route, cfg *shared.ConfigSite) ([]Route, string) {
 	if len(subdomainRoutes) == 0 {
 		return routes, ""
 	}
@@ -185,8 +185,8 @@ func GetSshCtx(r *http.Request) (*pssh.SSHServerConnSession, error) {
 	return payload, nil
 }
 
-func GetCfg(r *http.Request) *ConfigSite {
-	return r.Context().Value(ctxCfg{}).(*ConfigSite)
+func GetCfg(r *http.Request) *shared.ConfigSite {
+	return r.Context().Value(ctxCfg{}).(*shared.ConfigSite)
 }
 
 func GetLogger(r *http.Request) *slog.Logger {
@@ -213,7 +213,7 @@ func GetSubdomain(r *http.Request) string {
 	return r.Context().Value(CtxSubdomainKey{}).(string)
 }
 
-var txtCache = expirable.NewLRU[string, string](2048, nil, cache.CacheTimeout)
+var txtCache = expirable.NewLRU[string, string](2048, nil, shared.CacheTimeout)
 
 func GetCustomDomain(host string, space string) string {
 	txt := fmt.Sprintf("_%s.%s", space, host)

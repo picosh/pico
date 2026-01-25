@@ -11,7 +11,7 @@ import (
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/db/postgres"
 	"github.com/picosh/pico/pkg/shared"
-	"github.com/picosh/utils"
+	"github.com/picosh/pico/pkg/shared/router"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -73,11 +73,11 @@ type HeaderTxt struct {
 }
 
 func blogHandler(w http.ResponseWriter, r *http.Request) {
-	username := shared.GetUsernameFromRequest(r)
-	dbpool := shared.GetDB(r)
-	blogger := shared.GetLogger(r)
+	username := router.GetUsernameFromRequest(r)
+	dbpool := router.GetDB(r)
+	blogger := router.GetLogger(r)
 	logger := blogger.With("user", username)
-	cfg := shared.GetCfg(r)
+	cfg := router.GetCfg(r)
 
 	user, err := dbpool.FindUserByName(username)
 	if err != nil {
@@ -96,7 +96,7 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 
 	posts := pager.Data
 
-	ts, err := shared.RenderTemplate(cfg, []string{
+	ts, err := router.RenderTemplate(cfg, []string{
 		cfg.StaticPath("html/blog.page.tmpl"),
 	})
 
@@ -120,7 +120,7 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 			Title:          post.Filename,
 			PublishAt:      post.PublishAt.Format(time.DateOnly),
 			PublishAtISO:   post.PublishAt.Format(time.RFC3339),
-			UpdatedTimeAgo: utils.TimeAgo(post.UpdatedAt),
+			UpdatedTimeAgo: shared.TimeAgo(post.UpdatedAt),
 			UpdatedAtISO:   post.UpdatedAt.Format(time.RFC3339),
 		}
 		postCollection = append(postCollection, p)
@@ -156,19 +156,19 @@ func GetBlogName(username string) string {
 }
 
 func postHandler(w http.ResponseWriter, r *http.Request) {
-	username := shared.GetUsernameFromRequest(r)
-	subdomain := shared.GetSubdomain(r)
-	cfg := shared.GetCfg(r)
+	username := router.GetUsernameFromRequest(r)
+	subdomain := router.GetSubdomain(r)
+	cfg := router.GetCfg(r)
 
 	var slug string
 	if !cfg.IsSubdomains() || subdomain == "" {
-		slug, _ = url.PathUnescape(shared.GetField(r, 1))
+		slug, _ = url.PathUnescape(router.GetField(r, 1))
 	} else {
-		slug, _ = url.PathUnescape(shared.GetField(r, 0))
+		slug, _ = url.PathUnescape(router.GetField(r, 0))
 	}
 
-	dbpool := shared.GetDB(r)
-	blogger := shared.GetLogger(r)
+	dbpool := router.GetDB(r)
+	blogger := router.GetLogger(r)
 	logger := blogger.With("slug", slug, "user", username)
 
 	user, err := dbpool.FindUserByName(username)
@@ -190,7 +190,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 		unlisted := false
 		parsedText := ""
 		// we dont want to syntax highlight huge files
-		if post.FileSize > 1*utils.MB {
+		if post.FileSize > 1*shared.MB {
 			logger.Warn("paste too large to parse and apply syntax highlighting")
 			parsedText = post.Text
 		} else {
@@ -242,7 +242,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	ts, err := shared.RenderTemplate(cfg, []string{
+	ts, err := router.RenderTemplate(cfg, []string{
 		cfg.StaticPath("html/post.page.tmpl"),
 	})
 
@@ -259,19 +259,19 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func postHandlerRaw(w http.ResponseWriter, r *http.Request) {
-	username := shared.GetUsernameFromRequest(r)
-	subdomain := shared.GetSubdomain(r)
-	cfg := shared.GetCfg(r)
+	username := router.GetUsernameFromRequest(r)
+	subdomain := router.GetSubdomain(r)
+	cfg := router.GetCfg(r)
 
 	var slug string
 	if !cfg.IsSubdomains() || subdomain == "" {
-		slug, _ = url.PathUnescape(shared.GetField(r, 1))
+		slug, _ = url.PathUnescape(router.GetField(r, 1))
 	} else {
-		slug, _ = url.PathUnescape(shared.GetField(r, 0))
+		slug, _ = url.PathUnescape(router.GetField(r, 0))
 	}
 
-	dbpool := shared.GetDB(r)
-	blogger := shared.GetLogger(r)
+	dbpool := router.GetDB(r)
+	blogger := router.GetLogger(r)
 	logger := blogger.With("user", username, "slug", slug)
 
 	user, err := dbpool.FindUserByName(username)
@@ -300,8 +300,8 @@ func postHandlerRaw(w http.ResponseWriter, r *http.Request) {
 
 func serveFile(file string, contentType string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		logger := shared.GetLogger(r)
-		cfg := shared.GetCfg(r)
+		logger := router.GetLogger(r)
+		cfg := router.GetCfg(r)
 
 		contents, err := os.ReadFile(cfg.StaticPath(fmt.Sprintf("public/%s", file)))
 		if err != nil {
@@ -318,25 +318,25 @@ func serveFile(file string, contentType string) http.HandlerFunc {
 	}
 }
 
-func createStaticRoutes() []shared.Route {
-	return []shared.Route{
-		shared.NewRoute("GET", "/main.css", serveFile("main.css", "text/css")),
-		shared.NewRoute("GET", "/smol.css", serveFile("smol.css", "text/css")),
-		shared.NewRoute("GET", "/syntax.css", serveFile("syntax.css", "text/css")),
-		shared.NewRoute("GET", "/card.png", serveFile("card.png", "image/png")),
-		shared.NewRoute("GET", "/favicon-16x16.png", serveFile("favicon-16x16.png", "image/png")),
-		shared.NewRoute("GET", "/favicon-32x32.png", serveFile("favicon-32x32.png", "image/png")),
-		shared.NewRoute("GET", "/apple-touch-icon.png", serveFile("apple-touch-icon.png", "image/png")),
-		shared.NewRoute("GET", "/favicon.ico", serveFile("favicon.ico", "image/x-icon")),
-		shared.NewRoute("GET", "/robots.txt", serveFile("robots.txt", "text/plain")),
+func createStaticRoutes() []router.Route {
+	return []router.Route{
+		router.NewRoute("GET", "/main.css", serveFile("main.css", "text/css")),
+		router.NewRoute("GET", "/smol.css", serveFile("smol.css", "text/css")),
+		router.NewRoute("GET", "/syntax.css", serveFile("syntax.css", "text/css")),
+		router.NewRoute("GET", "/card.png", serveFile("card.png", "image/png")),
+		router.NewRoute("GET", "/favicon-16x16.png", serveFile("favicon-16x16.png", "image/png")),
+		router.NewRoute("GET", "/favicon-32x32.png", serveFile("favicon-32x32.png", "image/png")),
+		router.NewRoute("GET", "/apple-touch-icon.png", serveFile("apple-touch-icon.png", "image/png")),
+		router.NewRoute("GET", "/favicon.ico", serveFile("favicon.ico", "image/x-icon")),
+		router.NewRoute("GET", "/robots.txt", serveFile("robots.txt", "text/plain")),
 	}
 }
 
-func createMainRoutes(staticRoutes []shared.Route) []shared.Route {
-	routes := []shared.Route{
-		shared.NewRoute("GET", "/", shared.CreatePageHandler("html/marketing.page.tmpl")),
-		shared.NewRoute("GET", "/check", shared.CheckHandler),
-		shared.NewRoute("GET", "/_metrics", promhttp.Handler().ServeHTTP),
+func createMainRoutes(staticRoutes []router.Route) []router.Route {
+	routes := []router.Route{
+		router.NewRoute("GET", "/", router.CreatePageHandler("html/marketing.page.tmpl")),
+		router.NewRoute("GET", "/check", router.CheckHandler),
+		router.NewRoute("GET", "/_metrics", promhttp.Handler().ServeHTTP),
 	}
 
 	routes = append(
@@ -346,18 +346,18 @@ func createMainRoutes(staticRoutes []shared.Route) []shared.Route {
 
 	routes = append(
 		routes,
-		shared.NewRoute("GET", "/([^/]+)", blogHandler),
-		shared.NewRoute("GET", "/([^/]+)/([^/]+)", postHandler),
-		shared.NewRoute("GET", "/([^/]+)/([^/]+)/raw", postHandlerRaw),
-		shared.NewRoute("GET", "/raw/([^/]+)/([^/]+)", postHandlerRaw),
+		router.NewRoute("GET", "/([^/]+)", blogHandler),
+		router.NewRoute("GET", "/([^/]+)/([^/]+)", postHandler),
+		router.NewRoute("GET", "/([^/]+)/([^/]+)/raw", postHandlerRaw),
+		router.NewRoute("GET", "/raw/([^/]+)/([^/]+)", postHandlerRaw),
 	)
 
 	return routes
 }
 
-func createSubdomainRoutes(staticRoutes []shared.Route) []shared.Route {
-	routes := []shared.Route{
-		shared.NewRoute("GET", "/", blogHandler),
+func createSubdomainRoutes(staticRoutes []router.Route) []router.Route {
+	routes := []router.Route{
+		router.NewRoute("GET", "/", blogHandler),
 	}
 
 	routes = append(
@@ -367,9 +367,9 @@ func createSubdomainRoutes(staticRoutes []shared.Route) []shared.Route {
 
 	routes = append(
 		routes,
-		shared.NewRoute("GET", "/([^/]+)", postHandler),
-		shared.NewRoute("GET", "/([^/]+)/raw", postHandlerRaw),
-		shared.NewRoute("GET", "/raw/([^/]+)", postHandlerRaw),
+		router.NewRoute("GET", "/([^/]+)", postHandler),
+		router.NewRoute("GET", "/([^/]+)/raw", postHandlerRaw),
+		router.NewRoute("GET", "/raw/([^/]+)", postHandlerRaw),
 	)
 
 	return routes
@@ -388,17 +388,17 @@ func StartApiServer() {
 	staticRoutes := createStaticRoutes()
 
 	if cfg.Debug {
-		staticRoutes = shared.CreatePProfRoutes(staticRoutes)
+		staticRoutes = router.CreatePProfRoutes(staticRoutes)
 	}
 
 	mainRoutes := createMainRoutes(staticRoutes)
 	subdomainRoutes := createSubdomainRoutes(staticRoutes)
 
-	apiConfig := &shared.ApiConfig{
+	apiConfig := &router.ApiConfig{
 		Cfg:    cfg,
 		Dbpool: db,
 	}
-	handler := shared.CreateServe(mainRoutes, subdomainRoutes, apiConfig)
+	handler := router.CreateServe(mainRoutes, subdomainRoutes, apiConfig)
 	router := http.HandlerFunc(handler)
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)

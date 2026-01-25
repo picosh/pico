@@ -14,7 +14,6 @@ import (
 	"github.com/picosh/pico/pkg/db"
 	sst "github.com/picosh/pico/pkg/pobj/storage"
 	"github.com/picosh/pico/pkg/shared"
-	"github.com/picosh/utils"
 )
 
 func NewTabWriter(out io.Writer) *tabwriter.Writer {
@@ -46,7 +45,7 @@ func projectTable(sesh io.Writer, projects []*db.Project) {
 
 type Cmd struct {
 	User    *db.User
-	Session utils.CmdSession
+	Session shared.CmdSession
 	Log     *slog.Logger
 	Store   sst.ObjectStorage
 	Dbpool  pgsdb.PgsDB
@@ -222,8 +221,8 @@ func (c *Cmd) stats(cfgMaxSize uint64) error {
 	_, _ = fmt.Fprintf(
 		writer,
 		"%.4f\t%.4f\t%.4f\t%d\r\n",
-		utils.BytesToGB(int(totalFileSize)),
-		utils.BytesToGB(int(storageMax)),
+		shared.BytesToGB(int(totalFileSize)),
+		shared.BytesToGB(int(storageMax)),
 		(float32(totalFileSize)/float32(storageMax))*100,
 		len(projects),
 	)

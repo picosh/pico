@@ -1,4 +1,4 @@
-package shared
+package router
 
 import (
 	"encoding/json"
@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/picosh/pico/pkg/db"
-	"github.com/picosh/utils"
+	"github.com/picosh/pico/pkg/shared"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -61,7 +61,7 @@ type UserApi struct {
 func NewUserApi(user *db.User, pubkey ssh.PublicKey) *UserApi {
 	return &UserApi{
 		User:        user,
-		Fingerprint: utils.KeyForSha256(pubkey),
+		Fingerprint: shared.KeyForSha256(pubkey),
 	}
 }
 
@@ -136,7 +136,7 @@ var FuncMap = template.FuncMap{
 	"intRange": intRange,
 }
 
-func RenderTemplate(cfg *ConfigSite, templates []string) (*template.Template, error) {
+func RenderTemplate(cfg *shared.ConfigSite, templates []string) (*template.Template, error) {
 	files := make([]string, len(templates))
 	copy(files, templates)
 	files = append(
@@ -165,7 +165,7 @@ func CreatePageHandler(fname string) http.HandlerFunc {
 			return
 		}
 
-		data := PageData{
+		data := shared.PageData{
 			Site: *cfg.GetSiteData(),
 		}
 		err = ts.Execute(w, data)

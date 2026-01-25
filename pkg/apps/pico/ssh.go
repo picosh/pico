@@ -19,7 +19,6 @@ import (
 	"github.com/picosh/pico/pkg/send/protocols/sftp"
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/pico/pkg/tui"
-	"github.com/picosh/utils"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -41,9 +40,9 @@ func createTui(shrd *tui.SharedModel) pssh.SSHServerMiddleware {
 func StartSshServer() {
 	appName := "pico-ssh"
 
-	host := utils.GetEnv("PICO_HOST", "0.0.0.0")
-	port := utils.GetEnv("PICO_SSH_PORT", "2222")
-	promPort := utils.GetEnv("PICO_PROM_PORT", "9222")
+	host := shared.GetEnv("PICO_HOST", "0.0.0.0")
+	port := shared.GetEnv("PICO_SSH_PORT", "2222")
+	promPort := shared.GetEnv("PICO_PROM_PORT", "9222")
 	cfg := NewConfigSite(appName)
 	logger := cfg.Logger
 
@@ -84,7 +83,7 @@ func StartSshServer() {
 			if perms == nil {
 				perms = &ssh.Permissions{
 					Extensions: map[string]string{
-						"pubkey": utils.KeyForKeyText(key),
+						"pubkey": shared.KeyForKeyText(key),
 					},
 				}
 			}

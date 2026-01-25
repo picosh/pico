@@ -4,20 +4,19 @@ import (
 	"strings"
 
 	"github.com/picosh/pico/pkg/shared"
-	"github.com/picosh/utils"
 )
 
-var MAX_FILE_SIZE = 3 * utils.MB
+var MAX_FILE_SIZE = 3 * shared.MB
 
 func NewConfigSite(service string) *shared.ConfigSite {
-	debug := utils.GetEnv("PROSE_DEBUG", "0")
-	domain := utils.GetEnv("PROSE_DOMAIN", "prose.sh")
-	port := utils.GetEnv("PROSE_WEB_PORT", "3000")
-	protocol := utils.GetEnv("PROSE_PROTOCOL", "https")
-	dbURL := utils.GetEnv("DATABASE_URL", "")
-	maxSize := uint64(25 * utils.MB)
-	maxImgSize := int64(10 * utils.MB)
-	withPipe := strings.ToLower(utils.GetEnv("PICO_PIPE_ENABLED", "true")) == "true"
+	debug := shared.GetEnv("PROSE_DEBUG", "0")
+	domain := shared.GetEnv("PROSE_DOMAIN", "prose.sh")
+	port := shared.GetEnv("PROSE_WEB_PORT", "3000")
+	protocol := shared.GetEnv("PROSE_PROTOCOL", "https")
+	dbURL := shared.GetEnv("DATABASE_URL", "")
+	maxSize := uint64(25 * shared.MB)
+	maxImgSize := int64(10 * shared.MB)
+	withPipe := strings.ToLower(shared.GetEnv("PICO_PIPE_ENABLED", "true")) == "true"
 
 	return &shared.ConfigSite{
 		Debug:    debug == "1",

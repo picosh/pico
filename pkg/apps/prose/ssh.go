@@ -19,15 +19,14 @@ import (
 	"github.com/picosh/pico/pkg/send/protocols/sftp"
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/pico/pkg/shared/storage"
-	"github.com/picosh/utils"
 )
 
 func StartSshServer() {
 	appName := "prose-ssh"
 
-	host := utils.GetEnv("PROSE_HOST", "0.0.0.0")
-	port := utils.GetEnv("PROSE_SSH_PORT", "2222")
-	promPort := utils.GetEnv("PROSE_PROM_PORT", "9222")
+	host := shared.GetEnv("PROSE_HOST", "0.0.0.0")
+	port := shared.GetEnv("PROSE_SSH_PORT", "2222")
+	promPort := shared.GetEnv("PROSE_PROM_PORT", "9222")
 	cfg := NewConfigSite(appName)
 	logger := cfg.Logger
 

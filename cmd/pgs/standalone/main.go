@@ -8,12 +8,11 @@ import (
 	pgsdb "github.com/picosh/pico/pkg/apps/pgs/db"
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/pico/pkg/shared/storage"
-	"github.com/picosh/utils"
 	"golang.org/x/crypto/ssh"
 )
 
 func main() {
-	dbURL := utils.GetEnv("DATABASE_URL", "./data/pgs.sqlite3")
+	dbURL := shared.GetEnv("DATABASE_URL", "./data/pgs.sqlite3")
 	logger := shared.CreateLogger("pgs-standalone", false)
 	dbpool, err := pgsdb.NewSqliteDB(dbURL, logger)
 	if err != nil {
@@ -45,7 +44,7 @@ func main() {
 			logger.Error("parse pubkey", "err", err)
 			return
 		}
-		pubkey := utils.KeyForKeyText(key)
+		pubkey := shared.KeyForKeyText(key)
 		logger.Info("init cli", "userName", userName, "pubkey", pubkey)
 
 		err = dbpool.RegisterAdmin(userName, pubkey, comment)

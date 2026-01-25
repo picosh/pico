@@ -17,15 +17,14 @@ import (
 	"github.com/picosh/pico/pkg/send/protocols/scp"
 	"github.com/picosh/pico/pkg/send/protocols/sftp"
 	"github.com/picosh/pico/pkg/shared"
-	"github.com/picosh/utils"
 )
 
 func StartSshServer() {
 	appName := "pastes-ssh"
 
-	host := utils.GetEnv("PASTES_HOST", "0.0.0.0")
-	port := utils.GetEnv("PASTES_SSH_PORT", "2222")
-	promPort := utils.GetEnv("PASTES_PROM_PORT", "9222")
+	host := shared.GetEnv("PASTES_HOST", "0.0.0.0")
+	port := shared.GetEnv("PASTES_SSH_PORT", "2222")
+	promPort := shared.GetEnv("PASTES_PROM_PORT", "9222")
 	cfg := NewConfigSite(appName)
 	logger := cfg.Logger
 

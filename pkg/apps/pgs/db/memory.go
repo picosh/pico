@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/picosh/pico/pkg/db"
-	"github.com/picosh/utils"
+	"github.com/picosh/pico/pkg/shared"
 )
 
 type MemoryDB struct {
@@ -37,9 +37,9 @@ func (me *MemoryDB) SetupTestData() {
 	feature := db.NewFeatureFlag(
 		user.ID,
 		"plus",
-		uint64(25*utils.MB),
-		int64(10*utils.MB),
-		int64(5*utils.KB),
+		uint64(25*shared.MB),
+		int64(10*shared.MB),
+		int64(5*shared.KB),
 	)
 	expiresAt := time.Now().Add(time.Hour * 24)
 	feature.ExpiresAt = &expiresAt

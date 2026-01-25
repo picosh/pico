@@ -1,4 +1,4 @@
-package shared
+package router
 
 import (
 	"context"
@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/picosh/pico/pkg/db"
+	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/utils/pipe/metrics"
 	"github.com/simplesurance/go-ip-anonymizer/ipanonymizer"
 	"github.com/x-way/crawlerdetect"
@@ -233,7 +234,7 @@ func AnalyticsCollect(ch chan *db.AnalyticsVisits, dbpool db.DB, logger *slog.Lo
 	drain := metrics.RegisterReconnectMetricRecorder(
 		context.Background(),
 		logger,
-		NewPicoPipeClient(),
+		shared.NewPicoPipeClient(),
 		100,
 		10*time.Millisecond,
 	)

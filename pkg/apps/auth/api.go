@@ -19,7 +19,7 @@ import (
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/db/postgres"
 	"github.com/picosh/pico/pkg/shared"
-	"github.com/picosh/utils"
+	"github.com/picosh/pico/pkg/shared/router"
 	"github.com/picosh/utils/pipe"
 	"github.com/picosh/utils/pipe/metrics"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -48,7 +48,7 @@ func generateURL(cfg *shared.ConfigSite, path string, space string) string {
 	return fmt.Sprintf("%s/%s%s", cfg.Domain, path, query)
 }
 
-func wellKnownHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
+func wellKnownHandler(apiConfig *router.ApiConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		space := r.PathValue("space")
 		if space == "" {
@@ -80,7 +80,7 @@ type oauth2Introspection struct {
 	Username string `json:"username"`
 }
 
-func introspectHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
+func introspectHandler(apiConfig *router.ApiConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		token := r.FormValue("token")
 		apiConfig.Cfg.Logger.Info("introspect token", "token", token)
@@ -114,7 +114,7 @@ func introspectHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 	}
 }
 
-func authorizeHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
+func authorizeHandler(apiConfig *router.ApiConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		responseType := r.URL.Query().Get("response_type")
 		clientID := r.URL.Query().Get("client_id")
@@ -158,7 +158,7 @@ func authorizeHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 	}
 }
 
-func redirectHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
+func redirectHandler(apiConfig *router.ApiConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		token := r.FormValue("token")
 		redirectURI := r.FormValue("redirect_uri")
@@ -194,7 +194,7 @@ type oauth2Token struct {
 	AccessToken string `json:"access_token"`
 }
 
-func tokenHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
+func tokenHandler(apiConfig *router.ApiConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		token := r.FormValue("code")
 		redirectURI := r.FormValue("redirect_uri")
@@ -233,7 +233,7 @@ type sishData struct {
 	RemoteAddress string `json:"remote_addr"`
 }
 
-func keyHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
+func keyHandler(apiConfig *router.ApiConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var data sishData
 
@@ -292,7 +292,7 @@ func keyHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 			log.Error("cannot insert access log", "err", err)
 		}
 
-		if !apiConfig.HasPrivilegedAccess(shared.GetApiToken(r)) {
+		if !apiConfig.HasPrivilegedAccess(router.GetApiToken(r)) {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
@@ -307,9 +307,9 @@ func keyHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 	}
 }
 
-func userHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
+func userHandler(apiConfig *router.ApiConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !apiConfig.HasPrivilegedAccess(shared.GetApiToken(r)) {
+		if !apiConfig.HasPrivilegedAccess(router.GetApiToken(r)) {
 			w.WriteHeader(http.StatusForbidden)
 			return
 		}
@@ -354,7 +354,7 @@ func userHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 	}
 }
 
-func rssHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
+func rssHandler(apiConfig *router.ApiConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		apiToken := r.PathValue("token")
 		user, err := apiConfig.Dbpool.FindUserByToken(apiToken)
@@ -387,7 +387,7 @@ func rssHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 	}
 }
 
-func pubkeysHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
+func pubkeysHandler(apiConfig *router.ApiConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userName := r.PathValue("user")
 		user, err := apiConfig.Dbpool.FindUserByName(userName)
@@ -456,7 +456,7 @@ type OrderEvent struct {
 
 // Status code must be 200 or else lemonsqueezy will keep retrying
 // https://docs.lemonsqueezy.com/help/webhooks
-func paymentWebhookHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
+func paymentWebhookHandler(apiConfig *router.ApiConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		dbpool := apiConfig.Dbpool
 		logger := apiConfig.Cfg.Logger
@@ -482,7 +482,7 @@ func paymentWebhookHandler(apiConfig *shared.ApiConfig) http.HandlerFunc {
 			return
 		}
 
-		hash := shared.HmacString(apiConfig.Cfg.SecretWebhook, string(payload))
+		hash := router.HmacString(apiConfig.Cfg.SecretWebhook, string(payload))
 		sig := r.Header.Get("X-Signature")
 		if !hmac.Equal([]byte(hash), []byte(sig)) {
 			logger.Error("invalid signature X-Signature")
@@ -678,14 +678,14 @@ func deserializeCaddyAccessLog(dbpool db.DB, access *AccessLog) (*db.AnalyticsVi
 	} else if strings.HasSuffix(host, "prose.sh") {
 		subdomain = strings.TrimSuffix(host, ".prose.sh")
 	} else {
-		subdomain = shared.GetCustomDomain(host, space)
+		subdomain = router.GetCustomDomain(host, space)
 	}
 
 	subdomain = strings.TrimSuffix(subdomain, ".nue")
 	subdomain = strings.TrimSuffix(subdomain, ".ash")
 
 	// get user and namespace details from subdomain
-	props, err := shared.GetProjectFromSubdomain(subdomain)
+	props, err := router.GetProjectFromSubdomain(subdomain)
 	if err != nil {
 		return nil, fmt.Errorf("could not get project from subdomain %s: %w", subdomain, err)
 	}
@@ -772,7 +772,7 @@ func metricDrainSub(ctx context.Context, dbpool db.DB, logger *slog.Logger, secr
 			}
 
 			logger.Info("received visit", "visit", visit)
-			err = shared.AnalyticsVisitFromVisit(visit, dbpool, secret)
+			err = router.AnalyticsVisitFromVisit(visit, dbpool, secret)
 			if err != nil {
 				logger.Info("could not record analytics visit", "err", err)
 				continue
@@ -834,7 +834,7 @@ func tunsEventLogDrainSub(ctx context.Context, dbpool db.DB, logger *slog.Logger
 	}
 }
 
-func authMux(apiConfig *shared.ApiConfig) *http.ServeMux {
+func authMux(apiConfig *router.ApiConfig) *http.ServeMux {
 	serverRoot, err := fs.Sub(embedFS, "public")
 	if err != nil {
 		panic(err)
@@ -866,24 +866,24 @@ func authMux(apiConfig *shared.ApiConfig) *http.ServeMux {
 	mux.HandleFunc("GET /_metrics", promhttp.Handler().ServeHTTP)
 
 	if apiConfig.Cfg.Debug {
-		shared.CreatePProfRoutesMux(mux)
+		router.CreatePProfRoutesMux(mux)
 	}
 
 	return mux
 }
 
 func StartApiServer() {
-	debug := utils.GetEnv("AUTH_DEBUG", "0")
-	withPipe := strings.ToLower(utils.GetEnv("PICO_PIPE_ENABLED", "true")) == "true"
+	debug := shared.GetEnv("AUTH_DEBUG", "0")
+	withPipe := strings.ToLower(shared.GetEnv("PICO_PIPE_ENABLED", "true")) == "true"
 
 	cfg := &shared.ConfigSite{
-		DbURL:         utils.GetEnv("DATABASE_URL", ""),
+		DbURL:         shared.GetEnv("DATABASE_URL", ""),
 		Debug:         debug == "1",
-		Issuer:        utils.GetEnv("AUTH_ISSUER", "pico.sh"),
-		Domain:        utils.GetEnv("AUTH_DOMAIN", "http://0.0.0.0:3000"),
-		Port:          utils.GetEnv("AUTH_WEB_PORT", "3000"),
-		Secret:        utils.GetEnv("PICO_SECRET", ""),
-		SecretWebhook: utils.GetEnv("PICO_SECRET_WEBHOOK", ""),
+		Issuer:        shared.GetEnv("AUTH_ISSUER", "pico.sh"),
+		Domain:        shared.GetEnv("AUTH_DOMAIN", "http://0.0.0.0:3000"),
+		Port:          shared.GetEnv("AUTH_WEB_PORT", "3000"),
+		Secret:        shared.GetEnv("PICO_SECRET", ""),
+		SecretWebhook: shared.GetEnv("PICO_SECRET_WEBHOOK", ""),
 	}
 
 	if cfg.SecretWebhook == "" {
@@ -911,7 +911,7 @@ func StartApiServer() {
 	// gather connect/disconnect logs from tuns
 	go tunsEventLogDrainSub(ctx, db, logger, cfg.Secret)
 
-	apiConfig := &shared.ApiConfig{
+	apiConfig := &router.ApiConfig{
 		Cfg:    cfg,
 		Dbpool: db,
 	}

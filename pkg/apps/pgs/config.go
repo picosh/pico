@@ -7,8 +7,8 @@ import (
 	"time"
 
 	pgsdb "github.com/picosh/pico/pkg/apps/pgs/db"
+	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/pico/pkg/shared/storage"
-	"github.com/picosh/utils"
 )
 
 type PgsConfig struct {
@@ -61,26 +61,26 @@ func (c *PgsConfig) StaticPath(fname string) string {
 	return filepath.Join("pkg", "apps", "pgs", fname)
 }
 
-var maxSize = uint64(25 * utils.MB)
-var maxAssetSize = int64(10 * utils.MB)
+var maxSize = uint64(25 * shared.MB)
+var maxAssetSize = int64(10 * shared.MB)
 
 // Needs to be small for caching files like _headers and _redirects.
-var maxSpecialFileSize = int64(5 * utils.KB)
+var maxSpecialFileSize = int64(5 * shared.KB)
 
 func NewPgsConfig(logger *slog.Logger, dbpool pgsdb.PgsDB, st storage.StorageServe, pubsub PicoPubsub) *PgsConfig {
-	domain := utils.GetEnv("PGS_DOMAIN", "pgs.sh")
-	port := utils.GetEnv("PGS_WEB_PORT", "3000")
-	protocol := utils.GetEnv("PGS_PROTOCOL", "https")
-	cacheTTL, err := time.ParseDuration(utils.GetEnv("PGS_CACHE_TTL", ""))
+	domain := shared.GetEnv("PGS_DOMAIN", "pgs.sh")
+	port := shared.GetEnv("PGS_WEB_PORT", "3000")
+	protocol := shared.GetEnv("PGS_PROTOCOL", "https")
+	cacheTTL, err := time.ParseDuration(shared.GetEnv("PGS_CACHE_TTL", ""))
 	if err != nil {
 		cacheTTL = 600 * time.Second
 	}
-	cacheControl := utils.GetEnv(
+	cacheControl := shared.GetEnv(
 		"PGS_CACHE_CONTROL",
 		fmt.Sprintf("max-age=%d", int(cacheTTL.Seconds())))
 
-	sshHost := utils.GetEnv("PGS_SSH_HOST", "0.0.0.0")
-	sshPort := utils.GetEnv("PGS_SSH_PORT", "2222")
+	sshHost := shared.GetEnv("PGS_SSH_HOST", "0.0.0.0")
+	sshPort := shared.GetEnv("PGS_SSH_PORT", "2222")
 
 	cfg := PgsConfig{
 		CacheControl:       cacheControl,

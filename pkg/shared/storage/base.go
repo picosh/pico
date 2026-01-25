@@ -4,18 +4,18 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/picosh/utils"
+	"github.com/picosh/pico/pkg/shared"
 )
 
 func GetStorageTypeFromEnv() string {
-	return utils.GetEnv("STORAGE_ADAPTER", "fs")
+	return shared.GetEnv("STORAGE_ADAPTER", "fs")
 }
 
 func NewStorage(logger *slog.Logger, adapter string) (StorageServe, error) {
 	logger.Info("storage adapter", "adapter", adapter)
 	switch adapter {
 	case "fs":
-		fsPath := utils.GetEnv("FS_STORAGE_DIR", "/tmp/pico_storage")
+		fsPath := shared.GetEnv("FS_STORAGE_DIR", "/tmp/pico_storage")
 		logger.Info("using filesystem storage", "path", fsPath)
 		return NewStorageFS(logger, fsPath)
 	case "memory":

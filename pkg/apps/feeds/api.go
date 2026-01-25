@@ -8,13 +8,14 @@ import (
 
 	"github.com/picosh/pico/pkg/db/postgres"
 	"github.com/picosh/pico/pkg/shared"
+	"github.com/picosh/pico/pkg/shared/router"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func keepAliveHandler(w http.ResponseWriter, r *http.Request) {
-	dbpool := shared.GetDB(r)
-	logger := shared.GetLogger(r)
-	postID, _ := url.PathUnescape(shared.GetField(r, 0))
+	dbpool := router.GetDB(r)
+	logger := router.GetLogger(r)
+	postID, _ := url.PathUnescape(router.GetField(r, 0))
 
 	post, err := dbpool.FindPost(postID)
 	if err != nil {
@@ -60,9 +61,9 @@ func keepAliveHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func unsubHandler(w http.ResponseWriter, r *http.Request) {
-	dbpool := shared.GetDB(r)
-	logger := shared.GetLogger(r)
-	postID, _ := url.PathUnescape(shared.GetField(r, 0))
+	dbpool := router.GetDB(r)
+	logger := router.GetLogger(r)
+	postID, _ := url.PathUnescape(router.GetField(r, 0))
 
 	post, err := dbpool.FindPost(postID)
 	if err != nil {
@@ -96,12 +97,12 @@ func unsubHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func createMainRoutes(staticRoutes []shared.Route) []shared.Route {
-	routes := []shared.Route{
-		shared.NewRoute("GET", "/", shared.CreatePageHandler("html/marketing.page.tmpl")),
-		shared.NewRoute("GET", "/keep-alive/(.+)", keepAliveHandler),
-		shared.NewRoute("GET", "/unsub/(.+)", unsubHandler),
-		shared.NewRoute("GET", "/_metrics", promhttp.Handler().ServeHTTP),
+func createMainRoutes(staticRoutes []router.Route) []router.Route {
+	routes := []router.Route{
+		router.NewRoute("GET", "/", router.CreatePageHandler("html/marketing.page.tmpl")),
+		router.NewRoute("GET", "/keep-alive/(.+)", keepAliveHandler),
+		router.NewRoute("GET", "/unsub/(.+)", unsubHandler),
+		router.NewRoute("GET", "/_metrics", promhttp.Handler().ServeHTTP),
 	}
 
 	routes = append(
@@ -112,15 +113,15 @@ func createMainRoutes(staticRoutes []shared.Route) []shared.Route {
 	return routes
 }
 
-func createStaticRoutes() []shared.Route {
-	return []shared.Route{
-		shared.NewRoute("GET", "/main.css", shared.ServeFile("main.css", "text/css")),
-		shared.NewRoute("GET", "/card.png", shared.ServeFile("card.png", "image/png")),
-		shared.NewRoute("GET", "/favicon-16x16.png", shared.ServeFile("favicon-16x16.png", "image/png")),
-		shared.NewRoute("GET", "/favicon-32x32.png", shared.ServeFile("favicon-32x32.png", "image/png")),
-		shared.NewRoute("GET", "/apple-touch-icon.png", shared.ServeFile("apple-touch-icon.png", "image/png")),
-		shared.NewRoute("GET", "/favicon.ico", shared.ServeFile("favicon.ico", "image/x-icon")),
-		shared.NewRoute("GET", "/robots.txt", shared.ServeFile("robots.txt", "text/plain")),
+func createStaticRoutes() []router.Route {
+	return []router.Route{
+		router.NewRoute("GET", "/main.css", router.ServeFile("main.css", "text/css")),
+		router.NewRoute("GET", "/card.png", router.ServeFile("card.png", "image/png")),
+		router.NewRoute("GET", "/favicon-16x16.png", router.ServeFile("favicon-16x16.png", "image/png")),
+		router.NewRoute("GET", "/favicon-32x32.png", router.ServeFile("favicon-32x32.png", "image/png")),
+		router.NewRoute("GET", "/apple-touch-icon.png", router.ServeFile("apple-touch-icon.png", "image/png")),
+		router.NewRoute("GET", "/favicon.ico", router.ServeFile("favicon.ico", "image/x-icon")),
+		router.NewRoute("GET", "/robots.txt", router.ServeFile("robots.txt", "text/plain")),
 	}
 }
 
@@ -139,16 +140,16 @@ func StartApiServer() {
 	staticRoutes := createStaticRoutes()
 
 	if cfg.Debug {
-		staticRoutes = shared.CreatePProfRoutes(staticRoutes)
+		staticRoutes = router.CreatePProfRoutes(staticRoutes)
 	}
 
 	mainRoutes := createMainRoutes(staticRoutes)
 
-	apiConfig := &shared.ApiConfig{
+	apiConfig := &router.ApiConfig{
 		Cfg:    cfg,
 		Dbpool: db,
 	}
-	handler := shared.CreateServe(mainRoutes, []shared.Route{}, apiConfig)
+	handler := router.CreateServe(mainRoutes, []router.Route{}, apiConfig)
 	router := http.HandlerFunc(handler)
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)

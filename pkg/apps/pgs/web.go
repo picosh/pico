@@ -22,10 +22,10 @@ import (
 	"github.com/darkweak/storages/core"
 	"github.com/gorilla/feeds"
 	"github.com/hashicorp/golang-lru/v2/expirable"
-	"github.com/picosh/pico/pkg/cache"
 	"github.com/picosh/pico/pkg/db"
 	sst "github.com/picosh/pico/pkg/pobj/storage"
 	"github.com/picosh/pico/pkg/shared"
+	"github.com/picosh/pico/pkg/shared/router"
 	"github.com/picosh/pico/pkg/shared/storage"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/protobuf/proto"
@@ -115,8 +115,8 @@ func NewWebRouter(cfg *PgsConfig) *WebRouter {
 func newWebRouter(cfg *PgsConfig) *WebRouter {
 	router := &WebRouter{
 		Cfg:            cfg,
-		RedirectsCache: expirable.NewLRU[string, []*RedirectRule](2048, nil, cache.CacheTimeout),
-		HeadersCache:   expirable.NewLRU[string, []*HeaderRule](2048, nil, cache.CacheTimeout),
+		RedirectsCache: expirable.NewLRU[string, []*RedirectRule](2048, nil, shared.CacheTimeout),
+		HeadersCache:   expirable.NewLRU[string, []*HeaderRule](2048, nil, shared.CacheTimeout),
 	}
 	router.initRouters()
 	return router
@@ -242,8 +242,8 @@ func (web *WebRouter) checkHandler(w http.ResponseWriter, r *http.Request) {
 	appDomain := strings.Split(cfg.Domain, ":")[0]
 
 	if !strings.Contains(hostDomain, appDomain) {
-		subdomain := shared.GetCustomDomain(hostDomain, cfg.TxtPrefix)
-		props, err := shared.GetProjectFromSubdomain(subdomain)
+		subdomain := router.GetCustomDomain(hostDomain, cfg.TxtPrefix)
+		props, err := router.GetProjectFromSubdomain(subdomain)
 		if err != nil {
 			logger.Error(
 				"could not get project from subdomain",
@@ -448,7 +448,7 @@ func (web *WebRouter) ImageRequest(perm func(proj *db.Project) bool) http.Handle
 }
 
 func (web *WebRouter) ServeAsset(fname string, opts *storage.ImgProcessOpts, hasPerm HasPerm, w http.ResponseWriter, r *http.Request) {
-	subdomain := shared.GetSubdomain(r)
+	subdomain := router.GetSubdomain(r)
 
 	logger := web.Cfg.Logger.With(
 		"subdomain", subdomain,
@@ -457,7 +457,7 @@ func (web *WebRouter) ServeAsset(fname string, opts *storage.ImgProcessOpts, has
 		"host", r.Host,
 	)
 
-	props, err := shared.GetProjectFromSubdomain(subdomain)
+	props, err := router.GetProjectFromSubdomain(subdomain)
 	if err != nil {
 		logger.Info(
 			"could not determine project from subdomain",
@@ -542,23 +542,23 @@ func (web *WebRouter) ServeAsset(fname string, opts *storage.ImgProcessOpts, has
 }
 
 func (web *WebRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	subdomain := shared.GetSubdomainFromRequest(r, web.Cfg.Domain, web.Cfg.TxtPrefix)
+	subdomain := router.GetSubdomainFromRequest(r, web.Cfg.Domain, web.Cfg.TxtPrefix)
 	if web.RootRouter == nil || web.UserRouter == nil {
 		web.Cfg.Logger.Error("routers not initialized")
 		http.Error(w, "routers not initialized", http.StatusInternalServerError)
 		return
 	}
 
-	var router *http.ServeMux
+	var mux *http.ServeMux
 	if subdomain == "" {
-		router = web.RootRouter
+		mux = web.RootRouter
 	} else {
-		router = web.UserRouter
+		mux = web.UserRouter
 	}
 
 	ctx := r.Context()
-	ctx = context.WithValue(ctx, shared.CtxSubdomainKey{}, subdomain)
-	router.ServeHTTP(w, r.WithContext(ctx))
+	ctx = context.WithValue(ctx, router.CtxSubdomainKey{}, subdomain)
+	mux.ServeHTTP(w, r.WithContext(ctx))
 }
 
 type CompatLogger struct {

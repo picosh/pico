@@ -14,7 +14,6 @@ import (
 	"github.com/picosh/pico/pkg/pssh"
 	sendutils "github.com/picosh/pico/pkg/send/utils"
 	"github.com/picosh/pico/pkg/shared"
-	"github.com/picosh/utils"
 )
 
 type PostMetaData struct {
@@ -116,9 +115,9 @@ func (h *ScpUploadHandler) Write(s *pssh.SSHServerConnSession, entry *sendutils.
 	}
 
 	now := time.Now()
-	slug := utils.SanitizeFileExt(filename)
+	slug := shared.SanitizeFileExt(filename)
 	fileSize := binary.Size(origText)
-	shasum := utils.Shasum(origText)
+	shasum := shared.Shasum(origText)
 
 	nextPost := db.Post{
 		Filename:  filename,

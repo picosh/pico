@@ -12,7 +12,6 @@ import (
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/pssh"
 	"github.com/picosh/pico/pkg/shared"
-	"github.com/picosh/utils"
 
 	pipeLogger "github.com/picosh/utils/pipe/log"
 )
@@ -22,7 +21,7 @@ func getUser(s *pssh.SSHServerConnSession, dbpool db.DB) (*db.User, error) {
 		return nil, fmt.Errorf("key not found")
 	}
 
-	key := utils.KeyForKeyText(s.PublicKey())
+	key := shared.KeyForKeyText(s.PublicKey())
 
 	user, err := dbpool.FindUserByKey(s.User(), key)
 	if err != nil {
@@ -39,7 +38,7 @@ func getUser(s *pssh.SSHServerConnSession, dbpool db.DB) (*db.User, error) {
 type Cmd struct {
 	User       *db.User
 	SshSession *pssh.SSHServerConnSession
-	Session    utils.CmdSession
+	Session    shared.CmdSession
 	Log        *slog.Logger
 	Dbpool     db.DB
 	Write      bool
@@ -77,9 +76,9 @@ func (c *Cmd) user() {
 }
 
 func (c *Cmd) notFound(host, interval string) error {
-	origin := utils.StartOfYear()
+	origin := shared.StartOfYear()
 	if interval == "month" {
-		origin = utils.StartOfMonth()
+		origin = shared.StartOfMonth()
 	}
 	c.output(fmt.Sprintf("starting from: %s\n", origin.Format(time.RFC3339)))
 	urls, err := c.Dbpool.VisitUrlNotFound(&db.SummaryOpts{
@@ -155,10 +154,10 @@ func (c *Cmd) logs(ctx context.Context) error {
 			continue
 		}
 
-		user := utils.AnyToStr(parsedData, "user")
-		userId := utils.AnyToStr(parsedData, "userId")
+		user := shared.AnyToStr(parsedData, "user")
+		userId := shared.AnyToStr(parsedData, "userId")
 
-		hidden := utils.AnyToBool(parsedData, "hidden")
+		hidden := shared.AnyToBool(parsedData, "hidden")
 
 		if !hidden && (user == c.User.Name || userId == c.User.ID) {
 			select {

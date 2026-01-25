@@ -20,6 +20,7 @@ import (
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/db/postgres"
 	"github.com/picosh/pico/pkg/shared"
+	"github.com/picosh/pico/pkg/shared/router"
 	"github.com/picosh/utils/pipe"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -36,8 +37,8 @@ var (
 
 func serveFile(file string, contentType string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		logger := shared.GetLogger(r)
-		cfg := shared.GetCfg(r)
+		logger := router.GetLogger(r)
+		cfg := router.GetCfg(r)
 
 		contents, err := os.ReadFile(cfg.StaticPath(fmt.Sprintf("public/%s", file)))
 		if err != nil {
@@ -54,18 +55,18 @@ func serveFile(file string, contentType string) http.HandlerFunc {
 	}
 }
 
-func createStaticRoutes() []shared.Route {
-	return []shared.Route{
-		shared.NewRoute("GET", "/main.css", serveFile("main.css", "text/css")),
-		shared.NewRoute("GET", "/smol.css", serveFile("smol.css", "text/css")),
-		shared.NewRoute("GET", "/syntax.css", serveFile("syntax.css", "text/css")),
-		shared.NewRoute("GET", "/card.png", serveFile("card.png", "image/png")),
-		shared.NewRoute("GET", "/favicon-16x16.png", serveFile("favicon-16x16.png", "image/png")),
-		shared.NewRoute("GET", "/favicon-32x32.png", serveFile("favicon-32x32.png", "image/png")),
-		shared.NewRoute("GET", "/apple-touch-icon.png", serveFile("apple-touch-icon.png", "image/png")),
-		shared.NewRoute("GET", "/favicon.ico", serveFile("favicon.ico", "image/x-icon")),
-		shared.NewRoute("GET", "/robots.txt", serveFile("robots.txt", "text/plain")),
-		shared.NewRoute("GET", "/anim.js", serveFile("anim.js", "text/javascript")),
+func createStaticRoutes() []router.Route {
+	return []router.Route{
+		router.NewRoute("GET", "/main.css", serveFile("main.css", "text/css")),
+		router.NewRoute("GET", "/smol.css", serveFile("smol.css", "text/css")),
+		router.NewRoute("GET", "/syntax.css", serveFile("syntax.css", "text/css")),
+		router.NewRoute("GET", "/card.png", serveFile("card.png", "image/png")),
+		router.NewRoute("GET", "/favicon-16x16.png", serveFile("favicon-16x16.png", "image/png")),
+		router.NewRoute("GET", "/favicon-32x32.png", serveFile("favicon-32x32.png", "image/png")),
+		router.NewRoute("GET", "/apple-touch-icon.png", serveFile("apple-touch-icon.png", "image/png")),
+		router.NewRoute("GET", "/favicon.ico", serveFile("favicon.ico", "image/x-icon")),
+		router.NewRoute("GET", "/robots.txt", serveFile("robots.txt", "text/plain")),
+		router.NewRoute("GET", "/anim.js", serveFile("anim.js", "text/javascript")),
 	}
 }
 
@@ -86,10 +87,10 @@ var _ io.Writer = writeFlusher{}
 
 func handleSub(pubsub bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		logger := shared.GetLogger(r)
+		logger := router.GetLogger(r)
 
 		clientInfo := shared.NewPicoPipeClient()
-		topic, _ := url.PathUnescape(shared.GetField(r, 0))
+		topic, _ := url.PathUnescape(router.GetField(r, 0))
 
 		topic = cleanRegex.ReplaceAllString(topic, "")
 
@@ -139,10 +140,10 @@ func handleSub(pubsub bool) http.HandlerFunc {
 
 func handlePub(pubsub bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		logger := shared.GetLogger(r)
+		logger := router.GetLogger(r)
 
 		clientInfo := shared.NewPicoPipeClient()
-		topic, _ := url.PathUnescape(shared.GetField(r, 0))
+		topic, _ := url.PathUnescape(router.GetField(r, 0))
 
 		topic = cleanRegex.ReplaceAllString(topic, "")
 
@@ -283,7 +284,7 @@ func handlePub(pubsub bool) http.HandlerFunc {
 
 func handlePipe() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		logger := shared.GetLogger(r)
+		logger := router.GetLogger(r)
 
 		c, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
@@ -296,7 +297,7 @@ func handlePipe() http.HandlerFunc {
 		}()
 
 		clientInfo := shared.NewPicoPipeClient()
-		topic, _ := url.PathUnescape(shared.GetField(r, 0))
+		topic, _ := url.PathUnescape(router.GetField(r, 0))
 
 		topic = cleanRegex.ReplaceAllString(topic, "")
 
@@ -435,7 +436,7 @@ func handlePipe() http.HandlerFunc {
 
 func rssHandler(cfg *shared.ConfigSite, dbpool db.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		apiToken, _ := url.PathUnescape(shared.GetField(r, 0))
+		apiToken, _ := url.PathUnescape(router.GetField(r, 0))
 		user, err := dbpool.FindUserByToken(apiToken)
 		if err != nil {
 			cfg.Logger.Error(
@@ -470,20 +471,20 @@ func rssHandler(cfg *shared.ConfigSite, dbpool db.DB) http.HandlerFunc {
 	}
 }
 
-func createMainRoutes(staticRoutes []shared.Route, cfg *shared.ConfigSite, dbpool db.DB) []shared.Route {
-	routes := []shared.Route{
-		shared.NewRoute("GET", "/", shared.CreatePageHandler("html/marketing.page.tmpl")),
-		shared.NewRoute("GET", "/check", shared.CheckHandler),
-		shared.NewRoute("GET", "/rss/(.+)", rssHandler(cfg, dbpool)),
-		shared.NewRoute("GET", "/_metrics", promhttp.Handler().ServeHTTP),
+func createMainRoutes(staticRoutes []router.Route, cfg *shared.ConfigSite, dbpool db.DB) []router.Route {
+	routes := []router.Route{
+		router.NewRoute("GET", "/", router.CreatePageHandler("html/marketing.page.tmpl")),
+		router.NewRoute("GET", "/check", router.CheckHandler),
+		router.NewRoute("GET", "/rss/(.+)", rssHandler(cfg, dbpool)),
+		router.NewRoute("GET", "/_metrics", promhttp.Handler().ServeHTTP),
 	}
 
-	pipeRoutes := []shared.Route{
-		shared.NewRoute("GET", "/topic/(.+)", handleSub(false)),
-		shared.NewRoute("POST", "/topic/(.+)", handlePub(false)),
-		shared.NewRoute("GET", "/pubsub/(.+)", handleSub(true)),
-		shared.NewRoute("POST", "/pubsub/(.+)", handlePub(true)),
-		shared.NewRoute("GET", "/pipe/(.+)", handlePipe()),
+	pipeRoutes := []router.Route{
+		router.NewRoute("GET", "/topic/(.+)", handleSub(false)),
+		router.NewRoute("POST", "/topic/(.+)", handlePub(false)),
+		router.NewRoute("GET", "/pubsub/(.+)", handleSub(true)),
+		router.NewRoute("POST", "/pubsub/(.+)", handlePub(true)),
+		router.NewRoute("GET", "/pipe/(.+)", handlePipe()),
 	}
 
 	for _, route := range pipeRoutes {
@@ -510,7 +511,7 @@ func StartApiServer() {
 	staticRoutes := createStaticRoutes()
 
 	if cfg.Debug {
-		staticRoutes = shared.CreatePProfRoutes(staticRoutes)
+		staticRoutes = router.CreatePProfRoutes(staticRoutes)
 	}
 
 	mainRoutes := createMainRoutes(staticRoutes, cfg, db)
@@ -541,11 +542,11 @@ func StartApiServer() {
 		}
 	}()
 
-	apiConfig := &shared.ApiConfig{
+	apiConfig := &router.ApiConfig{
 		Cfg:    cfg,
 		Dbpool: db,
 	}
-	handler := shared.CreateServe(mainRoutes, subdomainRoutes, apiConfig)
+	handler := router.CreateServe(mainRoutes, subdomainRoutes, apiConfig)
 	router := http.HandlerFunc(handler)
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)

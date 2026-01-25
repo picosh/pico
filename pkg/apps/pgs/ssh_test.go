@@ -16,8 +16,8 @@ import (
 
 	pgsdb "github.com/picosh/pico/pkg/apps/pgs/db"
 	"github.com/picosh/pico/pkg/db"
+	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/pico/pkg/shared/storage"
-	"github.com/picosh/utils"
 	"github.com/pkg/sftp"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/crypto/ssh"
@@ -55,7 +55,7 @@ func TestSshServerSftp(t *testing.T) {
 	dbpool.Pubkeys = append(dbpool.Pubkeys, &db.PublicKey{
 		ID:     "nice-pubkey",
 		UserID: dbpool.Users[0].ID,
-		Key:    utils.KeyForKeyText(user.signer.PublicKey()),
+		Key:    shared.KeyForKeyText(user.signer.PublicKey()),
 	})
 
 	client, err := user.NewClient()
@@ -139,7 +139,7 @@ func TestSshServerRsync(t *testing.T) {
 	time.Sleep(time.Millisecond * 100)
 
 	user := GenerateUser()
-	key := utils.KeyForKeyText(user.signer.PublicKey())
+	key := shared.KeyForKeyText(user.signer.PublicKey())
 	// add user's pubkey to the default test account
 	dbpool.Pubkeys = append(dbpool.Pubkeys, &db.PublicKey{
 		ID:     "nice-pubkey",

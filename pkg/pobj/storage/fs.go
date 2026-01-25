@@ -17,8 +17,10 @@ import (
 	"github.com/google/renameio/v2"
 	"github.com/picosh/pico/pkg/send/utils"
 	"github.com/picosh/pico/pkg/shared/mime"
-	putils "github.com/picosh/utils"
 )
+
+var KB = 1000
+var MB = KB * 1000
 
 // https://stackoverflow.com/a/32482941
 func dirSize(path string) (int64, error) {
@@ -121,7 +123,7 @@ func (s *StorageFS) GetObject(bucket Bucket, fpath string) (utils.ReadAndReaderA
 
 	etag := ""
 	// only generate etag if file is less than 10MB
-	if info.Size() <= int64(10*putils.MB) {
+	if info.Size() <= int64(10*MB) {
 		// calculate etag
 		h := md5.New()
 		if _, err := io.Copy(h, dat); err != nil {

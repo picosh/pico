@@ -8,7 +8,7 @@ import (
 
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/pssh"
-	"github.com/picosh/pico/pkg/shared"
+	"github.com/picosh/pico/pkg/shared/router"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -30,7 +30,7 @@ func tunnelPerm(proj *db.Project) bool {
 
 func (web *TunnelWebRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	ctx = context.WithValue(ctx, shared.CtxSubdomainKey{}, web.subdomain)
+	ctx = context.WithValue(ctx, router.CtxSubdomainKey{}, web.subdomain)
 	web.UserRouter.ServeHTTP(w, r.WithContext(ctx))
 }
 
@@ -57,17 +57,17 @@ func CreateHttpHandler(cfg *PgsConfig) CtxHttpBridge {
 		pubkey := ctx.Permissions().Extensions["pubkey"]
 		if pubkey == "" {
 			log.Error("pubkey not found in extensions", "subdomain", subdomain)
-			return http.HandlerFunc(shared.UnauthorizedHandler)
+			return http.HandlerFunc(router.UnauthorizedHandler)
 		}
 
 		log = log.With(
 			"pubkey", pubkey,
 		)
 
-		props, err := shared.GetProjectFromSubdomain(subdomain)
+		props, err := router.GetProjectFromSubdomain(subdomain)
 		if err != nil {
 			log.Error("could not get project from subdomain", "err", err.Error())
-			return http.HandlerFunc(shared.UnauthorizedHandler)
+			return http.HandlerFunc(router.UnauthorizedHandler)
 		}
 
 		owner, err := cfg.DB.FindUserByName(props.Username)
@@ -77,7 +77,7 @@ func CreateHttpHandler(cfg *PgsConfig) CtxHttpBridge {
 				"name", props.Username,
 				"err", err.Error(),
 			)
-			return http.HandlerFunc(shared.UnauthorizedHandler)
+			return http.HandlerFunc(router.UnauthorizedHandler)
 		}
 		log = log.With(
 			"owner", owner.Name,
@@ -86,7 +86,7 @@ func CreateHttpHandler(cfg *PgsConfig) CtxHttpBridge {
 		project, err := cfg.DB.FindProjectByName(owner.ID, props.ProjectName)
 		if err != nil {
 			log.Error("could not get project by name", "project", props.ProjectName, "err", err.Error())
-			return http.HandlerFunc(shared.UnauthorizedHandler)
+			return http.HandlerFunc(router.UnauthorizedHandler)
 		}
 
 		requester, _ := cfg.DB.FindUserByPubkey(pubkey)
@@ -108,7 +108,7 @@ func CreateHttpHandler(cfg *PgsConfig) CtxHttpBridge {
 
 			if !isAdmin {
 				log.Error("impersonation attempt failed")
-				return http.HandlerFunc(shared.UnauthorizedHandler)
+				return http.HandlerFunc(router.UnauthorizedHandler)
 			}
 			requester, _ = cfg.DB.FindUserByName(asUser)
 		}
@@ -117,11 +117,11 @@ func CreateHttpHandler(cfg *PgsConfig) CtxHttpBridge {
 		publicKey, _, _, _, err := ssh.ParseAuthorizedKey([]byte(pubkey))
 		if err != nil {
 			log.Error("could not parse public key", "pubkey", pubkey, "err", err)
-			return http.HandlerFunc(shared.UnauthorizedHandler)
+			return http.HandlerFunc(router.UnauthorizedHandler)
 		}
 		if !HasProjectAccess(project, owner, requester, publicKey) {
 			log.Error("no access")
-			return http.HandlerFunc(shared.UnauthorizedHandler)
+			return http.HandlerFunc(router.UnauthorizedHandler)
 		}
 
 		log.Info("user has access to site")

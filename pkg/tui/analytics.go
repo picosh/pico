@@ -11,7 +11,7 @@ import (
 	"git.sr.ht/~rockorager/vaxis/vxfw/richtext"
 	"git.sr.ht/~rockorager/vaxis/vxfw/text"
 	"github.com/picosh/pico/pkg/db"
-	"github.com/picosh/utils"
+	"github.com/picosh/pico/pkg/shared"
 )
 
 type SitesLoaded struct{}
@@ -355,7 +355,7 @@ func (m *AnalyticsPage) visits(ctx vxfw.DrawContext, intervals []*db.VisitInterv
 func (m *AnalyticsPage) fetchSites() {
 	siteList, err := m.shared.Dbpool.FindVisitSiteList(&db.SummaryOpts{
 		UserID: m.shared.User.ID,
-		Origin: utils.StartOfMonth(),
+		Origin: shared.StartOfMonth(),
 	})
 	if err != nil {
 		m.loadingSites = false
@@ -376,9 +376,9 @@ func (m *AnalyticsPage) fetchSiteStats(site string, interval string) {
 	}
 
 	if interval == "day" {
-		opts.Origin = utils.StartOfMonth()
+		opts.Origin = shared.StartOfMonth()
 	} else {
-		opts.Origin = utils.StartOfYear()
+		opts.Origin = shared.StartOfYear()
 	}
 
 	summary, err := m.shared.Dbpool.VisitSummary(opts)

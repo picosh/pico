@@ -11,7 +11,7 @@ import (
 	"git.sr.ht/~rockorager/vaxis/vxfw/richtext"
 	"git.sr.ht/~rockorager/vaxis/vxfw/text"
 	"github.com/picosh/pico/pkg/db"
-	"github.com/picosh/utils"
+	"github.com/picosh/pico/pkg/shared"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -253,7 +253,7 @@ func (m *AddKeyPage) addPubkey(pubkey string) error {
 		return err
 	}
 
-	key := utils.KeyForKeyText(pk)
+	key := shared.KeyForKeyText(pk)
 
 	return m.shared.Dbpool.InsertPublicKey(
 		m.shared.User.ID, key, comment,

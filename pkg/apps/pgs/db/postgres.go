@@ -8,7 +8,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 	"github.com/picosh/pico/pkg/db"
-	"github.com/picosh/utils"
+	"github.com/picosh/pico/pkg/shared"
 )
 
 type PgsPsqlDB struct {
@@ -107,7 +107,7 @@ func (me *PgsPsqlDB) InsertAccessLog(log *db.AccessLog) error {
 }
 
 func (me *PgsPsqlDB) InsertProject(userID, name, projectDir string) (string, error) {
-	if !utils.IsValidSubdomain(name) {
+	if !shared.IsValidSubdomain(name) {
 		return "", fmt.Errorf("'%s' is not a valid project name, must match /^[a-z0-9-]+$/", name)
 	}
 

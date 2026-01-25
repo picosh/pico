@@ -11,7 +11,6 @@ import (
 	"github.com/picosh/pico/pkg/filehandlers"
 	"github.com/picosh/pico/pkg/pssh"
 	"github.com/picosh/pico/pkg/shared"
-	"github.com/picosh/utils"
 )
 
 type FeedHooks struct {
@@ -20,7 +19,7 @@ type FeedHooks struct {
 }
 
 func (p *FeedHooks) FileValidate(s *pssh.SSHServerConnSession, data *filehandlers.PostMetaData) (bool, error) {
-	if !utils.IsTextFile(string(data.Text)) {
+	if !shared.IsTextFile(string(data.Text)) {
 		err := fmt.Errorf(
 			"WARNING: (%s) invalid file must be plain text (utf-8), skipping",
 			data.Filename,
@@ -28,7 +27,7 @@ func (p *FeedHooks) FileValidate(s *pssh.SSHServerConnSession, data *filehandler
 		return false, err
 	}
 
-	if !utils.IsExtAllowed(data.Filename, p.Cfg.AllowedExt) {
+	if !shared.IsExtAllowed(data.Filename, p.Cfg.AllowedExt) {
 		extStr := strings.Join(p.Cfg.AllowedExt, ",")
 		err := fmt.Errorf(
 			"WARNING: (%s) invalid file, format must be (%s), skipping",

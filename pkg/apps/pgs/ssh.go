@@ -15,13 +15,12 @@ import (
 	"github.com/picosh/pico/pkg/send/protocols/sftp"
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/pico/pkg/tunkit"
-	"github.com/picosh/utils"
 )
 
 func StartSshServer(cfg *PgsConfig, killCh chan error) {
-	host := utils.GetEnv("PGS_HOST", "0.0.0.0")
-	port := utils.GetEnv("PGS_SSH_PORT", "2222")
-	promPort := utils.GetEnv("PGS_PROM_PORT", "9222")
+	host := shared.GetEnv("PGS_HOST", "0.0.0.0")
+	port := shared.GetEnv("PGS_SSH_PORT", "2222")
+	promPort := shared.GetEnv("PGS_PROM_PORT", "9222")
 	logger := cfg.Logger
 
 	ctx, cancel := context.WithCancel(context.Background())

@@ -11,17 +11,16 @@ import (
 	"github.com/picosh/pico/pkg/pssh"
 	"github.com/picosh/pico/pkg/shared"
 	psub "github.com/picosh/pubsub"
-	"github.com/picosh/utils"
 	"golang.org/x/crypto/ssh"
 )
 
 func StartSshServer() {
 	appName := "pipe-ssh"
 
-	host := utils.GetEnv("PIPE_HOST", "0.0.0.0")
-	port := utils.GetEnv("PIPE_SSH_PORT", "2222")
-	portOverride := utils.GetEnv("PIPE_SSH_PORT_OVERRIDE", port)
-	promPort := utils.GetEnv("PIPE_PROM_PORT", "9222")
+	host := shared.GetEnv("PIPE_HOST", "0.0.0.0")
+	port := shared.GetEnv("PIPE_SSH_PORT", "2222")
+	portOverride := shared.GetEnv("PIPE_SSH_PORT_OVERRIDE", port)
+	promPort := shared.GetEnv("PIPE_PROM_PORT", "9222")
 	cfg := NewConfigSite(appName)
 	logger := cfg.Logger
 
@@ -62,7 +61,7 @@ func StartSshServer() {
 			if perms == nil {
 				perms = &ssh.Permissions{
 					Extensions: map[string]string{
-						"pubkey": utils.KeyForKeyText(key),
+						"pubkey": shared.KeyForKeyText(key),
 					},
 				}
 			}

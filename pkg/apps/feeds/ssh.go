@@ -16,15 +16,14 @@ import (
 	"github.com/picosh/pico/pkg/send/protocols/scp"
 	"github.com/picosh/pico/pkg/send/protocols/sftp"
 	"github.com/picosh/pico/pkg/shared"
-	"github.com/picosh/utils"
 )
 
 func StartSshServer() {
 	appName := "feeds-ssh"
 
-	host := utils.GetEnv("FEEDS_HOST", "0.0.0.0")
-	port := utils.GetEnv("FEEDS_SSH_PORT", "2222")
-	promPort := utils.GetEnv("FEEDS_PROM_PORT", "9222")
+	host := shared.GetEnv("FEEDS_HOST", "0.0.0.0")
+	port := shared.GetEnv("FEEDS_SSH_PORT", "2222")
+	promPort := shared.GetEnv("FEEDS_PROM_PORT", "9222")
 	cfg := NewConfigSite(appName)
 	logger := cfg.Logger
 

@@ -11,7 +11,6 @@ import (
 	"github.com/picosh/pico/pkg/filehandlers"
 	"github.com/picosh/pico/pkg/pssh"
 	"github.com/picosh/pico/pkg/shared"
-	"github.com/picosh/utils"
 	pipeUtil "github.com/picosh/utils/pipe"
 )
 
@@ -22,7 +21,7 @@ type MarkdownHooks struct {
 }
 
 func (p *MarkdownHooks) FileValidate(s *pssh.SSHServerConnSession, data *filehandlers.PostMetaData) (bool, error) {
-	if !utils.IsTextFile(data.Text) {
+	if !shared.IsTextFile(data.Text) {
 		err := fmt.Errorf(
 			"ERROR: (%s) invalid file must be plain text (utf-8), skipping",
 			data.Filename,
@@ -42,7 +41,7 @@ func (p *MarkdownHooks) FileValidate(s *pssh.SSHServerConnSession, data *filehan
 		return true, nil
 	}
 
-	if !utils.IsExtAllowed(data.Filename, p.Cfg.AllowedExt) {
+	if !shared.IsExtAllowed(data.Filename, p.Cfg.AllowedExt) {
 		extStr := strings.Join(p.Cfg.AllowedExt, ",")
 		err := fmt.Errorf(
 			"ERROR: (%s) invalid file, format must be (%s), skipping",
@@ -67,7 +66,7 @@ func (p *MarkdownHooks) metaLxt(data *filehandlers.PostMetaData) error {
 	parsedText := shared.ListParseText(data.Text)
 
 	if parsedText.Title == "" {
-		data.Title = utils.ToUpper(data.Slug)
+		data.Title = shared.ToUpper(data.Slug)
 	} else {
 		data.Title = parsedText.Title
 	}
@@ -91,7 +90,7 @@ func (p *MarkdownHooks) metaMd(data *filehandlers.PostMetaData) error {
 	}
 
 	if parsedText.Title == "" {
-		data.Title = utils.ToUpper(data.Slug)
+		data.Title = shared.ToUpper(data.Slug)
 	} else {
 		data.Title = parsedText.Title
 	}

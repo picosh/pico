@@ -14,7 +14,6 @@ import (
 	"git.sr.ht/~rockorager/vaxis/vxfw/richtext"
 	"git.sr.ht/~rockorager/vaxis/vxfw/text"
 	"github.com/picosh/pico/pkg/shared"
-	"github.com/picosh/utils"
 	pipeLogger "github.com/picosh/utils/pipe/log"
 )
 
@@ -215,10 +214,10 @@ func (m *LogsPage) connectToLogs() error {
 			continue
 		}
 
-		user := utils.AnyToStr(parsedData, "user")
-		userId := utils.AnyToStr(parsedData, "userId")
+		user := shared.AnyToStr(parsedData, "user")
+		userId := shared.AnyToStr(parsedData, "userId")
 
-		hidden := utils.AnyToBool(parsedData, "hidden")
+		hidden := shared.AnyToBool(parsedData, "hidden")
 
 		if !hidden && (user == m.shared.User.Name || userId == m.shared.User.ID) {
 			m.shared.App.PostEvent(LogLineLoaded{parsedData})
@@ -250,13 +249,13 @@ type LogLine struct {
 }
 
 func NewLogLine(data map[string]any) *LogLine {
-	rawtime := utils.AnyToStr(data, "time")
-	service := utils.AnyToStr(data, "service")
-	level := utils.AnyToStr(data, "level")
-	msg := utils.AnyToStr(data, "msg")
-	errMsg := utils.AnyToStr(data, "err")
-	status := utils.AnyToFloat(data, "status")
-	url := utils.AnyToStr(data, "url")
+	rawtime := shared.AnyToStr(data, "time")
+	service := shared.AnyToStr(data, "service")
+	level := shared.AnyToStr(data, "level")
+	msg := shared.AnyToStr(data, "msg")
+	errMsg := shared.AnyToStr(data, "err")
+	status := shared.AnyToFloat(data, "status")
+	url := shared.AnyToStr(data, "url")
 	date, err := time.Parse(time.RFC3339Nano, rawtime)
 	dateStr := rawtime
 	if err == nil {

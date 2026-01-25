@@ -14,7 +14,6 @@ import (
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/pssh"
 	"github.com/picosh/pico/pkg/shared"
-	"github.com/picosh/utils"
 )
 
 const (
@@ -289,7 +288,7 @@ func FindUser(shrd *SharedModel) (*db.User, error) {
 		return nil, fmt.Errorf("unable to find public key")
 	}
 
-	key := utils.KeyForKeyText(shrd.Session.PublicKey())
+	key := shared.KeyForKeyText(shrd.Session.PublicKey())
 
 	user, err := shrd.Dbpool.FindUserByKey(usr, key)
 	if err != nil {

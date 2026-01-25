@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/picosh/pico/pkg/db/postgres"
-	"github.com/picosh/pico/pkg/shared"
+	"github.com/picosh/pico/pkg/shared/router"
 )
 
 func main() {
@@ -47,7 +47,7 @@ func main() {
 
 			update := false
 
-			host, err := shared.CleanHost(origHost)
+			host, err := router.CleanHost(origHost)
 			if err != nil {
 				fmt.Println(err)
 			}
@@ -60,7 +60,7 @@ func main() {
 				)
 			}
 
-			ref, err := shared.CleanReferer(origRef)
+			ref, err := router.CleanReferer(origRef)
 			if err != nil {
 				fmt.Println(err)
 			}

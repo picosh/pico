@@ -6,7 +6,6 @@ import (
 
 	"github.com/picosh/pico/pkg/db/postgres"
 	"github.com/picosh/pico/pkg/shared"
-	"github.com/picosh/utils"
 )
 
 func main() {
@@ -25,7 +24,7 @@ func main() {
 	empty := 0
 	diff := 0
 	for _, post := range posts {
-		nextShasum := utils.Shasum([]byte(post.Text))
+		nextShasum := shared.Shasum([]byte(post.Text))
 		if post.Shasum == "" {
 			empty += 1
 		} else if post.Shasum != nextShasum {

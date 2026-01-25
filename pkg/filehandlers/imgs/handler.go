@@ -19,7 +19,6 @@ import (
 	sendutils "github.com/picosh/pico/pkg/send/utils"
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/pico/pkg/shared/storage"
-	"github.com/picosh/utils"
 )
 
 var Space = "imgs"
@@ -214,8 +213,8 @@ func (h *UploadImgHandler) Write(s *pssh.SSHServerConnSession, entry *sendutils.
 	str := fmt.Sprintf(
 		"%s (space: %.2f/%.2fGB, %.2f%%)",
 		url,
-		utils.BytesToGB(metadata.TotalFileSize+fileSize),
-		utils.BytesToGB(maxSize),
+		shared.BytesToGB(metadata.TotalFileSize+fileSize),
+		shared.BytesToGB(maxSize),
 		(float32(totalFileSize)/float32(maxSize))*100,
 	)
 	return str, nil
@@ -262,7 +261,7 @@ func (h *UploadImgHandler) validateImg(data *PostMetaData) (bool, error) {
 		return false, fmt.Errorf("ERROR: user (%s) has exceeded (%d bytes) max (%d bytes)", data.User.Name, data.TotalFileSize, storageMax)
 	}
 
-	if !utils.IsExtAllowed(data.Filename, h.Cfg.AllowedExt) {
+	if !shared.IsExtAllowed(data.Filename, h.Cfg.AllowedExt) {
 		extStr := strings.Join(h.Cfg.AllowedExt, ",")
 		err := fmt.Errorf(
 			"ERROR: (%s) invalid file, format must be (%s), skipping",

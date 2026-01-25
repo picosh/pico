@@ -18,7 +18,6 @@ import (
 	"github.com/picosh/pico/pkg/pssh"
 	"github.com/picosh/pico/pkg/shared"
 	psub "github.com/picosh/pubsub"
-	"github.com/picosh/utils"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/crypto/ssh"
 )
@@ -225,7 +224,7 @@ func NewTestSSHServer(t *testing.T) *TestSSHServer {
 			if perms == nil {
 				perms = &ssh.Permissions{
 					Extensions: map[string]string{
-						"pubkey": utils.KeyForKeyText(key),
+						"pubkey": shared.KeyForKeyText(key),
 					},
 				}
 			}
@@ -294,7 +293,7 @@ func GenerateUser(username string) UserSSH {
 }
 
 func (u UserSSH) PublicKey() string {
-	return utils.KeyForKeyText(u.signer.PublicKey())
+	return shared.KeyForKeyText(u.signer.PublicKey())
 }
 
 func (u UserSSH) NewClient() (*ssh.Client, error) {

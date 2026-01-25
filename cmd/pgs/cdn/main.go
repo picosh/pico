@@ -13,14 +13,12 @@ import (
 	"github.com/darkweak/souin/pkg/middleware"
 	"github.com/hashicorp/golang-lru/v2/expirable"
 	"github.com/picosh/pico/pkg/apps/pgs"
-	"github.com/picosh/pico/pkg/cache"
 	"github.com/picosh/pico/pkg/shared"
-	"github.com/picosh/utils"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func main() {
-	withPipe := strings.ToLower(utils.GetEnv("PICO_PIPE_ENABLED", "true")) == "true"
+	withPipe := strings.ToLower(shared.GetEnv("PICO_PIPE_ENABLED", "true")) == "true"
 	logger := shared.CreateLogger("pgs-cdn", withPipe)
 	ctx := context.Background()
 	drain := pgs.CreateSubCacheDrain(ctx, logger)
@@ -32,8 +30,8 @@ func main() {
 	httpCache := pgs.SetupCache(cfg)
 	router := &pgs.WebRouter{
 		Cfg:            cfg,
-		RedirectsCache: expirable.NewLRU[string, []*pgs.RedirectRule](2048, nil, cache.CacheTimeout),
-		HeadersCache:   expirable.NewLRU[string, []*pgs.HeaderRule](2048, nil, cache.CacheTimeout),
+		RedirectsCache: expirable.NewLRU[string, []*pgs.RedirectRule](2048, nil, shared.CacheTimeout),
+		HeadersCache:   expirable.NewLRU[string, []*pgs.HeaderRule](2048, nil, shared.CacheTimeout),
 	}
 	cacher := &cachedHttp{
 		handler: httpCache,

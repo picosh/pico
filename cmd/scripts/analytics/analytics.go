@@ -6,7 +6,7 @@ import (
 
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/db/postgres"
-	"github.com/picosh/utils"
+	"github.com/picosh/pico/pkg/shared"
 )
 
 func main() {
@@ -19,7 +19,7 @@ func main() {
 
 	stats, err := dbpool.VisitSummary(
 		&db.SummaryOpts{
-			Origin: utils.StartOfMonth(),
+			Origin: shared.StartOfMonth(),
 			Host:   host,
 		},
 	)

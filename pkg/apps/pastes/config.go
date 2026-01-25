@@ -4,16 +4,15 @@ import (
 	"strings"
 
 	"github.com/picosh/pico/pkg/shared"
-	"github.com/picosh/utils"
 )
 
 func NewConfigSite(service string) *shared.ConfigSite {
-	debug := utils.GetEnv("PASTES_DEBUG", "0")
-	domain := utils.GetEnv("PASTES_DOMAIN", "pastes.sh")
-	port := utils.GetEnv("PASTES_WEB_PORT", "3000")
-	dbURL := utils.GetEnv("DATABASE_URL", "")
-	protocol := utils.GetEnv("PASTES_PROTOCOL", "https")
-	withPipe := strings.ToLower(utils.GetEnv("PICO_PIPE_ENABLED", "true")) == "true"
+	debug := shared.GetEnv("PASTES_DEBUG", "0")
+	domain := shared.GetEnv("PASTES_DOMAIN", "pastes.sh")
+	port := shared.GetEnv("PASTES_WEB_PORT", "3000")
+	dbURL := shared.GetEnv("DATABASE_URL", "")
+	protocol := shared.GetEnv("PASTES_PROTOCOL", "https")
+	withPipe := strings.ToLower(shared.GetEnv("PICO_PIPE_ENABLED", "true")) == "true"
 
 	return &shared.ConfigSite{
 		Debug:        debug == "1",
@@ -23,6 +22,6 @@ func NewConfigSite(service string) *shared.ConfigSite {
 		DbURL:        dbURL,
 		Space:        "pastes",
 		Logger:       shared.CreateLogger(service, withPipe),
-		MaxAssetSize: int64(3 * utils.MB),
+		MaxAssetSize: int64(3 * shared.MB),
 	}
 }

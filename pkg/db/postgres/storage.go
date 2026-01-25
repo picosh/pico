@@ -14,7 +14,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 	"github.com/picosh/pico/pkg/db"
-	"github.com/picosh/utils"
+	"github.com/picosh/pico/pkg/shared"
 )
 
 var PAGER_SIZE = 15
@@ -1232,7 +1232,7 @@ func (me *PsqlDB) FindFeedItemsByPostID(postID string) ([]*db.FeedItem, error) {
 }
 
 func (me *PsqlDB) InsertProject(userID, name, projectDir string) (string, error) {
-	if !utils.IsValidSubdomain(name) {
+	if !shared.IsValidSubdomain(name) {
 		return "", fmt.Errorf("'%s' is not a valid project name, must match /^[a-z0-9-]+$/", name)
 	}
 

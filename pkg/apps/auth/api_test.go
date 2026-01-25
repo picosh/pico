@@ -15,6 +15,7 @@ import (
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/db/stub"
 	"github.com/picosh/pico/pkg/shared"
+	"github.com/picosh/pico/pkg/shared/router"
 )
 
 var testUserID = "user-1"
@@ -41,7 +42,7 @@ func TestPaymentWebhook(t *testing.T) {
 	}
 	jso, err := json.Marshal(event)
 	bail(err)
-	hash := shared.HmacString(apiConfig.Cfg.SecretWebhook, string(jso))
+	hash := router.HmacString(apiConfig.Cfg.SecretWebhook, string(jso))
 	body := bytes.NewReader(jso)
 
 	request := httptest.NewRequest("POST", mkpath("/webhook"), body)
@@ -275,7 +276,7 @@ func mkpath(path string) string {
 	return fmt.Sprintf("https://auth.pico.test%s", path)
 }
 
-func setupTest() *shared.ApiConfig {
+func setupTest() *router.ApiConfig {
 	logger := shared.CreateLogger("auth-test", false)
 	cfg := &shared.ConfigSite{
 		Issuer:        "auth.pico.test",
@@ -286,7 +287,7 @@ func setupTest() *shared.ApiConfig {
 	}
 	cfg.Logger = logger
 	db := NewAuthDb(cfg.Logger)
-	apiConfig := &shared.ApiConfig{
+	apiConfig := &router.ApiConfig{
 		Cfg:    cfg,
 		Dbpool: db,
 	}

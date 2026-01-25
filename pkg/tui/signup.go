@@ -10,7 +10,7 @@ import (
 	"git.sr.ht/~rockorager/vaxis/vxfw/text"
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/pssh"
-	"github.com/picosh/utils"
+	"github.com/picosh/pico/pkg/shared"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -44,7 +44,7 @@ func (m *SignupPage) createAccount(name string) (*db.User, error) {
 	if name == "" {
 		return nil, fmt.Errorf("name cannot be empty")
 	}
-	key := utils.KeyForKeyText(m.shared.Session.PublicKey())
+	key := shared.KeyForKeyText(m.shared.Session.PublicKey())
 	return m.shared.Dbpool.RegisterUser(name, key, "")
 }
 

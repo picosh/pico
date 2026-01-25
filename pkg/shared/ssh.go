@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/picosh/pico/pkg/db"
-	"github.com/picosh/utils"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -41,7 +40,7 @@ type AuthedPubkey struct {
 }
 
 func PubkeyCertVerify(key ssh.PublicKey, srcPrincipal string) (*AuthedPubkey, error) {
-	origPubkey := utils.KeyForKeyText(key)
+	origPubkey := KeyForKeyText(key)
 	authed := &AuthedPubkey{
 		OrigPubkey: origPubkey,
 		Pubkey:     origPubkey,
@@ -74,7 +73,7 @@ func PubkeyCertVerify(key ssh.PublicKey, srcPrincipal string) (*AuthedPubkey, er
 			return nil, fmt.Errorf("ssh-cert has expired")
 		}
 
-		authed.Pubkey = utils.KeyForKeyText(cert.SignatureKey)
+		authed.Pubkey = KeyForKeyText(cert.SignatureKey)
 		authed.Identity = cert.KeyId
 		return authed, nil
 	}

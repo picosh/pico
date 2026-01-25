@@ -22,7 +22,6 @@ import (
 	"github.com/picosh/pico/pkg/pssh"
 	sendutils "github.com/picosh/pico/pkg/send/utils"
 	"github.com/picosh/pico/pkg/shared"
-	"github.com/picosh/utils"
 	ignore "github.com/sabhiram/go-gitignore"
 )
 
@@ -405,7 +404,7 @@ func (h *UploadAssetHandler) Write(s *pssh.SSHServerConnSession, entry *sendutil
 
 	fsize, err := h.writeAsset(
 		s,
-		utils.NewMaxBytesReader(data.Reader, int64(sizeRemaining)),
+		shared.NewMaxBytesReader(data.Reader, int64(sizeRemaining)),
 		data,
 	)
 	if err != nil {
@@ -413,10 +412,10 @@ func (h *UploadAssetHandler) Write(s *pssh.SSHServerConnSession, entry *sendutil
 		cerr := fmt.Errorf(
 			"%s: storage size %.2fmb, storage max %.2fmb, file max %.2fmb, special file max %.4fmb",
 			err,
-			utils.BytesToMB(int(curStorageSize)),
-			utils.BytesToMB(int(storageMax)),
-			utils.BytesToMB(int(fileMax)),
-			utils.BytesToMB(int(specialFileMax)),
+			shared.BytesToMB(int(curStorageSize)),
+			shared.BytesToMB(int(storageMax)),
+			shared.BytesToMB(int(fileMax)),
+			shared.BytesToMB(int(specialFileMax)),
 		)
 		return "", cerr
 	}
@@ -434,8 +433,8 @@ func (h *UploadAssetHandler) Write(s *pssh.SSHServerConnSession, entry *sendutil
 	str := fmt.Sprintf(
 		"%s (space: %.2f/%.2fGB, %.2f%%)",
 		url,
-		utils.BytesToGB(int(nextStorageSize)),
-		utils.BytesToGB(maxSize),
+		shared.BytesToGB(int(nextStorageSize)),
+		shared.BytesToGB(maxSize),
 		(float32(nextStorageSize)/float32(maxSize))*100,
 	)
 

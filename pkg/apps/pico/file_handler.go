@@ -15,7 +15,6 @@ import (
 	"github.com/picosh/pico/pkg/pssh"
 	sendutils "github.com/picosh/pico/pkg/send/utils"
 	"github.com/picosh/pico/pkg/shared"
-	"github.com/picosh/utils"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -242,7 +241,7 @@ func (h *UploadHandler) ProcessAuthorizedKeys(text []byte, logger *slog.Logger, 
 	diff := authorizedKeysDiff(s.PublicKey(), curKeys, nextKeys)
 
 	for _, pk := range diff.Add {
-		key := utils.KeyForKeyText(pk.Pk)
+		key := shared.KeyForKeyText(pk.Pk)
 
 		_, _ = fmt.Fprintf(s.Stderr(), "adding pubkey (%s)\n", key)
 		logger.Info("adding pubkey", "pubkey", key)
@@ -255,7 +254,7 @@ func (h *UploadHandler) ProcessAuthorizedKeys(text []byte, logger *slog.Logger, 
 	}
 
 	for _, pk := range diff.Update {
-		key := utils.KeyForKeyText(pk.Pk)
+		key := shared.KeyForKeyText(pk.Pk)
 
 		_, _ = fmt.Fprintf(s.Stderr(), "updating pubkey with comment: %s (%s)\n", pk.Comment, key)
 		logger.Info(
