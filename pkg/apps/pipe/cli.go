@@ -20,8 +20,8 @@ import (
 	"github.com/gorilla/feeds"
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/pssh"
+	psub "github.com/picosh/pico/pkg/pubsub"
 	"github.com/picosh/pico/pkg/shared"
-	psub "github.com/picosh/pubsub"
 	gossh "golang.org/x/crypto/ssh"
 )
 

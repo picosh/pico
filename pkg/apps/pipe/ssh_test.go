@@ -16,8 +16,8 @@ import (
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/db/stub"
 	"github.com/picosh/pico/pkg/pssh"
+	psub "github.com/picosh/pico/pkg/pubsub"
 	"github.com/picosh/pico/pkg/shared"
-	psub "github.com/picosh/pubsub"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/crypto/ssh"
 )

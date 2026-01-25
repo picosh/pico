@@ -694,8 +694,6 @@ github.com/peterbourgon/diskv/v3 v3.0.1 h1:x06SQA46+PKIUftmEujdwSEpIx8kR+M9eLYsU
 github.com/peterbourgon/diskv/v3 v3.0.1/go.mod h1:kJ5Ny7vLdARGU3WUuy6uzO6T0nb/2gWcT1JiBvRmb5o=
 github.com/picosh/go-rsync-receiver v0.0.0-20250304201040-fcc11dd22d79 h1:MyB9P43hlQ6A2FoP9LGeiTBL3WKToW4gcWd6lQPg/Zg=
 github.com/picosh/go-rsync-receiver v0.0.0-20250304201040-fcc11dd22d79/go.mod h1:4ZICsr6bESoHP8He9DqROlZiMw4hHHjcbDzhtTTDQzA=
-github.com/picosh/pubsub v0.0.0-20241114191831-ec8f16c0eb88 h1:hdxE6rquHHw1/eeqS1b+ojLaxGtN8zOiTUclPwaVbPg=
-github.com/picosh/pubsub v0.0.0-20241114191831-ec8f16c0eb88/go.mod h1:+9hDKIDHQCvGFigCVlIl589BwpT9R4boKhUVc/OgRU4=
 github.com/picosh/utils v0.0.0-20260125160622-5c3a9e231ec6 h1:9KfCtfcx7vrSyGU1K9whdE1crll9Aq+nAZ6c0FzuzvE=
 github.com/picosh/utils v0.0.0-20260125160622-5c3a9e231ec6/go.mod h1:HogYEyJ43IGXrOa3D/kjM1pkzNAyh+pejRyv8Eo//pk=
 github.com/pierrec/lz4/v4 v4.1.22 h1:cKFw6uJDK+/gfw5BcDL0JL5aBsAFdsIT18eRtLj7VIU=

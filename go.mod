@@ -45,7 +45,6 @@ require (
 	github.com/mmcdole/gofeed v1.3.0
 	github.com/neurosnap/go-exif-remove v0.0.0-20221010134343-50d1e3c35577
 	github.com/picosh/go-rsync-receiver v0.0.0-20250304201040-fcc11dd22d79
-	github.com/picosh/pubsub v0.0.0-20241114191831-ec8f16c0eb88
 	github.com/picosh/utils v0.0.0-20260125160622-5c3a9e231ec6
 	github.com/pkg/sftp v1.13.9
 	github.com/prometheus/client_golang v1.22.0

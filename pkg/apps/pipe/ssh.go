@@ -9,8 +9,8 @@ import (
 	"github.com/antoniomika/syncmap"
 	"github.com/picosh/pico/pkg/db/postgres"
 	"github.com/picosh/pico/pkg/pssh"
+	psub "github.com/picosh/pico/pkg/pubsub"
 	"github.com/picosh/pico/pkg/shared"
-	psub "github.com/picosh/pubsub"
 	"golang.org/x/crypto/ssh"
 )
 
