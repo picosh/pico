@@ -600,6 +600,7 @@ func (handler *CliHandler) pub(cmd *CliCmd, topic string, clientID string) error
 	block := pubCmd.Bool("b", true, "Block writes until a subscriber is available")
 	timeout := pubCmd.Duration("t", 30*24*time.Hour, "Timeout as a Go duration to block for a subscriber to be available. Valid time units are 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h'. Default is 30 days.")
 	clean := pubCmd.Bool("c", false, "Don't send status messages")
+	broker := pubCmd.String("bk", "multicast", "Type of broker (e.g. multicast, round_robin)")
 
 	if !flagCheck(pubCmd, topic, cmd.args) {
 		return fmt.Errorf("invalid cmd args")
@@ -619,6 +620,7 @@ func (handler *CliHandler) pub(cmd *CliCmd, topic string, clientID string) error
 		"topic", topic,
 		"access", *access,
 		"clean", *clean,
+		"broker", *broker,
 	)
 
 	var accessList []string
@@ -795,13 +797,20 @@ func (handler *CliHandler) pub(cmd *CliCmd, topic string, clientID string) error
 
 	throttledRW := newThrottledMonitorRW(rw, handler, cmd, name)
 
+	var bk psub.MessageDispatcher
+	bk = &psub.MulticastDispatcher{}
+	if *broker == "round_robin" {
+		fmt.Println("BROKER ROUND ROBIN")
+		bk = &psub.RoundRobinDispatcher{}
+	}
+	channel := psub.NewChannel(name)
+	channel.Dispatcher = bk
+
 	err := handler.PubSub.Pub(
 		cmd.pipeCtx,
 		clientID,
 		throttledRW,
-		[]*psub.Channel{
-			psub.NewChannel(name),
-		},
+		[]*psub.Channel{channel},
 		*block,
 	)
 

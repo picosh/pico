@@ -196,6 +196,11 @@ func (b *BaseBroker) Connect(client *Client, channels []*Channel) (error, error)
 
 func (b *BaseBroker) ensureChannel(channel *Channel) *Channel {
 	dataChannel, _ := b.Channels.LoadOrStore(channel.Topic, channel)
+	// Allow overwriting the dispatcher
+	if channel.Dispatcher != nil && dataChannel.Dispatcher == nil {
+		dataChannel.Dispatcher = channel.Dispatcher
+	}
+
 	dataChannel.Handle()
 	return dataChannel
 }

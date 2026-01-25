@@ -57,6 +57,7 @@ type Channel struct {
 	Clients     *syncmap.Map[string, *Client]
 	handleOnce  sync.Once
 	cleanupOnce sync.Once
+	Dispatcher  MessageDispatcher
 }
 
 func (c *Channel) GetClients() iter.Seq2[string, *Client] {
@@ -83,30 +84,21 @@ func (c *Channel) Handle() {
 				case <-c.Done:
 					return
 				case data, ok := <-c.Data:
-					var wg sync.WaitGroup
-					for _, client := range c.GetClients() {
-						if client.Direction == ChannelDirectionInput || (client.ID == data.ClientID && !client.Replay) {
-							continue
+					if !ok {
+						// Channel is closing, close all client data channels
+						for _, client := range c.GetClients() {
+							client.onceData.Do(func() {
+								close(client.Data)
+							})
 						}
-
-						wg.Add(1)
-						go func() {
-							defer wg.Done()
-							if !ok {
-								client.onceData.Do(func() {
-									close(client.Data)
-								})
-								return
-							}
-
-							select {
-							case client.Data <- data:
-							case <-client.Done:
-							case <-c.Done:
-							}
-						}()
+						return
 					}
-					wg.Wait()
+
+					// Collect eligible subscribers
+					subscribers := dispatcherForGetClients(c.GetClients(), data)
+
+					// Dispatch message using the configured dispatcher
+					_ = c.Dispatcher.Dispatch(data, subscribers, c.Done)
 				}
 			}
 		}()
