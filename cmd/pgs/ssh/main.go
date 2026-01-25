@@ -8,12 +8,11 @@ import (
 	pgsdb "github.com/picosh/pico/pkg/apps/pgs/db"
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/pico/pkg/shared/storage"
-	"github.com/picosh/utils"
 )
 
 func main() {
-	dbURL := utils.GetEnv("DATABASE_URL", "")
-	withPipe := strings.ToLower(utils.GetEnv("PICO_PIPE_ENABLED", "true")) == "true"
+	dbURL := shared.GetEnv("DATABASE_URL", "")
+	withPipe := strings.ToLower(shared.GetEnv("PICO_PIPE_ENABLED", "true")) == "true"
 	logger := shared.CreateLogger("pgs-ssh", withPipe)
 	dbpool, err := pgsdb.NewDB(dbURL, logger)
 	if err != nil {
