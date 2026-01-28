@@ -800,7 +800,6 @@ func (handler *CliHandler) pub(cmd *CliCmd, topic string, clientID string) error
 	var bk psub.MessageDispatcher
 	bk = &psub.MulticastDispatcher{}
 	if *broker == "round_robin" {
-		fmt.Println("BROKER ROUND ROBIN")
 		bk = &psub.RoundRobinDispatcher{}
 	}
 	channel := psub.NewChannel(name)

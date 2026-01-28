@@ -71,6 +71,11 @@ func (c *Channel) Cleanup() {
 }
 
 func (c *Channel) Handle() {
+	// If no dispatcher is set, use multicast as default
+	if c.Dispatcher == nil {
+		c.Dispatcher = &MulticastDispatcher{}
+	}
+
 	c.handleOnce.Do(func() {
 		go func() {
 			defer func() {
