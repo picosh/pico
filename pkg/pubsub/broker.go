@@ -105,20 +105,20 @@ func (b *BaseBroker) Connect(client *Client, channels []*Channel) (error, error)
 				data := make([]byte, 32*1024)
 				n, err := client.ReadWriter.Read(data)
 
-				// Check for EOF before processing
-				if err != nil {
-					if errors.Is(err, io.EOF) {
+				// TODO: Skip empty reads
+				/*
+					if err != nil {
+						if errors.Is(err, io.EOF) {
+							return
+						}
+						inputErr = err
 						return
 					}
-					inputErr = err
-					return
-				}
 
-				// Skip empty reads
-				if n == 0 {
-					continue
-				}
-
+					if n == 0 {
+						continue
+					}
+				*/
 				data = data[:n]
 
 				channelMessage := ChannelMessage{
@@ -167,6 +167,14 @@ func (b *BaseBroker) Connect(client *Client, channels []*Channel) (error, error)
 				}
 
 				sendwg.Wait()
+
+				if err != nil {
+					if errors.Is(err, io.EOF) {
+						return
+					}
+					inputErr = err
+					return
+				}
 			}
 		}()
 	}
