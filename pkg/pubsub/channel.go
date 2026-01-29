@@ -71,11 +71,6 @@ func (c *Channel) Cleanup() {
 }
 
 func (c *Channel) Handle() {
-	// If no dispatcher is set, use multicast as default
-	if c.Dispatcher == nil {
-		c.Dispatcher = &MulticastDispatcher{}
-	}
-
 	c.handleOnce.Do(func() {
 		go func() {
 			defer func() {
@@ -100,10 +95,19 @@ func (c *Channel) Handle() {
 					}
 
 					// Collect eligible subscribers
-					subscribers := dispatcherForGetClients(c.GetClients(), data)
+					subscribers := make([]*Client, 0)
+					for _, client := range c.GetClients() {
+						// Skip input-only clients and senders (unless replay is enabled)
+						if client.Direction == ChannelDirectionInput || (client.ID == data.ClientID && !client.Replay) {
+							continue
+						}
+						subscribers = append(subscribers, client)
+					}
 
-					// Dispatch message using the configured dispatcher
-					_ = c.Dispatcher.Dispatch(data, subscribers, c.Done)
+					if len(data.Data) > 0 {
+						// Dispatch message using the configured dispatcher
+						_ = c.Dispatcher.Dispatch(data, subscribers, c.Done)
+					}
 				}
 			}
 		}()

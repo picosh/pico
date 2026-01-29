@@ -59,8 +59,13 @@ func (p *Multicast) GetSubs() iter.Seq2[string, *Client] {
 	return p.getClients(ChannelDirectionOutput)
 }
 
-func (p *Multicast) connect(ctx context.Context, ID string, rw io.ReadWriter, channels []*Channel, direction ChannelDirection, blockWrite bool, replay, keepAlive bool) (error, error) {
+func (p *Multicast) connect(ctx context.Context, ID string, rw io.ReadWriter, channels []*Channel, direction ChannelDirection, blockWrite bool, replay, keepAlive bool, dispatcher MessageDispatcher) (error, error) {
 	client := NewClient(ID, rw, direction, blockWrite, replay, keepAlive)
+
+	// Set dispatcher on all channels
+	for _, ch := range channels {
+		ch.Dispatcher = dispatcher
+	}
 
 	go func() {
 		<-ctx.Done()
@@ -71,15 +76,15 @@ func (p *Multicast) connect(ctx context.Context, ID string, rw io.ReadWriter, ch
 }
 
 func (p *Multicast) Pipe(ctx context.Context, ID string, rw io.ReadWriter, channels []*Channel, replay bool) (error, error) {
-	return p.connect(ctx, ID, rw, channels, ChannelDirectionInputOutput, false, replay, false)
+	return p.connect(ctx, ID, rw, channels, ChannelDirectionInputOutput, false, replay, false, &MulticastDispatcher{})
 }
 
 func (p *Multicast) Pub(ctx context.Context, ID string, rw io.ReadWriter, channels []*Channel, blockWrite bool) error {
-	return errors.Join(p.connect(ctx, ID, rw, channels, ChannelDirectionInput, blockWrite, false, false))
+	return errors.Join(p.connect(ctx, ID, rw, channels, ChannelDirectionInput, blockWrite, false, false, &MulticastDispatcher{}))
 }
 
 func (p *Multicast) Sub(ctx context.Context, ID string, rw io.ReadWriter, channels []*Channel, keepAlive bool) error {
-	return errors.Join(p.connect(ctx, ID, rw, channels, ChannelDirectionOutput, false, false, keepAlive))
+	return errors.Join(p.connect(ctx, ID, rw, channels, ChannelDirectionOutput, false, false, keepAlive, &MulticastDispatcher{}))
 }
 
 // MulticastDispatcher sends each message to all eligible subscribers.
