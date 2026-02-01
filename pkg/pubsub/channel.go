@@ -57,11 +57,26 @@ type Channel struct {
 	Clients     *syncmap.Map[string, *Client]
 	handleOnce  sync.Once
 	cleanupOnce sync.Once
+	mu          sync.Mutex
 	Dispatcher  MessageDispatcher
 }
 
 func (c *Channel) GetClients() iter.Seq2[string, *Client] {
 	return c.Clients.Range
+}
+
+func (c *Channel) SetDispatcher(d MessageDispatcher) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.Dispatcher == nil {
+		c.Dispatcher = d
+	}
+}
+
+func (c *Channel) GetDispatcher() MessageDispatcher {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.Dispatcher
 }
 
 func (c *Channel) Cleanup() {
@@ -106,7 +121,10 @@ func (c *Channel) Handle() {
 
 					if len(data.Data) > 0 {
 						// Dispatch message using the configured dispatcher
-						_ = c.Dispatcher.Dispatch(data, subscribers, c.Done)
+						dispatcher := c.GetDispatcher()
+						if dispatcher != nil {
+							_ = dispatcher.Dispatch(data, subscribers, c.Done)
+						}
 					}
 				}
 			}

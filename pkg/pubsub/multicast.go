@@ -6,7 +6,6 @@ import (
 	"io"
 	"iter"
 	"log/slog"
-	"sync"
 
 	"github.com/antoniomika/syncmap"
 )
@@ -62,9 +61,9 @@ func (p *Multicast) GetSubs() iter.Seq2[string, *Client] {
 func (p *Multicast) connect(ctx context.Context, ID string, rw io.ReadWriter, channels []*Channel, direction ChannelDirection, blockWrite bool, replay, keepAlive bool, dispatcher MessageDispatcher) (error, error) {
 	client := NewClient(ID, rw, direction, blockWrite, replay, keepAlive)
 
-	// Set dispatcher on all channels
+	// Set dispatcher on all channels (only if not already set)
 	for _, ch := range channels {
-		ch.Dispatcher = dispatcher
+		ch.SetDispatcher(dispatcher)
 	}
 
 	go func() {
@@ -85,26 +84,6 @@ func (p *Multicast) Pub(ctx context.Context, ID string, rw io.ReadWriter, channe
 
 func (p *Multicast) Sub(ctx context.Context, ID string, rw io.ReadWriter, channels []*Channel, keepAlive bool) error {
 	return errors.Join(p.connect(ctx, ID, rw, channels, ChannelDirectionOutput, false, false, keepAlive, &MulticastDispatcher{}))
-}
-
-// MulticastDispatcher sends each message to all eligible subscribers.
-type MulticastDispatcher struct{}
-
-func (d *MulticastDispatcher) Dispatch(msg ChannelMessage, subscribers []*Client, channelDone chan struct{}) error {
-	var wg sync.WaitGroup
-	for _, client := range subscribers {
-		wg.Add(1)
-		go func(cl *Client) {
-			defer wg.Done()
-			select {
-			case cl.Data <- msg:
-			case <-cl.Done:
-			case <-channelDone:
-			}
-		}(client)
-	}
-	wg.Wait()
-	return nil
 }
 
 var _ PubSub = (*Multicast)(nil)

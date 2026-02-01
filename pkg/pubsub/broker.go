@@ -5,6 +5,7 @@ import (
 	"io"
 	"iter"
 	"log/slog"
+	"reflect"
 	"sync"
 	"time"
 
@@ -21,6 +22,7 @@ type Broker interface {
 	GetChannels() iter.Seq2[string, *Channel]
 	GetClients() iter.Seq2[string, *Client]
 	Connect(*Client, []*Channel) (error, error)
+	SetDispatcher(dispatcher MessageDispatcher, channels []*Channel) error
 }
 
 type BaseBroker struct {
@@ -197,13 +199,19 @@ func (b *BaseBroker) Connect(client *Client, channels []*Channel) (error, error)
 
 func (b *BaseBroker) ensureChannel(channel *Channel) *Channel {
 	dataChannel, _ := b.Channels.LoadOrStore(channel.Topic, channel)
-	// Allow overwriting the dispatcher
-	if channel.Dispatcher != nil && dataChannel.Dispatcher == nil {
-		dataChannel.Dispatcher = channel.Dispatcher
-	}
-
 	dataChannel.Handle()
 	return dataChannel
+}
+
+func (b *BaseBroker) SetDispatcher(dispatcher MessageDispatcher, channels []*Channel) error {
+	for _, channel := range channels {
+		dataChannel := b.ensureChannel(channel)
+		existingDispatcher := dataChannel.GetDispatcher()
+		if reflect.TypeOf(existingDispatcher) != reflect.TypeOf(dispatcher) {
+			dataChannel.SetDispatcher(dispatcher)
+		}
+	}
+	return nil
 }
 
 var _ Broker = (*BaseBroker)(nil)

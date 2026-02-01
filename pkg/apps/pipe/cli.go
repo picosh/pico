@@ -600,7 +600,7 @@ func (handler *CliHandler) pub(cmd *CliCmd, topic string, clientID string) error
 	block := pubCmd.Bool("b", true, "Block writes until a subscriber is available")
 	timeout := pubCmd.Duration("t", 30*24*time.Hour, "Timeout as a Go duration to block for a subscriber to be available. Valid time units are 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h'. Default is 30 days.")
 	clean := pubCmd.Bool("c", false, "Don't send status messages")
-	broker := pubCmd.String("bk", "multicast", "Type of broker (e.g. multicast, round_robin)")
+	dispatcher := pubCmd.String("d", "multicast", "Type of dispatcher (e.g. multicast, round_robin)")
 
 	if !flagCheck(pubCmd, topic, cmd.args) {
 		return fmt.Errorf("invalid cmd args")
@@ -620,7 +620,7 @@ func (handler *CliHandler) pub(cmd *CliCmd, topic string, clientID string) error
 		"topic", topic,
 		"access", *access,
 		"clean", *clean,
-		"broker", *broker,
+		"dispatcher", *dispatcher,
 	)
 
 	var accessList []string
@@ -797,13 +797,13 @@ func (handler *CliHandler) pub(cmd *CliCmd, topic string, clientID string) error
 
 	throttledRW := newThrottledMonitorRW(rw, handler, cmd, name)
 
-	var bk psub.MessageDispatcher
-	bk = &psub.MulticastDispatcher{}
-	if *broker == "round_robin" {
-		bk = &psub.RoundRobinDispatcher{}
+	var dsp psub.MessageDispatcher
+	dsp = &psub.MulticastDispatcher{}
+	if *dispatcher == "round_robin" {
+		dsp = &psub.RoundRobinDispatcher{}
 	}
 	channel := psub.NewChannel(name)
-	channel.Dispatcher = bk
+	_ = handler.PubSub.SetDispatcher(dsp, []*psub.Channel{channel})
 
 	err := handler.PubSub.Pub(
 		cmd.pipeCtx,
@@ -1019,6 +1019,7 @@ func (handler *CliHandler) pipe(cmd *CliCmd, topic string, clientID string) erro
 	public := pipeCmd.Bool("p", false, "Pipe to a public topic")
 	replay := pipeCmd.Bool("r", false, "Replay messages to the client that sent it")
 	clean := pipeCmd.Bool("c", false, "Don't send status messages")
+	dispatcher := pipeCmd.String("d", "multicast", "Type of dispatcher (e.g. multicast, round_robin)")
 
 	if !flagCheck(pipeCmd, topic, cmd.args) {
 		return fmt.Errorf("invalid cmd args")
@@ -1036,6 +1037,7 @@ func (handler *CliHandler) pipe(cmd *CliCmd, topic string, clientID string) erro
 		"topic", topic,
 		"access", *access,
 		"clean", *clean,
+		"dispatcher", *dispatcher,
 	)
 
 	var accessList []string
@@ -1108,6 +1110,14 @@ func (handler *CliHandler) pipe(cmd *CliCmd, topic string, clientID string) erro
 	}
 
 	throttledRW := newThrottledMonitorRW(cmd.sesh, handler, cmd, name)
+
+	var dsp psub.MessageDispatcher
+	dsp = &psub.MulticastDispatcher{}
+	if *dispatcher == "round_robin" {
+		dsp = &psub.RoundRobinDispatcher{}
+	}
+	channel := psub.NewChannel(name)
+	_ = handler.PubSub.SetDispatcher(dsp, []*psub.Channel{channel})
 
 	readErr, writeErr := handler.PubSub.Pipe(
 		cmd.pipeCtx,
