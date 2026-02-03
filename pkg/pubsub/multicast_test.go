@@ -66,7 +66,7 @@ func TestMulticastSubBlock(t *testing.T) {
 		t.Fatalf("\norderActual:(%s)\norderExpected:(%s)", orderActual, orderExpected)
 	}
 	if actual.String() != expected {
-		t.Fatalf("\nactual:(%s)\nexpected:(%s)", actual, expected)
+		t.Fatalf("\nactual:(%s)\nexpected:(%s)", actual.String(), expected)
 	}
 }
 
@@ -96,8 +96,8 @@ func TestMulticastPubBlock(t *testing.T) {
 
 	go func() {
 		orderActual += "sub-"
-		wg.Done()
 		fmt.Println(cast.Sub(context.TODO(), "2", actual, []*Channel{channel}, false))
+		wg.Done()
 	}()
 
 	wg.Wait()
@@ -106,7 +106,7 @@ func TestMulticastPubBlock(t *testing.T) {
 		t.Fatalf("\norderActual:(%s)\norderExpected:(%s)", orderActual, orderExpected)
 	}
 	if actual.String() != expected {
-		t.Fatalf("\nactual:(%s)\nexpected:(%s)", actual, expected)
+		t.Fatalf("\nactual:(%s)\nexpected:(%s)", actual.String(), expected)
 	}
 }
 
@@ -156,9 +156,9 @@ func TestMulticastMultSubs(t *testing.T) {
 		t.Fatalf("\norderActual:(%s)\norderExpected:(%s)", orderActual, orderExpected)
 	}
 	if actual.String() != expected {
-		t.Fatalf("\nactual:(%s)\nexpected:(%s)", actual, expected)
+		t.Fatalf("\nactual:(%s)\nexpected:(%s)", actual.String(), expected)
 	}
 	if actualOther.String() != expected {
-		t.Fatalf("\nactual:(%s)\nexpected:(%s)", actualOther, expected)
+		t.Fatalf("\nactual:(%s)\nexpected:(%s)", actualOther.String(), expected)
 	}
 }

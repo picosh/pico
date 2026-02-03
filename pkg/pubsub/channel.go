@@ -57,10 +57,26 @@ type Channel struct {
 	Clients     *syncmap.Map[string, *Client]
 	handleOnce  sync.Once
 	cleanupOnce sync.Once
+	mu          sync.Mutex
+	Dispatcher  MessageDispatcher
 }
 
 func (c *Channel) GetClients() iter.Seq2[string, *Client] {
 	return c.Clients.Range
+}
+
+func (c *Channel) SetDispatcher(d MessageDispatcher) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.Dispatcher == nil {
+		c.Dispatcher = d
+	}
+}
+
+func (c *Channel) GetDispatcher() MessageDispatcher {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.Dispatcher
 }
 
 func (c *Channel) Cleanup() {
@@ -83,30 +99,33 @@ func (c *Channel) Handle() {
 				case <-c.Done:
 					return
 				case data, ok := <-c.Data:
-					var wg sync.WaitGroup
+					if !ok {
+						// Channel is closing, close all client data channels
+						for _, client := range c.GetClients() {
+							client.onceData.Do(func() {
+								close(client.Data)
+							})
+						}
+						return
+					}
+
+					// Collect eligible subscribers
+					subscribers := make([]*Client, 0)
 					for _, client := range c.GetClients() {
+						// Skip input-only clients and senders (unless replay is enabled)
 						if client.Direction == ChannelDirectionInput || (client.ID == data.ClientID && !client.Replay) {
 							continue
 						}
-
-						wg.Add(1)
-						go func() {
-							defer wg.Done()
-							if !ok {
-								client.onceData.Do(func() {
-									close(client.Data)
-								})
-								return
-							}
-
-							select {
-							case client.Data <- data:
-							case <-client.Done:
-							case <-c.Done:
-							}
-						}()
+						subscribers = append(subscribers, client)
 					}
-					wg.Wait()
+
+					if len(data.Data) > 0 {
+						// Dispatch message using the configured dispatcher
+						dispatcher := c.GetDispatcher()
+						if dispatcher != nil {
+							_ = dispatcher.Dispatch(data, subscribers, c.Done)
+						}
+					}
 				}
 			}
 		}()
