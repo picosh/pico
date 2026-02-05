@@ -95,7 +95,7 @@ build: build-prose build-pastes build-feeds build-pgs build-auth build-pico buil
 
 scripts:
 	# might need to set MINIO_URL
-	docker run --rm -it --env-file .env -v $(shell pwd):/app -w /app golang:1.24 /bin/bash
+	docker run --rm -it --env-file .env -v $(shell pwd):/app -w /app golang:1.25 /bin/bash
 .PHONY: scripts
 
 fmt:
