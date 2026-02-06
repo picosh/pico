@@ -29,6 +29,53 @@ type Event struct {
 	Workspace string `json:"workspace"`
 }
 
+func main() {
+	var keyLoc string
+	flag.StringVar(&keyLoc, "pk", "", "ssh private key used to authenticate with pico services (requires access to: pipe, pgs)")
+	var certLoc string
+	flag.StringVar(&certLoc, "ck", "", "ssh certificate public key used to authenticate with pico services (only required if using ssh certificates)")
+	flag.Parse()
+	cmd := flag.Arg(0)
+
+	logger := shared.CreateLogger("ci", false)
+	log := logger.With("key_loc", keyLoc, "cert_loc", certLoc)
+	ctx := context.Background()
+	cfg := &Cfg{
+		Logger:              log,
+		Ctx:                 ctx,
+		KeyLocation:         keyLoc,
+		CertificateLocation: certLoc,
+	}
+	cfg.Logger.Info("setting up ci", "cfg", cfg)
+	cfg.Logger.Info("running cmd", "cmd", cmd)
+
+	switch cmd {
+	case "runner":
+		psub := createSubJobs(cfg, cfg.Logger)
+		cfg.Logger.Info("waiting for pipe event")
+		for {
+			scanner := bufio.NewScanner(psub)
+			scanner.Buffer(make([]byte, 32*1024), 32*1024)
+			for scanner.Scan() {
+				payload := strings.TrimSpace(scanner.Text())
+				var eventData Event
+				err := json.Unmarshal([]byte(payload), &eventData)
+				if err != nil {
+					cfg.Logger.Error("json unmarshal", "err", err)
+				}
+				go eventHandler(cfg, &eventData)
+			}
+		}
+	case "status":
+		cfg.Logger.Info("running status updater")
+	case "orca":
+		cfg.Logger.Info("running orchastrator")
+	default:
+		cfg.Logger.Error("must provide cmd")
+		os.Exit(1)
+	}
+}
+
 type Workspace interface {
 	Setup() error
 	Cleanup() error
@@ -132,12 +179,11 @@ func (eng *JobEngine) Run() error {
 				if err != nil {
 					continue
 				}
-				log.Info("cmd done", "status", exitStatus)
 				// TODO report status
 				if exitStatus == 0 {
-					// success
+					log.Info("cmd success")
 				} else {
-					// failure
+					log.Error("cmd error", "status", exitStatus)
 				}
 				err = outCmd.Process.Kill()
 				if err != nil {
@@ -173,41 +219,6 @@ func (eng *JobEngine) getManifest() (string, error) {
 		return manifest, nil
 	}
 	return "", fmt.Errorf("manifest not found")
-}
-
-func main() {
-	var keyLoc string
-	flag.StringVar(&keyLoc, "pk", "", "ssh private key used to authenticate with pico services (requires access to: pipe, pgs)")
-	var certLoc string
-	flag.StringVar(&certLoc, "ck", "", "ssh certificate public key used to authenticate with pico services (only required if using ssh certificates)")
-	flag.Parse()
-
-	logger := shared.CreateLogger("ci", false)
-	log := logger.With("key_loc", keyLoc, "cert_loc", certLoc)
-	ctx := context.Background()
-	cfg := &Cfg{
-		Logger:              log,
-		Ctx:                 ctx,
-		KeyLocation:         keyLoc,
-		CertificateLocation: certLoc,
-	}
-	logger.Info("setting up ci", "cfg", cfg)
-
-	psub := createSubJobs(cfg, cfg.Logger)
-	cfg.Logger.Info("waiting for pipe event")
-	for {
-		scanner := bufio.NewScanner(psub)
-		scanner.Buffer(make([]byte, 32*1024), 32*1024)
-		for scanner.Scan() {
-			payload := strings.TrimSpace(scanner.Text())
-			var eventData Event
-			err := json.Unmarshal([]byte(payload), &eventData)
-			if err != nil {
-				cfg.Logger.Error("json unmarshal", "err", err)
-			}
-			go eventHandler(cfg, &eventData)
-		}
-	}
 }
 
 func eventHandler(cfg *Cfg, eventData *Event) {
