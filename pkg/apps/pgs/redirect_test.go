@@ -92,6 +92,55 @@ func TestParseRedirectText(t *testing.T) {
 		},
 	}
 
+	selfReferentialExact := RedirectFixture{
+		name:        "self-referential-exact",
+		input:       "/page /page 301",
+		expect:      []*RedirectRule{},
+		shouldError: true,
+	}
+
+	selfReferentialWildcard := RedirectFixture{
+		name:        "self-referential-wildcard",
+		input:       "/* /* 301",
+		expect:      []*RedirectRule{},
+		shouldError: true,
+	}
+
+	selfReferentialWithVariables := RedirectFixture{
+		name:        "self-referential-with-variables",
+		input:       "/:path /:path 301",
+		expect:      []*RedirectRule{},
+		shouldError: true,
+	}
+
+	externalUrlNotSelfRef := RedirectFixture{
+		name:  "external-url-not-self-referential",
+		input: "/* https://example.com 301",
+		expect: []*RedirectRule{
+			{
+				From:       "/*",
+				To:         "https://example.com",
+				Status:     301,
+				Query:      empty,
+				Conditions: empty,
+			},
+		},
+	}
+
+	validPathRedirect := RedirectFixture{
+		name:  "valid-path-redirect",
+		input: "/old-path /new-path 301",
+		expect: []*RedirectRule{
+			{
+				From:       "/old-path",
+				To:         "/new-path",
+				Status:     301,
+				Query:      empty,
+				Conditions: empty,
+			},
+		},
+	}
+
 	fixtures := []RedirectFixture{
 		spa,
 		rss,
@@ -99,6 +148,11 @@ func TestParseRedirectText(t *testing.T) {
 		noStatus,
 		absoluteUriNoProto,
 		absoluteUriWithProto,
+		selfReferentialExact,
+		selfReferentialWildcard,
+		selfReferentialWithVariables,
+		externalUrlNotSelfRef,
+		validPathRedirect,
 	}
 
 	for _, fixture := range fixtures {

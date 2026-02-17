@@ -77,6 +77,32 @@ The parts are:
   - "conditions": a whitespace-separated list of "key=value"
   - "Sign" is a special condition
 */
+// isSelfReferentialRedirect checks if a redirect rule would redirect to itself.
+// This includes exact matches and wildcard patterns that would match the same path.
+func isSelfReferentialRedirect(from, to string) bool {
+	// External URLs are never self-referential
+	if isUrl(to) {
+		return false
+	}
+
+	// Exact match: /page redirects to /page
+	if from == to {
+		return true
+	}
+
+	// Wildcard match: /* redirects to /*
+	if from == to && strings.Contains(from, "*") {
+		return true
+	}
+
+	// Pattern with variable: /:path redirects to /:path
+	if from == to && strings.Contains(from, ":") {
+		return true
+	}
+
+	return false
+}
+
 func parseRedirectText(text string) ([]*RedirectRule, error) {
 	rules := []*RedirectRule{}
 	origLines := strings.Split(text, "\n")
@@ -129,6 +155,11 @@ func parseRedirectText(text string) ([]*RedirectRule, error) {
 			}
 			if len(lastParts) > 1 {
 				conditions = parsePairs(lastParts[1:])
+			}
+
+			// Validate that the redirect is not self-referential
+			if isSelfReferentialRedirect(from, to) {
+				return rules, fmt.Errorf("self-referential redirect: '%s' cannot redirect to itself", from)
 			}
 
 			rules = append(rules, &RedirectRule{
