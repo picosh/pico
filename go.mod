@@ -28,7 +28,7 @@ require (
 	github.com/containerd/console v1.0.5
 	github.com/darkweak/souin v1.7.8
 	github.com/darkweak/souin/plugins/souin/storages v1.7.8
-	github.com/darkweak/storages/core v0.0.17
+	github.com/darkweak/storages/core v0.0.16
 	github.com/emersion/go-sasl v0.0.0-20241020182733-b788ff22d5a6
 	github.com/emersion/go-smtp v0.24.0
 	github.com/gkampitakis/go-snaps v0.5.15
@@ -115,14 +115,14 @@ require (
 	github.com/cpuguy83/dockercfg v0.3.2 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
 	github.com/darkweak/go-esi v0.0.6 // indirect
-	github.com/darkweak/storages/badger v0.0.17 // indirect
-	github.com/darkweak/storages/etcd v0.0.17 // indirect
-	github.com/darkweak/storages/nats v0.0.17 // indirect
-	github.com/darkweak/storages/nuts v0.0.17 // indirect
-	github.com/darkweak/storages/olric v0.0.17 // indirect
-	github.com/darkweak/storages/otter v0.0.17 // indirect
-	github.com/darkweak/storages/redis v0.0.17 // indirect
-	github.com/darkweak/storages/simplefs v0.0.17 // indirect
+	github.com/darkweak/storages/badger v0.0.16 // indirect
+	github.com/darkweak/storages/etcd v0.0.16 // indirect
+	github.com/darkweak/storages/nats v0.0.16 // indirect
+	github.com/darkweak/storages/nuts v0.0.16 // indirect
+	github.com/darkweak/storages/olric v0.0.16 // indirect
+	github.com/darkweak/storages/otter v0.0.16 // indirect
+	github.com/darkweak/storages/redis v0.0.16 // indirect
+	github.com/darkweak/storages/simplefs v0.0.16 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/delthas/go-libnp v0.2.0 // indirect
 	github.com/delthas/go-localeinfo v0.2.0 // indirect
