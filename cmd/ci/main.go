@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/picosh/pico/pkg/shared"
@@ -140,69 +139,17 @@ func (eng *JobEngine) Run() error {
 	jobName := filepath.Base(eng.Wk.GetDir())
 	log := eng.Logger.With("manifest", manifest)
 	evStr := fmt.Sprintf("PICO_CI_EVENT=%s", eng.Ev.Type)
-	// create a marker so we can scan for it in stdout to know when the job is complete
-	// and capture the exit status
-	marker := fmt.Sprintf("__ZMX_CMD_EXIT:%s:", jobName)
-	// run the manifest shell script and then output the end marker
-	runner := fmt.Sprintf(`bash -c './%s ; echo %s$?'`, manifest, marker)
-	// run the job inside of zmx so we get session persistence
-	cmd := exec.Command("zmx", "run", jobName, runner)
+	jobStr := fmt.Sprintf("ZMX_SESSION_PREFIX=%s.", jobName)
+	cmd := exec.Command("bash", manifest)
 	cmd.Env = append(os.Environ(), evStr)
+	cmd.Env = append(os.Environ(), jobStr)
 	cmd.Dir = eng.Wk.GetDir()
 	err = runCmd(cmd, log)
 	if err != nil {
 		return err
 	}
 
-	outCmd := exec.Command("zmx", "tail", jobName)
-	stdout, err := outCmd.StdoutPipe()
-	if err != nil {
-		return err
-	}
-
-	stderr, err := outCmd.StderrPipe()
-	if err != nil {
-		return err
-	}
-
-	if err := outCmd.Start(); err != nil {
-		return err
-	}
-
-	go func() {
-		scanner := bufio.NewScanner(stdout)
-		for scanner.Scan() {
-			line := scanner.Text()
-			if strings.Contains(line, marker) {
-				status := strings.Replace(line, marker, "", 1)
-				exitStatus, err := strconv.Atoi(status)
-				if err != nil {
-					continue
-				}
-				// TODO report status
-				if exitStatus == 0 {
-					log.Info("cmd success")
-				} else {
-					log.Error("cmd error", "status", exitStatus)
-				}
-				err = outCmd.Process.Kill()
-				if err != nil {
-					log.Error("cmd proc kill", "err", err)
-				}
-			} else {
-				log.Info("cmd stdout", "text", line)
-			}
-		}
-	}()
-
-	go func() {
-		scanner := bufio.NewScanner(stderr)
-		for scanner.Scan() {
-			log.Error("cmd stderr", "text", scanner.Text())
-		}
-	}()
-
-	return outCmd.Wait()
+	return cmd.Wait()
 }
 
 func (eng *JobEngine) Cleanup() error {
