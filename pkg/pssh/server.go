@@ -151,6 +151,22 @@ func (s *SSHServerConnSession) Exit(code int) error {
 	return err
 }
 
+func (s *SSHServerConnSession) Errorf(sesh *SSHServerConnSession, f string, v ...interface{}) {
+	_, _ = fmt.Fprintf(sesh.Stderr(), f, v...)
+}
+
+func (s *SSHServerConnSession) Errorln(sesh *SSHServerConnSession, v ...interface{}) {
+	_, _ = fmt.Fprintln(sesh.Stderr(), v...)
+}
+
+func (s *SSHServerConnSession) Printf(sesh *SSHServerConnSession, f string, v ...interface{}) {
+	_, _ = fmt.Fprintf(sesh, f, v...)
+}
+
+func (s *SSHServerConnSession) Println(sesh *SSHServerConnSession, v ...interface{}) {
+	_, _ = fmt.Fprintln(sesh, v...)
+}
+
 func (s *SSHServerConnSession) Fatal(err error) {
 	_, _ = fmt.Fprintln(s.Stderr(), err)
 	_, _ = fmt.Fprintf(s.Stderr(), "\r")

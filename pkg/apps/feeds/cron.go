@@ -600,7 +600,7 @@ func (f *Fetcher) SendEmail(logger *slog.Logger, username, email, subject, unsub
 	}
 	var content strings.Builder
 	for k, v := range headers {
-		content.WriteString(fmt.Sprintf("%s: %s\r\n", k, v))
+		fmt.Fprintf(&content, "%s: %s\r\n", k, v)
 	}
 	content.WriteString("\r\n")
 	content.WriteString("\r\n--boundary123\r\n")
