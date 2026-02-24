@@ -2,13 +2,19 @@ package pssh_test
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
+	"io"
 	"log/slog"
 	"net"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/picosh/pico/pkg/pssh"
+	"github.com/picosh/pico/pkg/shared"
+	"golang.org/x/crypto/ed25519"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -273,5 +279,176 @@ func TestSSHServerConnHandle(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Error("Handle did not return after context canceled")
+	}
+}
+
+func TestSSHServerCommandParsing(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	logger := slog.Default()
+	var capturedCommand []string
+
+	user := GenerateKey()
+
+	server := pssh.NewSSHServer(ctx, logger, &pssh.SSHServerConfig{
+		ListenAddr: "localhost:2222",
+		Middleware: []pssh.SSHServerMiddleware{
+			func(next pssh.SSHServerHandler) pssh.SSHServerHandler {
+				return func(sesh *pssh.SSHServerConnSession) error {
+					capturedCommand = sesh.Command()
+					return next(sesh)
+				}
+			},
+		},
+		ServerConfig: &ssh.ServerConfig{
+			NoClientAuth: true,
+			NoClientAuthCallback: func(ssh.ConnMetadata) (*ssh.Permissions, error) {
+				return &ssh.Permissions{
+					Extensions: map[string]string{
+						"pubkey": shared.KeyForKeyText(user.signer.PublicKey()),
+					},
+				}, nil
+			},
+		},
+	})
+	server.Config.AddHostKey(user.signer)
+
+	// Start server in a goroutine
+	errChan := make(chan error, 1)
+	go func() {
+		err := server.ListenAndServe()
+		errChan <- err
+	}()
+
+	// Wait a bit for the server to start
+	time.Sleep(100 * time.Millisecond)
+
+	// Send command to server
+	user.MustCmd(nil, "accept --comment 'here we go' 101")
+
+	time.Sleep(1000 * time.Millisecond)
+
+	expectedCommand := []string{"accept", "--comment", "'here we go'", "101"}
+	if !slices.Equal(expectedCommand, capturedCommand) {
+		t.Error("command not exected", capturedCommand, len(capturedCommand), expectedCommand, len(expectedCommand))
+	}
+
+	// Trigger cancellation to stop the server
+	cancel()
+
+	// Wait for server to stop
+	select {
+	case err := <-errChan:
+		if err != nil && !errors.Is(err, net.ErrClosed) {
+			t.Errorf("unexpected error: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Error("server did not shut down in time")
+	}
+}
+
+type UserSSH struct {
+	username string
+	signer   ssh.Signer
+}
+
+func NewUserSSH(username string, signer ssh.Signer) *UserSSH {
+	return &UserSSH{
+		username: username,
+		signer:   signer,
+	}
+}
+
+func (s UserSSH) Public() string {
+	pubkey := s.signer.PublicKey()
+	return string(ssh.MarshalAuthorizedKey(pubkey))
+}
+
+func (s UserSSH) MustCmd(patch []byte, cmd string) string {
+	res, err := s.Cmd(patch, cmd)
+	if err != nil {
+		panic(err)
+	}
+	return res
+}
+
+func (s UserSSH) Cmd(patch []byte, cmd string) (string, error) {
+	host := "localhost:2222"
+
+	config := &ssh.ClientConfig{
+		User: s.username,
+		Auth: []ssh.AuthMethod{
+			ssh.PublicKeys(s.signer),
+		},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+	}
+
+	client, err := ssh.Dial("tcp", host, config)
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		_ = client.Close()
+	}()
+
+	session, err := client.NewSession()
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		_ = session.Close()
+	}()
+
+	stdinPipe, err := session.StdinPipe()
+	if err != nil {
+		return "", err
+	}
+
+	stdoutPipe, err := session.StdoutPipe()
+	if err != nil {
+		return "", err
+	}
+
+	if err := session.Start(cmd); err != nil {
+		return "", err
+	}
+
+	if patch != nil {
+		_, err = stdinPipe.Write(patch)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	_ = stdinPipe.Close()
+
+	if err := session.Wait(); err != nil {
+		return "", err
+	}
+
+	buf := new(strings.Builder)
+	_, err = io.Copy(buf, stdoutPipe)
+	if err != nil {
+		return "", err
+	}
+
+	return buf.String(), nil
+}
+
+func GenerateKey() UserSSH {
+	_, userKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		panic(err)
+	}
+
+	userSigner, err := ssh.NewSignerFromKey(userKey)
+	if err != nil {
+		panic(err)
+	}
+
+	return UserSSH{
+		username: "user",
+		signer:   userSigner,
 	}
 }
