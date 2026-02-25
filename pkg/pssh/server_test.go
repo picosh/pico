@@ -329,7 +329,7 @@ func TestSSHServerCommandParsing(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	expectedCommand := []string{"accept", "--comment", "'here we go'", "101"}
+	expectedCommand := []string{"accept", "--comment", "here we go", "101"}
 	if !slices.Equal(expectedCommand, capturedCommand) {
 		t.Error("command not exected", capturedCommand, len(capturedCommand), expectedCommand, len(expectedCommand))
 	}

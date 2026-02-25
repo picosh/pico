@@ -537,7 +537,7 @@ func NewSSHServer(ctx context.Context, logger *slog.Logger, config *SSHServerCon
 									splitter.SingleQuotes,
 								)
 								command = payload.Value
-								cmdSlice, _ := commaSplitter.Split(command)
+								cmdSlice, _ := commaSplitter.Split(command, splitter.StripQuotes)
 								sesh.SetValue("command", cmdSlice)
 							}
 
