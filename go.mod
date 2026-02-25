@@ -32,6 +32,7 @@ require (
 	github.com/emersion/go-sasl v0.0.0-20241020182733-b788ff22d5a6
 	github.com/emersion/go-smtp v0.24.0
 	github.com/gkampitakis/go-snaps v0.5.15
+	github.com/go-andiamo/splitter v1.2.5
 	github.com/google/go-cmp v0.7.0
 	github.com/google/renameio/v2 v2.0.2
 	github.com/google/uuid v1.6.0

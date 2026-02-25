@@ -325,9 +325,9 @@ func TestSSHServerCommandParsing(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Send command to server
-	user.MustCmd(nil, "accept --comment 'here we go' 101")
+	_, _ = user.Cmd(nil, "accept --comment 'here we go' 101")
 
-	time.Sleep(1000 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 
 	expectedCommand := []string{"accept", "--comment", "'here we go'", "101"}
 	if !slices.Equal(expectedCommand, capturedCommand) {

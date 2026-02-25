@@ -15,12 +15,12 @@ import (
 	"net/http"
 	"os"
 	"path"
-	"strings"
 	"sync"
 	"time"
 	"unicode/utf8"
 
 	"github.com/antoniomika/syncmap"
+	"github.com/go-andiamo/splitter"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -531,9 +531,14 @@ func NewSSHServer(ctx context.Context, logger *slog.Logger, config *SSHServerCon
 									return
 								}
 
+								commaSplitter, _ := splitter.NewSplitter(
+									' ',
+									splitter.DoubleQuotes,
+									splitter.SingleQuotes,
+								)
 								command = payload.Value
-
-								sesh.SetValue("command", strings.Fields(payload.Value))
+								cmdSlice, _ := commaSplitter.Split(command)
+								sesh.SetValue("command", cmdSlice)
 							}
 
 							if !utf8.ValidString(command) {
