@@ -80,7 +80,7 @@ func (app *App) CaptureEvent(ev vaxis.Event) (vxfw.Command, error) {
 		if msg.Matches('c', vaxis.ModCtrl) {
 			return vxfw.QuitCmd{}, nil
 		}
-		if msg.Matches(vaxis.KeyEsc) {
+		if msg.Matches(vaxis.KeyEsc) || msg.Matches('q') {
 			if app.page == "signup" || app.page == HOME {
 				return nil, nil
 			}
@@ -167,7 +167,7 @@ func (app *App) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	wdgt, ok := cur.(WidgetFooter)
 	segs := []Shortcut{
 		{Shortcut: "^c", Text: "quit"},
-		{Shortcut: "esc", Text: "prev page"},
+		{Shortcut: "esc/q", Text: "prev page"},
 	}
 	if ok {
 		segs = append(segs, wdgt.Footer()...)
