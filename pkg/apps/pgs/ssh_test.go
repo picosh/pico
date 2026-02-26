@@ -1,12 +1,14 @@
 package pgs
 
 import (
+	"context"
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/pem"
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -16,12 +18,48 @@ import (
 
 	pgsdb "github.com/picosh/pico/pkg/apps/pgs/db"
 	"github.com/picosh/pico/pkg/db"
+	"github.com/picosh/pico/pkg/pssh"
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/pico/pkg/shared/storage"
 	"github.com/pkg/sftp"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/crypto/ssh"
 )
+
+func StartSshServerForTesting(cfg *PgsConfig, killCh chan error) *pssh.SSHServer {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		// Cancel is deferred to avoid being called in error path
+		// It will be called from the cleanup goroutine
+		_ = cancel
+	}()
+
+	cacheClearingQueue := make(chan string, 100)
+	logger := cfg.Logger
+
+	server, err := createSshServer(cfg, ctx, cacheClearingQueue)
+	if err != nil {
+		logger.Error("failed to create ssh server", "err", err.Error())
+		cancel() // Clean up if server creation fails
+		return nil
+	}
+
+	logger.Info("Starting SSH server", "addr", server.Config.ListenAddr)
+	go func() {
+		if err = server.ListenAndServe(); err != nil {
+			logger.Error("serve", "err", err.Error())
+		}
+	}()
+
+	go func() {
+		// Wait for kill signal and clean up
+		<-killCh
+		logger.Info("stopping ssh server")
+		cancel()
+	}()
+
+	return server
+}
 
 func TestSshServerSftp(t *testing.T) {
 	opts := &slog.HandlerOptions{
@@ -43,12 +81,32 @@ func TestSshServerSftp(t *testing.T) {
 	defer func() {
 		_ = pubsub.Close()
 	}()
+
+	// Use dynamic port for tests to avoid port conflicts
+	_ = os.Setenv("PGS_SSH_PORT", "0")
+
 	cfg := NewPgsConfig(logger, dbpool, st, pubsub)
 	done := make(chan error)
 	prometheus.DefaultRegisterer = prometheus.NewRegistry()
-	go StartSshServer(cfg, done)
-	// Hack to wait for startup
-	time.Sleep(time.Millisecond * 100)
+
+	var server *pssh.SSHServer
+	go func() {
+		server = StartSshServerForTesting(cfg, done)
+	}()
+
+	// Wait for server to be ready and get the actual listening address
+	var actualAddr string
+	for i := 0; i < 100; i++ {
+		if server != nil && server.Listener != nil {
+			actualAddr = server.Listener.Addr().String()
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+
+	if actualAddr == "" {
+		t.Fatal("server listener not ready")
+	}
 
 	user := GenerateUser()
 	// add user's pubkey to the default test account
@@ -58,7 +116,7 @@ func TestSshServerSftp(t *testing.T) {
 		Key:    shared.KeyForKeyText(user.signer.PublicKey()),
 	})
 
-	client, err := user.NewClient()
+	client, err := user.NewClientAddr(actualAddr)
 	if err != nil {
 		t.Error(err)
 		return
@@ -96,19 +154,7 @@ func TestSshServerSftp(t *testing.T) {
 	}
 
 	close(done)
-
-	p, err := os.FindProcess(os.Getpid())
-	if err != nil {
-		t.Fatal(err)
-		return
-	}
-
-	err = p.Signal(os.Interrupt)
-	if err != nil {
-		t.Fatal(err)
-		return
-	}
-	<-time.After(10 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 }
 
 func TestSshServerRsync(t *testing.T) {
@@ -131,12 +177,32 @@ func TestSshServerRsync(t *testing.T) {
 	defer func() {
 		_ = pubsub.Close()
 	}()
+
+	// Use dynamic port for tests to avoid port conflicts
+	_ = os.Setenv("PGS_SSH_PORT", "0")
+
 	cfg := NewPgsConfig(logger, dbpool, st, pubsub)
 	done := make(chan error)
 	prometheus.DefaultRegisterer = prometheus.NewRegistry()
-	go StartSshServer(cfg, done)
-	// Hack to wait for startup
-	time.Sleep(time.Millisecond * 100)
+
+	var server *pssh.SSHServer
+	go func() {
+		server = StartSshServerForTesting(cfg, done)
+	}()
+
+	// Wait for server to be ready and get the actual listening address
+	var actualAddr string
+	for i := 0; i < 100; i++ {
+		if server != nil && server.Listener != nil {
+			actualAddr = server.Listener.Addr().String()
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+
+	if actualAddr == "" {
+		t.Fatal("server listener not ready")
+	}
 
 	user := GenerateUser()
 	key := shared.KeyForKeyText(user.signer.PublicKey())
@@ -147,7 +213,7 @@ func TestSshServerRsync(t *testing.T) {
 		Key:    key,
 	})
 
-	conn, err := user.NewClient()
+	conn, err := user.NewClientAddr(actualAddr)
 	if err != nil {
 		t.Error(err)
 		return
@@ -215,13 +281,22 @@ func TestSshServerRsync(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Extract port from actualAddr (format: "0.0.0.0:XXXXX")
+	_, port, err := net.SplitHostPort(actualAddr)
+	if err != nil {
+		t.Fatalf("failed to parse server address: %v", err)
+	}
+	// Use localhost for rsync (works regardless of IPv4/IPv6 binding)
+	host := "localhost"
+
 	eCmd := fmt.Sprintf(
-		"ssh -p 2222 -o IdentitiesOnly=yes -i %s -o StrictHostKeyChecking=no",
+		"ssh -p %s -o IdentitiesOnly=yes -i %s -o StrictHostKeyChecking=no",
+		port,
 		keyFile,
 	)
 
 	// copy files
-	cmd := exec.Command("rsync", "-rv", "-e", eCmd, name+"/", "localhost:/test")
+	cmd := exec.Command("rsync", "-rv", "-e", eCmd, name+"/", host+":/test")
 	result, err := cmd.CombinedOutput()
 	if err != nil {
 		cfg.Logger.Error("cannot upload", "err", err, "result", string(result))
@@ -270,7 +345,7 @@ func TestSshServerRsync(t *testing.T) {
 		_ = os.RemoveAll(dlName)
 	}()
 	// download files
-	downloadCmd := exec.Command("rsync", "-rvvv", "-e", eCmd, "localhost:/test/", dlName+"/")
+	downloadCmd := exec.Command("rsync", "-rvvv", "-e", eCmd, host+":/test/", dlName+"/")
 	result, err = downloadCmd.CombinedOutput()
 	if err != nil {
 		cfg.Logger.Error("cannot download files", "err", err, "result", string(result))
@@ -306,19 +381,7 @@ func TestSshServerRsync(t *testing.T) {
 	}
 
 	close(done)
-
-	p, err := os.FindProcess(os.Getpid())
-	if err != nil {
-		t.Fatal(err)
-		return
-	}
-
-	err = p.Signal(os.Interrupt)
-	if err != nil {
-		t.Fatal(err)
-		return
-	}
-	<-time.After(10 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 }
 
 type UserSSH struct {
@@ -347,9 +410,7 @@ func (s UserSSH) MustCmd(client *ssh.Client, patch []byte, cmd string) string {
 	return res
 }
 
-func (s UserSSH) NewClient() (*ssh.Client, error) {
-	host := "localhost:2222"
-
+func (s UserSSH) NewClientAddr(addr string) (*ssh.Client, error) {
 	config := &ssh.ClientConfig{
 		User: s.username,
 		Auth: []ssh.AuthMethod{
@@ -358,8 +419,13 @@ func (s UserSSH) NewClient() (*ssh.Client, error) {
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 
-	client, err := ssh.Dial("tcp", host, config)
+	client, err := ssh.Dial("tcp", addr, config)
 	return client, err
+}
+
+func (s UserSSH) NewClient() (*ssh.Client, error) {
+	// Default to localhost:2222 for backward compatibility
+	return s.NewClientAddr("localhost:2222")
 }
 
 func (s UserSSH) Cmd(client *ssh.Client, patch []byte, cmd string) (string, error) {

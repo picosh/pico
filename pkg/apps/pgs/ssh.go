@@ -17,16 +17,12 @@ import (
 	"github.com/picosh/pico/pkg/tunkit"
 )
 
-func StartSshServer(cfg *PgsConfig, killCh chan error) {
+func createSshServer(cfg *PgsConfig, ctx context.Context, cacheClearingQueue chan string) (*pssh.SSHServer, error) {
 	host := shared.GetEnv("PGS_HOST", "0.0.0.0")
 	port := shared.GetEnv("PGS_SSH_PORT", "2222")
 	promPort := shared.GetEnv("PGS_PROM_PORT", "9222")
 	logger := cfg.Logger
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	cacheClearingQueue := make(chan string, 100)
 	handler := NewUploadAssetHandler(
 		cfg,
 		cacheClearingQueue,
@@ -68,6 +64,17 @@ func StartSshServer(cfg *PgsConfig, killCh chan error) {
 		},
 	)
 
+	return server, err
+}
+
+func StartSshServer(cfg *PgsConfig, killCh chan error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	cacheClearingQueue := make(chan string, 100)
+	logger := cfg.Logger
+
+	server, err := createSshServer(cfg, ctx, cacheClearingQueue)
 	if err != nil {
 		logger.Error("failed to create ssh server", "err", err.Error())
 		os.Exit(1)
