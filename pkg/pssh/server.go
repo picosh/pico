@@ -1,6 +1,7 @@
 package pssh
 
 import (
+	"bytes"
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
@@ -183,6 +184,32 @@ func (s *SSHServerConnSession) Pty() (*Pty, <-chan Window, bool) {
 	}
 
 	return s.pty, s.winch, true
+}
+
+// Write overrides the embedded Channel's Write to normalize line endings when PTY is allocated.
+func (s *SSHServerConnSession) Write(p []byte) (n int, err error) {
+	s.mu.Lock()
+	hasPty := s.pty != nil
+	s.mu.Unlock()
+
+	if !hasPty {
+		// No PTY, write as-is
+		return s.Channel.Write(p)
+	}
+
+	// When PTY is active, normalize line endings like a real terminal would.
+	// Replace \n with \r\n, but avoid double \r\n.
+	normalized := bytes.ReplaceAll(p, []byte{'\n'}, []byte{'\r', '\n'})
+	normalized = bytes.ReplaceAll(normalized, []byte{'\r', '\r', '\n'}, []byte{'\r', '\n'})
+
+	// Write the normalized data
+	written, err := s.Channel.Write(normalized)
+
+	// Return the count based on original data length, not normalized
+	if written > len(p) {
+		written = len(p)
+	}
+	return written, err
 }
 
 var _ context.Context = &SSHServerConnSession{}
