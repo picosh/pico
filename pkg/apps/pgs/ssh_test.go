@@ -105,8 +105,11 @@ func TestSshServerSftp(t *testing.T) {
 	// Wait for listener to be created
 	var actualAddr string
 	for i := 0; i < 100; i++ {
-		if server.Listener != nil {
-			actualAddr = server.Listener.Addr().String()
+		server.Mu.Lock()
+		listener := server.Listener
+		server.Mu.Unlock()
+		if listener != nil {
+			actualAddr = listener.Addr().String()
 			break
 		}
 		time.Sleep(10 * time.Millisecond)
@@ -205,8 +208,11 @@ func TestSshServerRsync(t *testing.T) {
 	// Wait for listener to be created
 	var actualAddr string
 	for i := 0; i < 100; i++ {
-		if server.Listener != nil {
-			actualAddr = server.Listener.Addr().String()
+		server.Mu.Lock()
+		listener := server.Listener
+		server.Mu.Unlock()
+		if listener != nil {
+			actualAddr = listener.Addr().String()
 			break
 		}
 		time.Sleep(10 * time.Millisecond)
