@@ -319,6 +319,8 @@ type SSHServer struct {
 	SessionsCreated  *prometheus.CounterVec
 	SessionsFinished *prometheus.CounterVec
 	SessionsDuration *prometheus.CounterVec
+
+	Mu sync.Mutex
 }
 
 func (s *SSHServer) ListenAndServe() error {
@@ -379,7 +381,9 @@ func (s *SSHServer) ListenAndServe() error {
 		return err
 	}
 
+	s.Mu.Lock()
 	s.Listener = listen
+	s.Mu.Unlock()
 	defer func() {
 		_ = s.Listener.Close()
 	}()

@@ -520,8 +520,11 @@ func TestSSHServerCommandParsing(t *testing.T) {
 	// Wait for server to be ready and get the actual listening address
 	var actualAddr string
 	for i := 0; i < 50; i++ {
-		if server.Listener != nil {
-			actualAddr = server.Listener.Addr().String()
+		server.Mu.Lock()
+		listener := server.Listener
+		server.Mu.Unlock()
+		if listener != nil {
+			actualAddr = listener.Addr().String()
 			break
 		}
 		time.Sleep(10 * time.Millisecond)
