@@ -197,12 +197,22 @@ func (s *SSHServerConnSession) Write(p []byte) (n int, err error) {
 		return s.Channel.Write(p)
 	}
 
-	// When PTY is active, normalize line endings like a real terminal would.
-	// Replace \n with \r\n, but avoid double \r\n.
-	normalized := bytes.ReplaceAll(p, []byte{'\n'}, []byte{'\r', '\n'})
-	normalized = bytes.ReplaceAll(normalized, []byte{'\r', '\r', '\n'}, []byte{'\r', '\n'})
+	// When PTY is active, ensure every \n is preceded by \r.
+	// This ensures the cursor returns to column 0 before the newline.
+	var buf bytes.Buffer
+	for i := 0; i < len(p); i++ {
+		if p[i] == '\n' {
+			// Check if preceded by \r
+			if i == 0 || p[i-1] != '\r' {
+				buf.WriteByte('\r')
+			}
+			buf.WriteByte('\n')
+		} else {
+			buf.WriteByte(p[i])
+		}
+	}
 
-	// Write the normalized data
+	normalized := buf.Bytes()
 	written, err := s.Channel.Write(normalized)
 
 	// Return the count based on original data length, not normalized
