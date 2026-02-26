@@ -26,7 +26,7 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-func StartSshServerForTesting(cfg *PgsConfig, killCh chan error) *pssh.SSHServer {
+func StartSshServerForTesting(cfg *PgsConfig, killCh chan error, readyCh chan *pssh.SSHServer) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
 		// Cancel is deferred to avoid being called in error path
@@ -41,15 +41,21 @@ func StartSshServerForTesting(cfg *PgsConfig, killCh chan error) *pssh.SSHServer
 	if err != nil {
 		logger.Error("failed to create ssh server", "err", err.Error())
 		cancel() // Clean up if server creation fails
-		return nil
+		readyCh <- nil
+		return
 	}
 
 	logger.Info("Starting SSH server", "addr", server.Config.ListenAddr)
+
+	// Signal that server is ready once ListenAndServe starts
 	go func() {
 		if err = server.ListenAndServe(); err != nil {
 			logger.Error("serve", "err", err.Error())
 		}
 	}()
+
+	// Send server when listener is created (happens early in ListenAndServe)
+	readyCh <- server
 
 	go func() {
 		// Wait for kill signal and clean up
@@ -57,8 +63,6 @@ func StartSshServerForTesting(cfg *PgsConfig, killCh chan error) *pssh.SSHServer
 		logger.Info("stopping ssh server")
 		cancel()
 	}()
-
-	return server
 }
 
 func TestSshServerSftp(t *testing.T) {
@@ -87,21 +91,25 @@ func TestSshServerSftp(t *testing.T) {
 
 	cfg := NewPgsConfig(logger, dbpool, st, pubsub)
 	done := make(chan error)
+	readyCh := make(chan *pssh.SSHServer)
 	prometheus.DefaultRegisterer = prometheus.NewRegistry()
 
-	var server *pssh.SSHServer
-	go func() {
-		server = StartSshServerForTesting(cfg, done)
-	}()
+	go StartSshServerForTesting(cfg, done, readyCh)
 
-	// Wait for server to be ready and get the actual listening address
+	// Wait for server to be ready
+	server := <-readyCh
+	if server == nil {
+		t.Fatal("failed to create ssh server")
+	}
+
+	// Wait for listener to be created
 	var actualAddr string
 	for i := 0; i < 100; i++ {
-		if server != nil && server.Listener != nil {
+		if server.Listener != nil {
 			actualAddr = server.Listener.Addr().String()
 			break
 		}
-		time.Sleep(20 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 	}
 
 	if actualAddr == "" {
@@ -183,21 +191,25 @@ func TestSshServerRsync(t *testing.T) {
 
 	cfg := NewPgsConfig(logger, dbpool, st, pubsub)
 	done := make(chan error)
+	readyCh := make(chan *pssh.SSHServer)
 	prometheus.DefaultRegisterer = prometheus.NewRegistry()
 
-	var server *pssh.SSHServer
-	go func() {
-		server = StartSshServerForTesting(cfg, done)
-	}()
+	go StartSshServerForTesting(cfg, done, readyCh)
 
-	// Wait for server to be ready and get the actual listening address
+	// Wait for server to be ready
+	server := <-readyCh
+	if server == nil {
+		t.Fatal("failed to create ssh server")
+	}
+
+	// Wait for listener to be created
 	var actualAddr string
 	for i := 0; i < 100; i++ {
-		if server != nil && server.Listener != nil {
+		if server.Listener != nil {
 			actualAddr = server.Listener.Addr().String()
 			break
 		}
-		time.Sleep(20 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 	}
 
 	if actualAddr == "" {
