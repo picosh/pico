@@ -8,7 +8,6 @@ import (
 	"html/template"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -17,71 +16,116 @@ import (
 
 	_ "net/http/pprof"
 
-	"github.com/darkweak/souin/configurationtypes"
-	"github.com/darkweak/souin/pkg/middleware"
-	"github.com/darkweak/souin/plugins/souin/storages"
-	"github.com/darkweak/storages/core"
 	"github.com/gorilla/feeds"
 	"github.com/hashicorp/golang-lru/v2/expirable"
 	"github.com/picosh/pico/pkg/db"
+	"github.com/picosh/pico/pkg/httpcache"
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/pico/pkg/shared/router"
 	"github.com/picosh/pico/pkg/storage"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"google.golang.org/protobuf/proto"
 )
 
-type CachedHttp struct {
-	handler *middleware.SouinBaseHandler
-	routes  *WebRouter
+type PgsCacheKey struct {
+	Domain    string
+	TxtPrefix string
 }
 
-func (c *CachedHttp) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
-	_ = c.handler.ServeHTTP(writer, req, func(w http.ResponseWriter, r *http.Request) error {
-		c.routes.ServeHTTP(w, r)
-		return nil
-	})
+func (c *PgsCacheKey) GetCacheKey(r *http.Request) string {
+	subdomain := router.GetSubdomainFromRequest(r, c.Domain, c.TxtPrefix)
+	return subdomain + "__" + r.Method + "__" + r.URL.RequestURI()
 }
 
-func SetupCache(cfg *PgsConfig) *middleware.SouinBaseHandler {
-	ttl := configurationtypes.Duration{Duration: cfg.CacheTTL}
-	stale := configurationtypes.Duration{Duration: cfg.CacheTTL * 2}
-	c := &middleware.BaseConfiguration{
-		API: configurationtypes.API{
-			Prometheus: configurationtypes.APIEndpoint{
-				Enable: true,
-			},
-		},
-		DefaultCache: &configurationtypes.DefaultCache{
-			TTL:   ttl,
-			Stale: stale,
-			Otter: configurationtypes.CacheProvider{
-				Uuid:          fmt.Sprintf("OTTER-%s", stale),
-				Configuration: map[string]interface{}{},
-			},
-			Regex: configurationtypes.Regex{
-				Exclude: "/check|/_metrics",
-			},
-			MaxBodyBytes:        uint64(cfg.MaxAssetSize),
-			DefaultCacheControl: cfg.CacheControl,
-		},
+type PromCacheMetrics struct {
+	Cache          httpcache.Cacher
+	CacheItems     prometheus.Gauge
+	CacheSizeBytes prometheus.Gauge
+	CacheHit       prometheus.Counter
+	CacheMiss      prometheus.Counter
+	UpstreamReq    prometheus.Counter
+}
+
+func NewPromCacheMetrics(reg prometheus.Registerer) *PromCacheMetrics {
+	name := "pgs"
+	auto := promauto.With(reg)
+	return &PromCacheMetrics{
+		CacheItems: auto.NewGauge(prometheus.GaugeOpts{
+			Namespace: name,
+			Subsystem: "http_cache",
+			Name:      "total_items",
+			Help:      "Number of items in the http cache",
+		}),
+		CacheSizeBytes: auto.NewGauge(prometheus.GaugeOpts{
+			Namespace: name,
+			Subsystem: "http_cache",
+			Name:      "total_size",
+			Help:      "The total size of the http cache in bytes",
+		}),
+		CacheHit: auto.NewCounter(prometheus.CounterOpts{
+			Namespace: name,
+			Subsystem: "http_cache",
+			Name:      "cache_hit",
+			Help:      "The number of times there was a cache hit",
+		}),
+		CacheMiss: auto.NewCounter(prometheus.CounterOpts{
+			Namespace: name,
+			Subsystem: "http_cache",
+			Name:      "cache_miss",
+			Help:      "The number of times there was a cache miss",
+		}),
+		UpstreamReq: auto.NewCounter(prometheus.CounterOpts{
+			Namespace: name,
+			Subsystem: "http_cache",
+			Name:      "upstream_request",
+			Help:      "The number of times the upstream http server was requested",
+		}),
 	}
-	c.SetLogger(&CompatLogger{Logger: cfg.Logger})
-	storages.InitFromConfiguration(c)
-	return middleware.NewHTTPCacheHandler(c)
+}
+func (p *PromCacheMetrics) AddCacheItem(size float64) {
+	p.CacheItems.Add(1)
+	p.CacheSizeBytes.Add(size)
+}
+func (p *PromCacheMetrics) EvictCacheItem(key string, value []byte) {
+	p.CacheItems.Add(-1)
+	p.CacheSizeBytes.Add(-float64(len(value)))
+}
+func (p *PromCacheMetrics) AddCacheHit() {
+	p.CacheHit.Add(1)
+}
+func (p *PromCacheMetrics) AddCacheMiss() {
+	p.CacheMiss.Add(1)
+}
+func (p *PromCacheMetrics) AddUpstreamRequest() {
+	p.UpstreamReq.Add(1)
+}
+
+func NewPgsHttpCache(cfg *PgsConfig, upstream http.Handler) *httpcache.HttpCache {
+	ttl := cfg.CacheTTL
+	metrics := NewPromCacheMetrics(prometheus.DefaultRegisterer)
+	cache := expirable.NewLRU(0, metrics.EvictCacheItem, ttl)
+	httpCache := &httpcache.HttpCache{
+		Ttl:      ttl,
+		Logger:   cfg.Logger,
+		Upstream: upstream,
+		Cache:    cache,
+		CacheKey: &PgsCacheKey{
+			Domain:    cfg.Domain,
+			TxtPrefix: cfg.TxtPrefix,
+		},
+		CacheMetrics: metrics,
+	}
+	httpCache.Logger.Info("httpcache initiated", "ttl", httpCache.Ttl, "storage", "lru")
+	return httpCache
 }
 
 func StartApiServer(cfg *PgsConfig) {
 	ctx := context.Background()
 
-	httpCache := SetupCache(cfg)
-	routes := NewWebRouter(cfg)
-	cacher := &CachedHttp{
-		handler: httpCache,
-		routes:  routes,
-	}
-
-	go routes.CacheMgmt(ctx, httpCache, cfg.CacheClearingQueue)
+	router := NewWebRouter(cfg)
+	httpCache := NewPgsHttpCache(router.Cfg, router)
+	go CacheMgmt(ctx, cfg.CacheClearingQueue, cfg, httpCache.Cache)
 
 	portStr := fmt.Sprintf(":%s", cfg.WebPort)
 	cfg.Logger.Info(
@@ -89,7 +133,7 @@ func StartApiServer(cfg *PgsConfig) {
 		"port", cfg.WebPort,
 		"domain", cfg.Domain,
 	)
-	err := http.ListenAndServe(portStr, cacher)
+	err := http.ListenAndServe(portStr, httpCache)
 	cfg.Logger.Error(
 		"listen and serve",
 		"err", err.Error(),
@@ -120,6 +164,26 @@ func newWebRouter(cfg *PgsConfig) *WebRouter {
 	}
 	router.initRouters()
 	return router
+}
+
+func (web *WebRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	subdomain := router.GetSubdomainFromRequest(r, web.Cfg.Domain, web.Cfg.TxtPrefix)
+	if web.RootRouter == nil || web.UserRouter == nil {
+		web.Cfg.Logger.Error("routers not initialized")
+		http.Error(w, "routers not initialized", http.StatusInternalServerError)
+		return
+	}
+
+	var mux *http.ServeMux
+	if subdomain == "" {
+		mux = web.RootRouter
+	} else {
+		mux = web.UserRouter
+	}
+
+	ctx := r.Context()
+	ctx = context.WithValue(ctx, router.CtxSubdomainKey{}, subdomain)
+	mux.ServeHTTP(w, r.WithContext(ctx))
 }
 
 func (web *WebRouter) WatchCacheClear() {
@@ -288,56 +352,27 @@ func (web *WebRouter) checkHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotFound)
 }
 
-func (web *WebRouter) CacheMgmt(ctx context.Context, httpCache *middleware.SouinBaseHandler, notify chan string) {
-	storer := httpCache.Storers[0]
-
+func CacheMgmt(ctx context.Context, notify chan string, cfg *PgsConfig, cacher httpcache.Cacher) {
+	cfg.Logger.Info("cache mgmt initiated")
 	for {
-		scanner := bufio.NewScanner(web.Cfg.Pubsub)
+		scanner := bufio.NewScanner(cfg.Pubsub)
 		scanner.Buffer(make([]byte, 32*1024), 32*1024)
 		for scanner.Scan() {
-			surrogateKey := strings.TrimSpace(scanner.Text())
-			web.Cfg.Logger.Info("received cache-drain item", "surrogateKey", surrogateKey)
-			notify <- surrogateKey
+			subdomain := strings.TrimSpace(scanner.Text())
+			cfg.Logger.Info("received cache-drain item", "subdomain", subdomain)
+			notify <- subdomain
 
-			if surrogateKey == "*" {
-				storer.DeleteMany(".+")
-				err := httpCache.SurrogateKeyStorer.Destruct()
-				if err != nil {
-					web.Cfg.Logger.Error("could not clear cache and surrogate key store", "err", err)
-				} else {
-					web.Cfg.Logger.Info("successfully cleared cache and surrogate keys store")
-				}
+			if subdomain == "*" {
+				cacher.Purge()
+				cfg.Logger.Info("successfully cleared cache from remote cli request")
 				continue
 			}
 
-			var header http.Header = map[string][]string{}
-			header.Add("Surrogate-Key", surrogateKey)
-
-			ck, _ := httpCache.SurrogateKeyStorer.Purge(header)
-			for _, key := range ck {
-				key, _ = strings.CutPrefix(key, core.MappingKeyPrefix)
-				if b := storer.Get(core.MappingKeyPrefix + key); len(b) > 0 {
-					var mapping core.StorageMapper
-					if e := proto.Unmarshal(b, &mapping); e == nil {
-						for k := range mapping.GetMapping() {
-							qkey, _ := url.QueryUnescape(k)
-							web.Cfg.Logger.Info(
-								"deleting key from surrogate cache",
-								"surrogateKey", surrogateKey,
-								"key", qkey,
-							)
-							storer.Delete(qkey)
-						}
-					}
+			for _, key := range cacher.Keys() {
+				if strings.HasPrefix(key, subdomain) {
+					cfg.Logger.Info("deleting cache item", "subdomain", subdomain, "key", key)
+					_ = cacher.Remove(key)
 				}
-
-				qkey, _ := url.QueryUnescape(key)
-				web.Cfg.Logger.Info(
-					"deleting from cache",
-					"surrogateKey", surrogateKey,
-					"key", core.MappingKeyPrefix+qkey,
-				)
-				storer.Delete(core.MappingKeyPrefix + qkey)
 			}
 		}
 	}
@@ -572,81 +607,4 @@ func (web *WebRouter) handleLogin(w http.ResponseWriter, r *http.Request) {
 
 func (web *WebRouter) handleAutoForm(w http.ResponseWriter, r *http.Request) {
 	handleAutoForm(w, r, web.Cfg)
-}
-
-func (web *WebRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	subdomain := router.GetSubdomainFromRequest(r, web.Cfg.Domain, web.Cfg.TxtPrefix)
-	if web.RootRouter == nil || web.UserRouter == nil {
-		web.Cfg.Logger.Error("routers not initialized")
-		http.Error(w, "routers not initialized", http.StatusInternalServerError)
-		return
-	}
-
-	var mux *http.ServeMux
-	if subdomain == "" {
-		mux = web.RootRouter
-	} else {
-		mux = web.UserRouter
-	}
-
-	ctx := r.Context()
-	ctx = context.WithValue(ctx, router.CtxSubdomainKey{}, subdomain)
-	mux.ServeHTTP(w, r.WithContext(ctx))
-}
-
-type CompatLogger struct {
-	Logger *slog.Logger
-}
-
-func (cl *CompatLogger) marshall(int ...interface{}) string {
-	res := ""
-	for _, val := range int {
-		switch r := val.(type) {
-		case string:
-			res += " " + r
-		}
-	}
-	return res
-}
-func (cl *CompatLogger) DPanic(int ...interface{}) {
-	cl.Logger.Error("panic", "output", cl.marshall(int))
-}
-func (cl *CompatLogger) DPanicf(st string, int ...interface{}) {
-	cl.Logger.Error(fmt.Sprintf(st, int...))
-}
-func (cl *CompatLogger) Debug(int ...interface{}) {
-	cl.Logger.Debug("debug", "output", cl.marshall(int))
-}
-func (cl *CompatLogger) Debugf(st string, int ...interface{}) {
-	cl.Logger.Debug(fmt.Sprintf(st, int...))
-}
-func (cl *CompatLogger) Error(int ...interface{}) {
-	cl.Logger.Error("error", "output", cl.marshall(int))
-}
-func (cl *CompatLogger) Errorf(st string, int ...interface{}) {
-	cl.Logger.Error(fmt.Sprintf(st, int...))
-}
-func (cl *CompatLogger) Fatal(int ...interface{}) {
-	cl.Logger.Error("fatal", "outpu", cl.marshall(int))
-}
-func (cl *CompatLogger) Fatalf(st string, int ...interface{}) {
-	cl.Logger.Error(fmt.Sprintf(st, int...))
-}
-func (cl *CompatLogger) Info(int ...interface{}) {
-	cl.Logger.Info("info", "output", cl.marshall(int))
-}
-func (cl *CompatLogger) Infof(st string, int ...interface{}) {
-	cl.Logger.Info(fmt.Sprintf(st, int...))
-}
-func (cl *CompatLogger) Panic(int ...interface{}) {
-	cl.Logger.Error("panic", "output", cl.marshall(int))
-}
-func (cl *CompatLogger) Panicf(st string, int ...interface{}) {
-	cl.Logger.Error(fmt.Sprintf(st, int...))
-}
-func (cl *CompatLogger) Warn(int ...interface{}) {
-	cl.Logger.Warn("warn", "output", cl.marshall(int))
-}
-func (cl *CompatLogger) Warnf(st string, int ...interface{}) {
-	cl.Logger.Warn(fmt.Sprintf(st, int...))
 }

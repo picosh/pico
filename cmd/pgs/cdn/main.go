@@ -3,22 +3,22 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
-	"net/http/httputil"
 	"net/url"
 	"strings"
 
-	"github.com/darkweak/souin/pkg/middleware"
-	"github.com/hashicorp/golang-lru/v2/expirable"
 	"github.com/picosh/pico/pkg/apps/pgs"
+	"github.com/picosh/pico/pkg/httpcache"
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func main() {
-	withPipe := strings.ToLower(shared.GetEnv("PICO_PIPE_ENABLED", "true")) == "true"
+	pipeEnabled := shared.GetEnv("PICO_PIPE_ENABLED", "true")
+	withPipe := strings.ToLower(pipeEnabled) == "true"
 	logger := shared.CreateLogger("pgs-cdn", withPipe)
 	ctx := context.Background()
 	drain := pgs.CreateSubCacheDrain(ctx, logger)
@@ -27,19 +27,14 @@ func main() {
 		_ = pubsub.Close()
 	}()
 	cfg := pgs.NewPgsConfig(logger, nil, nil, drain)
-	httpCache := pgs.SetupCache(cfg)
-	router := &pgs.WebRouter{
-		Cfg:            cfg,
-		RedirectsCache: expirable.NewLRU[string, []*pgs.RedirectRule](2048, nil, shared.CacheTimeout),
-		HeadersCache:   expirable.NewLRU[string, []*pgs.HeaderRule](2048, nil, shared.CacheTimeout),
-	}
+	proxy := newProxyServe(cfg.Logger)
+	httpCache := pgs.NewPgsHttpCache(cfg, proxy)
 	cacher := &cachedHttp{
-		handler: httpCache,
-		routes:  router,
+		Logger: cfg.Logger,
+		Cache:  httpCache,
 	}
 
-	go router.WatchCacheClear()
-	go router.CacheMgmt(ctx, httpCache, cfg.CacheClearingQueue)
+	go pgs.CacheMgmt(ctx, cfg.CacheClearingQueue, cfg, httpCache.Cache)
 
 	portStr := fmt.Sprintf(":%s", cfg.WebPort)
 	cfg.Logger.Info(
@@ -51,29 +46,54 @@ func main() {
 	cfg.Logger.Error("listen and serve", "err", err)
 }
 
+type proxyServe struct {
+	Logger    *slog.Logger
+	transport *http.Transport
+}
+
+func newProxyServe(logger *slog.Logger) *proxyServe {
+	defaultTransport := http.DefaultTransport.(*http.Transport)
+	oldDial := defaultTransport.DialContext
+	transport := &http.Transport{
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			return oldDial(ctx, "tcp", "ash.pgs.sh:443")
+		},
+	}
+	return &proxyServe{Logger: logger, transport: transport}
+}
+
+func (p *proxyServe) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	target, _ := url.Parse(partialURL(req))
+	p.Logger.Info("proxying request to ash.pgs.sh", "url", target.String())
+
+	proxyReq := req.Clone(req.Context())
+	proxyReq.URL.Scheme = target.Scheme
+	proxyReq.URL.Host = target.Host
+	proxyReq.URL.Path = target.Path
+	proxyReq.URL.RawQuery = target.RawQuery
+	proxyReq.RequestURI = ""
+
+	resp, err := p.transport.RoundTrip(proxyReq)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	for k, vals := range resp.Header {
+		for _, v := range vals {
+			w.Header().Set(k, v)
+		}
+	}
+	w.WriteHeader(resp.StatusCode)
+	_, _ = io.Copy(w, resp.Body)
+}
+
 type cachedHttp struct {
-	handler *middleware.SouinBaseHandler
-	routes  *pgs.WebRouter
-}
-
-type CustomTransport struct {
-	*http.Transport
 	Logger *slog.Logger
-}
-
-func (t *CustomTransport) RoundTrip(request *http.Request) (*http.Response, error) {
-	// reqDump, _ := httputil.DumpRequestOut(request, false)
-	// t.Logger.Info("request", "dump", string(reqDump))
-	response, err := http.DefaultTransport.RoundTrip(request)
-
-	// body, err := httputil.DumpResponse(response, false)
-	// if err != nil {
-	// 	// copying the response body did not work
-	// 	return nil, err
-	// }
-	// t.Logger.Info("response", "dump", string(body))
-
-	return response, err
+	Cache  *httpcache.HttpCache
 }
 
 func (c *cachedHttp) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
@@ -83,7 +103,7 @@ func (c *cachedHttp) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
 	}
 
 	if req.URL.Path == "/check" {
-		c.routes.Cfg.Logger.Info("proxying `/check` request to ash.pgs.sh", "query", req.URL.RawQuery)
+		c.Logger.Info("proxying `/check` request to ash.pgs.sh", "query", req.URL.RawQuery)
 		req, _ := http.NewRequest("GET", "https://ash.pgs.sh/check?"+req.URL.RawQuery, nil)
 		req.Host = "pgs.sh"
 		// reqDump, _ := httputil.DumpRequestOut(req, true)
@@ -91,27 +111,16 @@ func (c *cachedHttp) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
 
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
-			c.routes.Cfg.Logger.Error("check request", "err", err)
+			c.Logger.Error("check request", "err", err)
 		}
 		writer.WriteHeader(resp.StatusCode)
-		return
+		defer func() {
+			_ = resp.Body.Close()
+		}()
+		_, _ = io.Copy(writer, resp.Body)
 	}
 
-	_ = c.handler.ServeHTTP(writer, req, func(w http.ResponseWriter, r *http.Request) error {
-		url, _ := url.Parse(partialURL(r))
-
-		c.routes.Cfg.Logger.Info("proxying request to ash.pgs.sh", "url", url.String())
-		defaultTransport := http.DefaultTransport.(*http.Transport)
-		oldDialContext := defaultTransport.DialContext
-		newTransport := CustomTransport{Transport: defaultTransport, Logger: c.routes.Cfg.Logger}
-		newTransport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
-			return oldDialContext(ctx, "tcp", "ash.pgs.sh:443")
-		}
-		proxy := httputil.NewSingleHostReverseProxy(url)
-		proxy.Transport = &newTransport
-		proxy.ServeHTTP(w, r)
-		return nil
-	})
+	c.Cache.ServeHTTP(writer, req)
 }
 
 func partialURL(r *http.Request) string {
