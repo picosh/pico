@@ -289,6 +289,7 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	)
 	done, _ := checkPreconditions(w, r, info.LastModified.UTC())
 	if done {
+		logger.Info("A conditaionl request was detected, no body required")
 		// A conditional request was detected, status and headers are set, no body required (either 412 or 304)
 		return
 	}

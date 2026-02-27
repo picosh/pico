@@ -10,8 +10,6 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/darkweak/souin/pkg/middleware"
-	"github.com/hashicorp/golang-lru/v2/expirable"
 	"github.com/picosh/pico/pkg/apps/pgs"
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -27,19 +25,11 @@ func main() {
 		_ = pubsub.Close()
 	}()
 	cfg := pgs.NewPgsConfig(logger, nil, nil, drain)
-	httpCache := pgs.SetupCache(cfg)
-	router := &pgs.WebRouter{
-		Cfg:            cfg,
-		RedirectsCache: expirable.NewLRU[string, []*pgs.RedirectRule](2048, nil, shared.CacheTimeout),
-		HeadersCache:   expirable.NewLRU[string, []*pgs.HeaderRule](2048, nil, shared.CacheTimeout),
-	}
-	cacher := &cachedHttp{
-		handler: httpCache,
-		routes:  router,
-	}
+	proxy := &proxyServe{cfg.Logger}
+	httpCache := pgs.NewPgsHttpCache(cfg, proxy)
+	cacher := &cachedHttp{}
 
-	go router.WatchCacheClear()
-	go router.CacheMgmt(ctx, httpCache, cfg.CacheClearingQueue)
+	go pgs.CacheMgmt(ctx, cfg.CacheClearingQueue, cfg, httpCache.Cache)
 
 	portStr := fmt.Sprintf(":%s", cfg.WebPort)
 	cfg.Logger.Info(
@@ -51,9 +41,57 @@ func main() {
 	cfg.Logger.Error("listen and serve", "err", err)
 }
 
+type proxyServe struct {
+	Logger *slog.Logger
+}
+
+func (p *proxyServe) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	url, _ := url.Parse(partialURL(req))
+
+	p.Logger.Info("proxying request to ash.pgs.sh", "url", url.String())
+	defaultTransport := http.DefaultTransport.(*http.Transport)
+	oldDialContext := defaultTransport.DialContext
+	newTransport := CustomTransport{Transport: defaultTransport, Logger: p.Logger}
+	newTransport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		return oldDialContext(ctx, "tcp", "ash.pgs.sh:443")
+	}
+	proxy := httputil.NewSingleHostReverseProxy(url)
+	proxy.Transport = &newTransport
+	proxy.ServeHTTP(w, req)
+}
+
 type cachedHttp struct {
-	handler *middleware.SouinBaseHandler
-	routes  *pgs.WebRouter
+	Logger *slog.Logger
+}
+
+func (c *cachedHttp) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
+	if req.URL.Path == "/_metrics" {
+		promhttp.Handler().ServeHTTP(writer, req)
+		return
+	}
+
+	if req.URL.Path == "/check" {
+		c.Logger.Info("proxying `/check` request to ash.pgs.sh", "query", req.URL.RawQuery)
+		req, _ := http.NewRequest("GET", "https://ash.pgs.sh/check?"+req.URL.RawQuery, nil)
+		req.Host = "pgs.sh"
+		// reqDump, _ := httputil.DumpRequestOut(req, true)
+		// fmt.Printf("REQUEST:\n%s", string(reqDump))
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			c.Logger.Error("check request", "err", err)
+		}
+		writer.WriteHeader(resp.StatusCode)
+		return
+	}
+}
+
+func partialURL(r *http.Request) string {
+	builder := strings.Builder{}
+	// this service sits behind a proxy so we need to force it to https
+	builder.WriteString("https://")
+	builder.WriteString(r.Host)
+	return builder.String()
 }
 
 type CustomTransport struct {
@@ -74,50 +112,4 @@ func (t *CustomTransport) RoundTrip(request *http.Request) (*http.Response, erro
 	// t.Logger.Info("response", "dump", string(body))
 
 	return response, err
-}
-
-func (c *cachedHttp) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
-	if req.URL.Path == "/_metrics" {
-		promhttp.Handler().ServeHTTP(writer, req)
-		return
-	}
-
-	if req.URL.Path == "/check" {
-		c.routes.Cfg.Logger.Info("proxying `/check` request to ash.pgs.sh", "query", req.URL.RawQuery)
-		req, _ := http.NewRequest("GET", "https://ash.pgs.sh/check?"+req.URL.RawQuery, nil)
-		req.Host = "pgs.sh"
-		// reqDump, _ := httputil.DumpRequestOut(req, true)
-		// fmt.Printf("REQUEST:\n%s", string(reqDump))
-
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			c.routes.Cfg.Logger.Error("check request", "err", err)
-		}
-		writer.WriteHeader(resp.StatusCode)
-		return
-	}
-
-	_ = c.handler.ServeHTTP(writer, req, func(w http.ResponseWriter, r *http.Request) error {
-		url, _ := url.Parse(partialURL(r))
-
-		c.routes.Cfg.Logger.Info("proxying request to ash.pgs.sh", "url", url.String())
-		defaultTransport := http.DefaultTransport.(*http.Transport)
-		oldDialContext := defaultTransport.DialContext
-		newTransport := CustomTransport{Transport: defaultTransport, Logger: c.routes.Cfg.Logger}
-		newTransport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
-			return oldDialContext(ctx, "tcp", "ash.pgs.sh:443")
-		}
-		proxy := httputil.NewSingleHostReverseProxy(url)
-		proxy.Transport = &newTransport
-		proxy.ServeHTTP(w, r)
-		return nil
-	})
-}
-
-func partialURL(r *http.Request) string {
-	builder := strings.Builder{}
-	// this service sits behind a proxy so we need to force it to https
-	builder.WriteString("https://")
-	builder.WriteString(r.Host)
-	return builder.String()
 }

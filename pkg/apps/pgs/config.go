@@ -77,7 +77,8 @@ func NewPgsConfig(logger *slog.Logger, dbpool pgsdb.PgsDB, st storage.StorageSer
 	}
 	cacheControl := shared.GetEnv(
 		"PGS_CACHE_CONTROL",
-		fmt.Sprintf("max-age=%d", int(cacheTTL.Seconds())))
+		fmt.Sprintf("max-age=%d", int(cacheTTL.Seconds())),
+	)
 
 	sshHost := shared.GetEnv("PGS_SSH_HOST", "0.0.0.0")
 	sshPort := shared.GetEnv("PGS_SSH_PORT", "2222")

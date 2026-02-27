@@ -85,12 +85,16 @@ build-pico:
 	go build -o "build/pico-ssh" "./cmd/pico/ssh"
 .PHONY: build-auth
 
+build-pgs-cdn:
+	go build -o "build/pgs-cdn" "./cmd/pgs/cdn"
+.PHONY: build-cdn
+
 build-%:
 	go build -o "build/$*-web" "./cmd/$*/web"
 	go build -o "build/$*-ssh" "./cmd/$*/ssh"
 .PHONY: build-%
 
-build: build-prose build-pastes build-feeds build-pgs build-auth build-pico build-pipe
+build: build-prose build-pastes build-feeds build-pgs build-pgs-cdn build-auth build-pico build-pipe
 .PHONY: build
 
 scripts:
