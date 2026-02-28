@@ -183,7 +183,7 @@ func (m *AccessLogsPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	ah += int(brdSurf.Size.Height)
 
 	if err != nil {
-		txt := text.New(fmt.Sprintf("Error: %s", err.Error()))
+		txt := text.New(fmt.Sprintf("ERROR: %s", err.Error()))
 		txt.Style = vaxis.Style{Foreground: red}
 		txtSurf, _ := txt.Draw(ctx)
 		root.AddChild(0, ah, txtSurf)
