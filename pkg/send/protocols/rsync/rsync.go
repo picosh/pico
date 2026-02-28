@@ -188,7 +188,7 @@ func Middleware(writeHandler utils.CopyFromClientHandler) pssh.SSHServerMiddlewa
 			defer func() {
 				if r := recover(); r != nil {
 					logger.Error("error running rsync middleware", "err", r)
-					_, _ = session.Stderr().Write([]byte("error running rsync middleware, check the flags you are using\r\n"))
+					_, _ = session.Stderr().Write([]byte("ERROR: error running rsync middleware, check the flags you are using\r\n"))
 				}
 			}()
 
@@ -201,7 +201,7 @@ func Middleware(writeHandler utils.CopyFromClientHandler) pssh.SSHServerMiddlewa
 
 			optsCtx, err := rsyncopts.ParseArguments(cmdFlags[1:], true)
 			if err != nil {
-				_, _ = fmt.Fprintf(session.Stderr(), "error parsing rsync arguments: %s\r\n", err.Error())
+				_, _ = fmt.Fprintf(session.Stderr(), "ERROR: error parsing rsync arguments: %s\r\n", err.Error())
 				return err
 			}
 

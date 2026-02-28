@@ -192,7 +192,7 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 			user, err := getUser(sesh, dbpool)
 			if err != nil {
 				_, _ = fmt.Fprintf(sesh.Stderr(), "detected ssh command: %s\n", args)
-				s := fmt.Errorf("error: you need to create an account before using the remote cli: %w", err)
+				s := fmt.Errorf("ERROR: you need to create an account before using the remote cli: %w", err)
 				sesh.Fatal(s)
 				return s
 			}

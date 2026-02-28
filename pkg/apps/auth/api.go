@@ -467,9 +467,9 @@ func paymentWebhookHandler(apiConfig *router.ApiConfig) http.HandlerFunc {
 		w.Header().Add("content-type", "text/plain")
 
 		if err != nil {
-			logger.Error("error reading request body", "err", err.Error())
+			logger.Error("ERROR: reading request body", "err", err.Error())
 			w.WriteHeader(http.StatusOK)
-			_, _ = fmt.Fprintf(w, "error reading request body %s", err.Error())
+			_, _ = fmt.Fprintf(w, "ERROR: reading request body %s", err.Error())
 			return
 		}
 
