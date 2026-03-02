@@ -4,7 +4,26 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
 )
+
+type PicoCacheHandler struct {
+	Upstream http.Handler
+}
+
+func (c *PicoCacheHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if c.Upstream == nil {
+		http.Error(w, "upstream http handler not found", http.StatusNotFound)
+		return
+	}
+	c.Upstream.ServeHTTP(w, r)
+}
+
+func NewPicoCacheHandler(upstream http.Handler) *PicoCacheHandler {
+	return &PicoCacheHandler{
+		Upstream: upstream,
+	}
+}
 
 // CacheMiddlewareFactory creates a cache middleware wrapper for testing.
 // This abstraction allows swapping implementations (Souin → custom).
@@ -15,26 +34,18 @@ type CacheMiddlewareFactory interface {
 // TestContext holds shared test state.
 type TestContext struct {
 	t              *testing.T
-	factory        CacheMiddlewareFactory
-	backendHandler http.Handler
+	handler http.Handler
 	cachedServer   *httptest.Server
 }
 
 // NewTestContext creates a test context with a backend and cached server.
-func NewTestContext(t *testing.T, factory CacheMiddlewareFactory, backend http.HandlerFunc) *TestContext {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		backend(w, r)
-	})
-
+func NewTestContext(t *testing.T, cacheHandler http.Handler) *TestContext {
 	tc := &TestContext{
 		t:              t,
-		factory:        factory,
-		backendHandler: mux,
+		handler: cacheHandler,
 	}
 
-	cachedHandler := factory.CreateHandler(mux)
-	tc.cachedServer = httptest.NewServer(cachedHandler)
+	tc.cachedServer = httptest.NewServer(tc.handler)
 	t.Cleanup(tc.cachedServer.Close)
 
 	return tc
@@ -50,6 +61,21 @@ func (tc *TestContext) Get(path string, headers ...string) (*http.Response, erro
 
 func (tc *TestContext) GetHeader(resp *http.Response, key string) string {
 	return resp.Header.Get(key)
+}
+
+func TestCacheHandler(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		w.Write([]byte("success"))
+	})
+
+	handler := NewPicoCacheHandler(mux)
+	tc := NewTestContext(t, handler)
+	resp1, _ := tc.Get("/test")
+	if resp1.StatusCode != http.StatusOK {
+		t.Errorf("expected 200, got %d", resp1.StatusCode)
+	}
 }
 
 // // RFC 9111 Section 5.1: Cache-Control: max-age.
@@ -436,60 +462,4 @@ func (tc *TestContext) GetHeader(resp *http.Response, key string) string {
 
 // 	// Age should increase on subsequent cache hits
 // 	t.Logf("Age header test: age1=%d, age2=%d (age should increase or be present on cached responses)", age1, age2)
-// }
-
-// // NoOpLogger implements the logger interface for Souin.
-// type NoOpLogger struct{}
-
-// func (n *NoOpLogger) DPanic(...interface{})          {}
-// func (n *NoOpLogger) DPanicf(string, ...interface{}) {}
-// func (n *NoOpLogger) Debug(...interface{})           {}
-// func (n *NoOpLogger) Debugf(string, ...interface{})  {}
-// func (n *NoOpLogger) Error(...interface{})           {}
-// func (n *NoOpLogger) Errorf(string, ...interface{})  {}
-// func (n *NoOpLogger) Fatal(...interface{})           {}
-// func (n *NoOpLogger) Fatalf(string, ...interface{})  {}
-// func (n *NoOpLogger) Info(...interface{})            {}
-// func (n *NoOpLogger) Infof(string, ...interface{})   {}
-// func (n *NoOpLogger) Panic(...interface{})           {}
-// func (n *NoOpLogger) Panicf(string, ...interface{})  {}
-// func (n *NoOpLogger) Warn(...interface{})            {}
-// func (n *NoOpLogger) Warnf(string, ...interface{})   {}
-
-// // SouinMiddlewareFactory wraps Souin as the cache implementation.
-// type SouinMiddlewareFactory struct {
-// 	handler *middleware.SouinBaseHandler
-// }
-
-// func NewSouinMiddlewareFactory(cacheTTL time.Duration) *SouinMiddlewareFactory {
-// 	ttl := configurationtypes.Duration{Duration: cacheTTL}
-// 	stale := configurationtypes.Duration{Duration: cacheTTL * 2}
-// 	cfg := &middleware.BaseConfiguration{
-// 		DefaultCache: &configurationtypes.DefaultCache{
-// 			TTL:   ttl,
-// 			Stale: stale,
-// 			Otter: configurationtypes.CacheProvider{
-// 				Uuid:          fmt.Sprintf("OTTER-%s", stale),
-// 				Configuration: map[string]interface{}{},
-// 			},
-// 			Regex: configurationtypes.Regex{
-// 				Exclude: "/no-cache|/_metrics",
-// 			},
-// 			MaxBodyBytes: 10 * 1024 * 1024, // 10MB
-// 		},
-// 	}
-// 	cfg.SetLogger(&NoOpLogger{})
-// 	storages.InitFromConfiguration(cfg)
-// 	return &SouinMiddlewareFactory{
-// 		handler: middleware.NewHTTPCacheHandler(cfg),
-// 	}
-// }
-
-// func (s *SouinMiddlewareFactory) CreateHandler(next http.Handler) http.Handler {
-// 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-// 		_ = s.handler.ServeHTTP(w, r, func(w http.ResponseWriter, r *http.Request) error {
-// 			next.ServeHTTP(w, r)
-// 			return nil
-// 		})
-// 	})
 // }
