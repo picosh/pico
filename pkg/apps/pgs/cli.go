@@ -127,64 +127,87 @@ func (c *Cmd) RmProjectAssets(projectName string) error {
 }
 
 func (c *Cmd) help() {
-	helpStr := "Commands: [help, stats, ls, fzf, rm, link, unlink, prune, retain, depends, acl, cache]\r\n"
-	helpStr += "NOTICE:" + " *must* append with `--write` for the changes to persist.\r\n"
+	helpStr := `pgs.sh
+======
+
+Deploy static sites with a single command. No passwords. No config files. No CI setup. Just your SSH key and rsync.
+
+	rsync --delete -rv ./public/ pgs.sh:/mysite
+	# => https://erock-mysite.pgs.sh
+
+That's the entire workflow. Your SSH key is your identity and every deploy is instant.
+
+You can fetch project assets with the same command in reverse:
+
+	rsync -rv pgs.sh:/mysite/ ./public/
+
+You can also use unix pipes to directly upload files by providing the project name as part of the path:
+
+	echo "<body>hello world!</body>" | ssh pgs.sh /mysite/index.html
+	# => https://erock-mysite.pgs.sh/index.html
+
+The leading "/" is important.
+`
+	helpStr += "\r\nCommands: [help, stats, ls, fzf, rm, link, unlink, prune, retain, depends, acl, cache]\r\n"
+	helpStr += "For most of these commands you can provide a `-h` to learn about its usage.\r\n"
+	helpStr += "\r\n> NOTICE:" + " *must* append with `--write` for the changes to persist.\r\n"
 	c.output(helpStr)
-	projectName := "projA"
+	projectName := "{project}"
 
 	data := [][]string{
 		{
 			"help",
-			"prints this screen",
+			"Prints this screen",
 		},
 		{
 			"stats",
-			"usage statistics",
+			"Usage statistics (quota, % quota used, number of projects)",
 		},
 		{
 			"ls",
-			"lists projects",
+			"Lists all projects and meta data",
 		},
 		{
 			fmt.Sprintf("fzf %s", projectName),
-			fmt.Sprintf("lists urls of all assets in %s", projectName),
+			"Lists urls of all assets in project",
 		},
 		{
 			fmt.Sprintf("rm %s", projectName),
-			fmt.Sprintf("delete %s", projectName),
+			"Removes all files in project and then deletes the project",
 		},
 		{
 			fmt.Sprintf("link %s --to projB", projectName),
-			fmt.Sprintf("symbolic link `%s` to `projB`", projectName),
+			fmt.Sprintf("Instant promotion and rollback mechanism that symbolic links %s to `projB`", projectName),
 		},
 		{
 			fmt.Sprintf("unlink %s", projectName),
-			fmt.Sprintf("removes symbolic link for `%s`", projectName),
+			"Removes symbolic link",
 		},
 		{
 			fmt.Sprintf("prune %s", projectName),
-			fmt.Sprintf("removes projects that match prefix `%s`", projectName),
+			"Delete all projects matching a prefix (except projects with linked projects)",
 		},
 		{
 			fmt.Sprintf("retain %s", projectName),
-			"alias to `prune` but keeps last N projects",
+			"Delete all projects matching a prefix except the last N recently updated projects.",
 		},
 		{
 			fmt.Sprintf("depends %s", projectName),
-			fmt.Sprintf("lists all projects linked to `%s`", projectName),
+			"Lists all projects linked to project",
 		},
 		{
 			fmt.Sprintf("acl %s", projectName),
-			fmt.Sprintf("access control for `%s`", projectName),
+			"Access control for project",
 		},
 		{
 			fmt.Sprintf("cache %s", projectName),
-			fmt.Sprintf("clear http cache for `%s`", projectName),
+			"Clear http cache",
 		},
 	}
 
 	writer := NewTabWriter(c.Session)
 	_, _ = fmt.Fprintln(writer, "Cmd\tDescription")
+	_, _ = fmt.Fprintf(writer, "===\t===========\r\n")
 	for _, dat := range data {
 		_, _ = fmt.Fprintf(writer, "%s\t%s\r\n", dat[0], dat[1])
 	}
