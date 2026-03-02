@@ -3,6 +3,7 @@ package pgs
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"html/template"
 	"log/slog"
@@ -152,6 +153,7 @@ func (web *WebRouter) initRouters() {
 
 	// subdomain or custom domains
 	userRouter := http.NewServeMux()
+	userRouter.HandleFunc("POST /auth/login", web.handleLogin)
 	userRouter.HandleFunc("GET /{fname...}", web.AssetRequest(WebPerm))
 	userRouter.HandleFunc("GET /{$}", web.AssetRequest(WebPerm))
 	web.UserRouter = userRouter
@@ -503,7 +505,26 @@ func (web *WebRouter) ServeAsset(fname string, opts *storage.ImgProcessOpts, has
 		return
 	}
 
-	if !hasPerm(project) {
+	if project.Acl.Type == "http-pass" {
+		cookie, err := r.Cookie(getCookieName(project.Name))
+		if err == nil {
+			if cookie.Valid() != nil || cookie.Value != project.ID {
+				logger.Error("cookie not valid", "err", err)
+				web.serveLoginForm(w, r, project, logger)
+				return
+			}
+		} else {
+			if errors.Is(err, http.ErrNoCookie) {
+				web.serveLoginForm(w, r, project, logger)
+				return
+			} else {
+				// Some other error occurred
+				logger.Error("failed to fetch cookie", "err", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
+	} else if !hasPerm(project) {
 		logger.Error("You do not have access to this site")
 		http.Error(w, "You do not have access to this site", http.StatusUnauthorized)
 		return
@@ -539,6 +560,14 @@ func (web *WebRouter) ServeAsset(fname string, opts *storage.ImgProcessOpts, has
 	}
 
 	asset.ServeHTTP(w, r)
+}
+
+func (web *WebRouter) serveLoginForm(w http.ResponseWriter, r *http.Request, project *db.Project, logger *slog.Logger) {
+	serveLoginFormWithConfig(w, r, project, web.Cfg, logger)
+}
+
+func (web *WebRouter) handleLogin(w http.ResponseWriter, r *http.Request) {
+	handleLogin(w, r, web.Cfg)
 }
 
 func (web *WebRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {

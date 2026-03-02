@@ -227,7 +227,7 @@ func Middleware(handler *UploadAssetHandler) pssh.SSHServerMiddleware {
 				}
 				opts.Write = *write
 
-				if !slices.Contains([]string{"public", "pubkeys", "pico"}, *aclType) {
+				if !slices.Contains([]string{"public", "pubkeys", "pico", "http-pass"}, *aclType) {
 					err := fmt.Errorf(
 						"acl type must be one of the following: [public, pubkeys, pico], found %s",
 						*aclType,

@@ -82,7 +82,7 @@ type Project struct {
 }
 
 type ProjectAcl struct {
-	Type string   `json:"type" db:"type"` // public, pico, pubkeys, private
+	Type string   `json:"type" db:"type"` // public, pico, pubkeys, private, http-pass
 	Data []string `json:"data" db:"data"`
 }
 
