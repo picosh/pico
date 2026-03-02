@@ -21,6 +21,10 @@ func HasProjectAccess(project *db.Project, owner *db.User, requester *db.User, p
 		}
 	}
 
+	if aclType == "private" {
+		return false
+	}
+
 	if aclType == "pico" {
 		if requester == nil {
 			return false

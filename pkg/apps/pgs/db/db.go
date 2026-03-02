@@ -1,6 +1,10 @@
 package pgsdb
 
-import "github.com/picosh/pico/pkg/db"
+import (
+	"strings"
+
+	"github.com/picosh/pico/pkg/db"
+)
 
 type PgsDB interface {
 	FindUser(userID string) (*db.User, error)
@@ -26,4 +30,8 @@ type PgsDB interface {
 	RegisterAdmin(username, pubkey, pubkeyName string) error
 
 	Close() error
+}
+
+func IsProjectPrivate(projectName string) bool {
+	return strings.HasPrefix(projectName, "private-")
 }

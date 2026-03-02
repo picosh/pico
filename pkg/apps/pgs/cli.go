@@ -147,6 +147,12 @@ You can also use unix pipes to directly upload files by providing the project na
 	# => https://erock-mysite.pgs.sh/index.html
 
 The leading "/" is important.
+
+You can also create private projects when you prefix the project name with 'private':
+
+	rsync -rv ./public/ pgs.sh:/private-site/
+
+This means only you can access the site through a web tunnel or by downloading the files.
 `
 	helpStr += "\r\nCommands: [help, stats, ls, fzf, rm, link, unlink, prune, retain, depends, acl, cache]\r\n"
 	helpStr += "For most of these commands you can provide a `-h` to learn about its usage.\r\n"

@@ -154,6 +154,12 @@ func (me *PgsPsqlDB) UpsertProject(userID, projectName, projectDir string) (*db.
 		)
 		return nil, err
 	}
+	if IsProjectPrivate(projectName) {
+		err = me.UpdateProjectAcl(userID, projectName, db.ProjectAcl{Type: "private", Data: []string{}})
+		if err != nil {
+			return nil, err
+		}
+	}
 	return me.FindProjectByName(userID, projectName)
 }
 

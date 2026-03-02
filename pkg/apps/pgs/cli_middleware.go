@@ -236,6 +236,12 @@ func Middleware(handler *UploadAssetHandler) pssh.SSHServerMiddleware {
 					return err
 				}
 
+				if pgsdb.IsProjectPrivate(projectName) {
+					err = fmt.Errorf("projects prefixed with `private-` can *never* have their access changed; however you can symlink to it")
+					opts.bail(err)
+					return err
+				}
+
 				err := opts.acl(projectName, *aclType, acls)
 				opts.notice()
 				opts.bail(err)
