@@ -24,6 +24,11 @@ func GetProjectName(entry *utils.FileEntry) string {
 
 	dir := filepath.Dir(entry.Filepath)
 	list := strings.Split(dir, string(os.PathSeparator))
+	if len(list) == 0 {
+		return ""
+	} else if len(list) == 1 {
+		return list[0]
+	}
 	return list[1]
 }
 

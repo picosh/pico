@@ -36,6 +36,10 @@ func Middleware(writeHandler utils.CopyFromClientHandler, ext string) pssh.SSHSe
 			if name == "" {
 				name = fmt.Sprintf("%s%s", strconv.Itoa(int(postTime.UnixNano())), ext)
 			}
+			// add a `/` prefix mainly for pgs support
+			if !strings.HasPrefix(name, "/") {
+				name = "/" + name
+			}
 
 			result, err := writeHandler.Write(session, &utils.FileEntry{
 				Filepath: name,
