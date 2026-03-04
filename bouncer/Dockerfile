@@ -12,7 +12,7 @@ RUN git clone https://codeberg.org/emersion/soju.git
 
 WORKDIR /app/soju
 
-RUN git checkout v0.9.0
+RUN git checkout v0.10.1
 
 # RUN git apply ../subscriber-change.diff
 
