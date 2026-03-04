@@ -437,8 +437,8 @@ func (web *WebRouter) ImageRequest(perm func(proj *db.Project) bool) http.Handle
 
 		opts, err := storage.UriToImgProcessOpts(imgOpts)
 		if err != nil {
-			errMsg := fmt.Sprintf("error processing img options: %s", err.Error())
-			web.Cfg.Logger.Error("error processing img options", "err", errMsg)
+			errMsg := fmt.Sprintf("ERROR: error processing img options: %s", err.Error())
+			web.Cfg.Logger.Error("ERROR: processing img options", "err", errMsg)
 			http.Error(w, errMsg, http.StatusUnprocessableEntity)
 			return
 		}
