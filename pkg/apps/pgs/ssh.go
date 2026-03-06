@@ -80,6 +80,9 @@ func StartSshServer(cfg *PgsConfig, killCh chan error) {
 		os.Exit(1)
 	}
 
+	// start cron job for bin project ttl
+	go BinCron(cfg)
+
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	logger.Info("Starting SSH server", "addr", server.Config.ListenAddr)
