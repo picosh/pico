@@ -336,6 +336,10 @@ func (h *UploadAssetHandler) Write(s *pssh.SSHServerConnSession, entry *sendutil
 	}
 
 	featureFlag := findPlusFF(h.Cfg.DB, h.Cfg, user.ID)
+	if !featureFlag.IsValid() && pgsdb.IsProjectPrivate(projectName) {
+		return "", fmt.Errorf("private projects are only allowed for pico+ users")
+	}
+
 	// calculate the filsize difference between the same file already
 	// stored and the updated file being uploaded
 	assetFilename := shared.GetAssetFileName(entry)

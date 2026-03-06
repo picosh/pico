@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	pgsdb "github.com/picosh/pico/pkg/apps/pgs/db"
 	"github.com/picosh/pico/pkg/db"
@@ -232,6 +233,20 @@ func Middleware(handler *UploadAssetHandler) pssh.SSHServerMiddleware {
 						"acl type must be one of the following: [public, pubkeys, pico], found %s",
 						*aclType,
 					)
+					opts.bail(err)
+					return err
+				}
+
+				hasPicoPlus := false
+				ff, _ := dbpool.FindFeature(user.ID, "plus")
+				if ff != nil {
+					if ff.ExpiresAt.After(time.Now()) {
+						hasPicoPlus = true
+					}
+				}
+
+				if !hasPicoPlus {
+					err = fmt.Errorf("setting acl on a project requires pico+")
 					opts.bail(err)
 					return err
 				}
