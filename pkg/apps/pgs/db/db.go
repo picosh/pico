@@ -27,6 +27,11 @@ type PgsDB interface {
 	FindProjectsByPrefix(userID, name string) ([]*db.Project, error)
 	FindProjects(by string) ([]*db.Project, error)
 
+	InsertFormEntry(userID, name string, data map[string]interface{}) error
+	FindFormEntriesByUserAndName(userID, name string) ([]*db.FormEntry, error)
+	FindFormNamesByUser(userID string) ([]string, error)
+	RemoveFormEntriesByUserAndName(userID, name string) error
+
 	RegisterAdmin(username, pubkey, pubkeyName string) error
 
 	Close() error

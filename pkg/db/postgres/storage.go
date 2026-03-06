@@ -6,10 +6,9 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"slices"
 	"strings"
 	"time"
-
-	"slices"
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"

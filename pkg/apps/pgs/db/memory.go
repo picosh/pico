@@ -11,11 +11,12 @@ import (
 )
 
 type MemoryDB struct {
-	Logger   *slog.Logger
-	Users    []*db.User
-	Projects []*db.Project
-	Pubkeys  []*db.PublicKey
-	Feature  *db.FeatureFlag
+	Logger      *slog.Logger
+	Users       []*db.User
+	Projects    []*db.Project
+	Pubkeys     []*db.PublicKey
+	Feature     *db.FeatureFlag
+	FormEntries []*db.FormEntry
 }
 
 var _ PgsDB = (*MemoryDB)(nil)
@@ -194,4 +195,53 @@ func (me *MemoryDB) RegisterAdmin(username, pubkey, pubkeyName string) error {
 
 func (me *MemoryDB) InsertAccessLog(*db.AccessLog) error {
 	return errNotImpl
+}
+
+func (me *MemoryDB) InsertFormEntry(userID, name string, data map[string]interface{}) error {
+	id := uuid.NewString()
+	now := time.Now()
+	entry := &db.FormEntry{
+		ID:        id,
+		UserID:    userID,
+		Name:      name,
+		Data:      data,
+		CreatedAt: &now,
+	}
+	me.FormEntries = append(me.FormEntries, entry)
+	return nil
+}
+
+func (me *MemoryDB) FindFormEntriesByUserAndName(userID, name string) ([]*db.FormEntry, error) {
+	entries := []*db.FormEntry{}
+	for _, entry := range me.FormEntries {
+		if entry.UserID == userID && entry.Name == name {
+			entries = append(entries, entry)
+		}
+	}
+	return entries, nil
+}
+
+func (me *MemoryDB) FindFormNamesByUser(userID string) ([]string, error) {
+	names := make(map[string]bool)
+	for _, entry := range me.FormEntries {
+		if entry.UserID == userID {
+			names[entry.Name] = true
+		}
+	}
+	result := []string{}
+	for name := range names {
+		result = append(result, name)
+	}
+	return result, nil
+}
+
+func (me *MemoryDB) RemoveFormEntriesByUserAndName(userID, name string) error {
+	filtered := []*db.FormEntry{}
+	for _, entry := range me.FormEntries {
+		if entry.UserID != userID || entry.Name != name {
+			filtered = append(filtered, entry)
+		}
+	}
+	me.FormEntries = filtered
+	return nil
 }

@@ -214,6 +214,29 @@ func Middleware(handler *UploadAssetHandler) pssh.SSHServerMiddleware {
 				opts.notice()
 				opts.bail(err)
 				return err
+			case "forms":
+				formName := projectName
+				formsCmd, write := flagSet("forms", sesh)
+				rmForm := formsCmd.Bool("rm", false, "delete form data")
+				if !flagCheck(formsCmd, formName, cmdArgs) {
+					return nil
+				}
+				opts.Write = *write
+
+				var err error
+				if formName == "ls" {
+					err = opts.formsLs()
+				} else {
+					if *rmForm {
+						err = opts.formRm(formName)
+						opts.notice()
+					} else {
+						err = opts.formData(formName)
+					}
+				}
+
+				opts.bail(err)
+				return err
 			case "acl":
 				aclCmd, write := flagSet("acl", sesh)
 				aclType := aclCmd.String("type", "", "access type: public, pico, pubkeys")

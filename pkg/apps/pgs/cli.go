@@ -1,6 +1,7 @@
 package pgs
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -558,6 +559,42 @@ func (c *Cmd) cacheAll() error {
 	c.output("clearing http cache for all sites")
 	if c.Write {
 		return purgeAllCache(c.Cfg, c.Cfg.Pubsub)
+	}
+	return nil
+}
+
+func (c *Cmd) formsLs() error {
+	forms, err := c.Dbpool.FindFormNamesByUser(c.User.ID)
+	if err != nil {
+		return err
+	}
+	if len(forms) == 0 {
+		c.output("no forms found")
+		return nil
+	}
+	for _, name := range forms {
+		c.output(name)
+	}
+	return nil
+}
+
+func (c *Cmd) formData(formName string) error {
+	formData, err := c.Dbpool.FindFormEntriesByUserAndName(c.User.ID, formName)
+	if err != nil {
+		return err
+	}
+	data, err := json.Marshal(formData)
+	if err != nil {
+		return err
+	}
+	c.output(string(data))
+	return nil
+}
+
+func (c *Cmd) formRm(formName string) error {
+	c.output(fmt.Sprintf("removing all data associated with form: %s", formName))
+	if c.Write {
+		return c.Dbpool.RemoveFormEntriesByUserAndName(c.User.ID, formName)
 	}
 	return nil
 }

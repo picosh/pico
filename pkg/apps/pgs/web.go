@@ -153,7 +153,8 @@ func (web *WebRouter) initRouters() {
 
 	// subdomain or custom domains
 	userRouter := http.NewServeMux()
-	userRouter.HandleFunc("POST /auth/login", web.handleLogin)
+	userRouter.HandleFunc("POST /pgs/login", web.handleLogin)
+	userRouter.HandleFunc("POST /pgs/forms/{fname...}", web.handleAutoForm)
 	userRouter.HandleFunc("GET /{fname...}", web.AssetRequest(WebPerm))
 	userRouter.HandleFunc("GET /{$}", web.AssetRequest(WebPerm))
 	web.UserRouter = userRouter
@@ -568,6 +569,10 @@ func (web *WebRouter) serveLoginForm(w http.ResponseWriter, r *http.Request, pro
 
 func (web *WebRouter) handleLogin(w http.ResponseWriter, r *http.Request) {
 	handleLogin(w, r, web.Cfg)
+}
+
+func (web *WebRouter) handleAutoForm(w http.ResponseWriter, r *http.Request) {
+	handleAutoForm(w, r, web.Cfg)
 }
 
 func (web *WebRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {

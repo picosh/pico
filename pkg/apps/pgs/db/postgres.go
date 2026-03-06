@@ -1,6 +1,7 @@
 package pgsdb
 
 import (
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"time"
@@ -293,5 +294,43 @@ func (me *PgsPsqlDB) RegisterAdmin(username, pubkey, pubkeyName string) error {
 	}
 
 	_, err = me.Db.Exec("INSERT INTO feature_flags (user_id, name, expires_at) VALUES (1, 'admin', '2100-01-01')", userID)
+	return err
+}
+
+func (me *PgsPsqlDB) InsertFormEntry(userID, name string, data map[string]interface{}) error {
+	dataJSON, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+
+	_, err = me.Db.Exec(
+		"INSERT INTO form_entries (user_id, name, data) VALUES ($1, $2, $3)",
+		userID, name, dataJSON,
+	)
+	return err
+}
+
+func (me *PgsPsqlDB) FindFormEntriesByUserAndName(userID, name string) ([]*db.FormEntry, error) {
+	entries := []*db.FormEntry{}
+	err := me.Db.Select(
+		&entries,
+		"SELECT * FROM form_entries WHERE user_id=$1 AND name=$2 ORDER BY created_at DESC",
+		userID, name,
+	)
+	return entries, err
+}
+
+func (me *PgsPsqlDB) FindFormNamesByUser(userID string) ([]string, error) {
+	names := []string{}
+	err := me.Db.Select(
+		&names,
+		"SELECT DISTINCT name FROM form_entries WHERE user_id=$1 ORDER BY name ASC",
+		userID,
+	)
+	return names, err
+}
+
+func (me *PgsPsqlDB) RemoveFormEntriesByUserAndName(userID, name string) error {
+	_, err := me.Db.Exec("DELETE FROM form_entries WHERE user_id=$1 AND name=$2", userID, name)
 	return err
 }

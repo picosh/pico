@@ -58,6 +58,18 @@ CREATE TABLE IF NOT EXISTS feature_flags (
 		ON DELETE CASCADE
 		ON UPDATE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS form_entries (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	user_id INTEGER NOT NULL,
+	name TEXT NOT NULL,
+	data BLOB NOT NULL,
+	created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	CONSTRAINT form_entries_user_id_fk
+		FOREIGN KEY(user_id) REFERENCES app_users(id)
+		ON DELETE CASCADE
+		ON UPDATE CASCADE
+);
 `
 
 var sqliteMigrations = []string{

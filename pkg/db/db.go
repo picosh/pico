@@ -249,6 +249,30 @@ type Token struct {
 	ExpiresAt *time.Time `json:"expires_at" db:"expires_at"`
 }
 
+type FormEntry struct {
+	ID        string        `json:"id" db:"id"`
+	UserID    string        `json:"-" db:"user_id"`
+	Name      string        `json:"-" db:"name"`
+	Data      FormEntryData `json:"data" db:"data"`
+	CreatedAt *time.Time    `json:"created_at" db:"created_at"`
+}
+
+type FormEntryData map[string]interface{}
+
+// Make the FormEntry struct implement the driver.Valuer interface.
+func (f FormEntryData) Value() (driver.Value, error) {
+	return json.Marshal(f)
+}
+
+// Make the FormEntry struct implement the sql.Scanner interface.
+func (f *FormEntryData) Scan(value any) error {
+	b, err := tcast(value)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(b, &f)
+}
+
 type FeatureFlag struct {
 	ID               string          `json:"id" db:"id"`
 	UserID           string          `json:"user_id" db:"user_id"`
