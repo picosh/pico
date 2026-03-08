@@ -23,8 +23,8 @@ func NewConfigSite(service string) *shared.ConfigSite {
 		Protocol:    protocol,
 		DbURL:       dbURL,
 		Space:       "feeds",
-		AllowedExt:  []string{".txt"},
-		HiddenPosts: []string{"_header.txt", "_readme.txt"},
+		AllowedExt:  []string{".txt", ".lxt"},
+		HiddenPosts: []string{},
 		Logger:      shared.CreateLogger(service, withPipe),
 	}
 }

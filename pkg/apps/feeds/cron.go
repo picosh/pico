@@ -227,25 +227,25 @@ func (f *Fetcher) RunPost(logger *slog.Logger, user *db.User, isPicoPlus bool, p
 
 	urls := []string{}
 	for _, item := range parsed.Items {
-		u := ""
-		if item.IsText || item.IsURL {
-			u = item.Value
+		rawUrl := ""
+		if item.IsText {
+			rawUrl = string(item.Value)
 		} else if item.IsURL {
-			u = string(item.Value)
+			rawUrl = string(item.URL)
 		}
 
-		if u == "" {
+		if rawUrl == "" {
 			continue
 		}
 
-		_, err := url.Parse(string(item.URL))
+		_, err := url.Parse(rawUrl)
 		if err != nil {
-			logger.Info("invalid url", "url", string(item.URL))
+			logger.Info("invalid url", "url", rawUrl)
 			continue
 		}
 
-		logger.Info("found rss feed url", "url", u)
-		urls = append(urls, u)
+		logger.Info("found rss feed url", "url", rawUrl)
+		urls = append(urls, rawUrl)
 	}
 
 	if post.ExpiresAt == nil {
@@ -342,6 +342,10 @@ func (f *Fetcher) RunUser(user *db.User, now time.Time) error {
 		if ff.IsValid() {
 			isPicoPlus = true
 		}
+	}
+
+	if !isPicoPlus {
+		return fmt.Errorf("must be pico+ user to receive rss digests")
 	}
 
 	if len(posts.Data) > 0 {
