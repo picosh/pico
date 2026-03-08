@@ -272,7 +272,7 @@ func (f *Fetcher) RunPost(logger *slog.Logger, user *db.User, isPicoPlus bool, p
 		post.Data.Attempts += 1
 		logger.Error("could not fetch urls", "err", err, "attempts", post.Data.Attempts)
 
-		maxAttempts := 10
+		maxAttempts := 100
 		errBody := fmt.Sprintf(`There was an error attempting to fetch your feeds (%d) times.  After (%d) attempts we remove the file from our system.  Please check all the URLs and re-upload.
 Also, we have centralized logs in our pico.sh TUI that will display realtime feed errors so you can debug.
 
