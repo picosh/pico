@@ -93,7 +93,7 @@ func Middleware(dbpool db.DB, cfg *shared.ConfigSite) pssh.SSHServerMiddleware {
 					}
 					_, _ = fmt.Fprintf(
 						writer,
-						"%s\t%s\t%s\t%s\t%d/10\r\n",
+						"%s\t%s\t%s\t%s\t%d/100\r\n",
 						post.Filename,
 						lastStr,
 						nextDigest,
