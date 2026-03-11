@@ -44,6 +44,13 @@ func handleAutoForm(w http.ResponseWriter, r *http.Request, cfg *PgsConfig) {
 		return
 	}
 
+	ff, err := cfg.DB.FindFeature(user.ID, "plus")
+	if err != nil || (ff != nil && !ff.IsValid()) {
+		cfg.Logger.Error("pico+ required for auto-forms", "username", props.Username)
+		http.Error(w, "pico+ required for auto-forms", http.StatusPaymentRequired)
+		return
+	}
+
 	err = cfg.DB.InsertFormEntry(user.ID, formName, formValues)
 	if err != nil {
 		cfg.Logger.Error("failed to save form data", "err", err)
