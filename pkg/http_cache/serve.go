@@ -13,6 +13,8 @@ import (
 	"github.com/hashicorp/golang-lru/v2/expirable"
 )
 
+var ErrCacheStale = errors.New("cache is stale")
+
 type PicoCacheHandler struct {
 	Ttl      time.Duration
 	Upstream http.Handler
@@ -36,15 +38,13 @@ func serveCache(w http.ResponseWriter, ttl float64, cacheKey string, cacheValue 
 	hdr.Add("age", strconv.Itoa(int(age)))
 
 	hdr.Add("cache-status", cacheStatusHit(cacheKey, ttl))
-	w.Write(cacheValue.Body)
+	_, _ = w.Write(cacheValue.Body)
 	w.WriteHeader(http.StatusOK)
 }
 
 func isCachable(r *http.Request) error {
 	return nil
 }
-
-var ErrCacheStale = errors.New("cache is stale")
 
 func isCacheValid(r *http.Request) error {
 	control := r.Header.Get("cache-control")
@@ -72,7 +72,6 @@ func (c *PicoCacheHandler) maybeUseCache(cacheKey string, w http.ResponseWriter,
 	isValid := isCacheValid(r)
 	if isValid != nil {
 		if errors.Is(err, ErrCacheStale) {
-			fmt.Errorf("removing cache")
 			c.Cache.Remove(cacheKey)
 		}
 		return fmt.Errorf("cache invalid: %w", isValid)
