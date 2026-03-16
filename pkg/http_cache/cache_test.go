@@ -60,9 +60,8 @@ func testCacheValue(afterCreated time.Duration) *CacheValue {
 TODO:
 	Storing incomplete responses 	https://www.rfc-editor.org/rfc/rfc9111.html#section-3.3
 	Storing authenticated requests 	https://www.rfc-editor.org/rfc/rfc9111.html#section-3.5
-	Vary 							https://www.rfc-editor.org/rfc/rfc9111.html#section-4.1
-	Validation 						https://www.rfc-editor.org/rfc/rfc9111.html#section-4.3
 	Expires 						https://www.rfc-editor.org/rfc/rfc9111.html#section-5.3
+	Max-Age logic
 */
 
 // RFC 9211 The Cache-Status HTTP Response Header Field
@@ -218,6 +217,162 @@ func TestCacheStoringHeaders(t *testing.T) {
 	}
 }
 
+// RFC 9111 4.1 Vary.
+// https://www.rfc-editor.org/rfc/rfc9111.html#section-4.1
+func TestCacheVary(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		_, _ = w.Write([]byte("success"))
+	})
+
+	logger := slog.Default()
+	handler := NewPicoCacheHandler(logger, mux)
+	tc := NewTestContext(t, handler)
+
+	req, _ := http.NewRequest("GET", tc.cachedServer.URL+"/test", nil)
+	cacheKey := getCacheKey(req)
+	cv := testCacheValue(250 * time.Second)
+	cv.Header["Vary"] = []string{"Accept-Encoding"}
+	cv.Header["Content-Encoding"] = []string{"gzip"}
+	cacheValue, _ := json.Marshal(cv)
+	handler.Cache.Add(cacheKey, cacheValue)
+
+	respMatch, _ := tc.DoWithHeaders(req, map[string][]string{
+		"Accept-Encoding": {"gzip"},
+	})
+	status := respMatch.Header.Get("cache-status")
+	if !strings.Contains(status, "hit") {
+		t.Errorf("expected hit, got %s", status)
+	}
+
+	respMisMatch, _ := tc.DoWithHeaders(req, map[string][]string{
+		"Accept-Encoding": {"text/plain"},
+	})
+	status = respMisMatch.Header.Get("cache-status")
+	if !strings.Contains(status, "miss") {
+		t.Errorf("expected miss, got %s", status)
+	}
+}
+
+// RFC 9111 4.3 Validation.
+// https://www.rfc-editor.org/rfc/rfc9111.html#section-4.3
+// Last-Modified ETag If-Match If-None-Match If-Range If-Modified-Since If-Unmodified-Since
+// RFC 9110 13 Conditional Requests.
+// https://www.rfc-editor.org/rfc/rfc9110#section-13
+func TestCacheValidation(t *testing.T) {
+	actual := time.Now().Add(-10 * time.Minute).UTC()
+	actualStr := actual.Format(time.RFC1123)
+	now := time.Now().UTC()
+	nowStr := now.Format(time.RFC1123)
+	early := time.Now().Add(-20 * time.Minute)
+	earlyStr := early.Format(time.RFC1123)
+	tests := []struct {
+		name             string
+		link             string
+		validationHeader string
+		validationValue  string
+		expected         string
+		status           int
+	}{
+		{
+			name:             "RFC 9110 13.1.2 If-None-Match",
+			link:             "https://www.rfc-editor.org/rfc/rfc9110#section-13.1.2",
+			validationHeader: "If-None-Match",
+			validationValue:  "abc",
+			expected:         "miss",
+			status:           http.StatusPreconditionFailed,
+		},
+		{
+			name:             "RFC 9110 13.1.2 If-None-Match Wildcard",
+			link:             "https://www.rfc-editor.org/rfc/rfc9110#section-13.1.2",
+			validationHeader: "If-None-Match",
+			validationValue:  "*",
+			expected:         "hit",
+			status:           http.StatusNotModified,
+		},
+		{
+			name:             "RFC 9110 13.1.3 If-Modified-Since",
+			link:             "https://www.rfc-editor.org/rfc/rfc9110#section-13.1.3",
+			validationHeader: "If-Modified-Since",
+			validationValue:  nowStr,
+			expected:         "miss",
+			status:           http.StatusPreconditionFailed,
+		},
+		{
+			name:             "RFC 9110 13.1.4 If-Unmodified-Since",
+			link:             "https://www.rfc-editor.org/rfc/rfc9110#section-13.1.4",
+			validationHeader: "If-Unmodified-Since",
+			validationValue:  earlyStr,
+			expected:         "miss",
+			status:           http.StatusPreconditionFailed,
+		},
+		{
+			name:             "RFC 9110 13.1.5 If-Range Date",
+			link:             "https://www.rfc-editor.org/rfc/rfc9110#section-13.1.5",
+			validationHeader: "If-Range",
+			validationValue:  nowStr,
+			expected:         "miss",
+			status:           http.StatusPreconditionFailed,
+		},
+		{
+			name:             "RFC 9110 13.1.5 If-Range Date Hit",
+			link:             "https://www.rfc-editor.org/rfc/rfc9110#section-13.1.5",
+			validationHeader: "If-Range",
+			validationValue:  actualStr,
+			expected:         "hit",
+			status:           http.StatusNotModified,
+		},
+		{
+			name:             "RFC 9110 13.1.5 If-Range ETag",
+			link:             "https://www.rfc-editor.org/rfc/rfc9110#section-13.1.5",
+			validationHeader: "ETag",
+			validationValue:  "abc",
+			expected:         "miss",
+			status:           http.StatusPreconditionFailed,
+		},
+		{
+			name:             "RFC 9110 13.1.5 If-Range ETag Hit",
+			link:             "https://www.rfc-editor.org/rfc/rfc9110#section-13.1.5",
+			validationHeader: "ETag",
+			validationValue:  "ccc",
+			expected:         "hit",
+			status:           http.StatusNotModified,
+		},
+	}
+
+	for _, tt := range tests {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(tt.status)
+		})
+
+		logger := slog.Default()
+		handler := NewPicoCacheHandler(logger, mux)
+		handler.Ttl = time.Minute * 10
+		tc := NewTestContext(t, handler)
+
+		req, _ := http.NewRequest("GET", tc.cachedServer.URL+"/test", nil)
+		cacheKey := getCacheKey(req)
+		cv := testCacheValue(250 * time.Second)
+		cv.Header["ETag"] = []string{"ccc"}
+		cv.Header["Last-Modified"] = []string{actualStr}
+		cacheValue, _ := json.Marshal(cv)
+		handler.Cache.Add(cacheKey, cacheValue)
+
+		t.Run(tt.name, func(t *testing.T) {
+			resp, _ := tc.DoWithHeaders(req, map[string][]string{tt.validationHeader: {tt.validationValue}})
+			actual := resp.Header.Get("cache-status")
+			if !strings.Contains(actual, tt.expected) {
+				t.Errorf("expected %s, got %s\n%s", tt.expected, actual, tt.link)
+			}
+			if resp.StatusCode != tt.status {
+				t.Errorf("expected status %d, got %d", tt.status, resp.StatusCode)
+			}
+		})
+	}
+}
+
 // RFC 9111 5.1 Age.
 // https://www.rfc-editor.org/rfc/rfc9111.html#section-5.1
 // RFC 9111 4.2.3 Calculating Age.
@@ -245,7 +400,7 @@ func TestCacheAge(t *testing.T) {
 	age := resp.Header.Get("age")
 	ageNum, err := strconv.Atoi(age)
 	if err != nil {
-		t.Fatalf("invalide Age header %s", err)
+		t.Fatalf("invalide age header %s", err)
 	}
 	if ageNum == 0 {
 		t.Errorf("expected non-zero, got %d", ageNum)
@@ -289,7 +444,9 @@ func TestCacheRequestDirectives(t *testing.T) {
 			name:         "RFC 9111 5.2.1.5 Request Cache-Control: no-store",
 			link:         "https://www.rfc-editor.org/rfc/rfc9111.html#section-5.2.1.5",
 			cacheControl: "no-store",
-			expected:     "hit", // you can reply with the cached version, just cannot store or update the response in the cache
+			// you can reply with the cached version, just cannot store or update the response in
+			//   the cache.
+			expected: "hit",
 		},
 		{
 			name:         "RFC 9111 5.2.1.6 Request Cache-Control: no-transform",
@@ -334,82 +491,89 @@ func TestCacheRequestDirectives(t *testing.T) {
 
 // RFC 9111 5.2.2 Response Directives
 // https://www.rfc-editor.org/rfc/rfc9111.html#section-5.2.2
-func TestCacheResponseDirectives(t *testing.T) {
+// These tests simply confirm that the response generated from origin server corresponds to the
+// correct cache-control, http status code, and is "revalidated" the correct number of times.
+// It does **not** validate the correct cache control logic like cache using max-age from origin
+// server.
+func TestCacheResponseDirectivesHasCacheControl(t *testing.T) {
 	tests := []struct {
 		name         string
 		link         string
 		cacheControl string
-		expected     string
+		originCalls  int
+		status       int
 	}{
 		{
 			name:         "RFC 9111 5.2.2.1 Response Cache-Control max-age",
 			link:         "https://www.rfc-editor.org/rfc/rfc9111.html#section-5.2.2.1",
 			cacheControl: "max-age=100",
-			expected:     "miss",
 		},
 		{
 			name:         "RFC 9111 5.2.2.2 Response Cache-Control must-revalidate",
 			link:         "https://www.rfc-editor.org/rfc/rfc9111.html#section-5.2.2.2",
 			cacheControl: "must-revalidate",
-			expected:     "miss",
+			originCalls:  2,
+			status:       http.StatusNotModified,
 		},
 		{
 			name:         "RFC 9111 5.2.2.3 Response Cache-Control must-understand",
 			link:         "https://www.rfc-editor.org/rfc/rfc9111.html#section-5.2.2.3",
 			cacheControl: "must-understand",
-			expected:     "miss",
 		},
 		{
 			name:         "RFC 9111 5.2.2.4 Response Cache-Control no-cache",
 			link:         "https://www.rfc-editor.org/rfc/rfc9111.html#section-5.2.2.4",
 			cacheControl: "no-cache",
-			expected:     "miss",
+			originCalls:  2,
 		},
 		{
 			name:         "RFC 9111 5.2.2.5 Response Cache-Control no-store",
 			link:         "https://www.rfc-editor.org/rfc/rfc9111.html#section-5.2.2.5",
 			cacheControl: "no-store",
-			expected:     "miss",
 		},
 		{
 			name:         "RFC 9111 5.2.2.6 Response Cache-Control no-transform",
 			link:         "https://www.rfc-editor.org/rfc/rfc9111.html#section-5.2.2.6",
 			cacheControl: "no-transform",
-			expected:     "miss",
 		},
 		{
 			name:         "RFC 9111 5.2.2.7 Response Cache-Control private",
 			link:         "https://www.rfc-editor.org/rfc/rfc9111.html#section-5.2.2.7",
 			cacheControl: "private",
-			expected:     "miss",
 		},
 		{
 			name:         "RFC 9111 5.2.2.8 Response Cache-Control proxy-revalidate",
 			link:         "https://www.rfc-editor.org/rfc/rfc9111.html#section-5.2.2.8",
 			cacheControl: "proxy-revalidate",
-			expected:     "miss",
+			originCalls:  2,
+			status:       http.StatusNotModified,
 		},
 		{
 			name:         "RFC 9111 5.2.2.9 Response Cache-Control public",
 			link:         "https://www.rfc-editor.org/rfc/rfc9111.html#section-5.2.2.9",
 			cacheControl: "public",
-			expected:     "miss",
 		},
 		{
 			name:         "RFC 9111 5.2.2.10 Response Cache-Control s-maxage",
 			link:         "https://www.rfc-editor.org/rfc/rfc9111.html#section-5.2.2.10",
 			cacheControl: "s-maxage",
-			expected:     "miss",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mux := http.NewServeMux()
+			actualOriginCalls := 0
 			mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+				actualOriginCalls += 1
 				w.Header().Set("cache-control", tt.cacheControl)
 
-				w.WriteHeader(200)
+				// if zero-value then infer 200
+				if tt.status == 0 {
+					w.WriteHeader(200)
+				} else {
+					w.WriteHeader(tt.status)
+				}
 				_, _ = w.Write([]byte("success"))
 			})
 
@@ -419,14 +583,35 @@ func TestCacheResponseDirectives(t *testing.T) {
 			tc := NewTestContext(t, handler)
 
 			req, _ := http.NewRequest("GET", tc.cachedServer.URL+"/test", nil)
-			cacheKey := getCacheKey(req)
-			cacheValue, _ := json.Marshal(testCacheValue(250 * time.Second))
-			handler.Cache.Add(cacheKey, cacheValue)
 
-			resp, _ := tc.Do(req)
-			actual := resp.Header.Get("cache-status")
-			if !strings.Contains(actual, tt.expected) {
-				t.Errorf("expected %s, got %s\n%s", tt.expected, actual, tt.link)
+			// first request hits backend
+			resp1, _ := tc.Do(req)
+			status := resp1.Header.Get("cache-status")
+			if !strings.Contains(status, "miss") {
+				t.Errorf("expected miss, got %s", status)
+			}
+
+			// second request hits cache
+			resp2, _ := tc.Do(req)
+			expectedOriginCalls := tt.originCalls
+			// if zero-value then infer 1
+			if expectedOriginCalls == 0 {
+				expectedOriginCalls = 1
+			}
+
+			actualCc := resp2.Header.Get("cache-control")
+			if actualCc != tt.cacheControl {
+				t.Errorf("expected cache-control %s, got %s", tt.cacheControl, actualCc)
+			}
+			status = resp2.Header.Get("cache-status")
+			if expectedOriginCalls == 1 {
+				if !strings.Contains(status, "hit") {
+					t.Errorf("expected hit, got %s", status)
+				}
+			} else {
+				if expectedOriginCalls != actualOriginCalls {
+					t.Errorf("expected %d origin calls, got %d", expectedOriginCalls, actualOriginCalls)
+				}
 			}
 		})
 	}
