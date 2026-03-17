@@ -524,66 +524,81 @@ func TestCacheRequestDirectives(t *testing.T) {
 // server.
 func TestCacheResponseDirectivesHasCacheControl(t *testing.T) {
 	tests := []struct {
-		name         string
-		link         string
-		cacheControl string
-		originCalls  int
-		status       int
+		name                      string
+		link                      string
+		cacheControl              string
+		expectedOriginCalls       int
+		expectedSecondCacheStatus string
 	}{
 		{
-			name:         "RFC 9111 5.2.2.1 Response Cache-Control max-age",
-			link:         "https://www.rfc-editor.org/rfc/rfc9111.html#section-5.2.2.1",
-			cacheControl: "max-age=100",
+			name:                      "RFC 9111 5.2.2.1 Response Cache-Control max-age",
+			link:                      "https://www.rfc-editor.org/rfc/rfc9111.html#section-5.2.2.1",
+			cacheControl:              "max-age=100",
+			expectedOriginCalls:       1,
+			expectedSecondCacheStatus: "hit",
 		},
 		{
-			name:         "RFC 9111 5.2.2.2 Response Cache-Control must-revalidate",
-			link:         "https://www.rfc-editor.org/rfc/rfc9111.html#section-5.2.2.2",
-			cacheControl: "must-revalidate",
-			originCalls:  2,
-			status:       http.StatusNotModified,
+			name:                      "RFC 9111 5.2.2.2 Response Cache-Control must-revalidate",
+			link:                      "https://www.rfc-editor.org/rfc/rfc9111.html#section-5.2.2.2",
+			cacheControl:              "must-revalidate",
+			expectedOriginCalls:       1,
+			expectedSecondCacheStatus: "hit",
 		},
 		{
-			name:         "RFC 9111 5.2.2.3 Response Cache-Control must-understand",
-			link:         "https://www.rfc-editor.org/rfc/rfc9111.html#section-5.2.2.3",
-			cacheControl: "must-understand",
+			name:                      "RFC 9111 5.2.2.3 Response Cache-Control must-understand",
+			link:                      "https://www.rfc-editor.org/rfc/rfc9111.html#section-5.2.2.3",
+			cacheControl:              "must-understand",
+			expectedOriginCalls:       1,
+			expectedSecondCacheStatus: "hit",
 		},
 		{
-			name:         "RFC 9111 5.2.2.4 Response Cache-Control no-cache",
-			link:         "https://www.rfc-editor.org/rfc/rfc9111.html#section-5.2.2.4",
-			cacheControl: "no-cache",
-			originCalls:  2,
+			name:                      "RFC 9111 5.2.2.4 Response Cache-Control no-cache",
+			link:                      "https://www.rfc-editor.org/rfc/rfc9111.html#section-5.2.2.4",
+			cacheControl:              "no-cache",
+			expectedOriginCalls:       2,
+			expectedSecondCacheStatus: "miss",
 		},
 		{
-			name:         "RFC 9111 5.2.2.5 Response Cache-Control no-store",
-			link:         "https://www.rfc-editor.org/rfc/rfc9111.html#section-5.2.2.5",
-			cacheControl: "no-store",
+			name:                      "RFC 9111 5.2.2.5 Response Cache-Control no-store",
+			link:                      "https://www.rfc-editor.org/rfc/rfc9111.html#section-5.2.2.5",
+			cacheControl:              "no-store",
+			expectedOriginCalls:       2,
+			expectedSecondCacheStatus: "miss",
 		},
 		{
-			name:         "RFC 9111 5.2.2.6 Response Cache-Control no-transform",
-			link:         "https://www.rfc-editor.org/rfc/rfc9111.html#section-5.2.2.6",
-			cacheControl: "no-transform",
+			name:                      "RFC 9111 5.2.2.6 Response Cache-Control no-transform",
+			link:                      "https://www.rfc-editor.org/rfc/rfc9111.html#section-5.2.2.6",
+			cacheControl:              "no-transform",
+			expectedOriginCalls:       1,
+			expectedSecondCacheStatus: "hit",
 		},
 		{
-			name:         "RFC 9111 5.2.2.7 Response Cache-Control private",
-			link:         "https://www.rfc-editor.org/rfc/rfc9111.html#section-5.2.2.7",
-			cacheControl: "private",
+			name:                      "RFC 9111 5.2.2.7 Response Cache-Control private",
+			link:                      "https://www.rfc-editor.org/rfc/rfc9111.html#section-5.2.2.7",
+			cacheControl:              "private",
+			expectedOriginCalls:       1,
+			expectedSecondCacheStatus: "hit",
 		},
 		{
-			name:         "RFC 9111 5.2.2.8 Response Cache-Control proxy-revalidate",
-			link:         "https://www.rfc-editor.org/rfc/rfc9111.html#section-5.2.2.8",
-			cacheControl: "proxy-revalidate",
-			originCalls:  2,
-			status:       http.StatusNotModified,
+			name:                      "RFC 9111 5.2.2.8 Response Cache-Control proxy-revalidate",
+			link:                      "https://www.rfc-editor.org/rfc/rfc9111.html#section-5.2.2.8",
+			cacheControl:              "proxy-revalidate",
+			expectedOriginCalls:       1,
+			expectedSecondCacheStatus: "hit",
 		},
 		{
-			name:         "RFC 9111 5.2.2.9 Response Cache-Control public",
-			link:         "https://www.rfc-editor.org/rfc/rfc9111.html#section-5.2.2.9",
-			cacheControl: "public",
+			name:                      "RFC 9111 5.2.2.9 Response Cache-Control public",
+			link:                      "https://www.rfc-editor.org/rfc/rfc9111.html#section-5.2.2.9",
+			cacheControl:              "public",
+			expectedOriginCalls:       1,
+			expectedSecondCacheStatus: "hit",
 		},
 		{
-			name:         "RFC 9111 5.2.2.10 Response Cache-Control s-maxage",
-			link:         "https://www.rfc-editor.org/rfc/rfc9111.html#section-5.2.2.10",
-			cacheControl: "s-maxage",
+			name:                      "RFC 9111 5.2.2.10 Response Cache-Control s-maxage",
+			link:                      "https://www.rfc-editor.org/rfc/rfc9111.html#section-5.2.2.10",
+			cacheControl:              "s-maxage=100",
+			expectedOriginCalls:       1,
+			expectedSecondCacheStatus: "hit",
 		},
 	}
 
@@ -594,13 +609,7 @@ func TestCacheResponseDirectivesHasCacheControl(t *testing.T) {
 			mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 				actualOriginCalls += 1
 				w.Header().Set("cache-control", tt.cacheControl)
-
-				// if zero-value then infer 200
-				if tt.status == 0 {
-					w.WriteHeader(200)
-				} else {
-					w.WriteHeader(tt.status)
-				}
+				w.WriteHeader(200)
 				_, _ = w.Write([]byte("success"))
 			})
 
@@ -618,27 +627,19 @@ func TestCacheResponseDirectivesHasCacheControl(t *testing.T) {
 				t.Errorf("expected miss, got %s", status)
 			}
 
-			// second request hits cache
+			// second request can be served from cache or forwarded depending on directive
 			resp2, _ := tc.Do(req)
-			expectedOriginCalls := tt.originCalls
-			// if zero-value then infer 1
-			if expectedOriginCalls == 0 {
-				expectedOriginCalls = 1
-			}
 
 			actualCc := resp2.Header.Get("cache-control")
 			if actualCc != tt.cacheControl {
 				t.Errorf("expected cache-control %s, got %s", tt.cacheControl, actualCc)
 			}
 			status = resp2.Header.Get("cache-status")
-			if expectedOriginCalls == 1 {
-				if !strings.Contains(status, "hit") {
-					t.Errorf("expected hit, got %s", status)
-				}
-			} else {
-				if expectedOriginCalls != actualOriginCalls {
-					t.Errorf("expected %d origin calls, got %d", expectedOriginCalls, actualOriginCalls)
-				}
+			if tt.expectedSecondCacheStatus != "" && !strings.Contains(status, tt.expectedSecondCacheStatus) {
+				t.Errorf("expected %s, got %s", tt.expectedSecondCacheStatus, status)
+			}
+			if tt.expectedOriginCalls != actualOriginCalls {
+				t.Errorf("expected %d origin calls, got %d", tt.expectedOriginCalls, actualOriginCalls)
 			}
 		})
 	}
