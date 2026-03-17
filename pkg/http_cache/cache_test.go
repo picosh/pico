@@ -36,12 +36,19 @@ func (tc *TestContext) Do(req *http.Request) (*http.Response, error) {
 }
 
 func (tc *TestContext) DoWithHeaders(req *http.Request, headers map[string][]string) (*http.Response, error) {
+	reqCopy := req.Clone(req.Context())
+	reqCopy.Header = req.Header.Clone()
+	if reqCopy.Header == nil {
+		reqCopy.Header = make(http.Header)
+	}
+
 	for key, val := range headers {
+		reqCopy.Header.Del(key)
 		for _, v := range val {
-			req.Header.Add(key, v)
+			reqCopy.Header.Add(key, v)
 		}
 	}
-	return http.DefaultClient.Do(req)
+	return http.DefaultClient.Do(reqCopy)
 }
 
 func (tc *TestContext) GetHeader(resp *http.Response, key string) string {
@@ -52,7 +59,7 @@ func testCacheValue(afterCreated time.Duration) *CacheValue {
 	return &CacheValue{
 		Header:    map[string][]string{},
 		Body:      []byte("success"),
-		CreatedAt: time.Now().Add(afterCreated),
+		CreatedAt: time.Now().Add(-afterCreated),
 	}
 }
 
@@ -234,7 +241,8 @@ func TestCacheVary(t *testing.T) {
 	cacheKey := getCacheKey(req)
 	cv := testCacheValue(250 * time.Second)
 	cv.Header["Vary"] = []string{"Accept-Encoding"}
-	cv.Header["Content-Encoding"] = []string{"gzip"}
+	// Store the original request header that selected this representation.
+	cv.Header["Accept-Encoding"] = []string{"gzip"}
 	cacheValue, _ := json.Marshal(cv)
 	handler.Cache.Add(cacheKey, cacheValue)
 
@@ -428,6 +436,9 @@ func TestCacheAge(t *testing.T) {
 	ageNum, err := strconv.Atoi(age)
 	if err != nil {
 		t.Fatalf("invalide age header %s", err)
+	}
+	if ageNum < 0 {
+		t.Errorf("expected non-negative, got %d", ageNum)
 	}
 	if ageNum == 0 {
 		t.Errorf("expected non-zero, got %d", ageNum)
