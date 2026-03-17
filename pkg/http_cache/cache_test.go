@@ -65,10 +65,17 @@ func testCacheValue(afterCreated time.Duration) *CacheValue {
 
 /*
 TODO:
-	Storing incomplete responses 	https://www.rfc-editor.org/rfc/rfc9111.html#section-3.3
-	Storing authenticated requests 	https://www.rfc-editor.org/rfc/rfc9111.html#section-3.5
-	Expires 						https://www.rfc-editor.org/rfc/rfc9111.html#section-5.3
-	Max-Age logic
+	- Expires coverage (RFC 9111 §5.3): explicit tests for future/past/invalid Expires, and precedence when Cache-Control: max-age is also present.
+	- Freshness precedence rules (RFC 9111 §4.2.1, §5.2.2.1, §5.2.2.10): s-maxage overriding max-age in shared cache, and max-age=0/s-maxage=0 immediate staleness behavior.
+	- Stale-serving rules (RFC 9111 §4.2.4): stale allowed vs forbidden cases, especially with and without must-revalidate/proxy-revalidate.
+	- only-if-cached miss semantics (RFC 9111 §5.2.1.7): should return gateway-timeout style behavior when no cache entry exists, rather than forwarding.
+	- Request no-store store-prevention (RFC 9111 §5.2.1.5): verify a no-store request does not populate/update cache for subsequent requests.
+	- Authorization storage/use constraints (RFC 9111 §3.5): authenticated responses should not be reused unless explicitly permitted by response directives.
+	- Revalidation request construction (RFC 9111 §4.3.1/§4.3.2): stale cached entries should generate conditional upstream requests with If-None-Match and/or If-Modified-Since.
+	- 304 Not Modified merge/update behavior (RFC 9111 §4.3.4): validate header metadata updates while body remains cached body.
+	- Vary: * behavior (RFC 9111 §4.1): ensure such responses are not reused for subsequent requests.
+	- Multi-field Vary matching (RFC 9111 §4.1): all nominated request fields must match original request values, not just one.
+	- Age correction with upstream metadata (RFC 9111 §4.2.3, §5.1): test interactions of stored response Date/Age values rather than only local clock delta.
 */
 
 // RFC 9211 The Cache-Status HTTP Response Header Field
