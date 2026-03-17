@@ -272,16 +272,19 @@ func TestCacheValidation(t *testing.T) {
 		link             string
 		validationHeader string
 		validationValue  string
+		extraHeaders     map[string][]string
 		expected         string
-		status           int
+		originStatus     int
+		expectedStatus   int
 	}{
 		{
 			name:             "RFC 9110 13.1.2 If-None-Match",
 			link:             "https://www.rfc-editor.org/rfc/rfc9110#section-13.1.2",
 			validationHeader: "If-None-Match",
-			validationValue:  "abc",
-			expected:         "miss",
-			status:           http.StatusPreconditionFailed,
+			validationValue:  "\"abc\"",
+			expected:         "hit",
+			originStatus:     http.StatusOK,
+			expectedStatus:   http.StatusOK,
 		},
 		{
 			name:             "RFC 9110 13.1.2 If-None-Match Wildcard",
@@ -289,62 +292,81 @@ func TestCacheValidation(t *testing.T) {
 			validationHeader: "If-None-Match",
 			validationValue:  "*",
 			expected:         "hit",
-			status:           http.StatusNotModified,
+			originStatus:     http.StatusOK,
+			expectedStatus:   http.StatusNotModified,
 		},
 		{
 			name:             "RFC 9110 13.1.3 If-Modified-Since",
 			link:             "https://www.rfc-editor.org/rfc/rfc9110#section-13.1.3",
 			validationHeader: "If-Modified-Since",
 			validationValue:  nowStr,
-			expected:         "miss",
-			status:           http.StatusPreconditionFailed,
+			expected:         "hit",
+			originStatus:     http.StatusOK,
+			expectedStatus:   http.StatusNotModified,
 		},
 		{
 			name:             "RFC 9110 13.1.4 If-Unmodified-Since",
 			link:             "https://www.rfc-editor.org/rfc/rfc9110#section-13.1.4",
 			validationHeader: "If-Unmodified-Since",
 			validationValue:  earlyStr,
-			expected:         "miss",
-			status:           http.StatusPreconditionFailed,
+			expected:         "hit",
+			originStatus:     http.StatusOK,
+			expectedStatus:   http.StatusOK,
 		},
 		{
 			name:             "RFC 9110 13.1.5 If-Range Date",
 			link:             "https://www.rfc-editor.org/rfc/rfc9110#section-13.1.5",
 			validationHeader: "If-Range",
 			validationValue:  nowStr,
-			expected:         "miss",
-			status:           http.StatusPreconditionFailed,
+			extraHeaders: map[string][]string{
+				"Range": {"bytes=0-3"},
+			},
+			expected:       "hit",
+			originStatus:   http.StatusOK,
+			expectedStatus: http.StatusOK,
 		},
 		{
 			name:             "RFC 9110 13.1.5 If-Range Date Hit",
 			link:             "https://www.rfc-editor.org/rfc/rfc9110#section-13.1.5",
 			validationHeader: "If-Range",
 			validationValue:  actualStr,
-			expected:         "hit",
-			status:           http.StatusNotModified,
+			extraHeaders: map[string][]string{
+				"Range": {"bytes=0-3"},
+			},
+			expected:       "hit",
+			originStatus:   http.StatusOK,
+			expectedStatus: http.StatusOK,
 		},
 		{
 			name:             "RFC 9110 13.1.5 If-Range ETag",
 			link:             "https://www.rfc-editor.org/rfc/rfc9110#section-13.1.5",
-			validationHeader: "ETag",
-			validationValue:  "abc",
-			expected:         "miss",
-			status:           http.StatusPreconditionFailed,
+			validationHeader: "If-Range",
+			validationValue:  "\"abc\"",
+			extraHeaders: map[string][]string{
+				"Range": {"bytes=0-3"},
+			},
+			expected:       "hit",
+			originStatus:   http.StatusOK,
+			expectedStatus: http.StatusOK,
 		},
 		{
 			name:             "RFC 9110 13.1.5 If-Range ETag Hit",
 			link:             "https://www.rfc-editor.org/rfc/rfc9110#section-13.1.5",
-			validationHeader: "ETag",
-			validationValue:  "ccc",
-			expected:         "hit",
-			status:           http.StatusNotModified,
+			validationHeader: "If-Range",
+			validationValue:  "\"ccc\"",
+			extraHeaders: map[string][]string{
+				"Range": {"bytes=0-3"},
+			},
+			expected:       "hit",
+			originStatus:   http.StatusOK,
+			expectedStatus: http.StatusOK,
 		},
 	}
 
 	for _, tt := range tests {
 		mux := http.NewServeMux()
 		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(tt.status)
+			w.WriteHeader(tt.originStatus)
 		})
 
 		logger := slog.Default()
@@ -361,13 +383,18 @@ func TestCacheValidation(t *testing.T) {
 		handler.Cache.Add(cacheKey, cacheValue)
 
 		t.Run(tt.name, func(t *testing.T) {
-			resp, _ := tc.DoWithHeaders(req, map[string][]string{tt.validationHeader: {tt.validationValue}})
+			reqHeaders := map[string][]string{tt.validationHeader: {tt.validationValue}}
+			for key, values := range tt.extraHeaders {
+				reqHeaders[key] = values
+			}
+
+			resp, _ := tc.DoWithHeaders(req, reqHeaders)
 			actual := resp.Header.Get("cache-status")
 			if !strings.Contains(actual, tt.expected) {
 				t.Errorf("expected %s, got %s\n%s", tt.expected, actual, tt.link)
 			}
-			if resp.StatusCode != tt.status {
-				t.Errorf("expected status %d, got %d", tt.status, resp.StatusCode)
+			if resp.StatusCode != tt.expectedStatus {
+				t.Errorf("expected status %d, got %d", tt.expectedStatus, resp.StatusCode)
 			}
 		})
 	}
