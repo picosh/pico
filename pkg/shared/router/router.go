@@ -134,7 +134,7 @@ func GetSubdomainFromRequest(r *http.Request, domain, space string) string {
 	hostDomain := strings.ToLower(strings.Split(r.Host, ":")[0])
 	appDomain := strings.ToLower(strings.Split(domain, ":")[0])
 
-	if hostDomain != appDomain {
+	if hostDomain != appDomain && strings.Contains(hostDomain, ".") {
 		if strings.Contains(hostDomain, appDomain) {
 			subdomain := strings.TrimSuffix(hostDomain, fmt.Sprintf(".%s", appDomain))
 			return subdomain
