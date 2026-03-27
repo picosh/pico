@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM golang:1.25 AS builder-deps
+FROM --platform=$BUILDPLATFORM golang:1.26 AS builder-deps
 LABEL maintainer="Pico Maintainers <hello@pico.sh>"
 
 WORKDIR /app
@@ -8,13 +8,13 @@ RUN apt-get install -y git ca-certificates
 
 RUN git clone https://codeberg.org/emersion/soju.git
 
-# COPY subscriber-change.diff .
+COPY subscriber-change.diff .
 
 WORKDIR /app/soju
 
 RUN git checkout v0.10.1
 
-# RUN git apply ../subscriber-change.diff
+RUN git apply ../subscriber-change.diff
 
 RUN --mount=type=cache,target=/go/pkg/,rw \
   --mount=type=cache,target=/root/.cache/,rw \
