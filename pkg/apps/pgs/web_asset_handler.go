@@ -14,7 +14,6 @@ import (
 	"net/http/httputil"
 	_ "net/http/pprof"
 
-	sst "github.com/picosh/pico/pkg/pobj/storage"
 	"github.com/picosh/pico/pkg/shared/storage"
 )
 
@@ -27,7 +26,7 @@ type ApiAssetHandler struct {
 	Subdomain      string
 	ProjectDir     string
 	Filepath       string
-	Bucket         sst.Bucket
+	Bucket         storage.Bucket
 	ImgProcessOpts *storage.ImgProcessOpts
 	ProjectID      string
 	HasPicoPlus    bool
@@ -87,7 +86,7 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	var contents io.ReadCloser
 	assetFilepath := ""
-	var info *sst.ObjectInfo
+	var info *storage.ObjectInfo
 	status := http.StatusOK
 	attempts := []string{}
 	for _, fp := range routes {

@@ -13,8 +13,8 @@ import (
 
 	pgsdb "github.com/picosh/pico/pkg/apps/pgs/db"
 	"github.com/picosh/pico/pkg/db"
-	sst "github.com/picosh/pico/pkg/pobj/storage"
 	"github.com/picosh/pico/pkg/shared"
+	"github.com/picosh/pico/pkg/shared/storage"
 )
 
 func NewTabWriter(out io.Writer) *tabwriter.Writer {
@@ -48,7 +48,7 @@ type Cmd struct {
 	User    *db.User
 	Session shared.CmdSession
 	Log     *slog.Logger
-	Store   sst.ObjectStorage
+	Store   storage.ObjectStorage
 	Dbpool  pgsdb.PgsDB
 	Write   bool
 	Width   int

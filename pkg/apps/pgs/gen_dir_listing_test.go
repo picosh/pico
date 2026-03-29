@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	sst "github.com/picosh/pico/pkg/pobj/storage"
 	"github.com/picosh/pico/pkg/send/utils"
+	"github.com/picosh/pico/pkg/shared/storage"
 )
 
 func TestGenerateDirectoryHTML(t *testing.T) {
@@ -208,8 +208,8 @@ func TestShouldGenerateListing(t *testing.T) {
 
 	for _, fixture := range fixtures {
 		t.Run(fixture.Name, func(t *testing.T) {
-			st, _ := sst.NewStorageMemory(fixture.Storage)
-			bucket := sst.Bucket{Name: "testbucket", Path: "testbucket"}
+			st, _ := storage.NewStorageMemory(fixture.Storage)
+			bucket := storage.Bucket{Name: "testbucket", Path: "testbucket"}
 
 			result := shouldGenerateListing(st, bucket, "project", fixture.Path)
 

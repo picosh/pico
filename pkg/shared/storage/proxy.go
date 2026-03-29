@@ -13,8 +13,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/picosh/pico/pkg/pobj/storage"
 )
 
 func UriToImgProcessOpts(uri string) (*ImgProcessOpts, error) {
@@ -133,7 +131,7 @@ func (img *ImgProcessOpts) String() string {
 	return processOpts
 }
 
-func HandleProxy(r *http.Request, logger *slog.Logger, dataURL string, opts *ImgProcessOpts) (io.ReadCloser, *storage.ObjectInfo, error) {
+func HandleProxy(r *http.Request, logger *slog.Logger, dataURL string, opts *ImgProcessOpts) (io.ReadCloser, *ObjectInfo, error) {
 	imgProxyURL := os.Getenv("IMGPROXY_URL")
 	imgProxySalt := os.Getenv("IMGPROXY_SALT")
 	imgProxyKey := os.Getenv("IMGPROXY_KEY")
@@ -182,7 +180,7 @@ func HandleProxy(r *http.Request, logger *slog.Logger, dataURL string, opts *Img
 	if err != nil {
 		logger.Error("decoding last-modified", "err", err)
 	}
-	info := &storage.ObjectInfo{
+	info := &ObjectInfo{
 		Size:     res.ContentLength,
 		ETag:     trimEtag(res.Header.Get("etag")),
 		Metadata: res.Header.Clone(),

@@ -24,7 +24,6 @@ import (
 	"github.com/gorilla/feeds"
 	"github.com/hashicorp/golang-lru/v2/expirable"
 	"github.com/picosh/pico/pkg/db"
-	sst "github.com/picosh/pico/pkg/pobj/storage"
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/pico/pkg/shared/router"
 	"github.com/picosh/pico/pkg/shared/storage"
@@ -486,7 +485,7 @@ func (web *WebRouter) ServeAsset(fname string, opts *storage.ImgProcessOpts, has
 		"userId", user.ID,
 	)
 
-	var bucket sst.Bucket
+	var bucket storage.Bucket
 	bucket, err = web.Cfg.Storage.GetBucket(shared.GetAssetBucketName(user.ID))
 	project, perr := web.Cfg.DB.FindProjectByName(user.ID, props.ProjectName)
 	if perr != nil {

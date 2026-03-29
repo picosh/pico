@@ -17,11 +17,10 @@ import (
 
 	pgsdb "github.com/picosh/pico/pkg/apps/pgs/db"
 	"github.com/picosh/pico/pkg/db"
-	"github.com/picosh/pico/pkg/pobj"
-	sst "github.com/picosh/pico/pkg/pobj/storage"
 	"github.com/picosh/pico/pkg/pssh"
 	sendutils "github.com/picosh/pico/pkg/send/utils"
 	"github.com/picosh/pico/pkg/shared"
+	"github.com/picosh/pico/pkg/shared/storage"
 	ignore "github.com/sabhiram/go-gitignore"
 )
 
@@ -60,8 +59,8 @@ func setProject(s *pssh.SSHServerConnSession, project *db.Project) {
 	s.SetValue(ctxProjectKey{}, project)
 }
 
-func getBucket(s *pssh.SSHServerConnSession) (sst.Bucket, error) {
-	bucket := s.Context().Value(ctxBucketKey{}).(sst.Bucket)
+func getBucket(s *pssh.SSHServerConnSession) (storage.Bucket, error) {
+	bucket := s.Context().Value(ctxBucketKey{}).(storage.Bucket)
 	if bucket.Name == "" {
 		return bucket, fmt.Errorf("bucket not set on `ssh.Context()` for connection")
 	}
@@ -92,7 +91,7 @@ func shouldIgnoreFile(fp, ignoreStr string) bool {
 type FileData struct {
 	*sendutils.FileEntry
 	User     *db.User
-	Bucket   sst.Bucket
+	Bucket   storage.Bucket
 	Project  *db.Project
 	DenyList string
 }
@@ -145,7 +144,7 @@ func (h *UploadAssetHandler) Read(s *pssh.SSHServerConnSession, entry *sendutils
 	fileInfo.FSize = info.Size
 	fileInfo.FModTime = info.LastModified
 
-	reader := pobj.NewAllReaderAt(contents)
+	reader := storage.NewAllReaderAt(contents)
 
 	return fileInfo, reader, nil
 }
@@ -238,7 +237,7 @@ func (h *UploadAssetHandler) Validate(s *pssh.SSHServerConnSession) error {
 	return nil
 }
 
-func (h *UploadAssetHandler) findDenylist(bucket sst.Bucket, project *db.Project, logger *slog.Logger) (string, error) {
+func (h *UploadAssetHandler) findDenylist(bucket storage.Bucket, project *db.Project, logger *slog.Logger) (string, error) {
 	fp, _, err := h.Cfg.Storage.GetObject(bucket, filepath.Join(project.ProjectDir, "_pgs_ignore"))
 	if err != nil {
 		return "", fmt.Errorf("_pgs_ignore not found")

@@ -13,8 +13,6 @@ import (
 
 	exifremove "github.com/neurosnap/go-exif-remove"
 	"github.com/picosh/pico/pkg/db"
-	"github.com/picosh/pico/pkg/pobj"
-	sst "github.com/picosh/pico/pkg/pobj/storage"
 	"github.com/picosh/pico/pkg/pssh"
 	sendutils "github.com/picosh/pico/pkg/send/utils"
 	"github.com/picosh/pico/pkg/shared"
@@ -30,7 +28,7 @@ type PostMetaData struct {
 	Filename      string
 	User          *db.User
 	FeatureFlag   *db.FeatureFlag
-	Bucket        sst.Bucket
+	Bucket        storage.Bucket
 }
 
 type UploadImgHandler struct {
@@ -125,7 +123,7 @@ func (h *UploadImgHandler) Read(s *pssh.SSHServerConnSession, entry *sendutils.F
 	if err != nil {
 		return nil, nil, err
 	}
-	reader := pobj.NewAllReaderAt(contents)
+	reader := storage.NewAllReaderAt(contents)
 
 	fileInfo := &sendutils.VirtualFile{
 		FName:    cleanFilename,

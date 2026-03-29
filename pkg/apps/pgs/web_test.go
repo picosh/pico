@@ -11,7 +11,6 @@ import (
 	"time"
 
 	pgsdb "github.com/picosh/pico/pkg/apps/pgs/db"
-	sst "github.com/picosh/pico/pkg/pobj/storage"
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/pico/pkg/shared/storage"
 )
@@ -481,10 +480,10 @@ type ImageStorageMemory struct {
 	Fpath string
 }
 
-func (s *ImageStorageMemory) ServeObject(r *http.Request, bucket sst.Bucket, fpath string, opts *storage.ImgProcessOpts) (io.ReadCloser, *sst.ObjectInfo, error) {
+func (s *ImageStorageMemory) ServeObject(r *http.Request, bucket storage.Bucket, fpath string, opts *storage.ImgProcessOpts) (io.ReadCloser, *storage.ObjectInfo, error) {
 	s.Opts = opts
 	s.Fpath = fpath
-	info := sst.ObjectInfo{
+	info := storage.ObjectInfo{
 		Metadata: make(http.Header),
 	}
 	info.Metadata.Set("content-type", "image/jpeg")

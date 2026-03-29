@@ -1,4 +1,4 @@
-package pobj
+package storage
 
 import (
 	"errors"

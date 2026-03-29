@@ -1,4 +1,4 @@
-package pobj
+package storage
 
 import (
 	"bytes"
@@ -10,15 +10,14 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/picosh/pico/pkg/pobj/storage"
 	"github.com/picosh/pico/pkg/pssh"
 	"github.com/picosh/pico/pkg/send/utils"
 )
 
 type ctxBucketKey struct{}
 
-func getBucket(ctx *pssh.SSHServerConnSession) (storage.Bucket, error) {
-	bucket, ok := ctx.Value(ctxBucketKey{}).(storage.Bucket)
+func getBucket(ctx *pssh.SSHServerConnSession) (Bucket, error) {
+	bucket, ok := ctx.Value(ctxBucketKey{}).(Bucket)
 	if !ok {
 		return bucket, fmt.Errorf("bucket not set on `ssh.Context()` for connection")
 	}
@@ -27,7 +26,7 @@ func getBucket(ctx *pssh.SSHServerConnSession) (storage.Bucket, error) {
 	}
 	return bucket, nil
 }
-func setBucket(ctx *pssh.SSHServerConnSession, bucket storage.Bucket) {
+func setBucket(ctx *pssh.SSHServerConnSession, bucket Bucket) {
 	ctx.SetValue(ctxBucketKey{}, bucket)
 }
 
@@ -35,12 +34,12 @@ type FileData struct {
 	*utils.FileEntry
 	Text   []byte
 	User   string
-	Bucket storage.Bucket
+	Bucket Bucket
 }
 
 type Config struct {
 	Logger     *slog.Logger
-	Storage    storage.ObjectStorage
+	Storage    ObjectStorage
 	AssetNames AssetNames
 }
 

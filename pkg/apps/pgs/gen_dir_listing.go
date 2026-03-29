@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	sst "github.com/picosh/pico/pkg/pobj/storage"
+	"github.com/picosh/pico/pkg/shared/storage"
 )
 
 //go:embed html/*
@@ -92,7 +92,7 @@ func toDisplayEntries(entries []os.FileInfo) []dirEntryDisplay {
 	return displayEntries
 }
 
-func shouldGenerateListing(st sst.ObjectStorage, bucket sst.Bucket, projectDir string, path string) bool {
+func shouldGenerateListing(st storage.ObjectStorage, bucket storage.Bucket, projectDir string, path string) bool {
 	dirPath := projectDir + path
 	if path == "/" {
 		dirPath = projectDir + "/"
