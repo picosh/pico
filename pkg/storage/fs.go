@@ -43,8 +43,8 @@ type StorageFS struct {
 	Logger *slog.Logger
 }
 
-var _ ObjectStorage = &StorageFS{}
-var _ ObjectStorage = (*StorageFS)(nil)
+var _ StorageServe = &StorageFS{}
+var _ StorageServe = (*StorageFS)(nil)
 
 func NewStorageFS(logger *slog.Logger, dir string) (*StorageFS, error) {
 	return &StorageFS{Logger: logger, Dir: dir}, nil

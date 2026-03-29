@@ -48,7 +48,7 @@ type Cmd struct {
 	User    *db.User
 	Session shared.CmdSession
 	Log     *slog.Logger
-	Store   storage.ObjectStorage
+	Store   storage.StorageServe
 	Dbpool  pgsdb.PgsDB
 	Write   bool
 	Width   int

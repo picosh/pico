@@ -19,8 +19,8 @@ type StorageMemory struct {
 	mu      sync.RWMutex
 }
 
-var _ ObjectStorage = &StorageMemory{}
-var _ ObjectStorage = (*StorageMemory)(nil)
+var _ StorageServe = &StorageMemory{}
+var _ StorageServe = (*StorageMemory)(nil)
 
 func NewStorageMemory(st map[string]map[string]string) (*StorageMemory, error) {
 	return &StorageMemory{

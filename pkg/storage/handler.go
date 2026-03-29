@@ -39,7 +39,7 @@ type FileData struct {
 
 type Config struct {
 	Logger     *slog.Logger
-	Storage    ObjectStorage
+	Storage    StorageServe
 	AssetNames AssetNames
 }
 

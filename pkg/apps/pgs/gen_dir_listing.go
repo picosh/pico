@@ -92,7 +92,7 @@ func toDisplayEntries(entries []os.FileInfo) []dirEntryDisplay {
 	return displayEntries
 }
 
-func shouldGenerateListing(st storage.ObjectStorage, bucket storage.Bucket, projectDir string, path string) bool {
+func shouldGenerateListing(st storage.StorageServe, bucket storage.Bucket, projectDir string, path string) bool {
 	dirPath := projectDir + path
 	if path == "/" {
 		dirPath = projectDir + "/"
