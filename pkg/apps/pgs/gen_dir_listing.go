@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/picosh/pico/pkg/shared/storage"
+	"github.com/picosh/pico/pkg/storage"
 )
 
 //go:embed html/*

@@ -20,7 +20,7 @@ import (
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/pssh"
 	"github.com/picosh/pico/pkg/shared"
-	"github.com/picosh/pico/pkg/shared/storage"
+	"github.com/picosh/pico/pkg/storage"
 	"github.com/pkg/sftp"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/crypto/ssh"

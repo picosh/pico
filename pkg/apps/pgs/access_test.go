@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/picosh/pico/pkg/shared"
-	"github.com/picosh/pico/pkg/shared/storage"
+	"github.com/picosh/pico/pkg/storage"
 )
 
 func TestPrivateProjectDeniesWebAccess(t *testing.T) {

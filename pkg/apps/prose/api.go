@@ -20,7 +20,7 @@ import (
 	"github.com/picosh/pico/pkg/db/postgres"
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/pico/pkg/shared/router"
-	"github.com/picosh/pico/pkg/shared/storage"
+	"github.com/picosh/pico/pkg/storage"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 

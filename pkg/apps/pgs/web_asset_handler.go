@@ -14,7 +14,7 @@ import (
 	"net/http/httputil"
 	_ "net/http/pprof"
 
-	"github.com/picosh/pico/pkg/shared/storage"
+	"github.com/picosh/pico/pkg/storage"
 )
 
 type ApiAssetHandler struct {

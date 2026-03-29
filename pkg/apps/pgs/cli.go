@@ -14,7 +14,7 @@ import (
 	pgsdb "github.com/picosh/pico/pkg/apps/pgs/db"
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/shared"
-	"github.com/picosh/pico/pkg/shared/storage"
+	"github.com/picosh/pico/pkg/storage"
 )
 
 func NewTabWriter(out io.Writer) *tabwriter.Writer {

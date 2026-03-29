@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/picosh/pico/pkg/shared"
-	"github.com/picosh/pico/pkg/shared/storage"
+	"github.com/picosh/pico/pkg/storage"
 )
 
 // TestLargeFileNotTruncatedOnCacheHit reproduces the Souin truncation bug.

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/picosh/pico/pkg/send/utils"
-	"github.com/picosh/pico/pkg/shared/storage"
+	"github.com/picosh/pico/pkg/storage"
 )
 
 func TestGenerateDirectoryHTML(t *testing.T) {

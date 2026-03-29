@@ -18,7 +18,7 @@ import (
 	"github.com/picosh/pico/pkg/send/protocols/scp"
 	"github.com/picosh/pico/pkg/send/protocols/sftp"
 	"github.com/picosh/pico/pkg/shared"
-	"github.com/picosh/pico/pkg/shared/storage"
+	"github.com/picosh/pico/pkg/storage"
 )
 
 func StartSshServer() {
