@@ -144,9 +144,7 @@ func (h *UploadAssetHandler) Read(s *pssh.SSHServerConnSession, entry *sendutils
 	fileInfo.FSize = info.Size
 	fileInfo.FModTime = info.LastModified
 
-	reader := storage.NewAllReaderAt(contents)
-
-	return fileInfo, reader, nil
+	return fileInfo, contents, nil
 }
 
 func (h *UploadAssetHandler) List(s *pssh.SSHServerConnSession, fpath string, isDir bool, recursive bool) ([]os.FileInfo, error) {

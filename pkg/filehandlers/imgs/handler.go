@@ -123,7 +123,6 @@ func (h *UploadImgHandler) Read(s *pssh.SSHServerConnSession, entry *sendutils.F
 	if err != nil {
 		return nil, nil, err
 	}
-	reader := storage.NewAllReaderAt(contents)
 
 	fileInfo := &sendutils.VirtualFile{
 		FName:    cleanFilename,
@@ -132,7 +131,7 @@ func (h *UploadImgHandler) Read(s *pssh.SSHServerConnSession, entry *sendutils.F
 		FModTime: info.LastModified,
 	}
 
-	return fileInfo, reader, nil
+	return fileInfo, contents, nil
 }
 
 func (h *UploadImgHandler) Write(s *pssh.SSHServerConnSession, entry *sendutils.FileEntry) (string, error) {
