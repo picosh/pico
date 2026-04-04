@@ -1,9 +1,12 @@
 package mime
 
-import "path/filepath"
+import (
+	"path/filepath"
+	"strings"
+)
 
 func GetMimeType(fpath string) string {
-	ext := filepath.Ext(fpath)
+	ext := strings.ToLower(filepath.Ext(fpath))
 	switch ext {
 	case ".svg":
 		return "image/svg+xml"
