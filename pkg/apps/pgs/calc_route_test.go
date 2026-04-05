@@ -663,6 +663,25 @@ func TestCalcRoutes(t *testing.T) {
 				{Filepath: "public/404.html", Status: 404},
 			},
 		},
+		{
+			Name: "root-redirect",
+			Actual: calcRoutes(
+				"public",
+				"/",
+				[]*RedirectRule{
+					{
+						From:   "/",
+						To:     "/dax/cool/wow/",
+						Status: 302,
+						Force:  true,
+					},
+				},
+			),
+			Expected: []*HttpReply{
+				{Filepath: "public/dax/cool/wow/index.html", Status: 302},
+				{Filepath: "public/404.html", Status: 404},
+			},
+		},
 	}
 
 	for _, fixture := range fixtures {

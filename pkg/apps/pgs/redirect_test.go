@@ -141,6 +141,21 @@ func TestParseRedirectText(t *testing.T) {
 		},
 	}
 
+	rootRedirect := RedirectFixture{
+		name:  "root-redirect",
+		input: "/ /dax/cool/wow/ 302!",
+		expect: []*RedirectRule{
+			{
+				From:       "/",
+				To:         "/dax/cool/wow/",
+				Status:     302,
+				Query:      empty,
+				Conditions: empty,
+				Force:      true,
+			},
+		},
+	}
+
 	fixtures := []RedirectFixture{
 		spa,
 		rss,
@@ -153,6 +168,7 @@ func TestParseRedirectText(t *testing.T) {
 		selfReferentialWithVariables,
 		externalUrlNotSelfRef,
 		validPathRedirect,
+		rootRedirect,
 	}
 
 	for _, fixture := range fixtures {

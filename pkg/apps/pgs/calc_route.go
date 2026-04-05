@@ -112,6 +112,11 @@ func correlatePlaceholder(orig, pattern string) (string, string) {
 		_type = "variable"
 	}
 
+	// special case: root path matches root path
+	if orig == "/" && pattern == "/" {
+		return "/", "match"
+	}
+
 	return filepath.Join(nextList...), _type
 }
 
@@ -250,10 +255,25 @@ func calcRoutes(projectName, fp string, userRedirects []*RedirectRule) []*HttpRe
 			userReply := []*HttpReply{}
 			var rule *HttpReply
 			if redirect.To != "" {
-				rule = &HttpReply{
-					Filepath: route,
-					Status:   redirect.Status,
-					Query:    redirect.Query,
+				// expand redirect target to find actual file (e.g., directory -> index.html)
+				// but only if Force is true, it's not a full URL, and it's a directory path (ends with / but not just /)
+				if redirect.Force && !hasProtocol(redirect.To) && strings.HasSuffix(route, "/") && route != "/" {
+					expanded := expandRoute(projectName, route, redirect.Status)
+					if len(expanded) > 0 {
+						rule = expanded[0]
+					} else {
+						rule = &HttpReply{
+							Filepath: route,
+							Status:   redirect.Status,
+							Query:    redirect.Query,
+						}
+					}
+				} else {
+					rule = &HttpReply{
+						Filepath: route,
+						Status:   redirect.Status,
+						Query:    redirect.Query,
+					}
 				}
 				userReply = append(userReply, rule)
 			}
