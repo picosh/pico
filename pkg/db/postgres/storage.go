@@ -1369,7 +1369,7 @@ func (me *PsqlDB) AddPicoPlusUser(username, email, paymentType, txId string) err
 
 	plus := me.createFeatureExpiresAt(user.ID, "plus")
 	plusQuery := fmt.Sprintf(`INSERT INTO feature_flags (user_id, name, data, expires_at, payment_history_id)
-	VALUES ($1, 'plus', '{"storage_max":10000000000, "file_max":50000000, "email": "%s"}'::jsonb, $2, $3);`, email)
+	VALUES ($1, 'plus', '{"storage_max":10000000000, "file_max":250000000, "email": "%s"}'::jsonb, $2, $3);`, email)
 	_, err = tx.Exec(plusQuery, user.ID, plus, paymentHistoryId)
 	if err != nil {
 		return err
