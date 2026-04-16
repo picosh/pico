@@ -49,6 +49,7 @@ func (m *PlusPage) header(ctx vxfw.DrawContext) vxfw.Surface {
 		{Text: "• tuns\n"},
 		{Text: "  • per-site analytics\n"},
 		{Text: "• pgs\n"},
+		{Text: "  • per-file max size 100mb\n"},
 		{Text: "  • per-site analytics\n"},
 		{Text: "• prose\n"},
 		{Text: "  • blog analytics\n"},
