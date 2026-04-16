@@ -1448,8 +1448,8 @@ func TestFeatureFlagData_JSONBRoundtrip(t *testing.T) {
 	if feature.Data.StorageMax != 10000000000 {
 		t.Errorf("expected StorageMax 10000000000, got %d", feature.Data.StorageMax)
 	}
-	if feature.Data.FileMax != 250000000 {
-		t.Errorf("expected FileMax 250000000, got %d", feature.Data.FileMax)
+	if feature.Data.FileMax != 100000000 {
+		t.Errorf("expected FileMax 100000000, got %d", feature.Data.FileMax)
 	}
 }
 
