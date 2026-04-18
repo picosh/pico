@@ -18,3 +18,16 @@ select
 from app_users
 group by month
 order by month DESC;
+
+select
+  count(id) as subs,
+  date_trunc('month', created_at) as month
+from feature_flags
+where name = 'plus' and expires_at > now()
+group by month
+order by month DESC;
+
+select
+	count(*) as total_subs
+from feature_flags
+where name = 'plus' and expires_at > now();
