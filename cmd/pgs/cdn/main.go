@@ -63,7 +63,13 @@ func newProxyServe(logger *slog.Logger) *proxyServe {
 }
 
 func (p *proxyServe) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	target, _ := url.Parse(partialURL(req))
+	// Dial ash.pgs.sh but keep the original Host header so ash.pgs.sh
+	// can route the request to the correct subdomain (zmx.sh, etc.).
+	// Without the Host header, ash.pgs.sh serves its default vhost (HTML).
+	target, _ := url.Parse("https://ash.pgs.sh" + req.URL.Path)
+	if req.URL.RawQuery != "" {
+		target.RawQuery = req.URL.RawQuery
+	}
 	p.Logger.Info("proxying request to ash.pgs.sh", "url", target.String())
 
 	proxyReq := req.Clone(req.Context())
@@ -72,6 +78,8 @@ func (p *proxyServe) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	proxyReq.URL.Path = target.Path
 	proxyReq.URL.RawQuery = target.RawQuery
 	proxyReq.RequestURI = ""
+	// Preserve the original Host header so ash.pgs.sh routes correctly.
+	proxyReq.Host = req.Host
 
 	resp, err := p.transport.RoundTrip(proxyReq)
 	if err != nil {
@@ -121,12 +129,4 @@ func (c *cachedHttp) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
 	}
 
 	c.Cache.ServeHTTP(writer, req)
-}
-
-func partialURL(r *http.Request) string {
-	builder := strings.Builder{}
-	// this service sits behind a proxy so we need to force it to https
-	builder.WriteString("https://")
-	builder.WriteString(r.Host)
-	return builder.String()
 }
