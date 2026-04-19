@@ -44,6 +44,7 @@ func (c *PgsCacheKey) GetCacheKey(r *http.Request) string {
 }
 
 type PromCacheMetrics struct {
+	Logger         *slog.Logger
 	Cache          httpcache.Cacher
 	CacheItems     prometheus.Gauge
 	CacheSizeBytes prometheus.Gauge
@@ -52,10 +53,11 @@ type PromCacheMetrics struct {
 	UpstreamReq    prometheus.Counter
 }
 
-func NewPromCacheMetrics(reg prometheus.Registerer) *PromCacheMetrics {
+func NewPromCacheMetrics(logger *slog.Logger, reg prometheus.Registerer) *PromCacheMetrics {
 	name := "pgs"
 	auto := promauto.With(reg)
 	return &PromCacheMetrics{
+		Logger: logger,
 		CacheItems: auto.NewGauge(prometheus.GaugeOpts{
 			Namespace: name,
 			Subsystem: "http_cache",
@@ -93,6 +95,7 @@ func (p *PromCacheMetrics) AddCacheItem(size float64) {
 	p.CacheSizeBytes.Add(size)
 }
 func (p *PromCacheMetrics) EvictCacheItem(key string, value []byte) {
+	p.Logger.Info("evicting cache key", "key", key, "len_bytes", len(value))
 	p.CacheItems.Add(-1)
 	p.CacheSizeBytes.Add(-float64(len(value)))
 }
@@ -108,7 +111,7 @@ func (p *PromCacheMetrics) AddUpstreamRequest() {
 
 func NewPgsHttpCache(cfg *PgsConfig, upstream http.Handler) *httpcache.HttpCache {
 	ttl := cfg.CacheTTL
-	metrics := NewPromCacheMetrics(prometheus.DefaultRegisterer)
+	metrics := NewPromCacheMetrics(cfg.Logger, prometheus.DefaultRegisterer)
 	cache := expirable.NewLRU(0, metrics.EvictCacheItem, ttl)
 	httpCache := &httpcache.HttpCache{
 		Ttl:      ttl,
