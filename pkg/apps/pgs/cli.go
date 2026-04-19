@@ -543,7 +543,7 @@ func (c *Cmd) cacheAll() error {
 	isAdmin := false
 	ff, _ := c.Dbpool.FindFeature(c.User.ID, "admin")
 	if ff != nil {
-		if ff.ExpiresAt.Before(time.Now()) {
+		if ff.ExpiresAt.After(time.Now()) {
 			isAdmin = true
 		}
 	}
