@@ -914,6 +914,59 @@ func readBody(resp *http.Response) (string, error) {
 	return string(buf), nil
 }
 
+// Regression: a 304 from cache validation must include the cached response
+// headers (ETag, Content-Type, Cache-Control, etc.) so the browser can match
+// the 304 to its local cached body. Without them browsers show a blank page.
+func TestCache304IncludesCachedHeaders(t *testing.T) {
+	logger := slog.Default()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("etag", "\"abc\"")
+		w.Header().Set("content-type", "text/html; charset=utf-8")
+		w.Header().Set("cache-control", "max-age=300")
+		w.WriteHeader(200)
+		_, _ = w.Write([]byte("<h1>hello</h1>"))
+	})
+
+	handler := NewHttpCache(logger, mux)
+	tc := NewTestContext(t, handler)
+	req, _ := http.NewRequest("GET", tc.cachedServer.URL+"/test", nil)
+
+	// Populate cache with a fresh entry that has ETag, Content-Type, Cache-Control
+	cacheKey := handler.GetCacheKey(req)
+	cv := testCacheValue(10 * time.Second)
+	cv.Header["ETag"] = []string{"\"abc\""}
+	cv.Header["Content-Type"] = []string{"text/html; charset=utf-8"}
+	cv.Header["Cache-Control"] = []string{"max-age=300"}
+	cv.Body = []byte("<h1>hello</h1>")
+	cacheData, _ := json.Marshal(cv)
+	handler.Cache.Add(cacheKey, cacheData)
+
+	// Send conditional request that triggers a 304 from the cache layer
+	resp, _ := tc.DoWithHeaders(req, map[string][]string{
+		"If-None-Match": {"\"abc\""},
+	})
+	if resp.StatusCode != http.StatusNotModified {
+		t.Fatalf("expected 304, got %d", resp.StatusCode)
+	}
+
+	// The 304 must carry the cached headers so the browser can use them
+	// Note: Go's HTTP server strips Content-Type on 304 responses, which is fine
+	// per RFC 9110 — the browser already has it from the original 200.
+	if got := resp.Header.Get("ETag"); got != "\"abc\"" {
+		t.Errorf("expected ETag %q, got %q", "\"abc\"", got)
+	}
+	if got := resp.Header.Get("Cache-Control"); got != "max-age=300" {
+		t.Errorf("expected Cache-Control %q, got %q", "max-age=300", got)
+	}
+
+	// Body must be empty per RFC 9110 15.4.5
+	body, _ := readBody(resp)
+	if body != "" {
+		t.Errorf("expected empty body for 304, got %q", body)
+	}
+}
+
 func TestCacheAgeTtl(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

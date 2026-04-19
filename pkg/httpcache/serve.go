@@ -594,7 +594,18 @@ func (c *HttpCache) maybeUseCache(cacheKey string, w http.ResponseWriter, r *htt
 	if valid {
 		// RFC 9111 4.3.4 304 Not Modified
 		// https://www.rfc-editor.org/rfc/rfc9111.html#section-4.3.4
-		w.Header().Set("cache-status", cacheStatusHit(cacheKey, c.Ttl.Seconds()))
+		// A 304 response must include headers the client needs to update
+		// its cached representation (ETag, Last-Modified, Cache-Control, etc.)
+		hdr := w.Header()
+		for key, values := range cacheValue.Header {
+			if isForbiddenHeader(key) {
+				continue
+			}
+			for _, value := range values {
+				hdr.Add(key, value)
+			}
+		}
+		hdr.Set("cache-status", cacheStatusHit(cacheKey, c.Ttl.Seconds()))
 		w.WriteHeader(status)
 		return nil
 	}
