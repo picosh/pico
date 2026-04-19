@@ -45,10 +45,11 @@ func (p *DefaultCacheMetrics) AddUpstreamRequest()  {}
 type HttpCache struct {
 	CacheKey
 	CacheMetrics
-	Ttl      time.Duration
-	Upstream http.Handler
-	Cache    Cacher
-	Logger   *slog.Logger
+	Ttl          time.Duration
+	Upstream     http.Handler
+	Cache        Cacher
+	Logger       *slog.Logger
+	IgnoreRoutes []string
 }
 
 func NewHttpCache(log *slog.Logger, upstream http.Handler) *HttpCache {
@@ -71,6 +72,15 @@ func (c *HttpCache) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "upstream http handler not found", http.StatusNotFound)
 		return
 	}
+
+	reqUri := r.URL.RequestURI()
+	for _, uri := range c.IgnoreRoutes {
+		if uri == reqUri {
+			c.Upstream.ServeHTTP(w, r)
+			return
+		}
+	}
+
 	cacheKey := c.GetCacheKey(r)
 	log := c.Logger.With("cache_key", cacheKey)
 

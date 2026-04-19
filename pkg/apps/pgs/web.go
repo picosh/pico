@@ -120,6 +120,7 @@ func NewPgsHttpCache(cfg *PgsConfig, upstream http.Handler) *httpcache.HttpCache
 			TxtPrefix: cfg.TxtPrefix,
 		},
 		CacheMetrics: metrics,
+		IgnoreRoutes: []string{"/check", "/_metrics"},
 	}
 	httpCache.Logger.Info("httpcache initiated", "ttl", httpCache.Ttl, "storage", "lru")
 	return httpCache
