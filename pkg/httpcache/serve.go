@@ -73,7 +73,7 @@ func (c *HttpCache) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	reqUri := r.URL.RequestURI()
+	reqUri := r.URL.Path
 	for _, uri := range c.IgnoreRoutes {
 		if uri == reqUri {
 			c.Upstream.ServeHTTP(w, r)
