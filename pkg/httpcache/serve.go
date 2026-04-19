@@ -19,7 +19,13 @@ type CacheKey interface {
 type DefaultCacheKey struct{}
 
 func (p *DefaultCacheKey) GetCacheKey(r *http.Request) string {
-	return r.Host + "__" + r.Method + "__" + r.URL.RequestURI()
+	// RFC 9111 §3: HEAD responses can be served from a stored GET response.
+	// Normalize HEAD to GET so both methods share the same cache entry.
+	method := r.Method
+	if method == http.MethodHead {
+		method = http.MethodGet
+	}
+	return r.Host + "__" + method + "__" + r.URL.RequestURI()
 }
 
 type CacheMetrics interface {

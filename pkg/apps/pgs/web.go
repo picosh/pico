@@ -35,7 +35,12 @@ type PgsCacheKey struct {
 
 func (c *PgsCacheKey) GetCacheKey(r *http.Request) string {
 	subdomain := router.GetSubdomainFromRequest(r, c.Domain, c.TxtPrefix)
-	return subdomain + "__" + r.Method + "__" + r.URL.RequestURI()
+	// RFC 9111 §3: HEAD responses can be served from a stored GET response.
+	method := r.Method
+	if method == http.MethodHead {
+		method = http.MethodGet
+	}
+	return subdomain + "__" + method + "__" + r.URL.RequestURI()
 }
 
 type PromCacheMetrics struct {
