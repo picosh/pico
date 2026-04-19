@@ -71,19 +71,19 @@ func NewPromCacheMetrics(reg prometheus.Registerer) *PromCacheMetrics {
 		CacheHit: auto.NewCounter(prometheus.CounterOpts{
 			Namespace: name,
 			Subsystem: "http_cache",
-			Name:      "cache_hit",
+			Name:      "cache_hit_count",
 			Help:      "The number of times there was a cache hit",
 		}),
 		CacheMiss: auto.NewCounter(prometheus.CounterOpts{
 			Namespace: name,
 			Subsystem: "http_cache",
-			Name:      "cache_miss",
+			Name:      "cache_miss_count",
 			Help:      "The number of times there was a cache miss",
 		}),
 		UpstreamReq: auto.NewCounter(prometheus.CounterOpts{
 			Namespace: name,
 			Subsystem: "http_cache",
-			Name:      "upstream_request",
+			Name:      "upstream_request_count",
 			Help:      "The number of times the upstream http server was requested",
 		}),
 	}

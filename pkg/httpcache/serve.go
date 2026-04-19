@@ -163,9 +163,7 @@ func (c *HttpCache) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					if isForbiddenHeader(key) {
 						continue
 					}
-					for _, value := range values {
-						hdr.Add(key, value)
-					}
+					hdr[key] = values
 				}
 				ageDur := calcAge(cacheValue.CreatedAt)
 				hdr.Set("age", strconv.Itoa(int(ageDur.Seconds())+1))
@@ -217,15 +215,13 @@ func serveCache(w http.ResponseWriter, freshness time.Duration, cacheKey string,
 		if isForbiddenHeader(key) {
 			continue
 		}
-		for _, value := range values {
-			hdr.Add(key, value)
-		}
+		hdr[key] = values
 	}
 
 	ageDur := calcAge(cacheValue.CreatedAt)
 	age := ageDur.Seconds()
-	hdr.Add("age", strconv.Itoa(int(age)+1))
-	hdr.Add("cache-status", cacheStatusHit(cacheKey, freshness.Seconds()))
+	hdr.Set("age", strconv.Itoa(int(age)+1))
+	hdr.Set("cache-status", cacheStatusHit(cacheKey, freshness.Seconds()))
 	if cacheValue.StatusCode != 0 && cacheValue.StatusCode != http.StatusOK {
 		w.WriteHeader(cacheValue.StatusCode)
 	}
@@ -652,9 +648,7 @@ func (c *HttpCache) maybeUseCache(cacheKey string, w http.ResponseWriter, r *htt
 			if isForbiddenHeader(key) {
 				continue
 			}
-			for _, value := range values {
-				hdr.Add(key, value)
-			}
+			hdr[key] = values
 		}
 		ageDur := calcAge(cacheValue.CreatedAt)
 		hdr.Set("age", strconv.Itoa(int(ageDur.Seconds())+1))
