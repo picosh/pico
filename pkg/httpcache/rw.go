@@ -15,11 +15,9 @@ func (rw *responseWriter) WriteHeader(code int) {
 	rw.statusCode = code
 }
 
-// TODO: is there a way to preserve streaming to the base response writer while being able to set headers?
 func (rw *responseWriter) Write(data []byte) (int, error) {
 	rw.body = append(rw.body, data...)
-	// return rw.ResponseWriter.Write(data)
-	return 0, nil
+	return len(data), nil
 }
 
 // Body returns the captured response body.
@@ -37,6 +35,11 @@ func (rw *responseWriter) StatusCode() int {
 
 func (rw *responseWriter) Send() {
 	rw.ResponseWriter.WriteHeader(rw.StatusCode())
+	// RFC 9110 15.4.5: 304 responses MUST NOT contain a body.
+	if rw.StatusCode() == http.StatusNotModified {
+		return
+	}
+	_, _ = rw.ResponseWriter.Write(rw.body)
 }
 
 func (rw *responseWriter) ToCacheValue() *CacheValue {

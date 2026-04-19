@@ -147,16 +147,6 @@ func (c *HttpCache) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	wrapped.Send()
-	// RFC 9110 15.4.5: 304 responses MUST NOT contain a body.
-	// Skip writing body for 304 responses even if upstream wrote one.
-	var total int
-	if wrapped.StatusCode() != http.StatusNotModified {
-		total, err = wrapped.ResponseWriter.Write(wrapped.Body())
-	}
-	log.Info("response writer", "bytes_written", total)
-	if err != nil {
-		log.Error("response writer write", "err", err)
-	}
 }
 
 // isForbiddenHeader checks if a header should not be stored/served per RFC 9111 Section 3.1

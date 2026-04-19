@@ -799,6 +799,121 @@ func TestCache304NotModifiedMerge(t *testing.T) {
 	}
 }
 
+func TestCacheUpstreamResponseBody(t *testing.T) {
+	expectedBody := strings.Repeat("hello world! ", 1000)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("content-length", strconv.Itoa(len(expectedBody)))
+		w.WriteHeader(200)
+		_, _ = w.Write([]byte(expectedBody))
+	})
+
+	logger := slog.Default()
+	handler := NewHttpCache(logger, mux)
+	tc := NewTestContext(t, handler)
+	req, _ := http.NewRequest("GET", tc.cachedServer.URL+"/test", nil)
+
+	// first request goes to upstream
+	resp1, _ := tc.Do(req)
+	if resp1.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp1.StatusCode)
+	}
+	body1, _ := readBody(resp1)
+	if body1 != expectedBody {
+		t.Errorf("upstream body mismatch: got %d bytes, want %d bytes", len(body1), len(expectedBody))
+	}
+
+	// second request served from cache
+	resp2, _ := tc.Do(req)
+	if resp2.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp2.StatusCode)
+	}
+	body2, _ := readBody(resp2)
+	if body2 != expectedBody {
+		t.Errorf("cached body mismatch: got %d bytes, want %d bytes", len(body2), len(expectedBody))
+	}
+}
+
+func TestCacheUpstreamStatusCode(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(201)
+		_, _ = w.Write([]byte("created"))
+	})
+
+	logger := slog.Default()
+	handler := NewHttpCache(logger, mux)
+	tc := NewTestContext(t, handler)
+	req, _ := http.NewRequest("GET", tc.cachedServer.URL+"/test", nil)
+
+	resp, _ := tc.Do(req)
+	if resp.StatusCode != 201 {
+		t.Errorf("expected 201, got %d", resp.StatusCode)
+	}
+	body, _ := readBody(resp)
+	if body != "created" {
+		t.Errorf("expected body 'created', got %q", body)
+	}
+}
+
+// RFC 9110 15.4.5: 304 responses MUST NOT contain a body.
+// Even if the upstream handler writes body bytes with a 304,
+// the cache layer must strip them before sending to the client.
+func TestCache304NoBody(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("If-None-Match") == "\"abc\"" {
+			w.WriteHeader(http.StatusNotModified)
+			// Misbehaving upstream writes body alongside 304
+			_, _ = w.Write([]byte("should not appear"))
+			return
+		}
+		w.Header().Set("etag", "\"abc\"")
+		w.Header().Set("cache-control", "max-age=60, must-revalidate")
+		w.WriteHeader(200)
+		_, _ = w.Write([]byte("original body"))
+	})
+
+	logger := slog.Default()
+	handler := NewHttpCache(logger, mux)
+	tc := NewTestContext(t, handler)
+
+	req, _ := http.NewRequest("GET", tc.cachedServer.URL+"/test", nil)
+
+	// Populate cache with a stale must-revalidate entry so revalidation is triggered
+	cacheKey := handler.GetCacheKey(req)
+	cv := testCacheValue(250 * time.Second)
+	cv.Header["ETag"] = []string{"\"abc\""}
+	cv.Header["Cache-Control"] = []string{"max-age=60, must-revalidate"}
+	cv.Body = []byte("original body")
+	cacheData, _ := json.Marshal(cv)
+	handler.Cache.Add(cacheKey, cacheData)
+
+	// Trigger revalidation — upstream returns 304 with a spurious body
+	resp, _ := tc.Do(req)
+	if resp.StatusCode != http.StatusNotModified {
+		t.Fatalf("expected 304, got %d", resp.StatusCode)
+	}
+	body, _ := readBody(resp)
+	if body != "" {
+		t.Errorf("expected empty body for 304 response, got %q", body)
+	}
+}
+
+func readBody(resp *http.Response) (string, error) {
+	defer resp.Body.Close() //nolint:errcheck
+	buf := make([]byte, 0, 64*1024)
+	tmp := make([]byte, 4096)
+	for {
+		n, err := resp.Body.Read(tmp)
+		buf = append(buf, tmp[:n]...)
+		if err != nil {
+			break
+		}
+	}
+	return string(buf), nil
+}
+
 func TestCacheAgeTtl(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
