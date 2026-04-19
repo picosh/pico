@@ -90,6 +90,12 @@ func (c *HttpCache) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// RFC 9111 4.2.4 + 4.3.1/4.3.2: stale must-revalidate entries must be
 	// revalidated with conditional headers derived from the stored response.
+	// Preserve original client conditional headers so we can evaluate them
+	// after revalidation to decide whether the client gets 304 or 200.
+	clientIfNoneMatch := r.Header.Get("If-None-Match")
+	clientIfModifiedSince := r.Header.Get("If-Modified-Since")
+	clientConditional := clientIfNoneMatch != "" || clientIfModifiedSince != ""
+
 	if err.Error() == "cache is stale and must-revalidate requires revalidation" {
 		if cachedData, exists := c.Cache.Get(cacheKey); exists {
 			var cachedValue CacheValue
@@ -114,22 +120,58 @@ func (c *HttpCache) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if wrapped.StatusCode() == http.StatusNotModified {
 		log.Info("304 not modified, updating cached headers")
 		existingData, exists := c.Cache.Get(cacheKey)
-		if exists {
-			var cacheValue CacheValue
-			if json.Unmarshal(existingData, &cacheValue) == nil {
-				// Merge headers from the 304 response into the cached entry.
-				for key, values := range wrapped.Header() {
-					cacheValue.Header[key] = values
+		if !exists {
+			// Cache entry vanished; forward the 304 as-is.
+			wrapped.Send()
+			return
+		}
+
+		var cacheValue CacheValue
+		if json.Unmarshal(existingData, &cacheValue) != nil {
+			wrapped.Send()
+			return
+		}
+
+		// Merge non-forbidden headers from the 304 response into the cached entry.
+		for key, values := range wrapped.Header() {
+			if isForbiddenHeader(key) {
+				continue
+			}
+			cacheValue.Header[key] = values
+		}
+		// Revalidation refreshes the entry — reset CreatedAt so it's fresh again.
+		cacheValue.CreatedAt = time.Now()
+		enc, _ := json.Marshal(cacheValue)
+		c.Cache.Add(cacheKey, enc)
+		c.AddCacheItem(float64(len(enc)))
+
+		if clientConditional {
+			// Client sent conditional headers — re-evaluate against the
+			// updated cached entry and return 304 if it still matches.
+			r.Header.Set("If-None-Match", clientIfNoneMatch)
+			r.Header.Set("If-Modified-Since", clientIfModifiedSince)
+			valid, status := c.handleValidation(r, &cacheValue)
+			if valid {
+				hdr := w.Header()
+				for key, values := range cacheValue.Header {
+					if isForbiddenHeader(key) {
+						continue
+					}
+					for _, value := range values {
+						hdr.Add(key, value)
+					}
 				}
-				// Revalidation refreshes the entry — reset CreatedAt so it's fresh again.
-				cacheValue.CreatedAt = time.Now()
-				enc, _ := json.Marshal(cacheValue)
-				c.Cache.Add(cacheKey, enc)
-				c.AddCacheItem(float64(len(enc)))
+				ageDur := calcAge(cacheValue.CreatedAt)
+				hdr.Set("age", strconv.Itoa(int(ageDur.Seconds())+1))
+				hdr.Set("cache-status", cacheStatusHit(cacheKey, c.Ttl.Seconds()))
+				w.WriteHeader(status)
+				return
 			}
 		}
-		wrapped.Header().Set("cache-status", cacheStatusHit(cacheKey, c.Ttl.Seconds()))
-		wrapped.Send()
+
+		// Client request was unconditional (or conditional but no longer matches) —
+		// serve the full cached response.
+		serveCache(w, c.Ttl, cacheKey, &cacheValue)
 		return
 	}
 
@@ -154,8 +196,8 @@ func (c *HttpCache) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func isForbiddenHeader(key string) bool {
 	switch strings.ToLower(key) {
 	case "connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
-		"teardown", "transfer-encoding", "upgrade", "proxy-connection",
-		"www-authenticate", "proxy-authentication-info":
+		"te", "trailer", "transfer-encoding", "upgrade", "proxy-connection",
+		"proxy-authentication-info":
 		return true
 	default:
 		return false
@@ -178,6 +220,9 @@ func serveCache(w http.ResponseWriter, freshness time.Duration, cacheKey string,
 	age := ageDur.Seconds()
 	hdr.Add("age", strconv.Itoa(int(age)+1))
 	hdr.Add("cache-status", cacheStatusHit(cacheKey, freshness.Seconds()))
+	if cacheValue.StatusCode != 0 && cacheValue.StatusCode != http.StatusOK {
+		w.WriteHeader(cacheValue.StatusCode)
+	}
 	_, _ = w.Write(cacheValue.Body)
 }
 
@@ -605,6 +650,8 @@ func (c *HttpCache) maybeUseCache(cacheKey string, w http.ResponseWriter, r *htt
 				hdr.Add(key, value)
 			}
 		}
+		ageDur := calcAge(cacheValue.CreatedAt)
+		hdr.Set("age", strconv.Itoa(int(ageDur.Seconds())+1))
 		hdr.Set("cache-status", cacheStatusHit(cacheKey, c.Ttl.Seconds()))
 		w.WriteHeader(status)
 		return nil

@@ -765,12 +765,15 @@ func TestCache304NotModifiedMerge(t *testing.T) {
 	cacheData, _ := json.Marshal(staleCv)
 	handler.Cache.Add(cacheKey, cacheData)
 
-	// First request with If-None-Match triggers validation; origin returns 304
+	// First request with If-None-Match triggers validation; origin returns 304.
+	// Client sent conditional headers, so if they still match the updated cache
+	// entry, the client gets 304. Here the upstream updated the ETag to "abc-updated"
+	// so the client's If-None-Match "abc" no longer matches — serve cached body as 200.
 	resp1, _ := tc.DoWithHeaders(req, map[string][]string{
 		"If-None-Match": {"\"abc\""},
 	})
-	if resp1.StatusCode != http.StatusNotModified {
-		t.Errorf("expected 304, got %d", resp1.StatusCode)
+	if resp1.StatusCode != http.StatusOK {
+		t.Errorf("expected 200 (ETag changed after revalidation), got %d", resp1.StatusCode)
 	}
 	status := resp1.Header.Get("cache-status")
 	if !strings.Contains(status, "hit") {
@@ -889,14 +892,15 @@ func TestCache304NoBody(t *testing.T) {
 	cacheData, _ := json.Marshal(cv)
 	handler.Cache.Add(cacheKey, cacheData)
 
-	// Trigger revalidation — upstream returns 304 with a spurious body
+	// Trigger revalidation — upstream returns 304 with a spurious body.
+	// Client request is unconditional, so cache serves the stored body as 200.
 	resp, _ := tc.Do(req)
-	if resp.StatusCode != http.StatusNotModified {
-		t.Fatalf("expected 304, got %d", resp.StatusCode)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
 	body, _ := readBody(resp)
-	if body != "" {
-		t.Errorf("expected empty body for 304 response, got %q", body)
+	if body != "original body" {
+		t.Errorf("expected cached body 'original body', got %q", body)
 	}
 }
 
@@ -1075,8 +1079,10 @@ func TestCacheMustRevalidateRevalidationHeaders(t *testing.T) {
 
 			resp, _ := tc.Do(req)
 
-			if resp.StatusCode != http.StatusNotModified {
-				t.Errorf("expected 304, got %d", resp.StatusCode)
+			// Client request is unconditional — after upstream 304, cache
+			// serves the stored body as 200.
+			if resp.StatusCode != http.StatusOK {
+				t.Errorf("expected 200, got %d", resp.StatusCode)
 			}
 			status := resp.Header.Get("cache-status")
 			if !strings.Contains(status, "hit") {
