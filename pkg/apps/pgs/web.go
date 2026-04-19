@@ -60,7 +60,7 @@ func NewPromCacheMetrics(reg prometheus.Registerer) *PromCacheMetrics {
 		CacheSizeBytes: auto.NewGauge(prometheus.GaugeOpts{
 			Namespace: name,
 			Subsystem: "http_cache",
-			Name:      "total_size",
+			Name:      "total_size_bytes",
 			Help:      "The total size of the http cache in bytes",
 		}),
 		CacheHit: auto.NewCounter(prometheus.CounterOpts{
