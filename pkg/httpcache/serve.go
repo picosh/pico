@@ -434,15 +434,17 @@ func isResponseCachable(r *http.Request, resp *responseWriter) error {
 	return nil
 }
 
-// isCacheableStatusCode checks if the status code is cacheable per RFC 9110 Section 15.1-2
-// RFC 9110 15.1-2: 200, 203, 204, 206, 300, 301, 308, 404, 405, 410, 414, and 501.
+// RFC 9110 15.1-2: Heuristically cachable status codes
+// 200, 203, 204,
+// 206, 300, 301,
+// 308, 404, 405,
+// 410, 414, 501.
 func isCacheableStatusCode(code int) bool {
 	switch code {
-	case http.StatusOK, http.StatusMultipleChoices, http.StatusMovedPermanently, http.StatusFound,
-		http.StatusSeeOther, http.StatusUseProxy, http.StatusTemporaryRedirect,
-		http.StatusPermanentRedirect, http.StatusPartialContent, http.StatusMultiStatus,
-		http.StatusAlreadyReported, http.StatusIMUsed, http.StatusNotImplemented, http.StatusBadGateway,
-		http.StatusServiceUnavailable, http.StatusGatewayTimeout, http.StatusHTTPVersionNotSupported:
+	case http.StatusOK, http.StatusNonAuthoritativeInfo, http.StatusNoContent,
+		http.StatusPartialContent, http.StatusMultipleChoices, http.StatusMovedPermanently,
+		http.StatusPermanentRedirect, http.StatusNotFound, http.StatusMethodNotAllowed,
+		http.StatusGone, http.StatusRequestURITooLong, http.StatusNotImplemented:
 		return true
 	default:
 		return false
