@@ -266,8 +266,15 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Default cache: short TTL then must revalidate using ETag
-	w.Header().Set("cache-control", "max-age=60, must-revalidate")
+	// Default cache:
+	//   short TTL for private caches (browser),
+	//   long TTL for shared cache (our cache),
+	//   then must revalidate using ETag
+	cc := fmt.Sprintf(
+		"max-age=60, s-maxage=%0.f must-revalidate",
+		h.Cfg.CacheTTL.Seconds(),
+	)
+	w.Header().Set("cache-control", cc)
 
 	for _, hdr := range userHeaders {
 		w.Header().Add(hdr.Name, hdr.Value)

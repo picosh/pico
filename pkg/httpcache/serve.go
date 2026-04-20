@@ -733,7 +733,6 @@ func parseHeaderTime(cc string, prefix string) time.Duration {
 // https://www.rfc-editor.org/rfc/rfc9111#section-4.2.1
 func calcFreshness(state cacheControlState, expires time.Time, age time.Duration, defaultTtl time.Duration) time.Duration {
 	ttl := defaultTtl
-	// s-maxage uses hyphen (s-maxage), max-age uses hyphen (max-age)
 	smaxAgeDur := state.sharedMaxAge
 	maxAgeDur := state.maxAge
 	remExpires := time.Until(expires)
