@@ -45,11 +45,10 @@ func (p *DefaultCacheMetrics) AddUpstreamRequest()  {}
 type HttpCache struct {
 	CacheKey
 	CacheMetrics
-	Ttl          time.Duration
-	Upstream     http.Handler
-	Cache        Cacher
-	Logger       *slog.Logger
-	IgnoreRoutes []string
+	Ttl      time.Duration
+	Upstream http.Handler
+	Cache    Cacher
+	Logger   *slog.Logger
 }
 
 func NewHttpCache(log *slog.Logger, upstream http.Handler) *HttpCache {
@@ -71,14 +70,6 @@ func (c *HttpCache) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if c.Upstream == nil {
 		http.Error(w, "upstream http handler not found", http.StatusNotFound)
 		return
-	}
-
-	reqUri := r.URL.Path
-	for _, uri := range c.IgnoreRoutes {
-		if uri == reqUri {
-			c.Upstream.ServeHTTP(w, r)
-			return
-		}
 	}
 
 	cacheKey := c.GetCacheKey(r)
@@ -155,7 +146,7 @@ func (c *HttpCache) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 			cacheValue.Header[key] = values
 		}
-		// Revalidation refreshes the entry — reset CreatedAt so it's fresh again.
+		// Revalidation refreshes the entry -- reset CreatedAt so it's fresh again.
 		cacheValue.CreatedAt = time.Now()
 		enc, _ := json.Marshal(cacheValue)
 		c.Cache.Remove(cacheKey)
@@ -163,7 +154,7 @@ func (c *HttpCache) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		c.AddCacheItem(float64(len(enc)))
 
 		if clientConditional {
-			// Client sent conditional headers — re-evaluate against the
+			// Client sent conditional headers -- re-evaluate against the
 			// updated cached entry and return 304 if it still matches.
 			r.Header.Set("If-None-Match", clientIfNoneMatch)
 			r.Header.Set("If-Modified-Since", clientIfModifiedSince)
@@ -184,7 +175,7 @@ func (c *HttpCache) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		// Client request was unconditional (or conditional but no longer matches) —
+		// Client request was unconditional (or conditional but no longer matches)
 		// serve the full cached response.
 		serveCache(w, c.Ttl, cacheKey, &cacheValue)
 		return

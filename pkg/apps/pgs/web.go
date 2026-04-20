@@ -123,7 +123,6 @@ func NewPgsHttpCache(cfg *PgsConfig, upstream http.Handler) *httpcache.HttpCache
 			TxtPrefix: cfg.TxtPrefix,
 		},
 		CacheMetrics: metrics,
-		IgnoreRoutes: []string{"/check", "/_metrics"},
 	}
 	httpCache.Logger.Info("httpcache initiated", "ttl", httpCache.Ttl, "storage", "lru")
 	return httpCache
@@ -212,7 +211,11 @@ func (web *WebRouter) initRouters() {
 	// root domain
 	rootRouter := http.NewServeMux()
 	rootRouter.HandleFunc("GET /check", web.checkHandler)
-	rootRouter.HandleFunc("GET /_metrics", promhttp.Handler().ServeHTTP)
+	rootRouter.HandleFunc("GET /_metrics", func(w http.ResponseWriter, r *http.Request) {
+		// we do *not* want to cache this handler
+		w.Header().Set("cache-control", "no-store")
+		promhttp.Handler().ServeHTTP(w, r)
+	})
 	rootRouter.Handle("GET /main.css", web.serveFile("main.css", "text/css"))
 	rootRouter.Handle("GET /favicon-16x16.png", web.serveFile("favicon-16x16.png", "image/png"))
 	rootRouter.Handle("GET /favicon.ico", web.serveFile("favicon.ico", "image/x-icon"))
@@ -315,6 +318,9 @@ func (web *WebRouter) checkHandler(w http.ResponseWriter, r *http.Request) {
 
 	hostDomain := r.URL.Query().Get("domain")
 	appDomain := strings.Split(cfg.Domain, ":")[0]
+
+	// we do *not* want to cache this handler
+	w.Header().Set("cache-control", "no-store")
 
 	if !strings.Contains(hostDomain, appDomain) {
 		subdomain := router.GetCustomDomain(hostDomain, cfg.TxtPrefix)
