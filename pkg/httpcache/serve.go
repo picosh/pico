@@ -158,6 +158,7 @@ func (c *HttpCache) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// Revalidation refreshes the entry — reset CreatedAt so it's fresh again.
 		cacheValue.CreatedAt = time.Now()
 		enc, _ := json.Marshal(cacheValue)
+		c.Cache.Remove(cacheKey)
 		c.Cache.Add(cacheKey, enc)
 		c.AddCacheItem(float64(len(enc)))
 
@@ -194,6 +195,7 @@ func (c *HttpCache) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		log.Info("storing cache")
 		nextValue := wrapped.ToCacheValue()
 		enc, _ := json.Marshal(nextValue)
+		c.Cache.Remove(cacheKey)
 		c.Cache.Add(cacheKey, enc)
 		c.AddCacheItem(float64(len(enc)))
 		wrapped.Header().Set("cache-status", cacheStatusMiss(cacheKey, true))
