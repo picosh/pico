@@ -40,5 +40,4 @@ type ObjectStorage interface {
 type StorageServe interface {
 	BucketStorage
 	ObjectStorage
-	ServeObject(r *http.Request, bucket Bucket, fpath string, opts *ImgProcessOpts) (io.ReadCloser, *ObjectInfo, error)
 }

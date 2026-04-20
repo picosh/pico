@@ -6,14 +6,93 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
-	"io"
-	"log/slog"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
-	"time"
+
+	"github.com/picosh/pico/pkg/shared/mime"
 )
+
+type ImgProxy struct {
+	url      string
+	salt     string
+	key      string
+	filepath string
+	opts     *ImgProcessOpts
+}
+
+func NewImgProxy(fp string, opts *ImgProcessOpts) *ImgProxy {
+	return &ImgProxy{
+		url:      os.Getenv("IMGPROXY_URL"),
+		salt:     os.Getenv("IMGPROXY_SALT"),
+		key:      os.Getenv("IMGPROXY_KEY"),
+		filepath: fp,
+		opts:     opts,
+	}
+}
+
+func (img *ImgProxy) CanServe() error {
+	if img.url == "" {
+		return fmt.Errorf("no imgproxy url provided")
+	}
+	if img.opts == nil {
+		return fmt.Errorf("no image options provided")
+	}
+	mimeType := mime.GetMimeType(img.filepath)
+	if !strings.HasPrefix(mimeType, "image/") {
+		return fmt.Errorf("file mimetype not an image")
+	}
+	return nil
+}
+
+func (img *ImgProxy) GetSig(ppath []byte) string {
+	signature := "_"
+	imgProxySalt := img.salt
+	imgProxyKey := img.key
+	if imgProxySalt == "" || imgProxyKey == "" {
+		return signature
+	}
+
+	keyBin, err := hex.DecodeString(imgProxyKey)
+	if err != nil {
+		return signature
+	}
+
+	saltBin, err := hex.DecodeString(imgProxySalt)
+	if err != nil {
+		return signature
+	}
+
+	mac := hmac.New(sha256.New, keyBin)
+	mac.Write(saltBin)
+	mac.Write(ppath)
+	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+}
+
+func (img *ImgProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	dataURL := fmt.Sprintf("local:///%s", img.filepath)
+	imgProxyURL := img.url
+	processOpts := img.opts.String()
+	processPath := fmt.Sprintf(
+		"%s/%s",
+		processOpts,
+		base64.StdEncoding.EncodeToString([]byte(dataURL)),
+	)
+	sig := img.GetSig([]byte(processPath))
+
+	rurl := fmt.Sprintf("%s/%s%s", imgProxyURL, sig, processPath)
+	destUrl, err := url.Parse(rurl)
+	if err != nil {
+		msg := fmt.Sprintf("could not parse url: %s", rurl)
+		http.Error(w, msg, http.StatusInternalServerError)
+		return
+	}
+	proxy := httputil.NewSingleHostReverseProxy(destUrl)
+	proxy.ServeHTTP(w, r)
+}
 
 func UriToImgProcessOpts(uri string) (*ImgProcessOpts, error) {
 	opts := &ImgProcessOpts{}
@@ -129,74 +208,4 @@ func (img *ImgProcessOpts) String() string {
 	}
 
 	return processOpts
-}
-
-func HandleProxy(r *http.Request, logger *slog.Logger, dataURL string, opts *ImgProcessOpts) (io.ReadCloser, *ObjectInfo, error) {
-	imgProxyURL := os.Getenv("IMGPROXY_URL")
-	imgProxySalt := os.Getenv("IMGPROXY_SALT")
-	imgProxyKey := os.Getenv("IMGPROXY_KEY")
-
-	signature := "_"
-
-	processOpts := opts.String()
-
-	processPath := fmt.Sprintf("%s/%s", processOpts, base64.StdEncoding.EncodeToString([]byte(dataURL)))
-
-	if imgProxySalt != "" && imgProxyKey != "" {
-		keyBin, err := hex.DecodeString(imgProxyKey)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		saltBin, err := hex.DecodeString(imgProxySalt)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		mac := hmac.New(sha256.New, keyBin)
-		mac.Write(saltBin)
-		mac.Write([]byte(processPath))
-		signature = base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
-	}
-	proxyAddress := fmt.Sprintf("%s/%s%s", imgProxyURL, signature, processPath)
-
-	req, err := http.NewRequest(http.MethodGet, proxyAddress, nil)
-	if err != nil {
-		return nil, nil, err
-	}
-	req.Header.Set("accept", r.Header.Get("accept"))
-	req.Header.Set("accept-encoding", r.Header.Get("accept-encoding"))
-	req.Header.Set("accept-language", r.Header.Get("accept-language"))
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return nil, nil, fmt.Errorf("imgproxy returned %s", res.Status)
-	}
-	lastModified := res.Header.Get("Last-Modified")
-	parsedTime, err := time.Parse(time.RFC1123, lastModified)
-	if err != nil {
-		logger.Error("decoding last-modified", "err", err)
-	}
-	info := &ObjectInfo{
-		Size:     res.ContentLength,
-		ETag:     trimEtag(res.Header.Get("etag")),
-		Metadata: res.Header.Clone(),
-	}
-	if strings.HasPrefix(info.Metadata.Get("content-type"), "text/xml") {
-		info.Metadata.Set("content-type", "image/svg+xml")
-	}
-	if !parsedTime.IsZero() {
-		info.LastModified = parsedTime
-	}
-
-	return res.Body, info, nil
-}
-
-// trimEtag removes quotes from the etag header, which matches the behavior of the minio-go SDK.
-func trimEtag(etag string) string {
-	etag = strings.TrimPrefix(etag, "\"")
-	return strings.TrimSuffix(etag, "\"")
 }

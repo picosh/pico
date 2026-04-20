@@ -570,12 +570,15 @@ func (h *UploadAssetHandler) writeAsset(s *pssh.SSHServerConnSession, reader io.
 // per site per 5 seconds.
 func runCacheQueue(cfg *PgsConfig, ctx context.Context) {
 	var pendingFlushes sync.Map
-	tick := time.Tick(5 * time.Second)
+	tick := time.NewTicker(5 * time.Second)
+	defer tick.Stop()
 	for {
 		select {
+		case <-ctx.Done():
+			return
 		case host := <-cfg.CacheClearingQueue:
 			pendingFlushes.Store(host, host)
-		case <-tick:
+		case <-tick.C:
 			go func() {
 				pendingFlushes.Range(func(key, value any) bool {
 					pendingFlushes.Delete(key)

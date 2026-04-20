@@ -1,9 +1,9 @@
 package storage
 
 import (
+	"bytes"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,8 +11,13 @@ import (
 	"time"
 
 	"github.com/picosh/pico/pkg/send/utils"
-	"github.com/picosh/pico/pkg/shared/mime"
 )
+
+type seekableReader struct {
+	*bytes.Reader
+}
+
+func (s *seekableReader) Close() error { return nil }
 
 type StorageMemory struct {
 	storage map[string]map[string]string
@@ -97,8 +102,7 @@ func (s *StorageMemory) GetObject(bucket Bucket, fpath string) (utils.ReadAndRea
 	}
 
 	objInfo.Size = int64(len([]byte(dat)))
-	reader := utils.NopReadAndReaderAtCloser(strings.NewReader(dat))
-	return reader, objInfo, nil
+	return &seekableReader{bytes.NewReader([]byte(dat))}, objInfo, nil
 }
 
 func (s *StorageMemory) PutObject(bucket Bucket, fpath string, contents io.Reader, entry *utils.FileEntry) (string, int64, error) {
@@ -206,21 +210,4 @@ func (s *StorageMemory) ListObjects(bucket Bucket, dir string, recursive bool) (
 	}
 
 	return fileList, nil
-}
-
-func (s *StorageMemory) ServeObject(r *http.Request, bucket Bucket, fpath string, opts *ImgProcessOpts) (io.ReadCloser, *ObjectInfo, error) {
-	obj, info, err := s.GetObject(bucket, fpath)
-	if info.Metadata == nil {
-		info.Metadata = make(http.Header)
-	}
-	// Make tests work by supplying non-null Last-Modified and Etag values
-	if info.LastModified.IsZero() {
-		info.LastModified = time.Now().UTC()
-	}
-	if info.ETag == "" {
-		info.ETag = "static-etag-for-testing-purposes"
-	}
-	mimeType := mime.GetMimeType(fpath)
-	info.Metadata.Set("content-type", mimeType)
-	return obj, info, err
 }

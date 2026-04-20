@@ -84,7 +84,7 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	routes := calcRoutes(h.ProjectDir, fpath, redirects)
 
-	var contents io.ReadCloser
+	var contents io.ReadSeekCloser
 	assetFilepath := ""
 	var info *storage.ObjectInfo
 	status := http.StatusOK
@@ -134,39 +134,44 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				"status", fp.Status,
 			)
 
-			proxy := httputil.NewSingleHostReverseProxy(destUrl)
-			oldDirector := proxy.Director
-			proxy.Director = func(r *http.Request) {
-				oldDirector(r)
-				r.Host = destUrl.Host
-				r.URL = destUrl
-			}
-			// Disable caching
-			proxy.ModifyResponse = func(r *http.Response) error {
-				r.Header.Set("cache-control", "no-cache")
-				return nil
+			proxy := &httputil.ReverseProxy{
+				Rewrite: func(r *httputil.ProxyRequest) {
+					r.SetURL(destUrl)
+					r.Out.Header.Set("Host", destUrl.Host)
+				},
+				ModifyResponse: func(resp *http.Response) error {
+					resp.Header.Set("cache-control", "no-cache")
+					return nil
+				},
 			}
 			proxy.ServeHTTP(w, r)
 			return
 		}
 
-		var c io.ReadCloser
 		fpath := fp.Filepath
 		attempts = append(attempts, fpath)
 		logger = logger.With("object", fpath)
-		c, info, err = h.Cfg.Storage.ServeObject(
-			r,
-			h.Bucket,
-			fpath,
-			h.ImgProcessOpts,
-		)
-		if err != nil {
-			logger.Error("serving object", "err", err)
+
+		imgproxy := storage.NewImgProxy(fpath, h.ImgProcessOpts)
+		err = imgproxy.CanServe()
+		if err == nil {
+			logger.Info("serving image with imgproxy")
+			imgproxy.ServeHTTP(w, r)
+			return
 		} else {
-			contents = c
-			assetFilepath = fp.Filepath
-			status = fp.Status
-			break
+			var c io.ReadSeekCloser
+			c, info, err = h.Cfg.Storage.GetObject(
+				h.Bucket,
+				fpath,
+			)
+			if err != nil {
+				logger.Error("serving object", "err", err)
+			} else {
+				contents = c
+				assetFilepath = fp.Filepath
+				status = fp.Status
+				break
+			}
 		}
 	}
 
@@ -294,16 +299,13 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		"status", status,
 		"contentType", finContentType,
 	)
-	done, _ := checkPreconditions(w, r, info.LastModified.UTC())
-	if done {
-		logger.Info("A conditaionl request was detected, no body required")
-		// A conditional request was detected, status and headers are set, no body required (either 412 or 304)
+	if status != http.StatusOK {
+		w.WriteHeader(status)
+		_, err := io.Copy(w, contents)
+		if err != nil {
+			logger.Error("io copy", "err", err.Error())
+		}
 		return
 	}
-	w.WriteHeader(status)
-	_, err := io.Copy(w, contents)
-
-	if err != nil {
-		logger.Error("io copy", "err", err.Error())
-	}
+	http.ServeContent(w, r, assetFilepath, info.LastModified.UTC(), contents)
 }

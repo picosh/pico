@@ -320,26 +320,3 @@ func (s *StorageFS) ListObjects(bucket Bucket, dir string, recursive bool) ([]os
 
 	return fileList, err
 }
-
-func (s *StorageFS) ServeObject(r *http.Request, bucket Bucket, fpath string, opts *ImgProcessOpts) (io.ReadCloser, *ObjectInfo, error) {
-	var rc io.ReadCloser
-	info := &ObjectInfo{}
-	var err error
-	mimeType := mime.GetMimeType(fpath)
-	if !strings.HasPrefix(mimeType, "image/") || opts == nil || os.Getenv("IMGPROXY_URL") == "" {
-		rc, info, err = s.GetObject(bucket, fpath)
-		if info.Metadata == nil {
-			info.Metadata = map[string][]string{}
-		}
-		// StorageFS never returns a content-type.
-		info.Metadata.Set("content-type", mimeType)
-	} else {
-		filePath := filepath.Join(bucket.Name, fpath)
-		dataURL := fmt.Sprintf("local:///%s", filePath)
-		rc, info, err = HandleProxy(r, s.Logger, dataURL, opts)
-	}
-	if err != nil {
-		return nil, nil, err
-	}
-	return rc, info, err
-}
