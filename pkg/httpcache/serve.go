@@ -140,11 +140,12 @@ func (c *HttpCache) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Merge non-forbidden headers from the 304 response into the cached entry.
+		// Normalize keys to lowercase to avoid case-sensitivity issues.
 		for key, values := range wrapped.Header() {
 			if isForbiddenHeader(key) {
 				continue
 			}
-			cacheValue.Header[key] = values
+			cacheValue.Header[strings.ToLower(key)] = values
 		}
 		// Revalidation refreshes the entry -- reset CreatedAt so it's fresh again.
 		cacheValue.CreatedAt = time.Now()

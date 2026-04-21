@@ -2,6 +2,7 @@ package httpcache
 
 import (
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -43,8 +44,14 @@ func (rw *responseWriter) Send() {
 }
 
 func (rw *responseWriter) ToCacheValue() *CacheValue {
+	// Normalize header keys to lowercase to avoid case-sensitivity issues
+	// in the cached map (e.g., "ETag" vs "Etag" as separate keys).
+	headers := make(map[string][]string)
+	for k, v := range rw.Header() {
+		headers[strings.ToLower(k)] = v
+	}
 	cv := &CacheValue{
-		Header:     rw.Header(),
+		Header:     headers,
 		Body:       rw.body,
 		CreatedAt:  time.Now(),
 		StatusCode: rw.StatusCode(),
