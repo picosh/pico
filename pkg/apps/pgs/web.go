@@ -317,6 +317,10 @@ func (web *WebRouter) checkHandler(w http.ResponseWriter, r *http.Request) {
 	logger := web.Cfg.Logger
 
 	hostDomain := r.URL.Query().Get("domain")
+	if hostDomain == "" {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
 	appDomain := strings.Split(cfg.Domain, ":")[0]
 
 	// we do *not* want to cache this handler
