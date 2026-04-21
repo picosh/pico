@@ -105,7 +105,7 @@ func (s *StorageMemory) GetObject(bucket Bucket, fpath string) (utils.ReadAndRea
 	return &seekableReader{bytes.NewReader([]byte(dat))}, objInfo, nil
 }
 
-func (s *StorageMemory) PutObject(bucket Bucket, fpath string, contents io.Reader, entry *utils.FileEntry) (string, int64, error) {
+func (s *StorageMemory) PutObject(bucket Bucket, fpath string, contents io.Reader, info *ObjectInfo) (string, int64, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

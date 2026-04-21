@@ -32,7 +32,7 @@ type BucketStorage interface {
 
 type ObjectStorage interface {
 	GetObject(bucket Bucket, fpath string) (utils.ReadAndReaderAtCloser, *ObjectInfo, error)
-	PutObject(bucket Bucket, fpath string, contents io.Reader, entry *utils.FileEntry) (string, int64, error)
+	PutObject(bucket Bucket, fpath string, contents io.Reader, info *ObjectInfo) (string, int64, error)
 	DeleteObject(bucket Bucket, fpath string) error
 	ListObjects(bucket Bucket, dir string, recursive bool) ([]os.FileInfo, error)
 }

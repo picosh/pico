@@ -289,7 +289,7 @@ func (h *UploadImgHandler) metaImg(data *PostMetaData) error {
 		bucket,
 		h.getObjectPath(data.Filename),
 		sendutils.NopReadAndReaderAtCloser(reader),
-		&sendutils.FileEntry{},
+		&storage.ObjectInfo{},
 	)
 	if err != nil {
 		return err

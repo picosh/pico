@@ -58,8 +58,8 @@ func TestFsAdapter(t *testing.T) {
 
 	str := "here is a test file"
 	reader := strings.NewReader(str)
-	actualPath, size, err := st.PutObject(bucket, "./nice/test.txt", reader, &utils.FileEntry{
-		Mtime: modTime.Unix(),
+	actualPath, size, err := st.PutObject(bucket, "./nice/test.txt", reader, &ObjectInfo{
+		LastModified: modTime,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -98,8 +98,8 @@ func TestFsAdapter(t *testing.T) {
 
 	str = "a deeply nested test file"
 	reader = strings.NewReader(str)
-	_, _, err = st.PutObject(bucket, "./here/we/go/again.txt", reader, &utils.FileEntry{
-		Mtime: modTime.Unix(),
+	_, _, err = st.PutObject(bucket, "./here/we/go/again.txt", reader, &ObjectInfo{
+		LastModified: modTime,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -193,8 +193,8 @@ func TestFsAdapter(t *testing.T) {
 
 	str = "a deeply nested test file"
 	reader = strings.NewReader(str)
-	_, _, err = st.PutObject(bucket, "./here/yes/we/can.txt", reader, &utils.FileEntry{
-		Mtime: modTime.Unix(),
+	_, _, err = st.PutObject(bucket, "./here/yes/we/can.txt", reader, &ObjectInfo{
+		LastModified: modTime,
 	})
 	if err != nil {
 		t.Fatal(err)

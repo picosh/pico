@@ -275,6 +275,14 @@ func findPlusFF(dbpool pgsdb.PgsDB, cfg *PgsConfig, userID string) *db.FeatureFl
 	return ff
 }
 
+func mtimeToTime(entry *sendutils.FileEntry) time.Time {
+	var mtime time.Time
+	if entry.Mtime > 0 {
+		return time.Unix(entry.Mtime, 0)
+	}
+	return mtime
+}
+
 func (h *UploadAssetHandler) Write(s *pssh.SSHServerConnSession, entry *sendutils.FileEntry) (string, error) {
 	logger := pssh.GetLogger(s)
 	user := pssh.GetUser(s)
@@ -322,12 +330,15 @@ func (h *UploadAssetHandler) Write(s *pssh.SSHServerConnSession, entry *sendutil
 		return "", fmt.Errorf(msg, project.Blocked)
 	}
 
+	info := &storage.ObjectInfo{
+		LastModified: mtimeToTime(entry),
+	}
 	if entry.Mode.IsDir() {
 		_, _, err := h.Cfg.Storage.PutObject(
 			bucket,
 			path.Join(shared.GetAssetFileName(entry), "._pico_keep_dir"),
 			bytes.NewReader([]byte{}),
-			entry,
+			info,
 		)
 		return "", err
 	}
@@ -498,11 +509,14 @@ func (h *UploadAssetHandler) Delete(s *pssh.SSHServerConnSession, entry *senduti
 	})
 
 	if len(sibs) == 0 {
+		info := &storage.ObjectInfo{
+			LastModified: mtimeToTime(entry),
+		}
 		_, _, err := h.Cfg.Storage.PutObject(
 			bucket,
 			filepath.Join(pathDir, "._pico_keep_dir"),
 			bytes.NewReader([]byte{}),
-			entry,
+			info,
 		)
 		if err != nil {
 			return err
@@ -555,11 +569,14 @@ func (h *UploadAssetHandler) writeAsset(s *pssh.SSHServerConnSession, reader io.
 		"filename", assetFilepath,
 	)
 
+	info := &storage.ObjectInfo{
+		LastModified: mtimeToTime(data.FileEntry),
+	}
 	_, fsize, err := h.Cfg.Storage.PutObject(
 		data.Bucket,
 		assetFilepath,
 		reader,
-		data.FileEntry,
+		info,
 	)
 	return fsize, err
 }

@@ -252,11 +252,19 @@ func (h *UploadAssetHandler) writeAsset(s *pssh.SSHServerConnSession, data *File
 		objectFileName,
 	)
 
+	var mtime time.Time
+	if data.Mtime > 0 {
+		mtime = time.Unix(data.Mtime, 0)
+	}
+	info := &ObjectInfo{
+		LastModified: mtime,
+	}
+
 	_, _, err = h.Cfg.Storage.PutObject(
 		data.Bucket,
 		objectFileName,
 		utils.NopReadAndReaderAtCloser(reader),
-		data.FileEntry,
+		info,
 	)
 	if err != nil {
 		return err

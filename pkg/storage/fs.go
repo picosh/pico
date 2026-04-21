@@ -148,7 +148,7 @@ func (s *StorageFS) GetObject(bucket Bucket, fpath string) (utils.ReadAndReaderA
 	return dat, objInfo, nil
 }
 
-func (s *StorageFS) PutObject(bucket Bucket, fpath string, contents io.Reader, entry *utils.FileEntry) (string, int64, error) {
+func (s *StorageFS) PutObject(bucket Bucket, fpath string, contents io.Reader, info *ObjectInfo) (string, int64, error) {
 	loc := filepath.Join(bucket.Path, fpath)
 	err := os.MkdirAll(filepath.Dir(loc), os.ModePerm)
 	if err != nil {
@@ -168,8 +168,8 @@ func (s *StorageFS) PutObject(bucket Bucket, fpath string, contents io.Reader, e
 		return "", 0, err
 	}
 
-	if entry.Mtime > 0 {
-		uTime := time.Unix(entry.Mtime, 0)
+	if !info.LastModified.IsZero() {
+		uTime := info.LastModified
 		_ = os.Chtimes(loc, uTime, uTime)
 	}
 
