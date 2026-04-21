@@ -257,7 +257,7 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	contentType := ""
 	if info != nil {
-		contentType = info.Metadata.Get("content-type")
+		contentType = info.ContentType
 		if info.Size != 0 {
 			w.Header().Add("content-length", strconv.Itoa(int(info.Size)))
 		}

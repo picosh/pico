@@ -104,10 +104,7 @@ func newTestStorage(st storage.StorageServe) *testStorage {
 
 func (t *testStorage) GetObject(bucket storage.Bucket, fpath string) (utils.ReadAndReaderAtCloser, *storage.ObjectInfo, error) {
 	r, info, err := t.StorageServe.GetObject(bucket, fpath)
-	if info.Metadata == nil {
-		info.Metadata = make(http.Header)
-	}
-	info.Metadata.Set("content-type", mime.GetMimeType(fpath))
+	info.ContentType = mime.GetMimeType(fpath)
 	info.LastModified = time.Now().UTC()
 	info.ETag = "static-etag-for-testing-purposes"
 	return r, info, err

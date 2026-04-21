@@ -93,7 +93,6 @@ func (s *StorageMemory) GetObject(bucket Bucket, fpath string) (utils.ReadAndRea
 
 	objInfo := &ObjectInfo{
 		LastModified: time.Time{},
-		Metadata:     nil,
 	}
 
 	dat, ok := s.storage[bucket.Path][fpath]

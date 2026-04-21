@@ -2,7 +2,6 @@ package storage
 
 import (
 	"io"
-	"net/http"
 	"os"
 	"time"
 
@@ -19,7 +18,7 @@ type ObjectInfo struct {
 	Size         int64
 	LastModified time.Time
 	ETag         string
-	Metadata     http.Header
+	ContentType  string
 }
 
 type BucketStorage interface {

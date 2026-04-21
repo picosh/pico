@@ -7,7 +7,6 @@ import (
 	"io"
 	"io/fs"
 	"log/slog"
-	"net/http"
 	"os"
 	"path"
 	"path/filepath"
@@ -106,8 +105,8 @@ func (s *StorageFS) GetObject(bucket Bucket, fpath string) (utils.ReadAndReaderA
 	objInfo := &ObjectInfo{
 		Size:         0,
 		LastModified: time.Time{},
-		Metadata:     make(http.Header),
 		ETag:         "",
+		ContentType:  "",
 	}
 
 	dat, err := os.Open(filepath.Join(bucket.Path, fpath))
@@ -144,7 +143,7 @@ func (s *StorageFS) GetObject(bucket Bucket, fpath string) (utils.ReadAndReaderA
 	objInfo.ETag = etag
 	objInfo.Size = info.Size()
 	objInfo.LastModified = info.ModTime()
-	objInfo.Metadata.Set("content-type", mime.GetMimeType(fpath))
+	objInfo.ContentType = mime.GetMimeType(fpath)
 	return dat, objInfo, nil
 }
 
