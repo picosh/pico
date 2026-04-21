@@ -185,6 +185,7 @@ func AnalyticsVisitFromVisit(visit *db.AnalyticsVisits, dbpool db.DB, secret str
 	}
 	visit.Host = hostname
 	visit.UserAgent = CleanUserAgent(visit.UserAgent)
+	visit.ContentType = strings.ToLower(visit.ContentType)
 
 	return nil
 }

@@ -13,6 +13,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -749,6 +750,18 @@ func accessLogToVisit(dbpool db.DB, line string) (*db.AnalyticsVisits, error) {
 	return deserializeCaddyAccessLog(dbpool, &accessLog)
 }
 
+var allowedMime = []string{
+	"application/gzip",
+	"application/vnd.rar",
+	"application/x-7z-compressed",
+	"application/x-bzip",
+	"application/x-bzip2",
+	"application/x-freearc",
+	"application/x-tar",
+	"application/zip",
+	"text/html",
+}
+
 func metricDrainSub(ctx context.Context, dbpool db.DB, logger *slog.Logger, secret string) {
 	drain := metrics.ReconnectReadMetrics(
 		ctx,
@@ -778,8 +791,7 @@ func metricDrainSub(ctx context.Context, dbpool db.DB, logger *slog.Logger, secr
 				continue
 			}
 
-			if !strings.HasPrefix(visit.ContentType, "text/html") {
-				logger.Info("invalid content type", "contentType", visit.ContentType)
+			if !slices.Contains(allowedMime, visit.ContentType) {
 				continue
 			}
 
