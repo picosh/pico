@@ -112,7 +112,7 @@ func (p *PromCacheMetrics) AddUpstreamRequest() {
 func NewPgsHttpCache(cfg *PgsConfig, upstream http.Handler) *httpcache.HttpCache {
 	ttl := cfg.CacheTTL
 	metrics := NewPromCacheMetrics(cfg.Logger, prometheus.DefaultRegisterer)
-	cache := expirable.NewLRU(0, metrics.EvictCacheItem, ttl)
+	cache := expirable.NewLRU(cfg.CacheMaxItems, metrics.EvictCacheItem, ttl)
 	httpCache := &httpcache.HttpCache{
 		Ttl:      ttl,
 		Logger:   cfg.Logger,
@@ -124,7 +124,12 @@ func NewPgsHttpCache(cfg *PgsConfig, upstream http.Handler) *httpcache.HttpCache
 		},
 		CacheMetrics: metrics,
 	}
-	httpCache.Logger.Info("httpcache initiated", "ttl", httpCache.Ttl, "storage", "lru")
+	httpCache.Logger.Info(
+		"httpcache initiated",
+		"storageType", "expirable.LRU",
+		"ttl", ttl,
+		"maxItems", cfg.CacheMaxItems,
+	)
 	return httpCache
 }
 

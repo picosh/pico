@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	pgsdb "github.com/picosh/pico/pkg/apps/pgs/db"
@@ -13,6 +14,7 @@ import (
 
 type PgsConfig struct {
 	CacheTTL           time.Duration
+	CacheMaxItems      int
 	Domain             string
 	MaxAssetSize       int64
 	MaxSize            uint64
@@ -74,12 +76,18 @@ func NewPgsConfig(logger *slog.Logger, dbpool pgsdb.PgsDB, st storage.StorageSer
 	if err != nil {
 		cacheTTL = 600 * time.Second
 	}
+	cacheMaxItemsStr := shared.GetEnv("PGS_CACHE_MAX_ITEMS", "")
+	cacheMaxItems := 0
+	if cacheMaxItemsStr != "" {
+		cacheMaxItems, _ = strconv.Atoi(cacheMaxItemsStr)
+	}
 
 	sshHost := shared.GetEnv("PGS_SSH_HOST", "0.0.0.0")
 	sshPort := shared.GetEnv("PGS_SSH_PORT", "2222")
 
 	cfg := PgsConfig{
 		CacheTTL:           cacheTTL,
+		CacheMaxItems:      cacheMaxItems,
 		Domain:             domain,
 		MaxAssetSize:       maxAssetSize,
 		MaxSize:            maxSize,
