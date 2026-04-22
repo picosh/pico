@@ -95,9 +95,6 @@ func (c *HttpCache) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Info("cache miss, requesting upstream", "err", err)
-	c.AddCacheMiss()
-
 	// RFC 9111 4.2.4 + 4.3.1/4.3.2: stale must-revalidate entries must be
 	// revalidated with conditional headers derived from the stored response.
 	// Preserve original client conditional headers so we can evaluate them
@@ -120,6 +117,8 @@ func (c *HttpCache) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	log.Info("cache miss, requesting upstream", "err", err)
+	c.AddCacheMiss()
 	wrapped := &responseWriter{ResponseWriter: w}
 	c.Upstream.ServeHTTP(wrapped, r)
 	c.AddUpstreamRequest()
@@ -128,16 +127,18 @@ func (c *HttpCache) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// https://www.rfc-editor.org/rfc/rfc9111.html#section-4.3.4
 	// A 304 response updates header metadata but preserves the cached body.
 	if wrapped.StatusCode() == http.StatusNotModified {
-		log.Info("304 not modified, updating cached headers")
 		existingData, exists := c.Cache.Get(cacheKey)
 		if !exists {
 			// Cache entry vanished; forward the 304 as-is.
+			log.Info("no cache entry found, forwarding 304 as-is")
 			wrapped.Send()
 			return
 		}
 
 		var cacheValue CacheValue
-		if json.Unmarshal(existingData, &cacheValue) != nil {
+		err = json.Unmarshal(existingData, &cacheValue)
+		if err != nil {
+			log.Error("json unmarshal", "err", err)
 			wrapped.Send()
 			return
 		}
@@ -153,6 +154,7 @@ func (c *HttpCache) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// Revalidation refreshes the entry -- reset CreatedAt so it's fresh again.
 		cacheValue.CreatedAt = time.Now()
 		enc, _ := json.Marshal(cacheValue)
+		log.Info("updating cached headers from 304 response")
 		c.Cache.Remove(cacheKey)
 		c.Cache.Add(cacheKey, enc)
 		c.AddCacheItem(float64(len(enc)))
@@ -169,12 +171,14 @@ func (c *HttpCache) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				hdr.Set("age", strconv.Itoa(int(ageDur.Seconds())+1))
 				hdr.Set("cache-status", cacheStatusStale(cacheKey, wrapped.StatusCode()))
 				w.WriteHeader(http.StatusNotModified)
+				log.Info("client conditional headers match, returning 304")
 				return
 			}
 		}
 
 		// Client request was unconditional (or conditional but no longer matches)
 		// serve the full cached response.
+		log.Info("serving full cached response to client")
 		serveCache(w, c.Ttl, cacheKey, &cacheValue)
 		return
 	}
@@ -215,9 +219,11 @@ func serveCache(w http.ResponseWriter, freshness time.Duration, cacheKey string,
 	age := ageDur.Seconds()
 	hdr.Set("age", strconv.Itoa(int(age)+1))
 	hdr.Set("cache-status", cacheStatusHit(cacheKey, freshness.Seconds()))
-	if cacheValue.StatusCode != 0 && cacheValue.StatusCode != http.StatusOK {
-		w.WriteHeader(cacheValue.StatusCode)
+	statusCode := cacheValue.StatusCode
+	if statusCode == 0 {
+		statusCode = http.StatusOK
 	}
+	w.WriteHeader(statusCode)
 	_, _ = w.Write(cacheValue.Body)
 }
 
@@ -741,7 +747,7 @@ func stripForbiddenHeaders(w http.ResponseWriter, cacheValue *CacheValue) http.H
 		if isForbiddenHeader(key) {
 			continue
 		}
-		hdr[key] = values
+		hdr[http.CanonicalHeaderKey(key)] = values
 	}
 	return hdr
 }

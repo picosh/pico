@@ -62,6 +62,14 @@ func newProxyServe(logger *slog.Logger) *proxyServe {
 	return &proxyServe{Logger: logger, transport: transport}
 }
 
+// Headers that should be stripped from upstream responses because the CDN's
+// cache layer will add its own versions.
+var stripHeaders = map[string]bool{
+	"age":          true,
+	"cache-status": true,
+	"date":         true,
+}
+
 func (p *proxyServe) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// Dial ash.pgs.sh but keep the original Host header so ash.pgs.sh
 	// can route the request to the correct subdomain (zmx.sh, etc.).
@@ -90,10 +98,13 @@ func (p *proxyServe) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		_ = resp.Body.Close()
 	}()
 
+	// Copy headers from upstream, but strip cache-related headers that the
+	// CDN's cache layer will regenerate
 	for k, vals := range resp.Header {
-		for _, v := range vals {
-			w.Header().Set(k, v)
+		if stripHeaders[strings.ToLower(k)] {
+			continue
 		}
+		w.Header()[k] = vals
 	}
 	w.WriteHeader(resp.StatusCode)
 	_, _ = io.Copy(w, resp.Body)
@@ -121,11 +132,12 @@ func (c *cachedHttp) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
 		if err != nil {
 			c.Logger.Error("check request", "err", err)
 		}
-		writer.WriteHeader(resp.StatusCode)
 		defer func() {
 			_ = resp.Body.Close()
 		}()
+		writer.WriteHeader(resp.StatusCode)
 		_, _ = io.Copy(writer, resp.Body)
+		return
 	}
 
 	c.Cache.ServeHTTP(writer, req)
