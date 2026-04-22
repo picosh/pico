@@ -772,11 +772,11 @@ func TestCache304NotModifiedMerge(t *testing.T) {
 	resp1, _ := tc.DoWithHeaders(req, map[string][]string{
 		"If-None-Match": {"\"abc\""},
 	})
-	if resp1.StatusCode != http.StatusOK {
-		t.Errorf("expected 200 (ETag changed after revalidation), got %d", resp1.StatusCode)
+	if resp1.StatusCode != http.StatusNotModified {
+		t.Errorf("expected 304 (ETag changed after revalidation), got %d", resp1.StatusCode)
 	}
 	status := resp1.Header.Get("cache-status")
-	if !strings.Contains(status, "hit") {
+	if !strings.Contains(status, "fwd=stale") {
 		t.Errorf("expected cache-status hit, got %s", status)
 	}
 

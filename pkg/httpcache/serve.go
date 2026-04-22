@@ -2,6 +2,7 @@ package httpcache
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -11,6 +12,8 @@ import (
 
 	"github.com/hashicorp/golang-lru/v2/expirable"
 )
+
+var ErrMustRevalidate = errors.New("cache is stale and must-revalidate requires revalidation")
 
 type CacheKey interface {
 	GetCacheKey(r *http.Request) string
@@ -99,19 +102,19 @@ func (c *HttpCache) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// revalidated with conditional headers derived from the stored response.
 	// Preserve original client conditional headers so we can evaluate them
 	// after revalidation to decide whether the client gets 304 or 200.
-	clientIfNoneMatch := r.Header.Get("If-None-Match")
-	clientIfModifiedSince := r.Header.Get("If-Modified-Since")
+	clientIfNoneMatch := r.Header.Get("if-none-match")
+	clientIfModifiedSince := r.Header.Get("if-modified-since")
 	clientConditional := clientIfNoneMatch != "" || clientIfModifiedSince != ""
 
-	if err.Error() == "cache is stale and must-revalidate requires revalidation" {
+	if errors.Is(err, ErrMustRevalidate) {
 		if cachedData, exists := c.Cache.Get(cacheKey); exists {
 			var cachedValue CacheValue
 			if json.Unmarshal(cachedData, &cachedValue) == nil {
-				if etag := getHeader(cachedValue.Header, "ETag"); etag != "" {
-					r.Header.Set("If-None-Match", etag)
+				if etag := getHeader(cachedValue.Header, "etag"); etag != "" {
+					r.Header.Set("if-none-match", etag)
 				}
-				if lastMod := getHeader(cachedValue.Header, "Last-Modified"); lastMod != "" {
-					r.Header.Set("If-Modified-Since", lastMod)
+				if lastMod := getHeader(cachedValue.Header, "last-modified"); lastMod != "" {
+					r.Header.Set("if-modified-since", lastMod)
 				}
 			}
 		}
@@ -157,21 +160,15 @@ func (c *HttpCache) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if clientConditional {
 			// Client sent conditional headers -- re-evaluate against the
 			// updated cached entry and return 304 if it still matches.
-			r.Header.Set("If-None-Match", clientIfNoneMatch)
-			r.Header.Set("If-Modified-Since", clientIfModifiedSince)
-			valid, status := c.handleValidation(r, &cacheValue)
+			r.Header.Set("if-none-match", clientIfNoneMatch)
+			r.Header.Set("if-modified-since", clientIfModifiedSince)
+			valid := c.handleValidation(r, &cacheValue)
 			if valid {
-				hdr := w.Header()
-				for key, values := range cacheValue.Header {
-					if isForbiddenHeader(key) {
-						continue
-					}
-					hdr[key] = values
-				}
+				hdr := stripForbiddenHeaders(w, &cacheValue)
 				ageDur := calcAge(cacheValue.CreatedAt)
 				hdr.Set("age", strconv.Itoa(int(ageDur.Seconds())+1))
-				hdr.Set("cache-status", cacheStatusHit(cacheKey, c.Ttl.Seconds()))
-				w.WriteHeader(status)
+				hdr.Set("cache-status", cacheStatusStale(cacheKey, wrapped.StatusCode()))
+				w.WriteHeader(http.StatusNotModified)
 				return
 			}
 		}
@@ -213,15 +210,7 @@ func isForbiddenHeader(key string) bool {
 }
 
 func serveCache(w http.ResponseWriter, freshness time.Duration, cacheKey string, cacheValue *CacheValue) {
-	hdr := w.Header()
-	for key, values := range cacheValue.Header {
-		// RFC 9111 3.1 - Skip forbidden headers
-		if isForbiddenHeader(key) {
-			continue
-		}
-		hdr[key] = values
-	}
-
+	hdr := stripForbiddenHeaders(w, cacheValue)
 	ageDur := calcAge(cacheValue.CreatedAt)
 	age := ageDur.Seconds()
 	hdr.Set("age", strconv.Itoa(int(age)+1))
@@ -293,30 +282,12 @@ func getHeader(headers map[string][]string, key string) string {
 // handleValidation handles conditional request validation.
 // RFC 9110 13 Conditional Requests.
 // RFC 9111 4.3.2 Response Validation.
-func (c *HttpCache) handleValidation(r *http.Request, cacheValue *CacheValue) (bool, int) {
-	// Get ETag and Last-Modified with case-insensitive lookup
-	var etag string
-	var lastModified string
-	for key, values := range cacheValue.Header {
-		lowerKey := strings.ToLower(key)
-		c.Logger.Debug(
-			"validate",
-			"key", key,
-			"lowerKey", lowerKey,
-			"values", values,
-			"etag", etag,
-			"lastModified", lastModified,
-		)
-		if lowerKey == "etag" && len(values) > 0 {
-			etag = values[0]
-		}
-		if lowerKey == "last-modified" && len(values) > 0 {
-			lastModified = values[0]
-		}
-	}
+func (c *HttpCache) handleValidation(r *http.Request, cacheValue *CacheValue) bool {
+	etag := getHeader(cacheValue.Header, "etag")
+	lastModified := getHeader(cacheValue.Header, "last-modified")
 
 	c.Logger.Debug(
-		"validate result",
+		"validate",
 		"etag", etag,
 		"lastModified", lastModified,
 	)
@@ -327,20 +298,17 @@ func (c *HttpCache) handleValidation(r *http.Request, cacheValue *CacheValue) (b
 	if ifNoneMatch != "" {
 		// Wildcard If-None-Match: *
 		if ifNoneMatch == "*" {
-			if etag != "" {
-				return true, http.StatusNotModified
-			}
-			return false, 0
+			return etag != ""
 		}
 
 		// Check if any of the provided ETags match
 		etags := parseETags(ifNoneMatch)
 		for _, etagVal := range etags {
 			if etagVal == etag {
-				return true, http.StatusNotModified
+				return true
 			}
 		}
-		return false, 0
+		return false
 	}
 
 	// RFC 9110 13.1.3 If-Modified-Since
@@ -352,7 +320,7 @@ func (c *HttpCache) handleValidation(r *http.Request, cacheValue *CacheValue) (b
 			cachedTime := parseTimeFallback(lastModified)
 			if !cachedTime.IsZero() {
 				if !cachedTime.After(reqTime) {
-					return true, http.StatusNotModified
+					return true
 				}
 			}
 		}
@@ -371,13 +339,13 @@ func (c *HttpCache) handleValidation(r *http.Request, cacheValue *CacheValue) (b
 					// Cached response is not modified since the request time
 					// We can serve from cache, but don't return 304
 					// The caller will handle the cache hit
-					return false, 0
+					return false
 				}
 			}
 		}
 	}
 
-	return false, 0
+	return false
 }
 
 func parseETags(etags string) []string {
@@ -628,7 +596,7 @@ func (c *HttpCache) maybeUseCache(cacheKey string, w http.ResponseWriter, r *htt
 		age := calcAge(cacheValue.CreatedAt)
 		freshness := calcFreshness(cacheContState, expires, age, c.Ttl)
 		if freshness <= 0 {
-			return fmt.Errorf("cache is stale and must-revalidate requires revalidation")
+			return ErrMustRevalidate
 		}
 	}
 
@@ -640,31 +608,21 @@ func (c *HttpCache) maybeUseCache(cacheKey string, w http.ResponseWriter, r *htt
 		return fmt.Errorf("cache has no-store")
 	}
 
+	age := calcAge(cacheValue.CreatedAt)
+	freshness := calcFreshness(cacheContState, expires, age, c.Ttl)
+
 	// RFC 9111 4.3 Validation - check validation headers first
 	// RFC 9110 13 Conditional Requests
 	// https://www.rfc-editor.org/rfc/rfc9110.html#section-13
-	valid, status := c.handleValidation(r, &cacheValue)
+	valid := c.handleValidation(r, &cacheValue)
 	if valid {
-		// RFC 9111 4.3.4 304 Not Modified
-		// https://www.rfc-editor.org/rfc/rfc9111.html#section-4.3.4
-		// A 304 response must include headers the client needs to update
-		// its cached representation (ETag, Last-Modified, Cache-Control, etc.)
-		hdr := w.Header()
-		for key, values := range cacheValue.Header {
-			if isForbiddenHeader(key) {
-				continue
-			}
-			hdr[key] = values
-		}
+		hdr := stripForbiddenHeaders(w, &cacheValue)
 		ageDur := calcAge(cacheValue.CreatedAt)
 		hdr.Set("age", strconv.Itoa(int(ageDur.Seconds())+1))
-		hdr.Set("cache-status", cacheStatusHit(cacheKey, c.Ttl.Seconds()))
-		w.WriteHeader(status)
+		hdr.Set("cache-status", cacheStatusHit(cacheKey, freshness.Seconds()))
+		w.WriteHeader(http.StatusNotModified)
 		return nil
 	}
-
-	age := calcAge(cacheValue.CreatedAt)
-	freshness := calcFreshness(cacheContState, expires, age, c.Ttl)
 
 	// Check if request allows stale responses (max-stale)
 	// RFC 9111 5.2.1.2 - max-stale allows serving stale responses
@@ -758,6 +716,10 @@ func cacheStatusHit(cacheKey string, ttl float64) string {
 	return fmt.Sprintf("pico; hit; ttl=%d; key=%s", int(ttl), cacheKey)
 }
 
+func cacheStatusStale(cacheKey string, originStatus int) string {
+	return fmt.Sprintf("pico; fwd=stale; fwd-status=%d", originStatus)
+}
+
 func cacheStatusMiss(cacheKey string, stored bool) string {
 	// RFC 9211 2.2 Cache-Status fwd
 	// https://www.rfc-editor.org/rfc/rfc9211#section-2.2
@@ -771,4 +733,15 @@ func cacheStatusMiss(cacheKey string, stored bool) string {
 	// https://www.rfc-editor.org/rfc/rfc9211#section-2.7
 	status = fmt.Sprintf("%s; key=%s", status, cacheKey)
 	return status
+}
+
+func stripForbiddenHeaders(w http.ResponseWriter, cacheValue *CacheValue) http.Header {
+	hdr := w.Header()
+	for key, values := range cacheValue.Header {
+		if isForbiddenHeader(key) {
+			continue
+		}
+		hdr[key] = values
+	}
+	return hdr
 }
