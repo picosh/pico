@@ -186,7 +186,7 @@ func (c *HttpCache) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	err = isResponseCachable(r, wrapped)
 	if err == nil {
 		log.Info("storing cache")
-		nextValue := wrapped.ToCacheValue()
+		nextValue := wrapped.ToCacheValue(r)
 		enc, _ := json.Marshal(nextValue)
 		c.Cache.Remove(cacheKey)
 		c.Cache.Add(cacheKey, enc)
@@ -227,47 +227,43 @@ func serveCache(w http.ResponseWriter, freshness time.Duration, cacheKey string,
 	_, _ = w.Write(cacheValue.Body)
 }
 
-// matchVary checks if the request matches the Vary header from the cached response
+// matchVary checks if the request matches the Vary header from the cached response.
 // RFC 9111 4.1 Vary.
-func matchVary(r *http.Request, cachedHeaders map[string][]string) bool {
-	vary := getHeader(cachedHeaders, "Vary")
+//
+// Vary lists *request* header names, so we compare the incoming request headers
+// against the request header values that were snapshotted when the entry was
+// stored (CacheValue.VaryRequestHeaders). Comparing against response headers
+// (the old approach) silently skipped every field because request header names
+// never appear in response header maps.
+func matchVary(r *http.Request, cacheValue *CacheValue) bool {
+	vary := getHeader(cacheValue.Header, "Vary")
 	if vary == "" {
 		return true
 	}
 
-	// Vary: * means the response is not cacheable
+	// Vary: * means the response is not cacheable by a shared cache.
 	if vary == "*" {
 		return false
 	}
 
-	// Parse Vary header and check each field
-	fields := strings.FieldsFunc(vary, func(r rune) bool {
-		return r == ','
-	})
+	// If the entry predates VaryRequestHeaders (legacy/zero value), fall back to
+	// treating it as a miss so the cache re-populates with a fresh entry.
+	if len(cacheValue.VaryRequestHeaders) == 0 {
+		return false
+	}
 
+	fields := strings.FieldsFunc(vary, func(c rune) bool { return c == ',' })
 	for _, field := range fields {
 		field = strings.TrimSpace(strings.ToLower(field))
 		if field == "" {
 			continue
 		}
-
-		// Get the request header value
-		reqValue := r.Header.Get(field)
-
-		// Get the cached header value for this field (case-insensitive lookup)
-		var cachedValue string
-		for key, values := range cachedHeaders {
-			if strings.ToLower(key) == field && len(values) > 0 {
-				cachedValue = values[0]
-				break
-			}
+		cachedReqVal, known := cacheValue.VaryRequestHeaders[field]
+		if !known {
+			// Field listed in Vary but not recorded — treat as miss.
+			return false
 		}
-		if cachedValue == "" {
-			continue
-		}
-
-		// Compare values - must match exactly
-		if reqValue != cachedValue {
+		if r.Header.Get(field) != cachedReqVal {
 			return false
 		}
 	}
@@ -562,7 +558,7 @@ func (c *HttpCache) maybeUseCache(cacheKey string, w http.ResponseWriter, r *htt
 	}
 
 	// RFC 9111 4.1 Vary - check if request matches cached Vary values
-	if !matchVary(r, cacheValue.Header) {
+	if !matchVary(r, &cacheValue) {
 		return fmt.Errorf("vary mismatch")
 	}
 

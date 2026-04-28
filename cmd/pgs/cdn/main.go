@@ -86,6 +86,12 @@ func (p *proxyServe) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	proxyReq.URL.Path = target.Path
 	proxyReq.URL.RawQuery = target.RawQuery
 	proxyReq.RequestURI = ""
+	// Prevent the upstream from returning a compressed body. The CDN cache
+	// stores a single representation per URL; Caddy handles per-client
+	// encoding on the way out. If we forward Accept-Encoding, origin may
+	// return zstd-compressed bytes that get cached and then served to
+	// clients that never requested zstd.
+	proxyReq.Header.Del("Accept-Encoding")
 	// Preserve the original Host header so ash.pgs.sh routes correctly.
 	proxyReq.Host = req.Host
 

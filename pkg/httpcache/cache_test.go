@@ -242,8 +242,9 @@ func TestCacheVary(t *testing.T) {
 	cacheKey := handler.GetCacheKey(req)
 	cv := testCacheValue(250 * time.Second)
 	cv.Header["Vary"] = []string{"Accept-Encoding"}
-	// Store the original request header that selected this representation.
-	cv.Header["Accept-Encoding"] = []string{"gzip"}
+	// VaryRequestHeaders snapshots the request header values that were present
+	// when this entry was cached, keyed by the lowercase header name.
+	cv.VaryRequestHeaders = map[string]string{"accept-encoding": "gzip"}
 	cacheValue, _ := json.Marshal(cv)
 	handler.Cache.Add(cacheKey, cacheValue)
 

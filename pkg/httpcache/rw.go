@@ -43,26 +43,42 @@ func (rw *responseWriter) Send() {
 	_, _ = rw.ResponseWriter.Write(rw.body)
 }
 
-func (rw *responseWriter) ToCacheValue() *CacheValue {
+func (rw *responseWriter) ToCacheValue(r *http.Request) *CacheValue {
 	// Normalize header keys to lowercase to avoid case-sensitivity issues
 	// in the cached map (e.g., "ETag" vs "Etag" as separate keys).
 	headers := make(map[string][]string)
 	for k, v := range rw.Header() {
 		headers[strings.ToLower(k)] = v
 	}
+
+	// Snapshot the request header values named by the response Vary header so
+	// matchVary can compare them on future cache lookups (Vary lists request
+	// header names, not response header names).
+	varyReqHdrs := make(map[string]string)
+	if vary := headers["vary"]; len(vary) > 0 {
+		for _, field := range strings.FieldsFunc(vary[0], func(c rune) bool { return c == ',' }) {
+			field = strings.TrimSpace(strings.ToLower(field))
+			if field != "" && field != "*" {
+				varyReqHdrs[field] = r.Header.Get(field)
+			}
+		}
+	}
+
 	cv := &CacheValue{
-		Header:     headers,
-		Body:       rw.body,
-		CreatedAt:  time.Now(),
-		StatusCode: rw.StatusCode(),
+		Header:             headers,
+		Body:               rw.body,
+		CreatedAt:          time.Now(),
+		StatusCode:         rw.StatusCode(),
+		VaryRequestHeaders: varyReqHdrs,
 	}
 
 	return cv
 }
 
 type CacheValue struct {
-	Header     map[string][]string `json:"headers"`
-	Body       []byte              `json:"body"`
-	CreatedAt  time.Time           `json:"created_at"`
-	StatusCode int                 `json:"status_code"`
+	Header             map[string][]string `json:"headers"`
+	Body               []byte              `json:"body"`
+	CreatedAt          time.Time           `json:"created_at"`
+	StatusCode         int                 `json:"status_code"`
+	VaryRequestHeaders map[string]string   `json:"vary_request_headers,omitempty"`
 }
