@@ -8,4 +8,6 @@ COPY go.mod go.sum Makefile /app
 
 RUN go mod download
 
-CMD ["go", "test", "./..."]
+ENV PICO_SECRET="danger"
+
+CMD ["go", "test", "-v", "-race", "./..."]
