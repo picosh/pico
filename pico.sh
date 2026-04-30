@@ -1,16 +1,18 @@
 #!/usr/bin/env bash
 set -xeuo pipefail
 
-export ZMX_SESSION_PREFIX="ci-"
+export ZMX_SESSION_PREFIX="${ZMX_SESSION_PREFIX:-}ci-"
 
+printf "\x1b[33mrunning ci\x1b[0m\n"
+
+zmx run lint -d docker run -t --rm -v $(pwd):/app -w /app golangci/golangci-lint:v2.11.4 golangci-lint run
 cat << EOF | zmx run tests -d
 docker build -t pico-test -f ./Dockerfile.test . && \
-docker run -t --rm -v $(pwd):/app pico-test && \
-docker run -t --rm -v $(pwd):/app -w /app golangci/golangci-lint:v2.11.4 golangci-lint run
+docker run -t --rm -v $(pwd):/app pico-test
 EOF
 zmx wait "*"
 zmx kill "*"
-printf "\x1b[32msuccess tests!\x1b[0m"
+printf "\x1b[32msuccess tests!\x1b[0m\n"
 
 if [ "$1" != "release" ]; then
   exit 0
@@ -36,4 +38,4 @@ done
 zmx wait "*"
 
 zmx kill "*"
-printf "\x1b[32msuccess release!\x1b[0m"
+printf "\x1b[32msuccess release!\x1b[0m\n"

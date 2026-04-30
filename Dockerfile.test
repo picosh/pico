@@ -1,6 +1,6 @@
 FROM golang:1.25.0-alpine
 
-RUN apk add rsync openssh make
+RUN apk add rsync openssh make gcc musl-dev
 
 WORKDIR /app
 
@@ -10,4 +10,4 @@ RUN go mod download
 
 ENV PICO_SECRET="danger"
 
-CMD ["go", "test", "-v", "-race", "./..."]
+CMD ["go", "test", "-race", "./..."]
