@@ -4,24 +4,31 @@ set -xeuo pipefail
 export ZMX_SESSION_PREFIX="ci-"
 
 DOCKER_TAG="latest"
+DOCKER_PLATFORM="linux/amd64,linux/arm64"
 
-# zmx run tests podman compose -f docker-compose.test.yml up
-# zmx wait
+docker buildx ls | grep pico || docker buildx create --name pico
+docker buildx use pico
 
-zmx run caddy       podman build --tag "ghcr.io/picosh/pico/caddy:$DOCKER_TAG" ./caddy
-zmx run auth        podman build --tag "ghcr.io/picosh/pico/auth-web:$DOCKER_TAG" --build-arg APP=auth --target release-web .
-zmx run cdn         podman build --tag "ghcr.io/picosh/pico/pgs-cdn:$DOCKER_TAG" --target release-web -f Dockerfile.cdn .
-zmx run standalone  podman build --tag "ghcr.io/picosh/pgs:$DOCKER_TAG" --target release -f Dockerfile.standalone .
-zmx run bouncer     podman build --tag "ghcr.io/picosh/pico/bouncer:$DOCKER_TAG" ./bouncer
-zmx wait
+cat << EOF | zmx run tests -d
+docker build -t pico-test -f ./Dockerfile.test . && \
+docker run -t --rm -v $(pwd):/app pico-test && \
+docker run -t --rm -v $(pwd):/app -w /app golangci/golangci-lint:v2.11.4 golangci-lint run
+EOF
+zmx wait "*"
+
+zmx run caddy -d       docker buildx build --platform "$DOCKER_PLATFORM" -t "ghcr.io/picosh/pico/caddy:$DOCKER_TAG" ./caddy
+zmx run auth -d        docker buildx build --platform "$DOCKER_PLATFORM" -t "ghcr.io/picosh/pico/auth-web:$DOCKER_TAG" --build-arg APP=auth --target release-web .
+zmx run cdn -d         docker buildx build --platform "$DOCKER_PLATFORM" -t "ghcr.io/picosh/pico/pgs-cdn:$DOCKER_TAG" --target release-web -f Dockerfile.cdn .
+zmx run standalone -d  docker buildx build --platform "$DOCKER_PLATFORM" -t "ghcr.io/picosh/pgs:$DOCKER_TAG" --target release -f Dockerfile.standalone .
+zmx run bouncer -d     docker buildx build --platform "$DOCKER_PLATFORM" -t "ghcr.io/picosh/pico/bouncer:$DOCKER_TAG" ./bouncer
+zmx wait "*"
 
 apps=("prose" "pastes" "pgs" "feeds" "pipe")
 for APP in "${apps[@]}"; do
-  zmx run "$APP-ssh" podman build --tag "ghcr.io/picosh/pico/$APP-ssh:$DOCKER_TAG" --build-arg "APP=$APP" --target release-ssh .
-  zmx run "$APP-web" podman build --tag "ghcr.io/picosh/pico/$APP-web:$DOCKER_TAG" --build-arg "APP=$APP" --target release-web .
+  zmx run "$APP-ssh" -d docker buildx build --platform "$DOCKER_PLATFORM" -t "ghcr.io/picosh/pico/$APP-ssh:$DOCKER_TAG" --build-arg "APP=$APP" --target release-ssh .
+  zmx run "$APP-web" -d docker buildx build --platform "$DOCKER_PLATFORM" -t "ghcr.io/picosh/pico/$APP-web:$DOCKER_TAG" --build-arg "APP=$APP" --target release-web .
 done
-zmx wait
+zmx wait "*"
 
-zmx kill
-
+zmx kill "*"
 echo "success!"
