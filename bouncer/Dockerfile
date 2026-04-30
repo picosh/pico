@@ -16,9 +16,7 @@ RUN git checkout v0.10.1
 
 RUN git apply ../subscriber-change.diff
 
-RUN --mount=type=cache,target=/go/pkg/,rw \
-  --mount=type=cache,target=/root/.cache/,rw \
-  go mod download
+RUN go mod download
 
 FROM builder-deps AS builder
 
@@ -34,13 +32,9 @@ ENV LDFLAGS="-s -w"
 
 ENV GOOS=${TARGETOS} GOARCH=${TARGETARCH}
 
-RUN --mount=type=cache,target=/go/pkg/,rw \
-  --mount=type=cache,target=/root/.cache/,rw \
-  go build -ldflags "$LDFLAGS" ./cmd/soju
+RUN go build -ldflags "$LDFLAGS" ./cmd/soju
 
-RUN --mount=type=cache,target=/go/pkg/,rw \
-  --mount=type=cache,target=/root/.cache/,rw \
-  go build -ldflags "$LDFLAGS" ./cmd/sojuctl
+RUN go build -ldflags "$LDFLAGS" ./cmd/sojuctl
 
 FROM scratch
 
