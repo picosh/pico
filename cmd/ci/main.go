@@ -22,12 +22,14 @@ import (
 type Cfg struct {
 	Logger              *slog.Logger
 	Ctx                 context.Context
+	Cancel              context.CancelFunc
 	KeyLocation         string
 	CertificateLocation string
 	ArtifactDir         string
 	ArtifactDest        string
 	EventsFile          string
 	StatusFile          string
+	MonitorInterval     time.Duration
 }
 
 type Event struct {
@@ -36,77 +38,46 @@ type Event struct {
 	Workspace string `json:"workspace"`
 }
 
-func main() {
+func NewCfg() *Cfg {
 	var keyLoc, certLoc, artifactDir, artifactDest, eventsFile, statusFile string
+	var monitorInterval time.Duration
 	flag.StringVar(&keyLoc, "pk", "", "ssh private key used to authenticate with pico services")
 	flag.StringVar(&certLoc, "ck", "", "ssh certificate public key used to authenticate with pico services (only required if using ssh certificates)")
 	flag.StringVar(&artifactDir, "artifact-dir", "/tmp/pico-ci-artifacts", "local directory to stage artifacts")
 	flag.StringVar(&artifactDest, "artifact-dest", "", "rsync destination for artifacts (e.g. host:/path/)")
 	flag.StringVar(&eventsFile, "events-file", "", "file to read events from instead of pipe (one JSON event per line)")
 	flag.StringVar(&statusFile, "status-file", "", "file to write status to instead of pipe (one JSON status per line)")
+	flag.DurationVar(&monitorInterval, "monitor-interval", 5*time.Second, "interval for monitoring zmx sessions")
 	flag.Parse()
-	cmd := flag.Arg(0)
 
 	logger := shared.CreateLogger("ci", false)
-	log := logger.With("key_loc", keyLoc, "cert_loc", certLoc)
-	ctx := context.Background()
-	cfg := &Cfg{
-		Logger:              log,
+	ctx, cancel := context.WithCancel(context.Background())
+	return &Cfg{
+		Logger:              logger.With("key_loc", keyLoc, "cert_loc", certLoc),
 		Ctx:                 ctx,
+		Cancel:              cancel,
 		KeyLocation:         keyLoc,
 		CertificateLocation: certLoc,
 		ArtifactDir:         artifactDir,
 		ArtifactDest:        artifactDest,
 		EventsFile:          eventsFile,
 		StatusFile:          statusFile,
+		MonitorInterval:     monitorInterval,
 	}
+}
+
+func main() {
+	cmd := flag.Arg(0)
+	cfg := NewCfg()
+
 	cfg.Logger.Info("setting up ci", "cfg", cfg)
 	cfg.Logger.Info("running cmd", "cmd", cmd)
 
 	switch cmd {
 	case "runner":
-		var eventSource io.ReadCloser
-		if cfg.EventsFile != "" {
-			f, err := os.Open(cfg.EventsFile)
-			if err != nil {
-				cfg.Logger.Error("open events file", "err", err)
-				os.Exit(1)
-			}
-			eventSource = f
-		} else {
-			eventSource = createEventSubscriber(cfg, cfg.Logger)
-		}
-
-		var statusSink io.WriteCloser
-		if cfg.StatusFile != "" {
-			f, err := os.OpenFile(cfg.StatusFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-			if err != nil {
-				cfg.Logger.Error("open status file", "err", err)
-				os.Exit(1)
-			}
-			statusSink = f
-		} else {
-			statusSink = createStatusPublisher(cfg, cfg.Logger)
-		}
-		defer func() {
-			if err := statusSink.Close(); err != nil {
-				cfg.Logger.Error("close status sink", "err", err)
-			}
-		}()
-
-		cfg.Logger.Info("waiting for events")
-		for {
-			scanner := bufio.NewScanner(eventSource)
-			scanner.Buffer(make([]byte, 32*1024), 32*1024)
-			for scanner.Scan() {
-				payload := strings.TrimSpace(scanner.Text())
-				var eventData Event
-				err := json.Unmarshal([]byte(payload), &eventData)
-				if err != nil {
-					cfg.Logger.Error("json unmarshal", "err", err)
-				}
-				eventHandler(cfg, statusSink, &eventData)
-			}
+		if err := RunRunner(cfg); err != nil {
+			cfg.Logger.Error("runner", "err", err)
+			os.Exit(1)
 		}
 	case "status":
 		cfg.Logger.Info("running status updater")
@@ -116,6 +87,60 @@ func main() {
 		cfg.Logger.Error("must provide cmd")
 		os.Exit(1)
 	}
+}
+
+func RunRunner(cfg *Cfg) error {
+	var eventSource io.ReadCloser
+	if cfg.EventsFile != "" {
+		f, err := os.Open(cfg.EventsFile)
+		if err != nil {
+			return fmt.Errorf("open events file: %w", err)
+		}
+		eventSource = f
+	} else {
+		eventSource = createEventSubscriber(cfg, cfg.Logger)
+	}
+
+	var statusSink io.WriteCloser
+	if cfg.StatusFile != "" {
+		f, err := os.OpenFile(cfg.StatusFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if err != nil {
+			return fmt.Errorf("open status file: %w", err)
+		}
+		statusSink = f
+	} else {
+		statusSink = createStatusPublisher(cfg, cfg.Logger)
+	}
+	defer func() {
+		if err := statusSink.Close(); err != nil {
+			cfg.Logger.Error("close status sink", "err", err)
+		}
+	}()
+
+	cfg.Logger.Info("waiting for events")
+	scanner := bufio.NewScanner(eventSource)
+	scanner.Buffer(make([]byte, 32*1024), 32*1024)
+	for scanner.Scan() {
+		select {
+		case <-cfg.Ctx.Done():
+			cfg.Logger.Info("context cancelled, stopping event loop")
+			return cfg.Ctx.Err()
+		default:
+		}
+
+		payload := strings.TrimSpace(scanner.Text())
+		var eventData Event
+		if err := json.Unmarshal([]byte(payload), &eventData); err != nil {
+			cfg.Logger.Error("json unmarshal", "err", err)
+			continue
+		}
+		eventHandler(cfg, statusSink, &eventData)
+	}
+
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("scanning events: %w", err)
+	}
+	return nil
 }
 
 type Workspace interface {
@@ -187,11 +212,7 @@ type StatusPayload struct {
 }
 
 func (eng *JobEngine) Setup() error {
-	err := eng.Wk.Setup()
-	if err != nil {
-		return err
-	}
-	return nil
+	return eng.Wk.Setup()
 }
 
 func (eng *JobEngine) Run() error {
@@ -223,21 +244,28 @@ func (eng *JobEngine) Run() error {
 	}
 	eng.Cmd = cmd
 
-	go func() {
-		scanner := bufio.NewScanner(stdout)
-		for scanner.Scan() {
-			log.Info("pico.sh stdout", "text", scanner.Text())
-		}
-	}()
-
-	go func() {
-		scanner := bufio.NewScanner(stderr)
-		for scanner.Scan() {
-			log.Error("pico.sh stderr", "text", scanner.Text())
-		}
-	}()
+	// Stream stdout/stderr with context-aware shutdown
+	go eng.streamOutput(stdout, log, "stdout")
+	go eng.streamOutput(stderr, log, "stderr")
 
 	return nil
+}
+
+func (eng *JobEngine) streamOutput(reader io.Reader, log *slog.Logger, label string) {
+	done := eng.Cfg.Ctx.Done()
+	scanner := bufio.NewScanner(reader)
+	for scanner.Scan() {
+		select {
+		case <-done:
+			return
+		default:
+		}
+		if label == "stderr" {
+			log.Error("pico.sh stderr", "text", scanner.Text())
+		} else {
+			log.Info("pico.sh stdout", "text", scanner.Text())
+		}
+	}
 }
 
 func (eng *JobEngine) Cleanup() error {
@@ -246,10 +274,17 @@ func (eng *JobEngine) Cleanup() error {
 
 func (eng *JobEngine) Monitor(publisher io.WriteCloser) error {
 	prefix := fmt.Sprintf("%s.%s.", eng.Ev.Name, eng.JobID)
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(eng.Cfg.MonitorInterval)
 	defer ticker.Stop()
 
-	for range ticker.C {
+	for {
+		select {
+		case <-eng.Cfg.Ctx.Done():
+			eng.Logger.Info("context cancelled, stopping monitor")
+			return eng.Cfg.Ctx.Err()
+		case <-ticker.C:
+		}
+
 		// a. zmx list → filter sessions
 		listOutput, err := exec.Command("zmx", "list").CombinedOutput()
 		if err != nil {
@@ -291,18 +326,7 @@ func (eng *JobEngine) Monitor(publisher io.WriteCloser) error {
 
 		// e. Check if all sessions have ended
 		if allCompleted(matched) {
-			err := eng.Cmd.Wait()
-			exitCode := 0
-			status := "success"
-			if err != nil {
-				if exitError, ok := err.(*exec.ExitError); ok {
-					exitCode = int(exitError.ExitCode())
-					status = "failed"
-				} else {
-					status = "failed"
-				}
-			}
-
+			exitCode, status := eng.waitForCommand()
 			finalPayload := StatusPayload{
 				Name:     eng.Ev.Name,
 				JobID:    eng.JobID,
@@ -313,23 +337,31 @@ func (eng *JobEngine) Monitor(publisher io.WriteCloser) error {
 			if err := publishStatus(publisher, finalPayload); err != nil {
 				eng.Logger.Error("publish final status", "err", err)
 			}
-			break
+			return nil
 		}
 	}
+}
 
-	return nil
+func (eng *JobEngine) waitForCommand() (int, string) {
+	err := eng.Cmd.Wait()
+	if err == nil {
+		return 0, "success"
+	}
+	if exitError, ok := err.(*exec.ExitError); ok {
+		return int(exitError.ExitCode()), "failed"
+	}
+	return 1, "failed"
 }
 
 func (eng *JobEngine) getManifest() (string, error) {
 	fnames := []string{"pico.sh"}
 	for _, manifest := range fnames {
-		_, err := os.Stat(manifest)
-		if err != nil {
-			continue
+		path := filepath.Join(eng.Wk.GetDir(), manifest)
+		if _, err := os.Stat(path); err == nil {
+			return path, nil
 		}
-		return manifest, nil
 	}
-	return "", fmt.Errorf("manifest not found")
+	return "", fmt.Errorf("manifest not found in %s", eng.Wk.GetDir())
 }
 
 func eventHandler(cfg *Cfg, publisher io.WriteCloser, eventData *Event) {
