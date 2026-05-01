@@ -7,9 +7,11 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -22,6 +24,10 @@ type Cfg struct {
 	Ctx                 context.Context
 	KeyLocation         string
 	CertificateLocation string
+	ArtifactDir         string
+	ArtifactDest        string
+	EventsFile          string
+	StatusFile          string
 }
 
 type Event struct {
@@ -31,10 +37,13 @@ type Event struct {
 }
 
 func main() {
-	var keyLoc string
-	flag.StringVar(&keyLoc, "pk", "", "ssh private key used to authenticate with pico services (requires access to: pipe, pgs)")
-	var certLoc string
+	var keyLoc, certLoc, artifactDir, artifactDest, eventsFile, statusFile string
+	flag.StringVar(&keyLoc, "pk", "", "ssh private key used to authenticate with pico services")
 	flag.StringVar(&certLoc, "ck", "", "ssh certificate public key used to authenticate with pico services (only required if using ssh certificates)")
+	flag.StringVar(&artifactDir, "artifact-dir", "/tmp/pico-ci-artifacts", "local directory to stage artifacts")
+	flag.StringVar(&artifactDest, "artifact-dest", "", "rsync destination for artifacts (e.g. host:/path/)")
+	flag.StringVar(&eventsFile, "events-file", "", "file to read events from instead of pipe (one JSON event per line)")
+	flag.StringVar(&statusFile, "status-file", "", "file to write status to instead of pipe (one JSON status per line)")
 	flag.Parse()
 	cmd := flag.Arg(0)
 
@@ -46,16 +55,48 @@ func main() {
 		Ctx:                 ctx,
 		KeyLocation:         keyLoc,
 		CertificateLocation: certLoc,
+		ArtifactDir:         artifactDir,
+		ArtifactDest:        artifactDest,
+		EventsFile:          eventsFile,
+		StatusFile:          statusFile,
 	}
 	cfg.Logger.Info("setting up ci", "cfg", cfg)
 	cfg.Logger.Info("running cmd", "cmd", cmd)
 
 	switch cmd {
 	case "runner":
-		psub := createSubJobs(cfg, cfg.Logger)
-		cfg.Logger.Info("waiting for pipe event")
+		var eventSource io.ReadCloser
+		if cfg.EventsFile != "" {
+			f, err := os.Open(cfg.EventsFile)
+			if err != nil {
+				cfg.Logger.Error("open events file", "err", err)
+				os.Exit(1)
+			}
+			eventSource = f
+		} else {
+			eventSource = createEventSubscriber(cfg, cfg.Logger)
+		}
+
+		var statusSink io.WriteCloser
+		if cfg.StatusFile != "" {
+			f, err := os.OpenFile(cfg.StatusFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+			if err != nil {
+				cfg.Logger.Error("open status file", "err", err)
+				os.Exit(1)
+			}
+			statusSink = f
+		} else {
+			statusSink = createStatusPublisher(cfg, cfg.Logger)
+		}
+		defer func() {
+			if err := statusSink.Close(); err != nil {
+				cfg.Logger.Error("close status sink", "err", err)
+			}
+		}()
+
+		cfg.Logger.Info("waiting for events")
 		for {
-			scanner := bufio.NewScanner(psub)
+			scanner := bufio.NewScanner(eventSource)
 			scanner.Buffer(make([]byte, 32*1024), 32*1024)
 			for scanner.Scan() {
 				payload := strings.TrimSpace(scanner.Text())
@@ -64,7 +105,7 @@ func main() {
 				if err != nil {
 					cfg.Logger.Error("json unmarshal", "err", err)
 				}
-				eventHandler(cfg, &eventData)
+				eventHandler(cfg, statusSink, &eventData)
 			}
 		}
 	case "status":
@@ -203,7 +244,7 @@ func (eng *JobEngine) Cleanup() error {
 	return eng.Wk.Cleanup()
 }
 
-func (eng *JobEngine) Monitor(publisher *pipe.ReconnectReadWriteCloser) error {
+func (eng *JobEngine) Monitor(publisher io.WriteCloser) error {
 	prefix := fmt.Sprintf("%s.%s.", eng.Ev.Name, eng.JobID)
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
@@ -218,20 +259,25 @@ func (eng *JobEngine) Monitor(publisher *pipe.ReconnectReadWriteCloser) error {
 		sessions := parseZMXList(string(listOutput))
 		matched := filterSessions(sessions, prefix)
 
-		// b. For each matched session, fetch HTML and send to PGS
+		// b. For each matched session, fetch HTML and stage artifact
 		for _, s := range matched {
 			html, err := fetchHistoryHTML(s.Name)
 			if err != nil {
 				eng.Logger.Error("fetch history", "session", s.Name, "err", err)
 				continue
 			}
-			err = sendToPGS(eng.Cfg, eng.Ev.Name, eng.JobID, s.Short, html)
+			err = stageArtifact(eng.Cfg.ArtifactDir, eng.Ev.Name, eng.JobID, s.Short, html)
 			if err != nil {
-				eng.Logger.Error("send to pgs", "session", s.Short, "err", err)
+				eng.Logger.Error("stage artifact", "session", s.Short, "err", err)
 			}
 		}
 
-		// c. Publish status
+		// c. Sync artifacts to destination
+		if err := syncArtifacts(eng.Cfg, eng.Logger); err != nil {
+			eng.Logger.Error("sync artifacts", "err", err)
+		}
+
+		// d. Publish status
 		payload := StatusPayload{
 			Name:     eng.Ev.Name,
 			JobID:    eng.JobID,
@@ -243,7 +289,7 @@ func (eng *JobEngine) Monitor(publisher *pipe.ReconnectReadWriteCloser) error {
 			eng.Logger.Error("publish status", "err", err)
 		}
 
-		// d. Check if all sessions have ended
+		// e. Check if all sessions have ended
 		if allCompleted(matched) {
 			err := eng.Cmd.Wait()
 			exitCode := 0
@@ -286,7 +332,7 @@ func (eng *JobEngine) getManifest() (string, error) {
 	return "", fmt.Errorf("manifest not found")
 }
 
-func eventHandler(cfg *Cfg, eventData *Event) {
+func eventHandler(cfg *Cfg, publisher io.WriteCloser, eventData *Event) {
 	log := cfg.Logger.With("event", eventData)
 	log.Info("event payload")
 
@@ -324,13 +370,6 @@ func eventHandler(cfg *Cfg, eventData *Event) {
 		return
 	}
 
-	publisher := createStatusPublisher(cfg, log)
-	defer func() {
-		if err := publisher.Close(); err != nil {
-			log.Error("publisher close", "err", err)
-		}
-	}()
-
 	err = eng.Monitor(publisher)
 	if err != nil {
 		log.Error("monitor", "err", err)
@@ -339,7 +378,7 @@ func eventHandler(cfg *Cfg, eventData *Event) {
 	log.Info("job complete")
 }
 
-func createSubJobs(cfg *Cfg, logger *slog.Logger) *pipe.ReconnectReadWriteCloser {
+func createEventSubscriber(cfg *Cfg, logger *slog.Logger) io.ReadCloser {
 	logger.Info("subscribing to pipe", "topic", "build.jobs")
 	info := shared.NewPicoPipeClient()
 	info.KeyLocation = cfg.KeyLocation
@@ -424,16 +463,16 @@ func fetchHistoryHTML(sessionName string) (string, error) {
 	return string(output), nil
 }
 
-func publishStatus(publisher *pipe.ReconnectReadWriteCloser, payload StatusPayload) error {
+func publishStatus(w io.Writer, payload StatusPayload) error {
 	data, err := json.Marshal(payload)
 	if err != nil {
 		return err
 	}
-	_, err = publisher.Write(append(data, '\n'))
+	_, err = w.Write(append(data, '\n'))
 	return err
 }
 
-func createStatusPublisher(cfg *Cfg, logger *slog.Logger) *pipe.ReconnectReadWriteCloser {
+func createStatusPublisher(cfg *Cfg, logger *slog.Logger) io.WriteCloser {
 	logger.Info("creating pipe publisher", "topic", "build.status")
 	info := shared.NewPicoPipeClient()
 	info.KeyLocation = cfg.KeyLocation
@@ -450,16 +489,25 @@ func createStatusPublisher(cfg *Cfg, logger *slog.Logger) *pipe.ReconnectReadWri
 	return pub
 }
 
-func sendToPGS(cfg *Cfg, name, jobID, short, html string) error {
+func stageArtifact(dir, name, jobID, short, html string) error {
+	path := filepath.Join(dir, name, jobID, short+".html")
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
+	}
+	return os.WriteFile(path, []byte(html), 0644)
+}
+
+func syncArtifacts(cfg *Cfg, log *slog.Logger) error {
+	if cfg.ArtifactDest == "" {
+		return nil
+	}
 	sshArgs := fmt.Sprintf(
 		"-i %s -o IdentitiesOnly=yes -o CertificateFile %s",
 		cfg.KeyLocation,
 		cfg.CertificateLocation,
 	)
-	path := fmt.Sprintf("/private-ci/%s/%s/%s.html", name, jobID, short)
-	cmd := exec.Command("ssh", sshArgs, "pgs", fmt.Sprintf("cat > %s", path))
-	cmd.Stdin = strings.NewReader(html)
-	return cmd.Run()
+	cmd := exec.Command("rsync", "-e", sshArgs, "-rv", cfg.ArtifactDir+"/", cfg.ArtifactDest)
+	return runCmd(cmd, log)
 }
 
 func filterSessions(sessions []SessionInfo, prefix string) []SessionInfo {
