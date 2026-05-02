@@ -413,29 +413,31 @@ func monitorTick(cfg *Cfg, log *slog.Logger, publisher io.Writer) error {
 
 		log := log.With("repo", name, "job_id", jobID)
 
-		if allCompleted(group) {
-			log.Info("job completed, staging artifacts", "sessions", len(group))
-			// Stage artifacts for each session
-			for _, s := range group {
-				html, err := fetchHistoryHTML(s.Name)
-				if err != nil {
-					log.Error("fetch history html", "session", s.Name, "err", err)
-					continue
-				}
-				if err := stageArtifact(cfg.ArtifactDir, name, jobID, s.Short, html, ".html"); err != nil {
-					log.Error("stage html artifact", "session", s.Short, "err", err)
-				}
-
-				plain, err := fetchHistoryPlain(s.Name)
-				if err != nil {
-					log.Error("fetch history plain", "session", s.Name, "err", err)
-					continue
-				}
-				if err := stageArtifact(cfg.ArtifactDir, name, jobID, s.Short, plain, ".txt"); err != nil {
-					log.Error("stage txt artifact", "session", s.Short, "err", err)
-				}
+		// Fetch and stage history for every session at each tick,
+		// not just when the job completes. This gives live progress
+		// snapshots while the job is running.
+		for _, s := range group {
+			html, err := fetchHistoryHTML(s.Name)
+			if err != nil {
+				log.Error("fetch history html", "session", s.Name, "err", err)
+				continue
+			}
+			if err := stageArtifact(cfg.ArtifactDir, name, jobID, s.Short, html, ".html"); err != nil {
+				log.Error("stage html artifact", "session", s.Short, "err", err)
 			}
 
+			plain, err := fetchHistoryPlain(s.Name)
+			if err != nil {
+				log.Error("fetch history plain", "session", s.Name, "err", err)
+				continue
+			}
+			if err := stageArtifact(cfg.ArtifactDir, name, jobID, s.Short, plain, ".txt"); err != nil {
+				log.Error("stage txt artifact", "session", s.Short, "err", err)
+			}
+		}
+
+		if allCompleted(group) {
+			log.Info("job completed, publishing final status", "sessions", len(group))
 			// Publish final status
 			exitCode, status := resolveJobExitCode(group)
 			log.Info("job finished", "status", status, "exit_code", exitCode)

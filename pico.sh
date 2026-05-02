@@ -11,7 +11,7 @@ docker build -t pico-test -f ./Dockerfile.test . && \
 docker run -t --rm -v $(pwd):/app pico-test
 EOF
 zmx wait "*"
-zmx kill "*"
+# zmx kill "*"
 printf "\x1b[32msuccess tests!\x1b[0m\n"
 
 if [ "${1:-}" != "release" ]; then
