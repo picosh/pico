@@ -17,7 +17,6 @@ import (
 
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/utils/pipe"
-	"golang.org/x/term"
 )
 
 type WorkspaceFactory func(cfg *Cfg, logger *slog.Logger, source string) Workspace
@@ -38,7 +37,7 @@ type Cfg struct {
 	CertificateLocation string
 	ArtifactDir         string
 	ArtifactDest        string
-	StdinEvents         bool          // true when stdin is not a terminal
+	Event               string        // event JSON passed via --event flag
 	EventSource         io.ReadCloser // when set, used directly as the event source (for testing)
 	MonitorInterval     time.Duration
 	NewWorkspace        WorkspaceFactory
@@ -58,12 +57,13 @@ type CancelEvent struct {
 }
 
 func NewCfg() *Cfg {
-	var keyLoc, certLoc, artifactDir, artifactDest string
+	var keyLoc, certLoc, artifactDir, artifactDest, event string
 	var monitorInterval time.Duration
 	flag.StringVar(&keyLoc, "pk", "", "ssh private key used to authenticate with pico services")
 	flag.StringVar(&certLoc, "ck", "", "ssh certificate public key used to authenticate with pico services (only required if using ssh certificates)")
 	flag.StringVar(&artifactDir, "artifact-dir", "/tmp/pico-ci-artifacts", "local directory to stage artifacts")
 	flag.StringVar(&artifactDest, "artifact-dest", "", "rsync destination for artifacts (e.g. host:/path/)")
+	flag.StringVar(&event, "event", "", "event JSON to run (alternative to reading from stdin)")
 	flag.DurationVar(&monitorInterval, "monitor-interval", 5*time.Second, "interval for monitoring zmx sessions")
 	flag.Parse()
 
@@ -78,7 +78,7 @@ func NewCfg() *Cfg {
 		CertificateLocation: certLoc,
 		ArtifactDir:         artifactDir,
 		ArtifactDest:        artifactDest,
-		StdinEvents:         !term.IsTerminal(int(os.Stdin.Fd())),
+		Event:               event,
 		MonitorInterval:     monitorInterval,
 	}
 }
@@ -117,14 +117,29 @@ func main() {
 }
 
 func RunRunner(cfg *Cfg) error {
-	var eventSource io.ReadCloser
+	var payload string
 	if cfg.EventSource != nil {
-		eventSource = cfg.EventSource
-	} else if cfg.StdinEvents {
-		eventSource = os.Stdin
+		data, err := io.ReadAll(cfg.EventSource)
+		if err != nil {
+			return fmt.Errorf("read event source: %w", err)
+		}
+		payload = strings.TrimSpace(string(data))
+	} else if cfg.Event != "" {
+		payload = cfg.Event
 	} else {
-		eventSource = createEventSubscriber(cfg, cfg.Logger)
+		data, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			return fmt.Errorf("read stdin: %w", err)
+		}
+		payload = strings.TrimSpace(string(data))
 	}
+
+	var eventData Event
+	if err := json.Unmarshal([]byte(payload), &eventData); err != nil {
+		return fmt.Errorf("unmarshal event: %w", err)
+	}
+
+	cfg.Logger.Info("running job", "event", eventData)
 
 	var statusSink io.WriteCloser
 	if cfg.KeyLocation != "" {
@@ -144,30 +159,7 @@ func RunRunner(cfg *Cfg) error {
 		}
 	}()
 
-	cfg.Logger.Info("waiting for events")
-	scanner := bufio.NewScanner(eventSource)
-	scanner.Buffer(make([]byte, 32*1024), 32*1024)
-	for scanner.Scan() {
-		select {
-		case <-cfg.Ctx.Done():
-			cfg.Logger.Info("context cancelled, stopping event loop")
-			return cfg.Ctx.Err()
-		default:
-		}
-
-		payload := strings.TrimSpace(scanner.Text())
-		var eventData Event
-		if err := json.Unmarshal([]byte(payload), &eventData); err != nil {
-			cfg.Logger.Error("json unmarshal", "err", err)
-			continue
-		}
-		eventHandler(cfg, statusSink, &eventData)
-	}
-
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("scanning events: %w", err)
-	}
-	return nil
+	return eventHandler(cfg, statusSink, &eventData)
 }
 
 type Workspace interface {
@@ -385,7 +377,7 @@ func (eng *JobEngine) getManifest() (string, error) {
 	return "", fmt.Errorf("manifest not found in %s", eng.Wk.GetDir())
 }
 
-func eventHandler(cfg *Cfg, publisher io.WriteCloser, eventData *Event) {
+func eventHandler(cfg *Cfg, publisher io.WriteCloser, eventData *Event) error {
 	log := cfg.Logger.With("event", eventData)
 	log.Info("event payload")
 
@@ -401,47 +393,24 @@ func eventHandler(cfg *Cfg, publisher io.WriteCloser, eventData *Event) {
 		JobID:  jobID,
 	}
 	defer func() {
-		err := eng.Cleanup()
-		if err != nil {
+		if err := eng.Cleanup(); err != nil {
 			cfg.Logger.Error("engine cleanup", "err", err)
 		}
 	}()
 
-	err := eng.Setup()
-	if err != nil {
-		log.Error("setup", "err", err)
-		return
+	if err := eng.Setup(); err != nil {
+		return fmt.Errorf("setup: %w", err)
 	}
 
-	err = eng.Run()
-	if err != nil {
-		log.Error("run failure", "err", err)
-		return
+	if err := eng.Run(); err != nil {
+		return fmt.Errorf("run: %w", err)
 	}
 
-	err = eng.Monitor(publisher)
-	if err != nil {
-		log.Error("monitor", "err", err)
-		return
+	if err := eng.Monitor(publisher); err != nil {
+		return fmt.Errorf("monitor: %w", err)
 	}
 	log.Info("job complete")
-}
-
-func createEventSubscriber(cfg *Cfg, logger *slog.Logger) io.ReadCloser {
-	logger.Info("subscribing to pipe", "topic", "build.jobs")
-	info := shared.NewPicoPipeClient()
-	info.KeyLocation = cfg.KeyLocation
-	info.CertificateLocation = cfg.CertificateLocation
-	send := pipe.NewReconnectReadWriteCloser(
-		cfg.Ctx,
-		logger,
-		info,
-		"sub to build.jobs",
-		"sub build.jobs -k",
-		100,
-		-1,
-	)
-	return send
+	return nil
 }
 
 func generateJobID(name, workspace string) string {
