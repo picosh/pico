@@ -17,8 +17,8 @@ import (
 
 // TestE2E_RunnerWithZMXSessions is a full integration test that:
 // 1. Creates a workspace with pico.sh that spawns zmx sessions
-// 2. Feeds an event to RunRunner via a pipe
-// 3. Runs the full lifecycle: setup → run → monitor → complete
+// 2. Feeds an event to RunRunner (fire-and-forget)
+// 3. Runs the monitor to track job completion
 // 4. Reads the status file and asserts correct status transitions.
 func TestE2E_RunnerWithZMXSessions(t *testing.T) {
 	if testing.Short() {
@@ -39,7 +39,7 @@ zmx run step2 echo "hello from step2"
 		t.Fatalf("write pico.sh: %v", err)
 	}
 
-	// 3. Create config
+	// 2. Create config
 	artifactDir := t.TempDir()
 	ctx, cancel := context.WithCancel(context.Background())
 	event := Event{
@@ -58,15 +58,14 @@ zmx run step2 echo "hello from step2"
 		NewWorkspace:    defaultWorkspaceFactory,
 	}
 
-	// 5. Start runner in goroutine
-	done := make(chan error, 1)
+	// 3. Run the runner (fire-and-forget, exits quickly)
+	runnerDone := make(chan error, 1)
 	go func() {
-		done <- RunRunner(cfg)
+		runnerDone <- RunRunner(cfg)
 	}()
 
-	// 7. Wait for runner to complete (with timeout)
 	select {
-	case err := <-done:
+	case err := <-runnerDone:
 		if err != nil {
 			t.Fatalf("runner: %v", err)
 		}
@@ -74,50 +73,54 @@ zmx run step2 echo "hello from step2"
 		t.Fatal("timeout waiting for runner to complete")
 	}
 
-	// 8. Read and parse status file
-	statusFile := filepath.Join(artifactDir, "status.jsonl")
-	data, err := os.ReadFile(statusFile)
-	if err != nil {
-		t.Fatalf("read status file: %v", err)
-	}
+	// 4. Run the monitor until we see a final status
+	monitorDone := make(chan error, 1)
+	go func() {
+		monitorDone <- runMonitor(cfg)
+	}()
 
-	lines := scanLines(data)
-	if len(lines) == 0 {
-		t.Fatal("no status lines written")
-	}
-
-	// Parse all status payloads
-	var payloads []StatusPayload
-	for _, line := range lines {
-		var p StatusPayload
-		if err := json.Unmarshal([]byte(line), &p); err != nil {
-			t.Fatalf("unmarshal status line %q: %v", line, err)
-		}
-		payloads = append(payloads, p)
-	}
-
-	// 9. Assert we got at least one "running" and one final payload
-	var hasRunning, hasFinal bool
+	// 5. Wait for final status (with timeout)
 	var finalPayload *StatusPayload
-	for i := range payloads {
-		p := &payloads[i]
-		if p.Status == "running" {
-			hasRunning = true
+	for {
+		select {
+		case err := <-monitorDone:
+			t.Fatalf("monitor exited unexpectedly: %v", err)
+		case <-time.After(30 * time.Second):
+			t.Fatal("timeout waiting for final status from monitor")
+		default:
 		}
-		if p.Status == "success" || p.Status == "failed" {
-			hasFinal = true
-			finalPayload = p
+
+		// Check status file for final payload
+		statusFile := filepath.Join(artifactDir, "status.jsonl")
+		data, err := os.ReadFile(statusFile)
+		if err == nil {
+			lines := scanLines(data)
+			for _, line := range lines {
+				var p StatusPayload
+				if err := json.Unmarshal([]byte(line), &p); err != nil {
+					continue
+				}
+				if p.Status == "success" || p.Status == "failed" {
+					finalPayload = &p
+				}
+			}
 		}
+
+		if finalPayload != nil {
+			cancel() // stop the monitor
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
 	}
 
-	if !hasRunning {
-		t.Error("expected at least one 'running' status")
-	}
-	if !hasFinal {
-		t.Error("expected a final 'success' or 'failed' status")
+	// Wait for monitor to exit gracefully
+	select {
+	case <-monitorDone:
+	case <-time.After(5 * time.Second):
+		t.Log("warning: monitor did not exit gracefully")
 	}
 
-	// 10. Assert final payload has correct data
+	// 6. Assert final payload has correct data
 	if finalPayload == nil {
 		t.Fatal("no final payload")
 	}
@@ -134,7 +137,7 @@ zmx run step2 echo "hello from step2"
 		t.Errorf("expected at least 2 sessions, got %d", len(finalPayload.Sessions))
 	}
 
-	// 11. Assert sessions have correct names
+	// 7. Assert sessions have correct names
 	sessionNames := make(map[string]bool)
 	for _, s := range finalPayload.Sessions {
 		sessionNames[s.Short] = true
@@ -147,7 +150,7 @@ zmx run step2 echo "hello from step2"
 		t.Error("expected session 'step2'")
 	}
 
-	// 12. Assert HTML artifacts were staged for each session
+	// 8. Assert HTML artifacts were staged for each session
 	for _, s := range finalPayload.Sessions {
 		artifactPath := filepath.Join(cfg.ArtifactDir, finalPayload.Name, finalPayload.JobID, s.Short+".html")
 		data, err := os.ReadFile(artifactPath)
@@ -422,5 +425,82 @@ func TestKillSessionsEmpty(t *testing.T) {
 	}
 	if err := killSessions([]string{}); err != nil {
 		t.Errorf("killSessions([]) = %v, want nil", err)
+	}
+}
+
+func TestResolveJobExitCode(t *testing.T) {
+	tests := []struct {
+		name       string
+		sessions   []SessionInfo
+		wantCode   int
+		wantStatus string
+	}{
+		{
+			name: "all success",
+			sessions: []SessionInfo{
+				{Name: "ci.repo.abc.runner", ExitCode: "0", Ended: "1"},
+				{Name: "ci.repo.abc.step1", ExitCode: "0", Ended: "1"},
+			},
+			wantCode:   0,
+			wantStatus: "success",
+		},
+		{
+			name: "runner failed",
+			sessions: []SessionInfo{
+				{Name: "ci.repo.abc.runner", ExitCode: "1", Ended: "1"},
+				{Name: "ci.repo.abc.step1", ExitCode: "0", Ended: "1"},
+			},
+			wantCode:   1,
+			wantStatus: "failed",
+		},
+		{
+			name: "child failed, runner says 0 (defensive)",
+			sessions: []SessionInfo{
+				{Name: "ci.repo.abc.runner", ExitCode: "0", Ended: "1"},
+				{Name: "ci.repo.abc.step1", ExitCode: "0", Ended: "1"},
+				{Name: "ci.repo.abc.step2", ExitCode: "2", Ended: "1"},
+			},
+			wantCode:   2,
+			wantStatus: "failed",
+		},
+		{
+			name: "worst child exit code wins",
+			sessions: []SessionInfo{
+				{Name: "ci.repo.abc.runner", ExitCode: "0", Ended: "1"},
+				{Name: "ci.repo.abc.step1", ExitCode: "1", Ended: "1"},
+				{Name: "ci.repo.abc.step2", ExitCode: "3", Ended: "1"},
+			},
+			wantCode:   3,
+			wantStatus: "failed",
+		},
+		{
+			name: "no runner session",
+			sessions: []SessionInfo{
+				{Name: "ci.repo.abc.step1", ExitCode: "0", Ended: "1"},
+			},
+			wantCode:   0,
+			wantStatus: "success",
+		},
+		{
+			name: "sessions not yet ended (no exit code)",
+			sessions: []SessionInfo{
+				{Name: "ci.repo.abc.runner", ExitCode: "", Ended: ""},
+				{Name: "ci.repo.abc.step1", ExitCode: "", Ended: ""},
+			},
+			wantCode:   0,
+			wantStatus: "success",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			code, status := resolveJobExitCode(tt.sessions)
+			if code != tt.wantCode {
+				t.Errorf("exit code = %d, want %d", code, tt.wantCode)
+			}
+			if status != tt.wantStatus {
+				t.Errorf("status = %q, want %q", status, tt.wantStatus)
+			}
+		})
 	}
 }

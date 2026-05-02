@@ -106,6 +106,11 @@ func main() {
 			cfg.Logger.Error("gc", "err", err)
 			os.Exit(1)
 		}
+	case "monitor":
+		if err := runMonitor(cfg); err != nil {
+			cfg.Logger.Error("monitor", "err", err)
+			os.Exit(1)
+		}
 	case "status":
 		cfg.Logger.Info("running status updater")
 	case "orca":
@@ -141,25 +146,7 @@ func RunRunner(cfg *Cfg) error {
 
 	cfg.Logger.Info("running job", "event", eventData)
 
-	var statusSink io.WriteCloser
-	if cfg.KeyLocation != "" {
-		statusSink = createStatusPublisher(cfg, cfg.Logger)
-	} else {
-		statusPath := filepath.Join(cfg.ArtifactDir, "status.jsonl")
-		f, err := os.OpenFile(statusPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-		if err != nil {
-			return fmt.Errorf("open status file %s: %w", statusPath, err)
-		}
-		cfg.Logger.Info("writing status to file (no SSH keys)", "path", statusPath)
-		statusSink = f
-	}
-	defer func() {
-		if err := statusSink.Close(); err != nil {
-			cfg.Logger.Error("close status sink", "err", err)
-		}
-	}()
-
-	return eventHandler(cfg, statusSink, &eventData)
+	return eventHandler(cfg, &eventData)
 }
 
 type Workspace interface {
@@ -268,104 +255,6 @@ func (eng *JobEngine) Cleanup() error {
 	return eng.Wk.Cleanup()
 }
 
-func (eng *JobEngine) Monitor(publisher io.WriteCloser) error {
-	prefix := fmt.Sprintf("ci.%s.%s.", eng.Ev.Name, eng.JobID)
-	ticker := time.NewTicker(eng.Cfg.MonitorInterval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-eng.Cfg.Ctx.Done():
-			eng.Logger.Info("context cancelled, stopping monitor")
-			return eng.Cfg.Ctx.Err()
-		case <-ticker.C:
-		}
-
-		// a. zmx list → filter sessions
-		listOutput, err := exec.Command("zmx", "list").CombinedOutput()
-		if err != nil {
-			eng.Logger.Error("zmx list", "err", err)
-			continue
-		}
-		sessions := parseZMXList(string(listOutput))
-		matched := filterSessions(sessions, prefix)
-
-		// b. For each matched session, fetch HTML and stage artifact
-		for _, s := range matched {
-			html, err := fetchHistoryHTML(s.Name)
-			if err != nil {
-				eng.Logger.Error("fetch history", "session", s.Name, "err", err)
-				continue
-			}
-			err = stageArtifact(eng.Cfg.ArtifactDir, eng.Ev.Name, eng.JobID, s.Short, html)
-			if err != nil {
-				eng.Logger.Error("stage artifact", "session", s.Short, "err", err)
-			}
-		}
-
-		// c. Sync artifacts to destination
-		if err := syncArtifacts(eng.Cfg, eng.Logger); err != nil {
-			eng.Logger.Error("sync artifacts", "err", err)
-		}
-
-		// d. Publish status
-		payload := StatusPayload{
-			Name:     eng.Ev.Name,
-			JobID:    eng.JobID,
-			Status:   "running",
-			ExitCode: nil,
-			Sessions: matched,
-		}
-		if err := publishStatus(publisher, payload); err != nil {
-			eng.Logger.Error("publish status", "err", err)
-		}
-
-		// e. Check if all sessions have ended
-		if allCompleted(matched) {
-			exitCode, status := eng.waitForCommand()
-			finalPayload := StatusPayload{
-				Name:     eng.Ev.Name,
-				JobID:    eng.JobID,
-				Status:   status,
-				ExitCode: &exitCode,
-				Sessions: matched,
-			}
-			if err := publishStatus(publisher, finalPayload); err != nil {
-				eng.Logger.Error("publish final status", "err", err)
-			}
-			return nil
-		}
-	}
-}
-
-func (eng *JobEngine) waitForCommand() (int, string) {
-	prefix := fmt.Sprintf("ci.%s.%s.", eng.Ev.Name, eng.JobID)
-	runnerName := prefix + "runner"
-
-	listOutput, err := exec.Command("zmx", "list").CombinedOutput()
-	if err != nil {
-		eng.Logger.Error("zmx list for exit code", "err", err)
-		return 1, "failed"
-	}
-
-	sessions := parseZMXList(string(listOutput))
-	for _, s := range sessions {
-		if s.Name == runnerName {
-			if s.ExitCode == "0" || s.ExitCode == "" {
-				return 0, "success"
-			}
-			var exitCode int
-			if _, err := fmt.Sscanf(s.ExitCode, "%d", &exitCode); err == nil {
-				return exitCode, "failed"
-			}
-			return 1, "failed"
-		}
-	}
-
-	eng.Logger.Warn("runner session not found in zmx list")
-	return 1, "failed"
-}
-
 func (eng *JobEngine) getManifest() (string, error) {
 	fnames := []string{"pico.sh"}
 	for _, manifest := range fnames {
@@ -377,7 +266,7 @@ func (eng *JobEngine) getManifest() (string, error) {
 	return "", fmt.Errorf("manifest not found in %s", eng.Wk.GetDir())
 }
 
-func eventHandler(cfg *Cfg, publisher io.WriteCloser, eventData *Event) error {
+func eventHandler(cfg *Cfg, eventData *Event) error {
 	log := cfg.Logger.With("event", eventData)
 	log.Info("event payload")
 
@@ -406,11 +295,194 @@ func eventHandler(cfg *Cfg, publisher io.WriteCloser, eventData *Event) error {
 		return fmt.Errorf("run: %w", err)
 	}
 
-	if err := eng.Monitor(publisher); err != nil {
-		return fmt.Errorf("monitor: %w", err)
-	}
-	log.Info("job complete")
+	log.Info("job launched (fire-and-forget)")
 	return nil
+}
+
+// runMonitor is a long-lived daemon that polls all ci.* zmx sessions,
+// publishes status updates, stages artifacts, and syncs to destination.
+func runMonitor(cfg *Cfg) error {
+	log := cfg.Logger.With("cmd", "monitor")
+
+	var publisher io.WriteCloser
+	if cfg.KeyLocation != "" {
+		publisher = createStatusPublisher(cfg, log)
+	} else {
+		statusPath := filepath.Join(cfg.ArtifactDir, "status.jsonl")
+		f, err := os.OpenFile(statusPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if err != nil {
+			return fmt.Errorf("open status file %s: %w", statusPath, err)
+		}
+		log.Info("writing status to file (no SSH keys)", "path", statusPath)
+		publisher = f
+	}
+	defer func() {
+		if err := publisher.Close(); err != nil {
+			log.Error("close status publisher", "err", err)
+		}
+	}()
+
+	ticker := time.NewTicker(cfg.MonitorInterval)
+	defer ticker.Stop()
+
+	log.Info("monitor started", "interval", cfg.MonitorInterval)
+
+	for {
+		select {
+		case <-cfg.Ctx.Done():
+			log.Info("context cancelled, stopping monitor")
+			return cfg.Ctx.Err()
+		case <-ticker.C:
+		}
+
+		if err := monitorTick(cfg, log, publisher); err != nil {
+			log.Error("monitor tick", "err", err)
+		}
+	}
+}
+
+// monitorTick performs a single monitoring pass over all ci.* sessions.
+func monitorTick(cfg *Cfg, log *slog.Logger, publisher io.Writer) error {
+	// a. zmx list → filter ci.* sessions
+	listOutput, err := exec.Command("zmx", "list").CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("zmx list: %w", err)
+	}
+	sessions := parseZMXList(string(listOutput))
+	ciSessions := filterCISessions(sessions)
+
+	if len(ciSessions) == 0 {
+		return nil
+	}
+
+	// b. Group by job prefix: ci.<name>.<jobID>.
+	groups := groupSessionsByJob(ciSessions)
+
+	// c. Process each job group
+	for prefix, group := range groups {
+		name, jobID := parseJobPrefix(prefix)
+		if name == "" {
+			continue
+		}
+
+		if allCompleted(group) {
+			// Stage artifacts for each session
+			for _, s := range group {
+				html, err := fetchHistoryHTML(s.Name)
+				if err != nil {
+					log.Error("fetch history", "session", s.Name, "err", err)
+					continue
+				}
+				if err := stageArtifact(cfg.ArtifactDir, name, jobID, s.Short, html); err != nil {
+					log.Error("stage artifact", "session", s.Short, "err", err)
+				}
+			}
+
+			// Publish final status
+			exitCode, status := resolveJobExitCode(group)
+			payload := StatusPayload{
+				Name:     name,
+				JobID:    jobID,
+				Status:   status,
+				ExitCode: &exitCode,
+				Sessions: group,
+			}
+			if err := publishStatus(publisher, payload); err != nil {
+				log.Error("publish final status", "name", name, "job_id", jobID, "err", err)
+			}
+		} else {
+			// Publish running status
+			payload := StatusPayload{
+				Name:     name,
+				JobID:    jobID,
+				Status:   "running",
+				ExitCode: nil,
+				Sessions: group,
+			}
+			if err := publishStatus(publisher, payload); err != nil {
+				log.Error("publish status", "name", name, "job_id", jobID, "err", err)
+			}
+		}
+	}
+
+	// d. Sync artifacts once per tick
+	if err := syncArtifacts(cfg, log); err != nil {
+		log.Error("sync artifacts", "err", err)
+	}
+
+	return nil
+}
+
+// filterCISessions returns only sessions with ci. prefix.
+func filterCISessions(sessions []SessionInfo) []SessionInfo {
+	var filtered []SessionInfo
+	for _, s := range sessions {
+		if strings.HasPrefix(s.Name, "ci.") {
+			filtered = append(filtered, s)
+		}
+	}
+	return filtered
+}
+
+// groupSessionsByJob groups sessions by their job prefix (ci.<name>.<jobID>.).
+func groupSessionsByJob(sessions []SessionInfo) map[string][]SessionInfo {
+	groups := make(map[string][]SessionInfo)
+	for _, s := range sessions {
+		prefix := extractJobPrefix(s.Name)
+		if prefix == "" {
+			continue
+		}
+		// Set the Short name
+		s.Short = strings.TrimPrefix(s.Name, prefix)
+		groups[prefix] = append(groups[prefix], s)
+	}
+	return groups
+}
+
+// parseJobPrefix extracts name and jobID from a prefix like "ci.<name>.<jobID>.".
+func parseJobPrefix(prefix string) (name, jobID string) {
+	// ci.name.jobID. -> ["ci", "name", "jobID", ""]
+	parts := strings.Split(prefix, ".")
+	if len(parts) < 4 {
+		return "", ""
+	}
+	return parts[1], parts[2]
+}
+
+// resolveJobExitCode determines the job's exit code from its sessions.
+// Defensive: if any child session failed, the job failed regardless of the
+// runner's exit code. This protects against bad pico.sh scripts that exit 0
+// without waiting for children.
+func resolveJobExitCode(sessions []SessionInfo) (int, string) {
+	var runnerExit *int
+	var worstChild *int // highest non-zero child exit code
+
+	for _, s := range sessions {
+		if s.ExitCode == "" {
+			continue
+		}
+		var code int
+		if _, err := fmt.Sscanf(s.ExitCode, "%d", &code); err != nil {
+			continue
+		}
+
+		if strings.HasSuffix(s.Name, ".runner") {
+			runnerExit = &code
+		} else if code != 0 {
+			if worstChild == nil || code > *worstChild {
+				worstChild = &code
+			}
+		}
+	}
+
+	// Any child failure overrides the runner — defensive against bad scripts
+	if worstChild != nil {
+		return *worstChild, "failed"
+	}
+	if runnerExit != nil && *runnerExit != 0 {
+		return *runnerExit, "failed"
+	}
+	return 0, "success"
 }
 
 func generateJobID(name, workspace string) string {
