@@ -37,5 +37,5 @@ for APP in "${apps[@]}"; do
 done
 zmx wait "*"
 
-zmx kill "*"
+# zmx kill "*"
 printf "\x1b[32msuccess release!\x1b[0m\n"

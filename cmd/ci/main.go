@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/picosh/pico/cmd/ci/prettylog"
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/utils/pipe"
 )
@@ -59,15 +60,19 @@ type CancelEvent struct {
 func NewCfg() *Cfg {
 	var keyLoc, certLoc, artifactDir, artifactDest, event string
 	var monitorInterval time.Duration
+	var logLevel string
+	var structured bool
 	flag.StringVar(&keyLoc, "pk", "", "ssh private key used to authenticate with pico services")
 	flag.StringVar(&certLoc, "ck", "", "ssh certificate public key used to authenticate with pico services (only required if using ssh certificates)")
 	flag.StringVar(&artifactDir, "artifact-dir", "/tmp/pico-ci-artifacts", "local directory to stage artifacts")
 	flag.StringVar(&artifactDest, "artifact-dest", "", "rsync destination for artifacts (e.g. host:/path/)")
 	flag.StringVar(&event, "event", "", "event JSON to run (alternative to reading from stdin)")
 	flag.DurationVar(&monitorInterval, "monitor-interval", 5*time.Second, "interval for monitoring zmx sessions")
+	flag.StringVar(&logLevel, "log-level", "info", "log level: debug, info, warn, error")
+	flag.BoolVar(&structured, "structured", false, "use structured key=value log output")
 	flag.Parse()
 
-	logger := shared.CreateLogger("ci", false)
+	logger := newLogger("ci", logLevel, structured)
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Cfg{
 		NewWorkspace:        defaultWorkspaceFactory,
@@ -81,6 +86,31 @@ func NewCfg() *Cfg {
 		Event:               event,
 		MonitorInterval:     monitorInterval,
 	}
+}
+
+func parseLogLevel(s string) slog.Level {
+	switch strings.ToLower(s) {
+	case "debug":
+		return slog.LevelDebug
+	case "warn":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
+	}
+}
+
+func newLogger(space string, levelStr string, structured bool) *slog.Logger {
+	lvl := parseLogLevel(levelStr)
+	if structured {
+		return slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+			Level: lvl,
+		})).With("service", space)
+	}
+	return slog.New(prettylog.New(os.Stdout, prettylog.Options{
+		Level: lvl,
+	})).With("service", space)
 }
 
 func main() {
