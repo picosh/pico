@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/picosh/pico/cmd/ci/prettylog"
+	"github.com/golang-cz/devslog"
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/utils/pipe"
 )
@@ -108,8 +108,10 @@ func newLogger(space string, levelStr string, structured bool) *slog.Logger {
 			Level: lvl,
 		})).With("service", space)
 	}
-	return slog.New(prettylog.New(os.Stdout, prettylog.Options{
-		Level: lvl,
+	return slog.New(devslog.NewHandler(os.Stdout, &devslog.Options{
+		HandlerOptions: &slog.HandlerOptions{
+			Level: lvl,
+		},
 	})).With("service", space)
 }
 
@@ -117,38 +119,38 @@ func main() {
 	cfg := NewCfg()
 	cmd := flag.Arg(0)
 
-	cfg.Logger.Info("setting up ci", "cfg", cfg)
-	cfg.Logger.Info("running cmd", "cmd", cmd)
+	cfg.Logger.Debug("setting up ci", "cfg", cfg)
+	cfg.Logger.Debug("running cmd", "cmd", cmd)
 
 	switch cmd {
 	case "runner":
-		cfg.Logger.Info("starting runner")
+		cfg.Logger.Debug("starting runner")
 		if err := RunRunner(cfg); err != nil {
 			cfg.Logger.Error("runner failed", "err", err)
 			os.Exit(1)
 		}
 	case "cancel":
-		cfg.Logger.Info("starting cancel handler")
+		cfg.Logger.Debug("starting cancel handler")
 		if err := runCancel(cfg); err != nil {
 			cfg.Logger.Error("cancel failed", "err", err)
 			os.Exit(1)
 		}
 	case "gc":
-		cfg.Logger.Info("starting garbage collection")
+		cfg.Logger.Debug("starting garbage collection")
 		if err := runGC(cfg); err != nil {
 			cfg.Logger.Error("gc failed", "err", err)
 			os.Exit(1)
 		}
 	case "monitor":
-		cfg.Logger.Info("starting monitor")
+		cfg.Logger.Debug("starting monitor")
 		if err := runMonitor(cfg); err != nil {
 			cfg.Logger.Error("monitor failed", "err", err)
 			os.Exit(1)
 		}
 	case "status":
-		cfg.Logger.Info("starting status updater")
+		cfg.Logger.Debug("starting status updater")
 	case "orca":
-		cfg.Logger.Info("starting orchestrator")
+		cfg.Logger.Debug("starting orchestrator")
 	default:
 		cfg.Logger.Error("must provide command: runner, cancel, gc, monitor, status, or orca")
 		os.Exit(1)
@@ -204,7 +206,7 @@ func (w *WorkspaceRsync) Setup() error {
 	w.Dest = tempDir
 
 	log := w.Logger.With("source", w.Source, "dest", w.Dest)
-	log.Info("syncing workspace via rsync")
+	log.Debug("syncing workspace via rsync")
 
 	var cmd *exec.Cmd
 	if w.Cfg.KeyLocation != "" {
@@ -269,7 +271,7 @@ func (eng *JobEngine) Run() error {
 	prefix := fmt.Sprintf("ci.%s.%s.", eng.Ev.Name, eng.JobID)
 
 	log := eng.Logger.With("manifest", manifest, "prefix", prefix)
-	log.Info("starting runner session", "session", prefix+"runner")
+	log.Debug("starting runner session", "session", prefix+"runner")
 
 	evStr := fmt.Sprintf("PICO_CI_EVENT=%s", eng.Ev.Type)
 	jobStr := fmt.Sprintf("ZMX_SESSION_PREFIX=%s", prefix)
@@ -355,7 +357,7 @@ func runMonitor(cfg *Cfg) error {
 		if err != nil {
 			return fmt.Errorf("open status file %s: %w", statusPath, err)
 		}
-		log.Info("writing status to file (no SSH keys)", "path", statusPath)
+		log.Debug("writing status to file (no SSH keys)", "path", statusPath)
 		publisher = f
 	}
 	defer func() {
@@ -367,13 +369,13 @@ func runMonitor(cfg *Cfg) error {
 	ticker := time.NewTicker(cfg.MonitorInterval)
 	defer ticker.Stop()
 
-	log.Info("monitor started", "interval", cfg.MonitorInterval, "artifact_dir", cfg.ArtifactDir)
-	log.Info("monitoring ci.* sessions for job status")
+	log.Debug("monitor started", "interval", cfg.MonitorInterval, "artifact_dir", cfg.ArtifactDir)
+	log.Debug("monitoring ci.* sessions for job status")
 
 	for {
 		select {
 		case <-cfg.Ctx.Done():
-			log.Info("context cancelled, stopping monitor")
+			log.Debug("context cancelled, stopping monitor")
 			return cfg.Ctx.Err()
 		case <-ticker.C:
 		}
@@ -395,11 +397,11 @@ func monitorTick(cfg *Cfg, log *slog.Logger, publisher io.Writer) error {
 	ciSessions := filterCISessions(sessions)
 
 	if len(ciSessions) == 0 {
-		log.Info("no ci.* sessions found")
+		log.Debug("no ci.* sessions found")
 		return nil
 	}
 
-	log.Info("found ci sessions", "count", len(ciSessions))
+	log.Debug("found ci sessions", "count", len(ciSessions))
 
 	// b. Group by job prefix: ci.<name>.<jobID>.
 	groups := groupSessionsByJob(ciSessions)
@@ -437,7 +439,7 @@ func monitorTick(cfg *Cfg, log *slog.Logger, publisher io.Writer) error {
 		}
 
 		if allCompleted(group) {
-			log.Info("job completed, publishing final status", "sessions", len(group))
+			log.Debug("job completed, publishing final status", "sessions", len(group))
 			// Publish final status
 			exitCode, status := resolveJobExitCode(group)
 			log.Info("job finished", "status", status, "exit_code", exitCode)
@@ -452,7 +454,7 @@ func monitorTick(cfg *Cfg, log *slog.Logger, publisher io.Writer) error {
 				log.Error("publish final status", "err", err)
 			}
 		} else {
-			log.Info("job still running", "sessions", len(group))
+			log.Debug("job still running", "sessions", len(group))
 			// Publish running status
 			payload := StatusPayload{
 				Name:     name,
@@ -634,7 +636,7 @@ func publishStatus(w io.Writer, payload StatusPayload) error {
 }
 
 func createStatusPublisher(cfg *Cfg, logger *slog.Logger) io.WriteCloser {
-	logger.Info("creating pipe publisher", "topic", "build.status")
+	logger.Debug("creating pipe publisher", "topic", "build.status")
 	info := shared.NewPicoPipeClient()
 	info.KeyLocation = cfg.KeyLocation
 	info.CertificateLocation = cfg.CertificateLocation
@@ -710,7 +712,7 @@ func runCmd(cmd *exec.Cmd, log *slog.Logger) error {
 	go func() {
 		scanner := bufio.NewScanner(stdout)
 		for scanner.Scan() {
-			log.Info("cmd stdout", "text", scanner.Text())
+			log.Debug("cmd stdout", "text", scanner.Text())
 		}
 	}()
 
@@ -753,11 +755,11 @@ func runCancel(cfg *Cfg) error {
 func cancelRunningJobs(cfg *Cfg, log *slog.Logger, name string) {
 	runnerSessions, sessions := findRunningJobs(name)
 	if len(runnerSessions) == 0 {
-		log.Info("no running jobs to cancel")
+		log.Debug("no running jobs to cancel")
 		return
 	}
 
-	log.Info("found running jobs to cancel", "count", len(runnerSessions))
+	log.Debug("found running jobs to cancel", "count", len(runnerSessions))
 
 	statusPub := createStatusPublisher(cfg, log)
 	defer func() {
@@ -776,12 +778,12 @@ func cancelRunningJobs(cfg *Cfg, log *slog.Logger, name string) {
 		jobID := extractJobID(runnerName)
 		log := log.With("job_id", jobID)
 
-		log.Info("cancelling job", "runner", runnerName)
+		log.Debug("cancelling job", "runner", runnerName)
 		if err := killSessions([]string{runnerName}); err != nil {
 			log.Error("kill runner session", "err", err)
 			continue
 		}
-		log.Info("cancelled runner session")
+		log.Debug("cancelled runner session")
 
 		matched := filterSessions(sessions, fmt.Sprintf("ci.%s.%s.", name, jobID))
 		statusPayload := StatusPayload{
@@ -866,7 +868,7 @@ func publishCancelEvent(w io.Writer, event CancelEvent) error {
 
 // createCancelPublisher creates a pipe publisher for the build.cancel topic.
 func createCancelPublisher(cfg *Cfg, logger *slog.Logger) io.WriteCloser {
-	logger.Info("creating pipe publisher", "topic", "build.cancel")
+	logger.Debug("creating pipe publisher", "topic", "build.cancel")
 	info := shared.NewPicoPipeClient()
 	info.KeyLocation = cfg.KeyLocation
 	info.CertificateLocation = cfg.CertificateLocation
@@ -885,7 +887,7 @@ func createCancelPublisher(cfg *Cfg, logger *slog.Logger) io.WriteCloser {
 // runGC deletes completed CI zmx sessions that are not part of a running job.
 func runGC(cfg *Cfg) error {
 	log := cfg.Logger.With("cmd", "gc")
-	log.Info("running garbage collection")
+	log.Debug("running garbage collection")
 
 	listOutput, err := exec.Command("zmx", "list").CombinedOutput()
 	if err != nil {
@@ -919,13 +921,13 @@ func runGC(cfg *Cfg) error {
 			}
 		}
 		if allDone {
-			log.Info("completed job, scheduling for gc", "prefix", prefix, "sessions", len(group))
+			log.Debug("completed job, scheduling for gc", "prefix", prefix, "sessions", len(group))
 			toKill = append(toKill, group[0].Name)
 		}
 	}
 
 	if len(toKill) == 0 {
-		log.Info("no sessions to garbage collect")
+		log.Debug("no sessions to garbage collect")
 		return nil
 	}
 
@@ -933,7 +935,7 @@ func runGC(cfg *Cfg) error {
 		return fmt.Errorf("kill sessions: %w", err)
 	}
 
-	log.Info("garbage collection complete", "killed", len(toKill))
+	log.Debug("garbage collection complete", "killed", len(toKill))
 	return nil
 }
 
