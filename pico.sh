@@ -14,7 +14,7 @@ zmx wait "*"
 zmx kill "*"
 printf "\x1b[32msuccess tests!\x1b[0m\n"
 
-if [ "$1" != "release" ]; then
+if [ "${1:-}" != "release" ]; then
   exit 0
 fi
 

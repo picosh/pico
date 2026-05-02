@@ -24,6 +24,9 @@ func TestE2E_RunnerWithZMXSessions(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skip integration test")
 	}
+	if _, err := exec.LookPath("zmx"); err != nil {
+		t.Skip("zmx not found, skipping integration test")
+	}
 
 	// 1. Create workspace with pico.sh that spawns zmx sessions
 	workspaceDir := t.TempDir()
@@ -36,10 +39,8 @@ zmx run step2 echo "hello from step2"
 		t.Fatalf("write pico.sh: %v", err)
 	}
 
-	// 2. Create status file
-	statusFile := filepath.Join(t.TempDir(), "status.jsonl")
-
 	// 3. Create config
+	artifactDir := t.TempDir()
 	ctx, cancel := context.WithCancel(context.Background())
 	event := Event{
 		Type:      "build",
@@ -51,9 +52,8 @@ zmx run step2 echo "hello from step2"
 		Logger:          slog.New(slog.NewTextHandler(io.Discard, nil)),
 		Ctx:             ctx,
 		Cancel:          cancel,
-		ArtifactDir:     t.TempDir(),
+		ArtifactDir:     artifactDir,
 		EventSource:     io.NopCloser(bytes.NewReader(append(eventJSON, '\n'))),
-		StatusFile:      statusFile,
 		MonitorInterval: 200 * time.Millisecond,
 		NewWorkspace:    defaultWorkspaceFactory,
 	}
@@ -75,6 +75,7 @@ zmx run step2 echo "hello from step2"
 	}
 
 	// 8. Read and parse status file
+	statusFile := filepath.Join(artifactDir, "status.jsonl")
 	data, err := os.ReadFile(statusFile)
 	if err != nil {
 		t.Fatalf("read status file: %v", err)

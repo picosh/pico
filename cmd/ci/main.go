@@ -40,7 +40,6 @@ type Cfg struct {
 	ArtifactDest        string
 	StdinEvents         bool          // true when stdin is not a terminal
 	EventSource         io.ReadCloser // when set, used directly as the event source (for testing)
-	StatusFile          string
 	MonitorInterval     time.Duration
 	NewWorkspace        WorkspaceFactory
 }
@@ -59,13 +58,12 @@ type CancelEvent struct {
 }
 
 func NewCfg() *Cfg {
-	var keyLoc, certLoc, artifactDir, artifactDest, statusFile string
+	var keyLoc, certLoc, artifactDir, artifactDest string
 	var monitorInterval time.Duration
 	flag.StringVar(&keyLoc, "pk", "", "ssh private key used to authenticate with pico services")
 	flag.StringVar(&certLoc, "ck", "", "ssh certificate public key used to authenticate with pico services (only required if using ssh certificates)")
 	flag.StringVar(&artifactDir, "artifact-dir", "/tmp/pico-ci-artifacts", "local directory to stage artifacts")
 	flag.StringVar(&artifactDest, "artifact-dest", "", "rsync destination for artifacts (e.g. host:/path/)")
-	flag.StringVar(&statusFile, "status-file", "", "file to write status to instead of pipe (one JSON status per line)")
 	flag.DurationVar(&monitorInterval, "monitor-interval", 5*time.Second, "interval for monitoring zmx sessions")
 	flag.Parse()
 
@@ -81,14 +79,13 @@ func NewCfg() *Cfg {
 		ArtifactDir:         artifactDir,
 		ArtifactDest:        artifactDest,
 		StdinEvents:         !term.IsTerminal(int(os.Stdin.Fd())),
-		StatusFile:          statusFile,
 		MonitorInterval:     monitorInterval,
 	}
 }
 
 func main() {
-	cmd := flag.Arg(0)
 	cfg := NewCfg()
+	cmd := flag.Arg(0)
 
 	cfg.Logger.Info("setting up ci", "cfg", cfg)
 	cfg.Logger.Info("running cmd", "cmd", cmd)
@@ -130,14 +127,16 @@ func RunRunner(cfg *Cfg) error {
 	}
 
 	var statusSink io.WriteCloser
-	if cfg.StatusFile != "" {
-		f, err := os.OpenFile(cfg.StatusFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-		if err != nil {
-			return fmt.Errorf("open status file: %w", err)
-		}
-		statusSink = f
-	} else {
+	if cfg.KeyLocation != "" {
 		statusSink = createStatusPublisher(cfg, cfg.Logger)
+	} else {
+		statusPath := filepath.Join(cfg.ArtifactDir, "status.jsonl")
+		f, err := os.OpenFile(statusPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if err != nil {
+			return fmt.Errorf("open status file %s: %w", statusPath, err)
+		}
+		cfg.Logger.Info("writing status to file (no SSH keys)", "path", statusPath)
+		statusSink = f
 	}
 	defer func() {
 		if err := statusSink.Close(); err != nil {
