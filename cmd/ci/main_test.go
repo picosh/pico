@@ -179,6 +179,146 @@ func scanLines(data []byte) []string {
 	return lines
 }
 
+// TestE2E_DuplicateCancellation verifies that starting a new job for the same
+// repo cancels any existing running job for that repo.
+func TestE2E_DuplicateCancellation(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skip integration test")
+	}
+	if _, err := exec.LookPath("zmx"); err != nil {
+		t.Skip("zmx not found, skipping integration test")
+	}
+
+	// 1. Create workspace with a slow pico.sh so the first job stays running
+	workspaceDir := t.TempDir()
+	picoSh := `#!/usr/bin/env bash
+set -e
+zmx run slow-step sleep 30
+`
+	if err := os.WriteFile(filepath.Join(workspaceDir, "pico.sh"), []byte(picoSh), 0755); err != nil {
+		t.Fatalf("write pico.sh: %v", err)
+	}
+
+	// 2. Create a fast pico.sh for the second job
+	workspaceDir2 := t.TempDir()
+	picoSh2 := `#!/usr/bin/env bash
+set -e
+zmx run fast-step echo "done"
+`
+	if err := os.WriteFile(filepath.Join(workspaceDir2, "pico.sh"), []byte(picoSh2), 0755); err != nil {
+		t.Fatalf("write pico.sh: %v", err)
+	}
+
+	artifactDir := t.TempDir()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	makeCfg := func(eventSource io.ReadCloser) *Cfg {
+		return &Cfg{
+			Logger:          slog.New(slog.NewTextHandler(io.Discard, nil)),
+			Ctx:             ctx,
+			Cancel:          cancel,
+			ArtifactDir:     artifactDir,
+			EventSource:     eventSource,
+			MonitorInterval: 200 * time.Millisecond,
+			NewWorkspace:    defaultWorkspaceFactory,
+		}
+	}
+
+	// 3. Start first job (slow)
+	event1 := Event{Type: "build", Name: "dup-repo", Workspace: workspaceDir}
+	event1JSON, _ := json.Marshal(event1)
+	cfg1 := makeCfg(io.NopCloser(bytes.NewReader(append(event1JSON, '\n'))))
+
+	go func() {
+		_ = RunRunner(cfg1)
+	}()
+
+	// Wait for the first job's runner session to appear
+	if !waitForSessionPrefix(t, "ci.dup-repo.", 10*time.Second) {
+		t.Fatal("first job's runner session never appeared")
+	}
+
+	// Record the first job's runner session name
+	firstRunner := findRunnerSession(t, "dup-repo")
+	if firstRunner == "" {
+		t.Fatal("could not find first job's runner session")
+	}
+	t.Logf("first job runner: %s", firstRunner)
+
+	// 4. Start second job (same repo name, should cancel the first)
+	event2 := Event{Type: "build", Name: "dup-repo", Workspace: workspaceDir2}
+	event2JSON, _ := json.Marshal(event2)
+	cfg2 := makeCfg(io.NopCloser(bytes.NewReader(append(event2JSON, '\n'))))
+
+	runner2Done := make(chan error, 1)
+	go func() {
+		runner2Done <- RunRunner(cfg2)
+	}()
+
+	// Wait for second runner to complete
+	select {
+	case err := <-runner2Done:
+		if err != nil {
+			t.Fatalf("second runner: %v", err)
+		}
+	case <-time.After(30 * time.Second):
+		t.Fatal("timeout waiting for second runner")
+	}
+
+	// 5. Verify the first job's runner session was killed
+	// Give zmx kill time to propagate
+	time.Sleep(1 * time.Second)
+
+	listOutput, _ := exec.Command("zmx", "list").CombinedOutput()
+	sessions := parseZMXList(string(listOutput))
+	for _, s := range sessions {
+		if s.Name == firstRunner {
+			if s.Ended == "" {
+				t.Errorf("first job's runner session %s should have been killed (ended is empty)", firstRunner)
+			} else {
+				t.Logf("first job's runner session %s was killed (ended=%s)", firstRunner, s.Ended)
+			}
+		}
+	}
+
+	// Cleanup
+	_ = exec.Command("zmx", "kill", "-f", "ci.dup-repo").Run()
+}
+
+// waitForSessionPrefix returns true if a session with the given prefix appears within the timeout.
+func waitForSessionPrefix(t *testing.T, prefix string, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		listOutput, err := exec.Command("zmx", "list").CombinedOutput()
+		if err == nil {
+			sessions := parseZMXList(string(listOutput))
+			for _, s := range sessions {
+				if strings.HasPrefix(s.Name, prefix) {
+					return true
+				}
+			}
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	return false
+}
+
+// findRunnerSession finds the runner session for a given repo name.
+func findRunnerSession(t *testing.T, name string) string {
+	listOutput, err := exec.Command("zmx", "list").CombinedOutput()
+	if err != nil {
+		t.Fatalf("zmx list: %v", err)
+	}
+	sessions := parseZMXList(string(listOutput))
+	for _, s := range sessions {
+		if strings.HasPrefix(s.Name, "ci."+name+".") && strings.HasSuffix(s.Name, ".runner") {
+			return s.Name
+		}
+	}
+	return ""
+}
+
 func TestGenerateJobID(t *testing.T) {
 	// Same inputs should produce same hash
 	id1 := jobIDFor("myrepo", "/workspace", 1000)

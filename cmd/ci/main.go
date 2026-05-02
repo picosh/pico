@@ -270,6 +270,9 @@ func eventHandler(cfg *Cfg, eventData *Event) error {
 	log := cfg.Logger.With("event", eventData)
 	log.Info("event payload")
 
+	// Cancel any existing job for this repo before starting a new one
+	cancelRunningJobs(cfg, log, eventData.Name)
+
 	jobID := generateJobID(eventData.Name, eventData.Workspace)
 	log = log.With("job_id", jobID)
 
@@ -671,14 +674,21 @@ func runCancel(cfg *Cfg) error {
 	log = log.With("name", event.Name, "type", event.Type)
 	log.Info("cancelling jobs")
 
-	// Find running jobs matching name+type
-	runnerSessions, sessions := findRunningJobs(event.Name)
+	cancelRunningJobs(cfg, log, event.Name)
+	return nil
+}
+
+// cancelRunningJobs finds and cancels all running jobs for a given repo name.
+// It kills the runner sessions (which cascades to children), publishes cancelled
+// status, and publishes cancel events. Errors are logged but not returned — the
+// caller should proceed regardless.
+func cancelRunningJobs(cfg *Cfg, log *slog.Logger, name string) {
+	runnerSessions, sessions := findRunningJobs(name)
 	if len(runnerSessions) == 0 {
 		log.Info("no running jobs to cancel")
-		return nil
+		return
 	}
 
-	// Create publishers
 	statusPub := createStatusPublisher(cfg, log)
 	defer func() {
 		if err := statusPub.Close(); err != nil {
@@ -693,21 +703,18 @@ func runCancel(cfg *Cfg) error {
 	}()
 
 	for _, runnerName := range runnerSessions {
-		// Extract jobID from runner session name: ci.<name>.<jobID>.runner
 		jobID := extractJobID(runnerName)
 		log := log.With("job_id", jobID)
 
-		// Kill the runner session (cascades to children)
 		if err := killSessions([]string{runnerName}); err != nil {
 			log.Error("kill runner session", "err", err)
 			continue
 		}
 		log.Info("cancelled runner session")
 
-		// Publish cancelled status
-		matched := filterSessions(sessions, fmt.Sprintf("ci.%s.%s.", event.Name, jobID))
+		matched := filterSessions(sessions, fmt.Sprintf("ci.%s.%s.", name, jobID))
 		statusPayload := StatusPayload{
-			Name:     event.Name,
+			Name:     name,
 			JobID:    jobID,
 			Status:   "cancelled",
 			ExitCode: nil,
@@ -717,10 +724,9 @@ func runCancel(cfg *Cfg) error {
 			log.Error("publish cancelled status", "err", err)
 		}
 
-		// Publish cancel event
 		cancelEvent := CancelEvent{
 			Type:   "cancel",
-			Name:   event.Name,
+			Name:   name,
 			JobID:  jobID,
 			Reason: "duplicate_event",
 		}
@@ -728,8 +734,6 @@ func runCancel(cfg *Cfg) error {
 			log.Error("publish cancel event", "err", err)
 		}
 	}
-
-	return nil
 }
 
 // findRunningJobs finds all active runner sessions for a given name.
