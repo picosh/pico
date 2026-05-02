@@ -92,31 +92,35 @@ func main() {
 
 	switch cmd {
 	case "runner":
+		cfg.Logger.Info("starting runner")
 		if err := RunRunner(cfg); err != nil {
-			cfg.Logger.Error("runner", "err", err)
+			cfg.Logger.Error("runner failed", "err", err)
 			os.Exit(1)
 		}
 	case "cancel":
+		cfg.Logger.Info("starting cancel handler")
 		if err := runCancel(cfg); err != nil {
-			cfg.Logger.Error("cancel", "err", err)
+			cfg.Logger.Error("cancel failed", "err", err)
 			os.Exit(1)
 		}
 	case "gc":
+		cfg.Logger.Info("starting garbage collection")
 		if err := runGC(cfg); err != nil {
-			cfg.Logger.Error("gc", "err", err)
+			cfg.Logger.Error("gc failed", "err", err)
 			os.Exit(1)
 		}
 	case "monitor":
+		cfg.Logger.Info("starting monitor")
 		if err := runMonitor(cfg); err != nil {
-			cfg.Logger.Error("monitor", "err", err)
+			cfg.Logger.Error("monitor failed", "err", err)
 			os.Exit(1)
 		}
 	case "status":
-		cfg.Logger.Info("running status updater")
+		cfg.Logger.Info("starting status updater")
 	case "orca":
-		cfg.Logger.Info("running orchastrator")
+		cfg.Logger.Info("starting orchestrator")
 	default:
-		cfg.Logger.Error("must provide cmd")
+		cfg.Logger.Error("must provide command: runner, cancel, gc, monitor, status, or orca")
 		os.Exit(1)
 	}
 }
@@ -144,7 +148,7 @@ func RunRunner(cfg *Cfg) error {
 		return fmt.Errorf("unmarshal event: %w", err)
 	}
 
-	cfg.Logger.Info("running job", "event", eventData)
+	cfg.Logger.Info("received event", "type", eventData.Type, "repo", eventData.Name, "workspace", eventData.Workspace)
 
 	return eventHandler(cfg, &eventData)
 }
@@ -170,7 +174,7 @@ func (w *WorkspaceRsync) Setup() error {
 	w.Dest = tempDir
 
 	log := w.Logger.With("source", w.Source, "dest", w.Dest)
-	log.Info("cloning workspace")
+	log.Info("syncing workspace via rsync")
 
 	var cmd *exec.Cmd
 	if w.Cfg.KeyLocation != "" {
@@ -235,7 +239,7 @@ func (eng *JobEngine) Run() error {
 	prefix := fmt.Sprintf("ci.%s.%s.", eng.Ev.Name, eng.JobID)
 
 	log := eng.Logger.With("manifest", manifest, "prefix", prefix)
-	log.Info("starting runner session")
+	log.Info("starting runner session", "session", prefix+"runner")
 
 	evStr := fmt.Sprintf("PICO_CI_EVENT=%s", eng.Ev.Type)
 	jobStr := fmt.Sprintf("ZMX_SESSION_PREFIX=%s", prefix)
@@ -267,14 +271,15 @@ func (eng *JobEngine) getManifest() (string, error) {
 }
 
 func eventHandler(cfg *Cfg, eventData *Event) error {
-	log := cfg.Logger.With("event", eventData)
-	log.Info("event payload")
+	log := cfg.Logger.With("repo", eventData.Name, "type", eventData.Type)
+	log.Info("processing event", "workspace", eventData.Workspace)
 
 	// Cancel any existing job for this repo before starting a new one
 	cancelRunningJobs(cfg, log, eventData.Name)
 
 	jobID := generateJobID(eventData.Name, eventData.Workspace)
 	log = log.With("job_id", jobID)
+	log.Info("starting job", "session_prefix", fmt.Sprintf("ci.%s.%s", eventData.Name, jobID))
 
 	wk := cfg.NewWorkspace(cfg, log, eventData.Workspace)
 	eng := &JobEngine{
@@ -290,15 +295,19 @@ func eventHandler(cfg *Cfg, eventData *Event) error {
 		}
 	}()
 
+	log.Info("cloning workspace", "source", eventData.Workspace)
 	if err := eng.Setup(); err != nil {
 		return fmt.Errorf("setup: %w", err)
 	}
+	log.Info("workspace ready", "dir", eng.Wk.GetDir())
 
+	log.Info("launching job sessions")
 	if err := eng.Run(); err != nil {
 		return fmt.Errorf("run: %w", err)
 	}
 
-	log.Info("job launched (fire-and-forget)")
+	log.Info("job launched successfully — monitor will track progress", "artifact_dir", cfg.ArtifactDir)
+	log.Info("follow the runner live", "command", fmt.Sprintf("zmx tail ci.%s.%s.runner", eventData.Name, jobID))
 	return nil
 }
 
@@ -328,7 +337,8 @@ func runMonitor(cfg *Cfg) error {
 	ticker := time.NewTicker(cfg.MonitorInterval)
 	defer ticker.Stop()
 
-	log.Info("monitor started", "interval", cfg.MonitorInterval)
+	log.Info("monitor started", "interval", cfg.MonitorInterval, "artifact_dir", cfg.ArtifactDir)
+	log.Info("monitoring ci.* sessions for job status")
 
 	for {
 		select {
@@ -355,8 +365,11 @@ func monitorTick(cfg *Cfg, log *slog.Logger, publisher io.Writer) error {
 	ciSessions := filterCISessions(sessions)
 
 	if len(ciSessions) == 0 {
+		log.Info("no ci.* sessions found")
 		return nil
 	}
+
+	log.Info("found ci sessions", "count", len(ciSessions))
 
 	// b. Group by job prefix: ci.<name>.<jobID>.
 	groups := groupSessionsByJob(ciSessions)
@@ -368,7 +381,10 @@ func monitorTick(cfg *Cfg, log *slog.Logger, publisher io.Writer) error {
 			continue
 		}
 
+		log := log.With("repo", name, "job_id", jobID)
+
 		if allCompleted(group) {
+			log.Info("job completed, staging artifacts", "sessions", len(group))
 			// Stage artifacts for each session
 			for _, s := range group {
 				html, err := fetchHistoryHTML(s.Name)
@@ -392,6 +408,7 @@ func monitorTick(cfg *Cfg, log *slog.Logger, publisher io.Writer) error {
 
 			// Publish final status
 			exitCode, status := resolveJobExitCode(group)
+			log.Info("job finished", "status", status, "exit_code", exitCode)
 			payload := StatusPayload{
 				Name:     name,
 				JobID:    jobID,
@@ -400,9 +417,10 @@ func monitorTick(cfg *Cfg, log *slog.Logger, publisher io.Writer) error {
 				Sessions: group,
 			}
 			if err := publishStatus(publisher, payload); err != nil {
-				log.Error("publish final status", "name", name, "job_id", jobID, "err", err)
+				log.Error("publish final status", "err", err)
 			}
 		} else {
+			log.Info("job still running", "sessions", len(group))
 			// Publish running status
 			payload := StatusPayload{
 				Name:     name,
@@ -412,7 +430,7 @@ func monitorTick(cfg *Cfg, log *slog.Logger, publisher io.Writer) error {
 				Sessions: group,
 			}
 			if err := publishStatus(publisher, payload); err != nil {
-				log.Error("publish status", "name", name, "job_id", jobID, "err", err)
+				log.Error("publish status", "err", err)
 			}
 		}
 	}
@@ -689,8 +707,8 @@ func runCancel(cfg *Cfg) error {
 		return fmt.Errorf("unmarshal event: %w", err)
 	}
 
-	log = log.With("name", event.Name, "type", event.Type)
-	log.Info("cancelling jobs")
+	log = log.With("repo", event.Name, "type", event.Type)
+	log.Info("cancelling running jobs for repo")
 
 	cancelRunningJobs(cfg, log, event.Name)
 	return nil
@@ -706,6 +724,8 @@ func cancelRunningJobs(cfg *Cfg, log *slog.Logger, name string) {
 		log.Info("no running jobs to cancel")
 		return
 	}
+
+	log.Info("found running jobs to cancel", "count", len(runnerSessions))
 
 	statusPub := createStatusPublisher(cfg, log)
 	defer func() {
@@ -724,6 +744,7 @@ func cancelRunningJobs(cfg *Cfg, log *slog.Logger, name string) {
 		jobID := extractJobID(runnerName)
 		log := log.With("job_id", jobID)
 
+		log.Info("cancelling job", "runner", runnerName)
 		if err := killSessions([]string{runnerName}); err != nil {
 			log.Error("kill runner session", "err", err)
 			continue
