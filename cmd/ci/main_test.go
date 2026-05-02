@@ -1,8 +1,185 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
+	"context"
+	"encoding/json"
+	"io"
+	"log/slog"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"testing"
+	"time"
 )
+
+// TestE2E_RunnerWithZMXSessions is a full integration test that:
+// 1. Creates a workspace with pico.sh that spawns zmx sessions
+// 2. Feeds an event to RunRunner via a pipe
+// 3. Runs the full lifecycle: setup → run → monitor → complete
+// 4. Reads the status file and asserts correct status transitions.
+func TestE2E_RunnerWithZMXSessions(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skip integration test")
+	}
+
+	// 1. Create workspace with pico.sh that spawns zmx sessions
+	workspaceDir := t.TempDir()
+	picoSh := `#!/usr/bin/env bash
+set -e
+zmx run step1 echo "hello from step1"
+zmx run step2 echo "hello from step2"
+`
+	if err := os.WriteFile(filepath.Join(workspaceDir, "pico.sh"), []byte(picoSh), 0755); err != nil {
+		t.Fatalf("write pico.sh: %v", err)
+	}
+
+	// 2. Create status file
+	statusFile := filepath.Join(t.TempDir(), "status.jsonl")
+
+	// 3. Create config
+	ctx, cancel := context.WithCancel(context.Background())
+	cfg := &Cfg{
+		Logger:          slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Ctx:             ctx,
+		Cancel:          cancel,
+		ArtifactDir:     t.TempDir(),
+		EventsFile:      "", // pipe mode
+		StatusFile:      statusFile,
+		MonitorInterval: 200 * time.Millisecond,
+		NewWorkspace:    defaultWorkspaceFactory,
+	}
+
+	// Write event to file before starting the runner
+	eventFile := filepath.Join(t.TempDir(), "events.jsonl")
+	event := Event{
+		Type:      "build",
+		Name:      "test-repo",
+		Workspace: workspaceDir,
+	}
+	eventJSON, _ := json.Marshal(event)
+	if err := os.WriteFile(eventFile, append(eventJSON, '\n'), 0644); err != nil {
+		t.Fatalf("write event: %v", err)
+	}
+	cfg.EventsFile = eventFile
+
+	// 5. Start runner in goroutine
+	done := make(chan error, 1)
+	go func() {
+		done <- RunRunner(cfg)
+	}()
+
+	// 7. Wait for runner to complete (with timeout)
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("runner: %v", err)
+		}
+	case <-time.After(30 * time.Second):
+		t.Fatal("timeout waiting for runner to complete")
+	}
+
+	// 8. Read and parse status file
+	data, err := os.ReadFile(statusFile)
+	if err != nil {
+		t.Fatalf("read status file: %v", err)
+	}
+
+	lines := scanLines(data)
+	if len(lines) == 0 {
+		t.Fatal("no status lines written")
+	}
+
+	// Parse all status payloads
+	var payloads []StatusPayload
+	for _, line := range lines {
+		var p StatusPayload
+		if err := json.Unmarshal([]byte(line), &p); err != nil {
+			t.Fatalf("unmarshal status line %q: %v", line, err)
+		}
+		payloads = append(payloads, p)
+	}
+
+	// 9. Assert we got at least one "running" and one final payload
+	var hasRunning, hasFinal bool
+	var finalPayload *StatusPayload
+	for i := range payloads {
+		p := &payloads[i]
+		if p.Status == "running" {
+			hasRunning = true
+		}
+		if p.Status == "success" || p.Status == "failed" {
+			hasFinal = true
+			finalPayload = p
+		}
+	}
+
+	if !hasRunning {
+		t.Error("expected at least one 'running' status")
+	}
+	if !hasFinal {
+		t.Error("expected a final 'success' or 'failed' status")
+	}
+
+	// 10. Assert final payload has correct data
+	if finalPayload == nil {
+		t.Fatal("no final payload")
+	}
+	if finalPayload.Name != "test-repo" {
+		t.Errorf("expected name test-repo, got %q", finalPayload.Name)
+	}
+	if finalPayload.Status != "success" {
+		t.Errorf("expected status success, got %q", finalPayload.Status)
+	}
+	if finalPayload.ExitCode == nil || *finalPayload.ExitCode != 0 {
+		t.Errorf("expected exit code 0, got %v", finalPayload.ExitCode)
+	}
+	if len(finalPayload.Sessions) < 2 {
+		t.Errorf("expected at least 2 sessions, got %d", len(finalPayload.Sessions))
+	}
+
+	// 11. Assert sessions have correct names
+	sessionNames := make(map[string]bool)
+	for _, s := range finalPayload.Sessions {
+		sessionNames[s.Short] = true
+		t.Logf("session: name=%s short=%s exit_code=%s ended=%s", s.Name, s.Short, s.ExitCode, s.Ended)
+	}
+	if !sessionNames["step1"] {
+		t.Error("expected session 'step1'")
+	}
+	if !sessionNames["step2"] {
+		t.Error("expected session 'step2'")
+	}
+
+	// 12. Assert HTML artifacts were staged for each session
+	for _, s := range finalPayload.Sessions {
+		artifactPath := filepath.Join(cfg.ArtifactDir, finalPayload.Name, finalPayload.JobID, s.Short+".html")
+		data, err := os.ReadFile(artifactPath)
+		if err != nil {
+			t.Errorf("read artifact %s: %v", artifactPath, err)
+			continue
+		}
+		if len(data) == 0 {
+			t.Errorf("artifact %s is empty", artifactPath)
+		}
+		if !bytes.Contains(data, []byte("<div")) {
+			t.Errorf("artifact %s does not contain HTML content", artifactPath)
+		}
+	}
+
+	// Cleanup any leftover zmx sessions
+	_ = exec.Command("zmx", "kill", "-f", "test-repo").Run()
+}
+
+func scanLines(data []byte) []string {
+	var lines []string
+	scanner := bufio.NewScanner(bytes.NewReader(data))
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+	return lines
+}
 
 func TestGenerateJobID(t *testing.T) {
 	// Same inputs should produce same hash

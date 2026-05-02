@@ -19,6 +19,16 @@ import (
 	"github.com/picosh/utils/pipe"
 )
 
+type WorkspaceFactory func(cfg *Cfg, logger *slog.Logger, source string) Workspace
+
+func defaultWorkspaceFactory(cfg *Cfg, logger *slog.Logger, source string) Workspace {
+	return &WorkspaceRsync{
+		Cfg:    cfg,
+		Logger: logger,
+		Source: source,
+	}
+}
+
 type Cfg struct {
 	Logger              *slog.Logger
 	Ctx                 context.Context
@@ -30,6 +40,7 @@ type Cfg struct {
 	EventsFile          string
 	StatusFile          string
 	MonitorInterval     time.Duration
+	NewWorkspace        WorkspaceFactory
 }
 
 type Event struct {
@@ -53,6 +64,7 @@ func NewCfg() *Cfg {
 	logger := shared.CreateLogger("ci", false)
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Cfg{
+		NewWorkspace:        defaultWorkspaceFactory,
 		Logger:              logger.With("key_loc", keyLoc, "cert_loc", certLoc),
 		Ctx:                 ctx,
 		Cancel:              cancel,
@@ -163,14 +175,20 @@ func (w *WorkspaceRsync) Setup() error {
 	}
 	w.Dest = tempDir
 
-	sshcmd := fmt.Sprintf(
-		"-i %s -o IdentitiesOnly=yes -o CertificateFile %s",
-		w.Cfg.KeyLocation,
-		w.Cfg.CertificateLocation,
-	)
 	log := w.Logger.With("source", w.Source, "dest", w.Dest)
 	log.Info("cloning workspace")
-	cmd := exec.Command("rsync", "-e", sshcmd, "-rv", `--exclude="/.git"`, w.Source, w.Dest+"/")
+
+	var cmd *exec.Cmd
+	if w.Cfg.KeyLocation != "" {
+		sshcmd := fmt.Sprintf(
+			"-i %s -o IdentitiesOnly=yes -o CertificateFile %s",
+			w.Cfg.KeyLocation,
+			w.Cfg.CertificateLocation,
+		)
+		cmd = exec.Command("rsync", "-e", sshcmd, "-rv", `--exclude="/.git"`, w.Source+"/", w.Dest+"/")
+	} else {
+		cmd = exec.Command("rsync", "-rv", `--exclude="/.git"`, w.Source+"/", w.Dest+"/")
+	}
 	return runCmd(cmd, log)
 }
 
@@ -371,11 +389,7 @@ func eventHandler(cfg *Cfg, publisher io.WriteCloser, eventData *Event) {
 	jobID := generateJobID(eventData.Name, eventData.Workspace)
 	log = log.With("job_id", jobID)
 
-	wk := &WorkspaceRsync{
-		Logger: log,
-		Cfg:    cfg,
-		Source: eventData.Workspace,
-	}
+	wk := cfg.NewWorkspace(cfg, log, eventData.Workspace)
 	eng := &JobEngine{
 		Logger: log,
 		Cfg:    cfg,
