@@ -373,11 +373,20 @@ func monitorTick(cfg *Cfg, log *slog.Logger, publisher io.Writer) error {
 			for _, s := range group {
 				html, err := fetchHistoryHTML(s.Name)
 				if err != nil {
-					log.Error("fetch history", "session", s.Name, "err", err)
+					log.Error("fetch history html", "session", s.Name, "err", err)
 					continue
 				}
-				if err := stageArtifact(cfg.ArtifactDir, name, jobID, s.Short, html); err != nil {
-					log.Error("stage artifact", "session", s.Short, "err", err)
+				if err := stageArtifact(cfg.ArtifactDir, name, jobID, s.Short, html, ".html"); err != nil {
+					log.Error("stage html artifact", "session", s.Short, "err", err)
+				}
+
+				plain, err := fetchHistoryPlain(s.Name)
+				if err != nil {
+					log.Error("fetch history plain", "session", s.Name, "err", err)
+					continue
+				}
+				if err := stageArtifact(cfg.ArtifactDir, name, jobID, s.Short, plain, ".txt"); err != nil {
+					log.Error("stage txt artifact", "session", s.Short, "err", err)
 				}
 			}
 
@@ -556,6 +565,15 @@ func fetchHistoryHTML(sessionName string) (string, error) {
 	return string(output), nil
 }
 
+func fetchHistoryPlain(sessionName string) (string, error) {
+	cmd := exec.Command("zmx", "history", sessionName, "--plain")
+	output, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return string(output), nil
+}
+
 func publishStatus(w io.Writer, payload StatusPayload) error {
 	data, err := json.Marshal(payload)
 	if err != nil {
@@ -582,12 +600,12 @@ func createStatusPublisher(cfg *Cfg, logger *slog.Logger) io.WriteCloser {
 	return pub
 }
 
-func stageArtifact(dir, name, jobID, short, html string) error {
-	path := filepath.Join(dir, name, jobID, short+".html")
+func stageArtifact(dir, name, jobID, short, content, ext string) error {
+	path := filepath.Join(dir, name, jobID, short+ext)
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return err
 	}
-	return os.WriteFile(path, []byte(html), 0644)
+	return os.WriteFile(path, []byte(content), 0644)
 }
 
 func syncArtifacts(cfg *Cfg, log *slog.Logger) error {
