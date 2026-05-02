@@ -40,29 +40,22 @@ zmx run step2 echo "hello from step2"
 
 	// 3. Create config
 	ctx, cancel := context.WithCancel(context.Background())
-	cfg := &Cfg{
-		Logger:          slog.New(slog.NewTextHandler(io.Discard, nil)),
-		Ctx:             ctx,
-		Cancel:          cancel,
-		ArtifactDir:     t.TempDir(),
-		EventsFile:      "", // pipe mode
-		StatusFile:      statusFile,
-		MonitorInterval: 200 * time.Millisecond,
-		NewWorkspace:    defaultWorkspaceFactory,
-	}
-
-	// Write event to file before starting the runner
-	eventFile := filepath.Join(t.TempDir(), "events.jsonl")
 	event := Event{
 		Type:      "build",
 		Name:      "test-repo",
 		Workspace: workspaceDir,
 	}
 	eventJSON, _ := json.Marshal(event)
-	if err := os.WriteFile(eventFile, append(eventJSON, '\n'), 0644); err != nil {
-		t.Fatalf("write event: %v", err)
+	cfg := &Cfg{
+		Logger:          slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Ctx:             ctx,
+		Cancel:          cancel,
+		ArtifactDir:     t.TempDir(),
+		EventSource:     io.NopCloser(bytes.NewReader(append(eventJSON, '\n'))),
+		StatusFile:      statusFile,
+		MonitorInterval: 200 * time.Millisecond,
+		NewWorkspace:    defaultWorkspaceFactory,
 	}
-	cfg.EventsFile = eventFile
 
 	// 5. Start runner in goroutine
 	done := make(chan error, 1)

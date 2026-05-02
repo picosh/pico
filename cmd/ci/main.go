@@ -17,6 +17,7 @@ import (
 
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/utils/pipe"
+	"golang.org/x/term"
 )
 
 type WorkspaceFactory func(cfg *Cfg, logger *slog.Logger, source string) Workspace
@@ -37,7 +38,8 @@ type Cfg struct {
 	CertificateLocation string
 	ArtifactDir         string
 	ArtifactDest        string
-	EventsFile          string
+	StdinEvents         bool          // true when stdin is not a terminal
+	EventSource         io.ReadCloser // when set, used directly as the event source (for testing)
 	StatusFile          string
 	MonitorInterval     time.Duration
 	NewWorkspace        WorkspaceFactory
@@ -50,13 +52,12 @@ type Event struct {
 }
 
 func NewCfg() *Cfg {
-	var keyLoc, certLoc, artifactDir, artifactDest, eventsFile, statusFile string
+	var keyLoc, certLoc, artifactDir, artifactDest, statusFile string
 	var monitorInterval time.Duration
 	flag.StringVar(&keyLoc, "pk", "", "ssh private key used to authenticate with pico services")
 	flag.StringVar(&certLoc, "ck", "", "ssh certificate public key used to authenticate with pico services (only required if using ssh certificates)")
 	flag.StringVar(&artifactDir, "artifact-dir", "/tmp/pico-ci-artifacts", "local directory to stage artifacts")
 	flag.StringVar(&artifactDest, "artifact-dest", "", "rsync destination for artifacts (e.g. host:/path/)")
-	flag.StringVar(&eventsFile, "events-file", "", "file to read events from instead of pipe (one JSON event per line)")
 	flag.StringVar(&statusFile, "status-file", "", "file to write status to instead of pipe (one JSON status per line)")
 	flag.DurationVar(&monitorInterval, "monitor-interval", 5*time.Second, "interval for monitoring zmx sessions")
 	flag.Parse()
@@ -72,7 +73,7 @@ func NewCfg() *Cfg {
 		CertificateLocation: certLoc,
 		ArtifactDir:         artifactDir,
 		ArtifactDest:        artifactDest,
-		EventsFile:          eventsFile,
+		StdinEvents:         !term.IsTerminal(int(os.Stdin.Fd())),
 		StatusFile:          statusFile,
 		MonitorInterval:     monitorInterval,
 	}
@@ -103,12 +104,10 @@ func main() {
 
 func RunRunner(cfg *Cfg) error {
 	var eventSource io.ReadCloser
-	if cfg.EventsFile != "" {
-		f, err := os.Open(cfg.EventsFile)
-		if err != nil {
-			return fmt.Errorf("open events file: %w", err)
-		}
-		eventSource = f
+	if cfg.EventSource != nil {
+		eventSource = cfg.EventSource
+	} else if cfg.StdinEvents {
+		eventSource = os.Stdin
 	} else {
 		eventSource = createEventSubscriber(cfg, cfg.Logger)
 	}
