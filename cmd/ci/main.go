@@ -51,6 +51,13 @@ type Event struct {
 	Workspace string `json:"workspace"`
 }
 
+type CancelEvent struct {
+	Type   string `json:"type"` // "cancel"
+	Name   string `json:"name"`
+	JobID  string `json:"job_id"`
+	Reason string `json:"reason"` // "duplicate_event", "manual", "gc"
+}
+
 func NewCfg() *Cfg {
 	var keyLoc, certLoc, artifactDir, artifactDest, statusFile string
 	var monitorInterval time.Duration
@@ -90,6 +97,16 @@ func main() {
 	case "runner":
 		if err := RunRunner(cfg); err != nil {
 			cfg.Logger.Error("runner", "err", err)
+			os.Exit(1)
+		}
+	case "cancel":
+		if err := runCancel(cfg); err != nil {
+			cfg.Logger.Error("cancel", "err", err)
+			os.Exit(1)
+		}
+	case "gc":
+		if err := runGC(cfg); err != nil {
+			cfg.Logger.Error("gc", "err", err)
 			os.Exit(1)
 		}
 	case "status":
@@ -206,7 +223,6 @@ type JobEngine struct {
 	Cfg    *Cfg
 	Ev     *Event
 	JobID  string
-	Cmd    *exec.Cmd
 }
 
 type SessionInfo struct {
@@ -238,51 +254,23 @@ func (eng *JobEngine) Run() error {
 		return err
 	}
 
-	log := eng.Logger.With("manifest", manifest)
-	prefix := fmt.Sprintf("%s.%s.", eng.Ev.Name, eng.JobID)
+	prefix := fmt.Sprintf("ci.%s.%s.", eng.Ev.Name, eng.JobID)
+
+	log := eng.Logger.With("manifest", manifest, "prefix", prefix)
+	log.Info("starting runner session")
+
 	evStr := fmt.Sprintf("PICO_CI_EVENT=%s", eng.Ev.Type)
 	jobStr := fmt.Sprintf("ZMX_SESSION_PREFIX=%s", prefix)
-	cmd := exec.Command("bash", manifest)
-	cmd.Env = append(os.Environ(), evStr)
-	cmd.Env = append(os.Environ(), jobStr)
+
+	cmd := exec.Command("zmx", "run", "runner", "-d", "bash", manifest)
+	cmd.Env = append(os.Environ(), evStr, jobStr)
 	cmd.Dir = eng.Wk.GetDir()
 
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return err
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("start runner session: %w", err)
 	}
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		return err
-	}
-
-	if err := cmd.Start(); err != nil {
-		return err
-	}
-	eng.Cmd = cmd
-
-	// Stream stdout/stderr with context-aware shutdown
-	go eng.streamOutput(stdout, log, "stdout")
-	go eng.streamOutput(stderr, log, "stderr")
 
 	return nil
-}
-
-func (eng *JobEngine) streamOutput(reader io.Reader, log *slog.Logger, label string) {
-	done := eng.Cfg.Ctx.Done()
-	scanner := bufio.NewScanner(reader)
-	for scanner.Scan() {
-		select {
-		case <-done:
-			return
-		default:
-		}
-		if label == "stderr" {
-			log.Error("pico.sh stderr", "text", scanner.Text())
-		} else {
-			log.Info("pico.sh stdout", "text", scanner.Text())
-		}
-	}
 }
 
 func (eng *JobEngine) Cleanup() error {
@@ -290,7 +278,7 @@ func (eng *JobEngine) Cleanup() error {
 }
 
 func (eng *JobEngine) Monitor(publisher io.WriteCloser) error {
-	prefix := fmt.Sprintf("%s.%s.", eng.Ev.Name, eng.JobID)
+	prefix := fmt.Sprintf("ci.%s.%s.", eng.Ev.Name, eng.JobID)
 	ticker := time.NewTicker(eng.Cfg.MonitorInterval)
 	defer ticker.Stop()
 
@@ -360,13 +348,30 @@ func (eng *JobEngine) Monitor(publisher io.WriteCloser) error {
 }
 
 func (eng *JobEngine) waitForCommand() (int, string) {
-	err := eng.Cmd.Wait()
-	if err == nil {
-		return 0, "success"
+	prefix := fmt.Sprintf("ci.%s.%s.", eng.Ev.Name, eng.JobID)
+	runnerName := prefix + "runner"
+
+	listOutput, err := exec.Command("zmx", "list").CombinedOutput()
+	if err != nil {
+		eng.Logger.Error("zmx list for exit code", "err", err)
+		return 1, "failed"
 	}
-	if exitError, ok := err.(*exec.ExitError); ok {
-		return int(exitError.ExitCode()), "failed"
+
+	sessions := parseZMXList(string(listOutput))
+	for _, s := range sessions {
+		if s.Name == runnerName {
+			if s.ExitCode == "0" || s.ExitCode == "" {
+				return 0, "success"
+			}
+			var exitCode int
+			if _, err := fmt.Sscanf(s.ExitCode, "%d", &exitCode); err == nil {
+				return exitCode, "failed"
+			}
+			return 1, "failed"
+		}
 	}
+
+	eng.Logger.Warn("runner session not found in zmx list")
 	return 1, "failed"
 }
 
@@ -606,4 +611,225 @@ func runCmd(cmd *exec.Cmd, log *slog.Logger) error {
 	}()
 
 	return cmd.Wait()
+}
+
+// runCancel reads an event from stdin and cancels any running job with matching name+type.
+func runCancel(cfg *Cfg) error {
+	log := cfg.Logger.With("cmd", "cancel")
+
+	// Read event from stdin
+	scanner := bufio.NewScanner(os.Stdin)
+	if !scanner.Scan() {
+		return fmt.Errorf("no input on stdin")
+	}
+
+	var event Event
+	if err := json.Unmarshal([]byte(scanner.Text()), &event); err != nil {
+		return fmt.Errorf("unmarshal event: %w", err)
+	}
+
+	log = log.With("name", event.Name, "type", event.Type)
+	log.Info("cancelling jobs")
+
+	// Find running jobs matching name+type
+	runnerSessions, sessions := findRunningJobs(event.Name)
+	if len(runnerSessions) == 0 {
+		log.Info("no running jobs to cancel")
+		return nil
+	}
+
+	// Create publishers
+	statusPub := createStatusPublisher(cfg, log)
+	defer func() {
+		if err := statusPub.Close(); err != nil {
+			log.Error("close status publisher", "err", err)
+		}
+	}()
+	cancelPub := createCancelPublisher(cfg, log)
+	defer func() {
+		if err := cancelPub.Close(); err != nil {
+			log.Error("close cancel publisher", "err", err)
+		}
+	}()
+
+	for _, runnerName := range runnerSessions {
+		// Extract jobID from runner session name: ci.<name>.<jobID>.runner
+		jobID := extractJobID(runnerName)
+		log := log.With("job_id", jobID)
+
+		// Kill the runner session (cascades to children)
+		if err := killSessions([]string{runnerName}); err != nil {
+			log.Error("kill runner session", "err", err)
+			continue
+		}
+		log.Info("cancelled runner session")
+
+		// Publish cancelled status
+		matched := filterSessions(sessions, fmt.Sprintf("ci.%s.%s.", event.Name, jobID))
+		statusPayload := StatusPayload{
+			Name:     event.Name,
+			JobID:    jobID,
+			Status:   "cancelled",
+			ExitCode: nil,
+			Sessions: matched,
+		}
+		if err := publishStatus(statusPub, statusPayload); err != nil {
+			log.Error("publish cancelled status", "err", err)
+		}
+
+		// Publish cancel event
+		cancelEvent := CancelEvent{
+			Type:   "cancel",
+			Name:   event.Name,
+			JobID:  jobID,
+			Reason: "duplicate_event",
+		}
+		if err := publishCancelEvent(cancelPub, cancelEvent); err != nil {
+			log.Error("publish cancel event", "err", err)
+		}
+	}
+
+	return nil
+}
+
+// findRunningJobs finds all active runner sessions for a given name.
+// Returns runner session names and all sessions for reference.
+func findRunningJobs(name string) ([]string, []SessionInfo) {
+	listOutput, err := exec.Command("zmx", "list").CombinedOutput()
+	if err != nil {
+		return nil, nil
+	}
+
+	sessions := parseZMXList(string(listOutput))
+	var runners []string
+	for _, s := range sessions {
+		// Match ci.<name>.*.runner sessions that are still active (no ended)
+		if strings.HasPrefix(s.Name, "ci."+name+".") && strings.HasSuffix(s.Name, ".runner") && s.Ended == "" {
+			runners = append(runners, s.Name)
+		}
+	}
+	return runners, sessions
+}
+
+// extractJobID extracts the jobID from a runner session name like ci.<name>.<jobID>.runner.
+func extractJobID(runnerName string) string {
+	// ci.<name>.<jobID>.runner
+	// Remove "ci." prefix and ".runner" suffix, then take the part after the first "."
+	name := strings.TrimSuffix(runnerName, ".runner")
+	name = strings.TrimPrefix(name, "ci.")
+	// name is now <name>.<jobID>, take the jobID part
+	parts := strings.SplitN(name, ".", 2)
+	if len(parts) == 2 {
+		return parts[1]
+	}
+	return ""
+}
+
+// killSessions kills zmx sessions by name.
+func killSessions(names []string) error {
+	if len(names) == 0 {
+		return nil
+	}
+	args := append([]string{"kill"}, names...)
+	cmd := exec.Command("zmx", args...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("zmx kill: %s: %w", string(output), err)
+	}
+	return nil
+}
+
+// publishCancelEvent publishes a CancelEvent to the build.cancel pipe topic.
+func publishCancelEvent(w io.Writer, event CancelEvent) error {
+	data, err := json.Marshal(event)
+	if err != nil {
+		return err
+	}
+	_, err = w.Write(append(data, '\n'))
+	return err
+}
+
+// createCancelPublisher creates a pipe publisher for the build.cancel topic.
+func createCancelPublisher(cfg *Cfg, logger *slog.Logger) io.WriteCloser {
+	logger.Info("creating pipe publisher", "topic", "build.cancel")
+	info := shared.NewPicoPipeClient()
+	info.KeyLocation = cfg.KeyLocation
+	info.CertificateLocation = cfg.CertificateLocation
+	pub := pipe.NewReconnectReadWriteCloser(
+		cfg.Ctx,
+		logger,
+		info,
+		"pub build.cancel -b=false",
+		"pub build.cancel -b=false",
+		100,
+		-1,
+	)
+	return pub
+}
+
+// runGC deletes completed CI zmx sessions that are not part of a running job.
+func runGC(cfg *Cfg) error {
+	log := cfg.Logger.With("cmd", "gc")
+	log.Info("running garbage collection")
+
+	listOutput, err := exec.Command("zmx", "list").CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("zmx list: %w", err)
+	}
+
+	sessions := parseZMXList(string(listOutput))
+
+	// Group ci. sessions by job prefix: ci.<name>.<jobID>.
+	groups := make(map[string][]SessionInfo)
+	for _, s := range sessions {
+		if !strings.HasPrefix(s.Name, "ci.") {
+			continue
+		}
+		// Extract job prefix: ci.<name>.<jobID>.
+		prefix := extractJobPrefix(s.Name)
+		if prefix == "" {
+			continue
+		}
+		groups[prefix] = append(groups[prefix], s)
+	}
+
+	// For each group, if all sessions are completed, kill them.
+	var toKill []string
+	for prefix, group := range groups {
+		allDone := true
+		for _, s := range group {
+			if s.Ended == "" {
+				allDone = false
+				break
+			}
+		}
+		if allDone {
+			log.Info("completed job, scheduling for gc", "prefix", prefix, "sessions", len(group))
+			toKill = append(toKill, group[0].Name)
+		}
+	}
+
+	if len(toKill) == 0 {
+		log.Info("no sessions to garbage collect")
+		return nil
+	}
+
+	if err := killSessions(toKill); err != nil {
+		return fmt.Errorf("kill sessions: %w", err)
+	}
+
+	log.Info("garbage collection complete", "killed", len(toKill))
+	return nil
+}
+
+// extractJobPrefix extracts the job prefix from a session name.
+// ci.<name>.<jobID>.<step> -> ci.<name>.<jobID>.
+func extractJobPrefix(sessionName string) string {
+	// Find the third dot (after ci.<name>.<jobID>)
+	// ci.name.jobID.step -> ci.name.jobID.
+	parts := strings.Split(sessionName, ".")
+	if len(parts) < 4 {
+		return ""
+	}
+	return parts[0] + "." + parts[1] + "." + parts[2] + "."
 }

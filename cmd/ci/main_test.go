@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -162,7 +163,7 @@ zmx run step2 echo "hello from step2"
 	}
 
 	// Cleanup any leftover zmx sessions
-	_ = exec.Command("zmx", "kill", "-f", "test-repo").Run()
+	_ = exec.Command("zmx", "kill", "-f", "ci.test-repo").Run()
 }
 
 func scanLines(data []byte) []string {
@@ -212,9 +213,9 @@ func TestShortSessionName(t *testing.T) {
 		prefix  string
 		want    string
 	}{
-		{"myrepo.abc123.lint", "myrepo.abc123.", "lint"},
-		{"myrepo.abc123.tests", "myrepo.abc123.", "tests"},
-		{"lint", "myrepo.abc123.", "lint"}, // no prefix match
+		{"ci.myrepo.abc123.lint", "ci.myrepo.abc123.", "lint"},
+		{"ci.myrepo.abc123.tests", "ci.myrepo.abc123.", "tests"},
+		{"lint", "ci.myrepo.abc123.", "lint"}, // no prefix match
 	}
 
 	for _, tt := range tests {
@@ -294,12 +295,12 @@ func TestParseZMXList(t *testing.T) {
 
 func TestFilterSessions(t *testing.T) {
 	sessions := []SessionInfo{
-		{Name: "myrepo.abc123.lint", PID: "1"},
-		{Name: "myrepo.abc123.tests", PID: "2"},
-		{Name: "other.xyz.lint", PID: "3"},
+		{Name: "ci.myrepo.abc123.lint", PID: "1"},
+		{Name: "ci.myrepo.abc123.tests", PID: "2"},
+		{Name: "ci.other.xyz.lint", PID: "3"},
 	}
 
-	filtered := filterSessions(sessions, "myrepo.abc123.")
+	filtered := filterSessions(sessions, "ci.myrepo.abc123.")
 	if len(filtered) != 2 {
 		t.Fatalf("expected 2 filtered sessions, got %d", len(filtered))
 	}
@@ -309,5 +310,116 @@ func TestFilterSessions(t *testing.T) {
 	}
 	if filtered[1].Short != "tests" {
 		t.Errorf("expected short name tests, got %q", filtered[1].Short)
+	}
+}
+
+func TestExtractJobID(t *testing.T) {
+	tests := []struct {
+		runnerName string
+		want       string
+	}{
+		{"ci.myrepo.abc123.runner", "abc123"},
+		{"ci.test-repo.006d0847.runner", "006d0847"},
+		{"ci.my_org.project.abc123.runner", "project.abc123"}, // name with underscore
+	}
+
+	for _, tt := range tests {
+		got := extractJobID(tt.runnerName)
+		if got != tt.want {
+			t.Errorf("extractJobID(%q) = %q, want %q", tt.runnerName, got, tt.want)
+		}
+	}
+}
+
+func TestExtractJobPrefix(t *testing.T) {
+	tests := []struct {
+		sessionName string
+		want        string
+	}{
+		{"ci.myrepo.abc123.lint", "ci.myrepo.abc123."},
+		{"ci.myrepo.abc123.runner", "ci.myrepo.abc123."},
+		{"ci.myrepo.abc123.tests", "ci.myrepo.abc123."},
+		{"ci.name.jobID.step.substep", "ci.name.jobID."},
+		{"ci.a.b", ""}, // too few parts
+	}
+
+	for _, tt := range tests {
+		got := extractJobPrefix(tt.sessionName)
+		if got != tt.want {
+			t.Errorf("extractJobPrefix(%q) = %q, want %q", tt.sessionName, got, tt.want)
+		}
+	}
+}
+
+func TestFindRunningJobs(t *testing.T) {
+	output := `name=ci.myrepo.abc123.runner	pid=100	clients=0	created=1777519944	start_dir=/home/erock
+  name=ci.myrepo.abc123.lint	pid=101	clients=0	created=1777519944	start_dir=/home/erock
+  name=ci.myrepo.abc123.tests	pid=102	clients=0	created=1777519944	start_dir=/home/erock	ended=1777519986	exit_code=0
+  name=ci.myrepo.def456.runner	pid=103	clients=0	created=1777519944	start_dir=/home/erock	ended=1777519986	exit_code=0
+  name=ci.other.abc123.runner	pid=104	clients=0	created=1777519944	start_dir=/home/erock
+→ name=d.build.1	pid=549652	clients=0	created=1777513430	start_dir=/home/erock`
+
+	runners, sessions := findRunningJobsFromOutput(output, "myrepo")
+	if len(runners) != 1 {
+		t.Fatalf("expected 1 running job, got %d: %v", len(runners), runners)
+	}
+	if runners[0] != "ci.myrepo.abc123.runner" {
+		t.Errorf("expected runner ci.myrepo.abc123.runner, got %q", runners[0])
+	}
+	if len(sessions) != 6 {
+		t.Errorf("expected 6 total sessions, got %d", len(sessions))
+	}
+}
+
+func findRunningJobsFromOutput(output, name string) ([]string, []SessionInfo) {
+	sessions := parseZMXList(output)
+	var runners []string
+	for _, s := range sessions {
+		if strings.HasPrefix(s.Name, "ci."+name+".") && strings.HasSuffix(s.Name, ".runner") && s.Ended == "" {
+			runners = append(runners, s.Name)
+		}
+	}
+	return runners, sessions
+}
+
+func TestCancelEventMarshal(t *testing.T) {
+	event := CancelEvent{
+		Type:   "cancel",
+		Name:   "myrepo",
+		JobID:  "abc123",
+		Reason: "duplicate_event",
+	}
+
+	data, err := json.Marshal(event)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+
+	var decoded CancelEvent
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	if decoded.Type != "cancel" {
+		t.Errorf("expected type cancel, got %q", decoded.Type)
+	}
+	if decoded.Name != "myrepo" {
+		t.Errorf("expected name myrepo, got %q", decoded.Name)
+	}
+	if decoded.JobID != "abc123" {
+		t.Errorf("expected job_id abc123, got %q", decoded.JobID)
+	}
+	if decoded.Reason != "duplicate_event" {
+		t.Errorf("expected reason duplicate_event, got %q", decoded.Reason)
+	}
+}
+
+func TestKillSessionsEmpty(t *testing.T) {
+	// Should not error with empty list
+	if err := killSessions(nil); err != nil {
+		t.Errorf("killSessions(nil) = %v, want nil", err)
+	}
+	if err := killSessions([]string{}); err != nil {
+		t.Errorf("killSessions([]) = %v, want nil", err)
 	}
 }
