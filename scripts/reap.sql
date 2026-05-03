@@ -1,0 +1,1 @@
+SELECT count(*) FROM app_users u WHERE NOT EXISTS (SELECT 1 FROM posts WHERE user_id = u.id) AND NOT EXISTS (SELECT 1 FROM projects WHERE user_id = u.id) AND NOT EXISTS (SELECT 1 FROM access_logs WHERE user_id = u.id AND created_at > NOW() - INTERVAL '1 year');
