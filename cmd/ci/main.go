@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"html/template"
 	"io"
 	"log/slog"
 	"os"
@@ -436,6 +437,15 @@ func monitorTick(cfg *Cfg, log *slog.Logger, publisher io.Writer) error {
 			if err := stageArtifact(cfg.ArtifactDir, name, jobID, s.Short, plain, ".txt"); err != nil {
 				log.Error("stage txt artifact", "session", s.Short, "err", err)
 			}
+		}
+
+		// Generate and stage job index landing pages
+		indexHTML, indexTXT := generateJobIndex(name, jobID, group)
+		if err := stageArtifact(cfg.ArtifactDir, name, jobID, "index", indexHTML, ".html"); err != nil {
+			log.Error("stage index.html", "err", err)
+		}
+		if err := stageArtifact(cfg.ArtifactDir, name, jobID, "index", indexTXT, ".txt"); err != nil {
+			log.Error("stage index.txt", "err", err)
 		}
 
 		if allCompleted(group) {
@@ -949,4 +959,157 @@ func extractJobPrefix(sessionName string) string {
 		return ""
 	}
 	return parts[0] + "." + parts[1] + "." + parts[2] + "."
+}
+
+// sessionRow holds display info for a single session in the job index.
+type sessionRow struct {
+	Name     string
+	Short    string
+	Status   string
+	ExitCode string
+	Ended    string
+	Duration string
+}
+
+// generateJobIndex produces HTML and plain-text index pages listing all
+// sessions for a job with links and metadata (status, exit code, ended at).
+func generateJobIndex(name, jobID string, sessions []SessionInfo) (htmlContent, txtContent string) {
+	rows := make([]sessionRow, 0, len(sessions))
+	for _, s := range sessions {
+		row := sessionRow{
+			Name:  s.Name,
+			Short: s.Short,
+		}
+		if s.Ended == "" {
+			row.Status = "running"
+			row.Duration = fmtDuration(s.Created, fmt.Sprintf("%d", time.Now().Unix()))
+		} else if s.ExitCode == "0" {
+			row.Status = "success"
+			row.ExitCode = "0"
+		} else {
+			row.Status = "failed"
+			row.ExitCode = s.ExitCode
+		}
+		row.Ended = s.Ended
+		row.Duration = fmtDuration(s.Created, s.Ended)
+		rows = append(rows, row)
+	}
+
+	// Resolve overall job status
+	jobStatus := "success"
+	hasRunning := false
+	for _, r := range rows {
+		if r.Status == "running" {
+			hasRunning = true
+			break
+		}
+		if r.Status == "failed" {
+			jobStatus = "failed"
+		}
+	}
+	if hasRunning {
+		jobStatus = "running"
+	}
+
+	// HTML index
+	tmpl, err := template.New("index").Parse(indexHTMLTemplate)
+	if err == nil {
+		var buf strings.Builder
+		if err := tmpl.Execute(&buf, struct {
+			Name      string
+			JobID     string
+			JobStatus string
+			Rows      []sessionRow
+		}{Name: name, JobID: jobID, JobStatus: jobStatus, Rows: rows}); err == nil {
+			htmlContent = buf.String()
+		}
+	}
+
+	// Plain-text index
+	var buf strings.Builder
+	statusIcon := map[string]string{"success": "\u2705", "failed": "\u274c", "running": "\u23f3"}
+	icon := statusIcon[jobStatus]
+	fmt.Fprintf(&buf, "Job: %s (%s) %s\n", name, jobID, icon)
+	fmt.Fprintf(&buf, "Sessions: %d\n", len(rows))
+	fmt.Fprintln(&buf, strings.Repeat("-", 70))
+	for _, r := range rows {
+		rIcon := statusIcon[r.Status]
+		fmt.Fprintf(&buf, "  %s %-20s  exit: %-5s  duration: %-8s  ended: %s\n",
+			rIcon, r.Short, r.ExitCode, r.Duration, r.Ended)
+	}
+	fmt.Fprintln(&buf, strings.Repeat("-", 60))
+	txtContent = buf.String()
+
+	return htmlContent, txtContent
+}
+
+const indexHTMLTemplate = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CI Job: {{.Name}} ({{.JobID}})</title>
+<style>
+  body { font-family: system-ui, -apple-system, sans-serif; margin: 2rem; background: #fafafa; color: #222; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.25rem; display: flex; align-items: center; gap: 0.75rem; }
+  .meta { color: #666; margin-bottom: 1.5rem; font-size: 0.9rem; }
+  table { border-collapse: collapse; width: 100%; max-width: 800px; }
+  th { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 2px solid #ccc; font-size: 0.8rem; text-transform: uppercase; color: #555; }
+  td { padding: 0.5rem 0.75rem; border-bottom: 1px solid #eee; }
+  a { color: #0066cc; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .pill { display: inline-block; padding: 0.2rem 0.65rem; border-radius: 999px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
+  .pill-success { background: #d4edda; color: #155724; }
+  .pill-failed { background: #f8d7da; color: #721c24; }
+  .pill-running { background: #cce5ff; color: #004085; }
+</style>
+</head>
+<body>
+<h1>{{.Name}} <span class="pill pill-{{.JobStatus}}">{{.JobStatus}}</span></h1>
+<p class="meta">Job ID: {{.JobID}} &middot; {{len .Rows}} session(s)</p>
+<table>
+<thead>
+<tr><th>Session</th><th>Status</th><th>Exit Code</th><th>Duration</th><th>Ended</th><th>Artifacts</th></tr>
+</thead>
+<tbody>
+{{range .Rows}}
+<tr>
+  <td><strong>{{.Short}}</strong></td>
+  <td><span class="pill pill-{{.Status}}">{{.Status}}</span></td>
+  <td>{{.ExitCode}}</td>
+  <td>{{.Duration}}</td>
+  <td>{{.Ended}}</td>
+  <td><a href="{{.Short}}.html">html</a> / <a href="{{.Short}}.txt">txt</a></td>
+</tr>
+{{end}}
+</tbody>
+</table>
+</body>
+</html>`
+
+// fmtDuration formats the duration between two unix timestamp strings.
+// Returns human-readable strings like "2m34s", "1.5s", or "—" if invalid.
+func fmtDuration(created, ended string) string {
+	if created == "" || ended == "" {
+		return "—"
+	}
+	var c, e int64
+	if _, err := fmt.Sscanf(created, "%d", &c); err != nil {
+		return "—"
+	}
+	if _, err := fmt.Sscanf(ended, "%d", &e); err != nil {
+		return "—"
+	}
+	duration := time.Duration(e-c) * time.Second
+	if duration < 0 {
+		return "—"
+	}
+	if duration >= time.Minute {
+		return fmt.Sprintf("%dm%ds", duration/time.Minute, duration%time.Minute/time.Second)
+	}
+	secs := float64(duration) / float64(time.Second)
+	if secs >= 10 {
+		return fmt.Sprintf("%ds", int(secs))
+	}
+	return fmt.Sprintf("%.1fs", secs)
 }
