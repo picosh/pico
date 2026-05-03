@@ -1,5 +1,7 @@
+-- find unused accounts
+SELECT count(*) FROM app_users u WHERE NOT EXISTS (SELECT 1 FROM posts WHERE user_id = u.id) AND NOT EXISTS (SELECT 1 FROM projects WHERE user_id = u.id) AND NOT EXISTS (SELECT 1 FROM access_logs WHERE user_id = u.id AND created_at > NOW() - INTERVAL '1 year') AND NOT EXISTS (SELECT 1 FROM feature_flags ff WHERE ff.user_id = u.id AND ff.name = 'plus');
 -- delete unused accounts
-SELECT count(*) FROM app_users u WHERE NOT EXISTS (SELECT 1 FROM posts WHERE user_id = u.id) AND NOT EXISTS (SELECT 1 FROM projects WHERE user_id = u.id) AND NOT EXISTS (SELECT 1 FROM access_logs WHERE user_id = u.id AND created_at > NOW() - INTERVAL '1 year');
+DELETE FROM app_users u WHERE NOT EXISTS (SELECT 1 FROM posts WHERE user_id = u.id) AND NOT EXISTS (SELECT 1 FROM projects WHERE user_id = u.id) AND NOT EXISTS (SELECT 1 FROM access_logs WHERE user_id = u.id AND created_at > NOW() - INTERVAL '1 year') AND NOT EXISTS (SELECT 1 FROM feature_flags ff WHERE ff.user_id = u.id AND ff.name = 'plus');
 
 -- how many visits will be deleted
 SELECT count(*) FROM analytics_visits WHERE created_at < NOW() - INTERVAL '1 year';
