@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -73,24 +74,28 @@ zmx run step2 echo "hello from step2"
 		t.Fatal("timeout waiting for runner to complete")
 	}
 
-	// 4. Run the monitor until we see a final status
+	// 4. Run the monitor and poll for incremental artifacts
 	monitorDone := make(chan error, 1)
 	go func() {
 		monitorDone <- runMonitor(cfg)
 	}()
 
-	// 5. Wait for final status (with timeout)
+	// Track what we've seen during the run
+	seenIndexHTML := false
+	seenIndexTXT := false
+	sessionArtifactShorts := make(map[string]bool)
 	var finalPayload *StatusPayload
+
 	for {
 		select {
 		case err := <-monitorDone:
 			t.Fatalf("monitor exited unexpectedly: %v", err)
 		case <-time.After(30 * time.Second):
-			t.Fatal("timeout waiting for final status from monitor")
+			t.Fatal("timeout waiting for job to complete")
 		default:
 		}
 
-		// Check status file for final payload
+		// Read all statuses and artifacts seen so far
 		statusFile := filepath.Join(artifactDir, "status.jsonl")
 		data, err := os.ReadFile(statusFile)
 		if err == nil {
@@ -100,17 +105,54 @@ zmx run step2 echo "hello from step2"
 				if err := json.Unmarshal([]byte(line), &p); err != nil {
 					continue
 				}
+
+				// Ignore statuses from unrelated jobs (e.g., leftover sessions from previous tests)
+				if p.Name != "test-repo" {
+					continue
+				}
+
+				// Check index files exist (generated at every tick)
+				indexHTMLPath := filepath.Join(artifactDir, p.Name, p.JobID, "index.html")
+				indexTXTPath := filepath.Join(artifactDir, p.Name, p.JobID, "index.txt")
+				if _, err := os.Stat(indexHTMLPath); err == nil {
+					seenIndexHTML = true
+					t.Logf("index.html exists (status=%s)", p.Status)
+				}
+				if _, err := os.Stat(indexTXTPath); err == nil {
+					seenIndexTXT = true
+				}
+
+				// Track per-session artifacts
+				for _, s := range p.Sessions {
+					htmlPath := filepath.Join(artifactDir, p.Name, p.JobID, s.Short+".html")
+					txtPath := filepath.Join(artifactDir, p.Name, p.JobID, s.Short+".txt")
+					if _, err := os.Stat(htmlPath); err == nil {
+						sessionArtifactShorts[s.Short+"_html"] = true
+					}
+					if _, err := os.Stat(txtPath); err == nil {
+						sessionArtifactShorts[s.Short+"_txt"] = true
+					}
+				}
+
+				// Check if we've reached a final state
 				if p.Status == "success" || p.Status == "failed" {
+					cancel() // stop the monitor
 					finalPayload = &p
+					break
 				}
 			}
 		}
 
 		if finalPayload != nil {
-			cancel() // stop the monitor
 			break
 		}
-		time.Sleep(200 * time.Millisecond)
+
+		// Assert progress: if we see session artifacts, we should see index files too
+		if len(sessionArtifactShorts) > 0 && (!seenIndexHTML || !seenIndexTXT) {
+			t.Error("index files should exist once any session artifact exists")
+		}
+
+		time.Sleep(cfg.MonitorInterval / 2) // poll at twice the interval rate
 	}
 
 	// Wait for monitor to exit gracefully
@@ -120,10 +162,28 @@ zmx run step2 echo "hello from step2"
 		t.Log("warning: monitor did not exit gracefully")
 	}
 
+	// 5. Assert we saw index files during the run
+	if !seenIndexHTML {
+		t.Error("never saw index.html during monitoring")
+	}
+	if !seenIndexTXT {
+		t.Error("never saw index.txt during monitoring")
+	}
+
 	// 6. Assert final payload has correct data
 	if finalPayload == nil {
 		t.Fatal("no final payload")
 	}
+	// Filter to only sessions with our job prefix to avoid picking up unrelated ci.* sessions
+	expectedPrefix := fmt.Sprintf("ci.%s.%s.", finalPayload.Name, finalPayload.JobID)
+	sessions := make([]SessionInfo, 0, len(finalPayload.Sessions))
+	for _, s := range finalPayload.Sessions {
+		if strings.HasPrefix(s.Name, expectedPrefix) {
+			sessions = append(sessions, s)
+		}
+	}
+	finalPayload.Sessions = sessions
+
 	if finalPayload.Name != "test-repo" {
 		t.Errorf("expected name test-repo, got %q", finalPayload.Name)
 	}
@@ -143,6 +203,7 @@ zmx run step2 echo "hello from step2"
 		sessionNames[s.Short] = true
 		t.Logf("session: name=%s short=%s exit_code=%s ended=%s", s.Name, s.Short, s.ExitCode, s.Ended)
 	}
+	// Sessions from the test's pico.sh: step1 and step2
 	if !sessionNames["step1"] {
 		t.Error("expected session 'step1'")
 	}
@@ -166,8 +227,10 @@ zmx run step2 echo "hello from step2"
 		}
 	}
 
-	// Cleanup any leftover zmx sessions
-	_ = exec.Command("zmx", "kill", "-f", "ci.test-repo").Run()
+	// Cleanup any leftover zmx sessions for this job
+	if finalPayload != nil {
+		_ = exec.Command("zmx", "kill", "-f", fmt.Sprintf("ci.test-repo.%s", finalPayload.JobID)).Run()
+	}
 }
 
 func scanLines(data []byte) []string {
