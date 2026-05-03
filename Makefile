@@ -150,10 +150,11 @@ migrate:
 	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20251226_add_pipe_monitoring.sql
 	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20260116_add_analytics_filter_indexes.sql
 	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20260305_add_forms_table.sql
+	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20260503_add_analytics_summary_tables.sql
 .PHONY: migrate
 
 latest:
-	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20260305_add_forms_table.sql
+	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20260503_add_analytics_summary_tables.sql
 .PHONY: latest
 
 psql:
@@ -164,8 +165,9 @@ dump:
 	$(DOCKER_CMD) exec $(DB_CONTAINER) pg_dump -U $(PGUSER) $(PGDATABASE) > ./backup.sql
 .PHONY: dump
 
+BACKUP_FILE?=./backup.sql
 restore:
-	$(DOCKER_CMD) cp ./backup.sql $(DB_CONTAINER):/backup.sql
+	$(DOCKER_CMD) cp $(BACKUP_FILE) $(DB_CONTAINER):/backup.sql
 	$(DOCKER_CMD) exec -it $(DB_CONTAINER) /bin/bash
 	# psql postgres -U postgres -d pico < /backup.sql
 .PHONY: restore

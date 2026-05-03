@@ -159,8 +159,10 @@ type Paginate[T any] struct {
 }
 
 type VisitInterval struct {
-	Interval *time.Time `json:"interval" db:"interval"`
-	Visitors int        `json:"visitors" db:"visitors"`
+	Interval        *time.Time `json:"interval" db:"interval"`
+	Visitors        int        `json:"visitors" db:"visitors"`
+	MobileVisitors  int        `json:"mobile_visitors" db:"mobile_visitors"`
+	DesktopVisitors int        `json:"desktop_visitors" db:"desktop_visitors"`
 }
 
 type VisitUrl struct {

@@ -922,6 +922,8 @@ func StartApiServer() {
 	go metricDrainSub(ctx, db, logger, cfg.Secret)
 	// gather connect/disconnect logs from tuns
 	go tunsEventLogDrainSub(ctx, db, logger, cfg.Secret)
+	// monthly analytics aggregation (checks daily, runs if previous month is missing)
+	go analyticsAggregationCron(ctx, db, logger)
 
 	apiConfig := &router.ApiConfig{
 		Cfg:    cfg,
