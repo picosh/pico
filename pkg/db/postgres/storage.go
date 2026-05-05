@@ -9,6 +9,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -724,14 +725,28 @@ func visitFilterBy(opts *db.SummaryOpts) (string, string) {
 }
 
 func (me *PsqlDB) visitUnique(opts *db.SummaryOpts) ([]*db.VisitInterval, error) {
-	intervals, err := me.visitUniqueFromSummary(opts)
-	if err != nil {
-		return nil, fmt.Errorf("query summary visits: %w", err)
-	}
+	var intervals, currentIntervals []*db.VisitInterval
+	var sumErr, rawErr error
 
-	currentIntervals, err := me.visitUniqueFromRaw(opts)
-	if err != nil {
-		return nil, fmt.Errorf("query raw visits: %w", err)
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		intervals, sumErr = me.visitUniqueFromSummary(opts)
+	}()
+	go func() {
+		defer wg.Done()
+		currentIntervals, rawErr = me.visitUniqueFromRaw(opts)
+	}()
+
+	wg.Wait()
+
+	if sumErr != nil {
+		return nil, fmt.Errorf("query summary visits: %w", sumErr)
+	}
+	if rawErr != nil {
+		return nil, fmt.Errorf("query raw visits: %w", rawErr)
 	}
 
 	// Merge: current month data may overlap with summary data, combine counts
@@ -744,23 +759,13 @@ func (me *PsqlDB) visitUniqueFromSummary(opts *db.SummaryOpts) ([]*db.VisitInter
 	currentMonthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
 	previousMonthStart := currentMonthStart.AddDate(0, -1, 0)
 
-	// Always include at least the previous month in the summary query, since raw data
-	// for the previous month may have been deleted by aggregation. visitUniqueFromRaw
-	// covers the previous and current months, but once aggregation runs and deletes raw
-	// data, the summary table is the only source. Using min(origin, previousMonthStart)
-	// ensures we don't skip the previous month even when origin is set to the current month.
-	effectiveOrigin := opts.Origin
-	if opts.Origin.After(previousMonthStart) {
-		effectiveOrigin = previousMonthStart
-	}
-
-	// If effective origin is in or after current month, no historical data to fetch
-	if !effectiveOrigin.Before(currentMonthStart) {
+	// If origin is in the previous month or later, raw data covers it — no summary to fetch.
+	if !opts.Origin.Before(previousMonthStart) {
 		return nil, nil
 	}
 
 	where := ""
-	args := []interface{}{opts.UserID, effectiveOrigin, currentMonthStart}
+	args := []interface{}{opts.UserID, opts.Origin, currentMonthStart}
 	argIdx := 4
 	if opts.Host != "" {
 		where = "AND host = $" + fmt.Sprintf("%d", argIdx)
@@ -953,14 +958,28 @@ func mergeHosts(historical, current []*db.VisitUrl) []*db.VisitUrl {
 }
 
 func (me *PsqlDB) visitReferer(opts *db.SummaryOpts) ([]*db.VisitUrl, error) {
-	historical, err := me.visitRefererFromSummary(opts)
-	if err != nil {
-		return nil, fmt.Errorf("query summary referers: %w", err)
-	}
+	var historical, current []*db.VisitUrl
+	var histErr, rawErr error
 
-	current, err := me.visitRefererFromRaw(opts)
-	if err != nil {
-		return nil, fmt.Errorf("query raw referers: %w", err)
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		historical, histErr = me.visitRefererFromSummary(opts)
+	}()
+	go func() {
+		defer wg.Done()
+		current, rawErr = me.visitRefererFromRaw(opts)
+	}()
+
+	wg.Wait()
+
+	if histErr != nil {
+		return nil, fmt.Errorf("query summary referers: %w", histErr)
+	}
+	if rawErr != nil {
+		return nil, fmt.Errorf("query raw referers: %w", rawErr)
 	}
 
 	return mergeTopReferers(historical, current), nil
@@ -972,18 +991,13 @@ func (me *PsqlDB) visitRefererFromSummary(opts *db.SummaryOpts) ([]*db.VisitUrl,
 	currentMonthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
 	previousMonthStart := currentMonthStart.AddDate(0, -1, 0)
 
-	effectiveOrigin := opts.Origin
-	if opts.Origin.After(previousMonthStart) {
-		effectiveOrigin = previousMonthStart
-	}
-
-	// If effective origin is in or after current month, no historical data to fetch
-	if !effectiveOrigin.Before(currentMonthStart) {
+	// If origin is in the previous month or later, raw data covers it — no summary to fetch.
+	if !opts.Origin.Before(previousMonthStart) {
 		return nil, nil
 	}
 
 	// Clamp origin to month boundary for summary table lookup
-	originMonthStart := time.Date(effectiveOrigin.Year(), effectiveOrigin.Month(), 1, 0, 0, 0, 0, time.UTC)
+	originMonthStart := time.Date(opts.Origin.Year(), opts.Origin.Month(), 1, 0, 0, 0, 0, time.UTC)
 
 	where := ""
 	args := []interface{}{opts.UserID, originMonthStart, currentMonthStart}
@@ -1059,14 +1073,28 @@ func (me *PsqlDB) visitRefererFromRaw(opts *db.SummaryOpts) ([]*db.VisitUrl, err
 }
 
 func (me *PsqlDB) visitUrl(opts *db.SummaryOpts) ([]*db.VisitUrl, error) {
-	historical, err := me.visitUrlFromSummary(opts)
-	if err != nil {
-		return nil, fmt.Errorf("query summary urls: %w", err)
-	}
+	var historical, current []*db.VisitUrl
+	var histErr, rawErr error
 
-	current, err := me.visitUrlFromRaw(opts)
-	if err != nil {
-		return nil, fmt.Errorf("query raw urls: %w", err)
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		historical, histErr = me.visitUrlFromSummary(opts)
+	}()
+	go func() {
+		defer wg.Done()
+		current, rawErr = me.visitUrlFromRaw(opts)
+	}()
+
+	wg.Wait()
+
+	if histErr != nil {
+		return nil, fmt.Errorf("query summary urls: %w", histErr)
+	}
+	if rawErr != nil {
+		return nil, fmt.Errorf("query raw urls: %w", rawErr)
 	}
 
 	return mergeTopUrls(historical, current), nil
@@ -1078,18 +1106,13 @@ func (me *PsqlDB) visitUrlFromSummary(opts *db.SummaryOpts) ([]*db.VisitUrl, err
 	currentMonthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
 	previousMonthStart := currentMonthStart.AddDate(0, -1, 0)
 
-	effectiveOrigin := opts.Origin
-	if opts.Origin.After(previousMonthStart) {
-		effectiveOrigin = previousMonthStart
-	}
-
-	// If effective origin is in or after current month, no historical data to fetch
-	if !effectiveOrigin.Before(currentMonthStart) {
+	// If origin is in the previous month or later, raw data covers it — no summary to fetch.
+	if !opts.Origin.Before(previousMonthStart) {
 		return nil, nil
 	}
 
 	// Clamp origin to month boundary for summary table lookup
-	originMonthStart := time.Date(effectiveOrigin.Year(), effectiveOrigin.Month(), 1, 0, 0, 0, 0, time.UTC)
+	originMonthStart := time.Date(opts.Origin.Year(), opts.Origin.Month(), 1, 0, 0, 0, 0, time.UTC)
 
 	where := ""
 	args := []interface{}{opts.UserID, originMonthStart, currentMonthStart}
@@ -1170,14 +1193,28 @@ func (me *PsqlDB) VisitUrlNotFound(opts *db.SummaryOpts) ([]*db.VisitUrl, error)
 		limit = 10
 	}
 
-	historical, err := me.visitUrlNotFoundFromSummary(opts, limit)
-	if err != nil {
-		return nil, fmt.Errorf("query summary 404 urls: %w", err)
-	}
+	var historical, current []*db.VisitUrl
+	var histErr, rawErr error
 
-	current, err := me.visitUrlNotFoundFromRaw(opts, limit)
-	if err != nil {
-		return nil, fmt.Errorf("query raw 404 urls: %w", err)
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		historical, histErr = me.visitUrlNotFoundFromSummary(opts, limit)
+	}()
+	go func() {
+		defer wg.Done()
+		current, rawErr = me.visitUrlNotFoundFromRaw(opts, limit)
+	}()
+
+	wg.Wait()
+
+	if histErr != nil {
+		return nil, fmt.Errorf("query summary 404 urls: %w", histErr)
+	}
+	if rawErr != nil {
+		return nil, fmt.Errorf("query raw 404 urls: %w", rawErr)
 	}
 
 	return mergeTopUrls(historical, current), nil
@@ -1189,18 +1226,13 @@ func (me *PsqlDB) visitUrlNotFoundFromSummary(opts *db.SummaryOpts, limit int) (
 	currentMonthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
 	previousMonthStart := currentMonthStart.AddDate(0, -1, 0)
 
-	effectiveOrigin := opts.Origin
-	if opts.Origin.After(previousMonthStart) {
-		effectiveOrigin = previousMonthStart
-	}
-
-	// If effective origin is in or after current month, no historical data to fetch
-	if !effectiveOrigin.Before(currentMonthStart) {
+	// If origin is in the previous month or later, raw data covers it — no summary to fetch.
+	if !opts.Origin.Before(previousMonthStart) {
 		return nil, nil
 	}
 
 	// Clamp origin to month boundary for summary table lookup
-	originMonthStart := time.Date(effectiveOrigin.Year(), effectiveOrigin.Month(), 1, 0, 0, 0, 0, time.UTC)
+	originMonthStart := time.Date(opts.Origin.Year(), opts.Origin.Month(), 1, 0, 0, 0, 0, time.UTC)
 
 	where := ""
 	args := []interface{}{opts.UserID, originMonthStart, currentMonthStart}
@@ -1277,14 +1309,28 @@ func (me *PsqlDB) visitUrlNotFoundFromRaw(opts *db.SummaryOpts, limit int) ([]*d
 }
 
 func (me *PsqlDB) visitHost(opts *db.SummaryOpts) ([]*db.VisitUrl, error) {
-	historical, err := me.visitHostFromSummary(opts)
-	if err != nil {
-		return nil, fmt.Errorf("query summary hosts: %w", err)
-	}
+	var historical, current []*db.VisitUrl
+	var histErr, rawErr error
 
-	current, err := me.visitHostFromRaw(opts)
-	if err != nil {
-		return nil, fmt.Errorf("query raw hosts: %w", err)
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		historical, histErr = me.visitHostFromSummary(opts)
+	}()
+	go func() {
+		defer wg.Done()
+		current, rawErr = me.visitHostFromRaw(opts)
+	}()
+
+	wg.Wait()
+
+	if histErr != nil {
+		return nil, fmt.Errorf("query summary hosts: %w", histErr)
+	}
+	if rawErr != nil {
+		return nil, fmt.Errorf("query raw hosts: %w", rawErr)
 	}
 
 	return mergeHosts(historical, current), nil
@@ -1341,24 +1387,44 @@ func (me *PsqlDB) visitHostFromRaw(opts *db.SummaryOpts) ([]*db.VisitUrl, error)
 }
 
 func (me *PsqlDB) VisitSummary(opts *db.SummaryOpts) (*db.SummaryVisits, error) {
-	visitors, err := me.visitUnique(opts)
-	if err != nil {
-		return nil, err
-	}
+	var (
+		visitors    []*db.VisitInterval
+		urls        []*db.VisitUrl
+		refs        []*db.VisitUrl
+		notFound    []*db.VisitUrl
+		visitorsErr error
+		urlsErr     error
+		refsErr     error
+		nfErr       error
+	)
 
-	urls, err := me.visitUrl(opts)
-	if err != nil {
-		return nil, err
-	}
+	var wg sync.WaitGroup
+	wg.Add(4)
 
-	notFound, err := me.VisitUrlNotFound(opts)
-	if err != nil {
-		return nil, err
-	}
+	go func() {
+		defer wg.Done()
+		visitors, visitorsErr = me.visitUnique(opts)
+	}()
+	go func() {
+		defer wg.Done()
+		urls, urlsErr = me.visitUrl(opts)
+	}()
+	go func() {
+		defer wg.Done()
+		refs, refsErr = me.visitReferer(opts)
+	}()
+	go func() {
+		defer wg.Done()
+		notFound, nfErr = me.VisitUrlNotFound(opts)
+	}()
 
-	refs, err := me.visitReferer(opts)
-	if err != nil {
-		return nil, err
+	wg.Wait()
+
+	// Return the first error encountered
+	for _, err := range []error{visitorsErr, urlsErr, refsErr, nfErr} {
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &db.SummaryVisits{
