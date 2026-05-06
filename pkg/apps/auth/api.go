@@ -682,6 +682,11 @@ func deserializeCaddyAccessLog(dbpool db.DB, access *AccessLog) (*db.AnalyticsVi
 		subdomain = router.GetCustomDomain(host, space)
 	}
 
+	// skip requests to the base domain itself (e.g. prose.sh, tuns.sh, pgs.sh)
+	if subdomain == "" {
+		return nil, fmt.Errorf("request to base domain %s", host)
+	}
+
 	subdomain = strings.TrimSuffix(subdomain, ".nue")
 	subdomain = strings.TrimSuffix(subdomain, ".ash")
 
@@ -747,10 +752,17 @@ func accessLogToVisit(dbpool db.DB, line string) (*db.AnalyticsVisits, error) {
 		return nil, fmt.Errorf("could not unmarshal line: %w", err)
 	}
 
+	contentType := strings.Join(accessLog.RespHeaders.ContentType, " ")
+	baseMimeType := strings.TrimSpace(strings.SplitN(contentType, ";", 2)[0])
+	if !slices.Contains(allowedMime, baseMimeType) {
+		return nil, fmt.Errorf("content type %q not allowed", baseMimeType)
+	}
+
 	return deserializeCaddyAccessLog(dbpool, &accessLog)
 }
 
 var allowedMime = []string{
+	"application/atom+xml",
 	"application/gzip",
 	"application/vnd.rar",
 	"application/x-7z-compressed",
@@ -758,6 +770,7 @@ var allowedMime = []string{
 	"application/x-bzip2",
 	"application/x-freearc",
 	"application/x-tar",
+	"application/xml",
 	"application/zip",
 	"text/html",
 }
@@ -788,10 +801,6 @@ func metricDrainSub(ctx context.Context, dbpool db.DB, logger *slog.Logger, secr
 			err = router.AnalyticsVisitFromVisit(visit, dbpool, secret)
 			if err != nil {
 				logger.Info("could not record analytics visit", "err", err)
-				continue
-			}
-
-			if !slices.Contains(allowedMime, visit.ContentType) {
 				continue
 			}
 

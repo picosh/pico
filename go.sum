@@ -328,8 +328,8 @@ github.com/tklauser/go-sysconf v0.3.15 h1:VE89k0criAymJ/Os65CSn1IXaol+1wrsFHEB8O
 github.com/tklauser/go-sysconf v0.3.15/go.mod h1:Dmjwr6tYFIseJw7a3dRLJfsHAMXZ3nEnL/aZY+0IuI4=
 github.com/tklauser/numcpus v0.10.0 h1:18njr6LDBk1zuna922MgdjQuJFjrdppsZG60sHGfjso=
 github.com/tklauser/numcpus v0.10.0/go.mod h1:BiTKazU708GQTYF4mB+cmlpT2Is1gLk7XVuEeem8LsQ=
-github.com/x-way/crawlerdetect v0.2.30 h1:U43R8+TZ7AZwBZehWRPdRdW53NmPoVZSOptevJKo1mE=
-github.com/x-way/crawlerdetect v0.2.30/go.mod h1:BPHLsB3FOuiwoWyhAvnqeiUSAEKd34O7BcsTCcxHRj4=
+github.com/x-way/crawlerdetect v0.2.31-0.20260212224137-1c21876d88a2 h1:ssAyb7n/6TPLWUVuVbGfzky4/ECJuIGmktDBawNZPv8=
+github.com/x-way/crawlerdetect v0.2.31-0.20260212224137-1c21876d88a2/go.mod h1:BPHLsB3FOuiwoWyhAvnqeiUSAEKd34O7BcsTCcxHRj4=
 github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
 github.com/yuin/goldmark v1.4.15/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
 github.com/yuin/goldmark v1.8.2 h1:kEGpgqJXdgbkhcOgBxkC0X0PmoPG1ZyoZ117rDVp4zE=

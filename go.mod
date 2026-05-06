@@ -50,7 +50,7 @@ require (
 	github.com/simplesurance/go-ip-anonymizer v0.0.0-20200429124537-35a880f8e87d
 	github.com/testcontainers/testcontainers-go v0.40.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.40.0
-	github.com/x-way/crawlerdetect v0.2.30
+	github.com/x-way/crawlerdetect v0.2.31-0.20260212224137-1c21876d88a2
 	github.com/yuin/goldmark v1.8.2
 	github.com/yuin/goldmark-highlighting/v2 v2.0.0-20230729083705-37449abec8cc
 	github.com/yuin/goldmark-meta v1.1.0
