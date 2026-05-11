@@ -106,13 +106,14 @@ func (t *testStorage) GetObject(bucket storage.Bucket, fpath string) (utils.Read
 }
 
 type ApiExample struct {
-	name        string
-	path        string
-	reqHeaders  map[string]string
-	want        string
-	wantUrl     string
-	status      int
-	contentType string
+	name          string
+	path          string
+	reqHeaders    map[string]string
+	want          string
+	wantUrl       string
+	wantCacheCtrl string
+	status        int
+	contentType   string
 
 	storage map[string]map[string]string
 }
@@ -396,6 +397,21 @@ func TestApiBasic(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:          "headers-cache-control-override",
+			path:          "/test.html",
+			want:          "hello world!",
+			status:        http.StatusOK,
+			contentType:   "text/html",
+			wantCacheCtrl: "public, max-age=31536000, immutable",
+
+			storage: map[string]map[string]string{
+				bucketName: {
+					"/test/test.html": "hello world!",
+					"/test/_headers":  "/*\n\tcache-control: public, max-age=31536000, immutable",
+				},
+			},
+		},
 	}
 
 	for _, tc := range tt {
@@ -445,6 +461,13 @@ func TestApiBasic(t *testing.T) {
 				}
 				if tc.wantUrl != location.String() {
 					t.Errorf("Want '%s', got '%s'", tc.wantUrl, location.String())
+				}
+			}
+
+			if tc.wantCacheCtrl != "" {
+				cc := responseRecorder.Header().Get("cache-control")
+				if cc != tc.wantCacheCtrl {
+					t.Errorf("Want cache-control '%s', got '%s'", tc.wantCacheCtrl, cc)
 				}
 			}
 		})

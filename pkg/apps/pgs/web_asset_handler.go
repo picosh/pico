@@ -282,7 +282,12 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("cache-control", cc)
 
 	for _, hdr := range userHeaders {
-		w.Header().Add(hdr.Name, hdr.Value)
+		// Use Set() for cache-control to override the middleware default
+		if strings.EqualFold(hdr.Name, "cache-control") {
+			w.Header().Set(hdr.Name, hdr.Value)
+		} else {
+			w.Header().Add(hdr.Name, hdr.Value)
+		}
 	}
 	if w.Header().Get("content-type") == "" {
 		w.Header().Set("content-type", contentType)
