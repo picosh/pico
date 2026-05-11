@@ -27,7 +27,8 @@ func main() {
 	dbpool := postgres.NewDB(dbURL, logger)
 	defer func() { _ = dbpool.Close() }()
 
-	st, err := storage.NewStorage(logger, "fs")
+	adapter := storage.GetStorageTypeFromEnv()
+	st, err := storage.NewStorage(logger, adapter)
 	if err != nil {
 		logger.Error("failed to create storage", "err", err)
 		os.Exit(1)
