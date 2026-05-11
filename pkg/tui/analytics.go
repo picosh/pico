@@ -257,6 +257,10 @@ func (m *AnalyticsPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 		rightSurf.AddChild(0, ah, urlSurf)
 		ah += int(urlSurf.Size.Height)
 
+		deviceSurf, _ := m.devices(rightCtx, data.Intervals).Draw(rightCtx)
+		rightSurf.AddChild(0, ah, deviceSurf)
+		ah += int(deviceSurf.Size.Height)
+
 		surf, _ := m.visits(rightCtx, data.Intervals).Draw(rightCtx)
 		rightSurf.AddChild(0, ah, surf)
 
@@ -323,6 +327,31 @@ func (m *AnalyticsPage) urls(ctx vxfw.DrawContext, urls []*db.VisitUrl, label st
 	rightPane := NewBorder(wdgt)
 	rightPane.Width = ctx.Max.Width
 	rightPane.Label = label
+	m.focusBorder(rightPane)
+	return rightPane
+}
+
+func (m *AnalyticsPage) devices(ctx vxfw.DrawContext, intervals []*db.VisitInterval) vxfw.Widget {
+	mobile, desktop := 0, 0
+	for _, visit := range intervals {
+		mobile += visit.MobileVisitors
+		desktop += visit.DesktopVisitors
+	}
+	total := mobile + desktop
+	mobilePct := 0.0
+	desktopPct := 0.0
+	if total > 0 {
+		mobilePct = float64(mobile) / float64(total) * 100
+		desktopPct = float64(desktop) / float64(total) * 100
+	}
+	kv := []Kv{
+		{Key: "mobile", Value: fmt.Sprintf("%d (%.1f%%)", mobile, mobilePct)},
+		{Key: "desktop", Value: fmt.Sprintf("%d (%.1f%%)", desktop, desktopPct)},
+	}
+	wdgt := NewKv(kv)
+	rightPane := NewBorder(wdgt)
+	rightPane.Width = ctx.Max.Width
+	rightPane.Label = "devices"
 	m.focusBorder(rightPane)
 	return rightPane
 }
