@@ -1,6 +1,6 @@
-FROM golang:1.25.0-alpine
+FROM golang:1.25.0-bookworm
 
-RUN apk add --no-cache rsync openssh make gcc musl-dev git
+RUN apt-get update && apt-get install -y --no-install-recommends rsync openssh-client make gcc git docker.io && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 

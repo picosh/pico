@@ -30,26 +30,6 @@ func setupContainerRuntime() bool {
 		return true
 	}
 
-	// Try podman first
-	if cmd := exec.Command("podman", "info"); cmd.Run() == nil {
-		// For podman, we need to ensure the socket is running
-		// User should run: systemctl --user start podman.socket
-		_ = os.Setenv("TESTCONTAINERS_RYUK_DISABLED", "true")
-
-		// Check if socket exists and is accessible
-		xdgRuntime := os.Getenv("XDG_RUNTIME_DIR")
-		if xdgRuntime != "" {
-			socketPath := xdgRuntime + "/podman/podman.sock"
-			if _, err := os.Stat(socketPath); err == nil {
-				_ = os.Setenv("DOCKER_HOST", "unix://"+socketPath)
-				return true
-			}
-		}
-		// Socket not available, need to start it
-		fmt.Println("Podman detected but socket not running. Run: systemctl --user start podman.socket")
-		return false
-	}
-
 	// Try docker
 	if cmd := exec.Command("docker", "info"); cmd.Run() == nil {
 		return true
@@ -61,6 +41,9 @@ func setupContainerRuntime() bool {
 func TestMain(m *testing.M) {
 	ctx := context.Background()
 	testLogger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
+
+	// REQUIRE_TESTCONTAINERS=1 makes the build fail if containers can't start
+	requireContainers := os.Getenv("REQUIRE_TESTCONTAINERS") == "1"
 
 	// Check for external database URL first (for CI/CD or manual testing)
 	if dbURL := os.Getenv("TEST_DATABASE_URL"); dbURL != "" {
@@ -77,10 +60,13 @@ func TestMain(m *testing.M) {
 		fmt.Println("Container runtime not available, skipping integration tests")
 		fmt.Println("To run tests, either:")
 		fmt.Println("  - Set TEST_DATABASE_URL to a postgres connection string")
-		fmt.Println("  - Start podman socket: systemctl --user start podman.socket")
 		fmt.Println("  - Start docker daemon")
 		skipTests = true
-		os.Exit(0)
+		exitCode := 0
+		if requireContainers {
+			exitCode = 1
+		}
+		os.Exit(exitCode)
 	}
 
 	pgContainer, err := postgres.Run(ctx,
@@ -96,7 +82,11 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		fmt.Printf("Failed to start postgres container (Docker may not be running): %s\n", err)
 		skipTests = true
-		os.Exit(0)
+		exitCode := 0
+		if requireContainers {
+			exitCode = 1
+		}
+		os.Exit(exitCode)
 	}
 
 	connStr, err := pgContainer.ConnectionString(ctx, "sslmode=disable")

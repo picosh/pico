@@ -28,6 +28,10 @@ test:
 	go test ./...
 .PHONY: test
 
+test-integration:
+	REQUIRE_TESTCONTAINERS=1 go test ./...
+.PHONY: test-integration
+
 snaps:
 	UPDATE_SNAPS=true go test ./...
 .PHONY: snaps
