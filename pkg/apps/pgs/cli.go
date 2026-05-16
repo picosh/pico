@@ -155,7 +155,7 @@ You can also create private projects when you prefix the project name with 'priv
 
 This means only you can access the site through a web tunnel or by downloading the files.
 `
-	helpStr += "\r\nCommands: [help, stats, ls, fzf, rm, link, unlink, prune, retain, depends, acl, cache]\r\n"
+	helpStr += "\r\nCommands: [help, stats, ls, fzf, rm, link, unlink, prune, retain, depends, acl, cache, forms]\r\n"
 	helpStr += "For most of these commands you can provide a `-h` to learn about its usage.\r\n"
 	helpStr += "\r\n> NOTICE:" + " *must* append with `--write` for the changes to persist.\r\n"
 	c.output(helpStr)
@@ -209,6 +209,14 @@ This means only you can access the site through a web tunnel or by downloading t
 		{
 			fmt.Sprintf("cache %s", projectName),
 			"Clear http cache",
+		},
+		{
+			"forms ls",
+			"Print list of forms",
+		},
+		{
+			fmt.Sprintf("forms %s", projectName),
+			"Print form submissions in json",
 		},
 	}
 
