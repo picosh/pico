@@ -4,10 +4,12 @@ RUN apk add rsync openssh make gcc musl-dev
 
 WORKDIR /app
 
-COPY go.mod go.sum Makefile /app
+COPY go.mod go.sum /app
 
 RUN go mod download
 
 ENV PICO_SECRET="danger"
+
+COPY . /app
 
 CMD ["go", "test", "-race", "./..."]

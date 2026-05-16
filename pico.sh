@@ -7,11 +7,9 @@ EVENT_TYPE="${PICO_CI_EVENT_TYPE:-manual}"
 
 printf "\x1b[33m[%s] running ci (event=%s)\x1b[0m\n" "$JOB_ID" "$EVENT_TYPE"
 
-zmx run lint -d docker run -t --rm -v $(pwd):/app -w /app golangci/golangci-lint:v2.11.4 golangci-lint run
-cat << EOF | zmx run tests -d
-docker build -t pico-test -f ./Dockerfile.test . && \
-docker run -t --rm -v $(pwd):/app pico-test
-EOF
+zmx run lint -d  docker run -t --rm -v $(pwd):/app -w /app golangci/golangci-lint:v2.11.4 golangci-lint run
+zmx run build -d docker build -t pico-test -f ./Dockerfile.test . \
+                 docker run -t --rm pico-test
 zmx wait "*"
 printf "\x1b[32msuccess tests!\x1b[0m\n"
 
