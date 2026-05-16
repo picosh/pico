@@ -1,14 +1,19 @@
 FROM golang:1.25.0-alpine
 
-RUN apk add rsync openssh make gcc musl-dev
+RUN apk add --no-cache rsync openssh make gcc musl-dev git
 
 WORKDIR /app
+
+# Create directory for Docker socket mount
+RUN mkdir -p /var/run
 
 COPY go.mod go.sum /app
 
 RUN go mod download
 
 ENV PICO_SECRET="danger"
+# Disable Ryuk cleanup container — it has issues in socket-mount scenarios
+ENV TESTCONTAINERS_RYUK_DISABLED="true"
 
 COPY . /app
 
