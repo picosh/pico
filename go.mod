@@ -6,8 +6,6 @@ go 1.25.0
 
 // replace github.com/picosh/send => ../send
 
-// replace github.com/picosh/go-rsync-receiver => ../go-rsync-receiver
-
 // replace github.com/picosh/pobj => ../pobj
 
 // replace github.com/picosh/pubsub => ../pubsub
@@ -41,8 +39,8 @@ require (
 	github.com/matryer/is v1.4.1
 	github.com/microcosm-cc/bluemonday v1.0.27
 	github.com/mmcdole/gofeed v1.3.0
+	github.com/mmcloughlin/md4 v0.1.2
 	github.com/neurosnap/go-exif-remove v0.0.0-20221010134343-50d1e3c35577
-	github.com/picosh/go-rsync-receiver v0.0.0-20250304201040-fcc11dd22d79
 	github.com/picosh/utils v0.0.0-20260125160622-5c3a9e231ec6
 	github.com/pkg/sftp v1.13.10
 	github.com/prometheus/client_golang v1.23.2
@@ -58,6 +56,7 @@ require (
 	go.abhg.dev/goldmark/hashtag v0.4.0
 	go.abhg.dev/goldmark/toc v0.12.0
 	golang.org/x/crypto v0.50.0
+	golang.org/x/sync v0.20.0
 	gopkg.in/yaml.v2 v2.4.0
 	modernc.org/sqlite v1.49.1
 )
@@ -126,7 +125,6 @@ require (
 	github.com/mattn/go-runewidth v0.0.23 // indirect
 	github.com/mattn/go-sixel v0.0.9 // indirect
 	github.com/mmcdole/goxpp v1.1.1 // indirect
-	github.com/mmcloughlin/md4 v0.1.2 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/go-archive v0.1.0 // indirect
 	github.com/moby/patternmatcher v0.6.0 // indirect
@@ -173,7 +171,6 @@ require (
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	golang.org/x/image v0.39.0 // indirect
 	golang.org/x/net v0.53.0 // indirect
-	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/sys v0.43.0 // indirect
 	golang.org/x/text v0.36.0 // indirect
 	golang.org/x/time v0.15.0 // indirect

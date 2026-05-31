@@ -9,11 +9,11 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/picosh/go-rsync-receiver/rsyncopts"
-	"github.com/picosh/go-rsync-receiver/rsyncreceiver"
-	"github.com/picosh/go-rsync-receiver/rsyncsender"
-	rsyncutils "github.com/picosh/go-rsync-receiver/utils"
 	"github.com/picosh/pico/pkg/pssh"
+	"github.com/picosh/pico/pkg/rsync-receiver/rsyncopts"
+	"github.com/picosh/pico/pkg/rsync-receiver/rsyncreceiver"
+	"github.com/picosh/pico/pkg/rsync-receiver/rsyncsender"
+	rsyncutils "github.com/picosh/pico/pkg/rsync-receiver/utils"
 	"github.com/picosh/pico/pkg/send/utils"
 )
 

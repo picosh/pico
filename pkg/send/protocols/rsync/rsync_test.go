@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	rsyncutils "github.com/picosh/go-rsync-receiver/utils"
 	"github.com/picosh/pico/pkg/pssh"
+	rsyncutils "github.com/picosh/pico/pkg/rsync-receiver/utils"
 	"github.com/picosh/pico/pkg/send/utils"
 	"golang.org/x/crypto/ssh"
 )
