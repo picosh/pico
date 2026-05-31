@@ -81,21 +81,23 @@ bp-%: bp-setup
 bp-all: bp-prose bp-pastes bp-feeds bp-pgs bp-auth bp-bouncer bp-pipe bp-pgs-cdn
 .PHONY: bp-all
 
+LDFLAGS?=-s -w
+
 build-auth:
-	go build -o "build/auth" "./cmd/auth/web"
+	go build -ldflags="$(LDFLAGS)" -o "build/auth" "./cmd/auth/web"
 .PHONY: build-auth
 
 build-pico:
-	go build -o "build/pico-ssh" "./cmd/pico/ssh"
+	go build -ldflags="$(LDFLAGS)" -o "build/pico-ssh" "./cmd/pico/ssh"
 .PHONY: build-auth
 
 build-pgs-cdn:
-	go build -o "build/pgs-cdn" "./cmd/pgs/cdn"
+	go build -ldflags="$(LDFLAGS)" -o "build/pgs-cdn" "./cmd/pgs/cdn"
 .PHONY: build-cdn
 
 build-%:
-	go build -o "build/$*-web" "./cmd/$*/web"
-	go build -o "build/$*-ssh" "./cmd/$*/ssh"
+	go build -ldflags="$(LDFLAGS)" -o "build/$*-web" "./cmd/$*/web"
+	go build -ldflags="$(LDFLAGS)" -o "build/$*-ssh" "./cmd/$*/ssh"
 .PHONY: build-%
 
 build: build-prose build-pastes build-feeds build-pgs build-pgs-cdn build-auth build-pico build-pipe
