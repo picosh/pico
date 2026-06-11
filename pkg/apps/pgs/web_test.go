@@ -10,6 +10,7 @@ import (
 	"time"
 
 	pgsdb "github.com/picosh/pico/pkg/apps/pgs/db"
+	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/send/utils"
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/pico/pkg/shared/mime"
@@ -471,6 +472,72 @@ func TestApiBasic(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestApiHttpPassNotCached verifies that responses for password-protected
+// (http-pass) projects are served with `cache-control: private, no-store` so
+// the shared cache never stores them. Without this, the first authenticated
+// request would populate the cache and let later unauthenticated visitors
+// bypass the password gate. The asset here ships a `_headers` file that tries
+// to mark the response aggressively cacheable, to prove the http-pass override
+// wins over user-supplied headers.
+func TestApiHttpPassNotCached(t *testing.T) {
+	logger := slog.Default()
+	dbpool := NewPgsDb(logger)
+	user := dbpool.Users[0]
+	bucketName := shared.GetAssetBucketName(user.ID)
+
+	projectID, err := dbpool.InsertProject(user.ID, "secret", "secret")
+	if err != nil {
+		t.Fatal(err)
+	}
+	project, err := dbpool.FindProjectByName(user.ID, "secret")
+	if err != nil {
+		t.Fatal(err)
+	}
+	project.Acl = db.ProjectAcl{Type: "http-pass", Data: []string{"hunter2"}}
+
+	store := map[string]map[string]string{
+		bucketName: {
+			"/secret/index.html": "top secret!",
+			"/secret/_headers":   "/*\n\tcache-control: public, max-age=31536000, immutable",
+		},
+	}
+
+	memSt, err := storage.NewStorageMemory(store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	st := newTestStorage(memSt)
+	pubsub := NewPubsubChan()
+	defer func() {
+		_ = pubsub.Close()
+	}()
+	cfg := NewPgsConfig(logger, dbpool, st, pubsub)
+	cfg.Domain = "pgs.test"
+	router := NewWebRouter(cfg)
+
+	url := fmt.Sprintf("https://%s-secret.pgs.test/", user.Name)
+	request := httptest.NewRequest("GET", url, strings.NewReader(""))
+	// Supply a valid session cookie so we get past the password gate and
+	// actually serve the protected asset (the path we need to not cache).
+	request.AddCookie(&http.Cookie{
+		Name:  getCookieName("secret"),
+		Value: projectID,
+	})
+	responseRecorder := httptest.NewRecorder()
+	router.ServeHTTP(responseRecorder, request)
+
+	if responseRecorder.Code != http.StatusOK {
+		t.Fatalf("Want status '%d', got '%d'", http.StatusOK, responseRecorder.Code)
+	}
+	if body := strings.TrimSpace(responseRecorder.Body.String()); body != "top secret!" {
+		t.Fatalf("Want body 'top secret!', got '%s'", body)
+	}
+	cc := responseRecorder.Header().Get("cache-control")
+	if cc != "private, no-store" {
+		t.Errorf("http-pass response must be non-cacheable; want 'private, no-store', got '%s'", cc)
 	}
 }
 

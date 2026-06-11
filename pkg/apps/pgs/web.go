@@ -616,6 +616,7 @@ func (web *WebRouter) ServeAsset(fname string, opts *storage.ImgProcessOpts, has
 		Bucket:         bucket,
 		ImgProcessOpts: opts,
 		HasPicoPlus:    hasPicoPlus,
+		HttpPass:       project.Acl.Type == "http-pass",
 	}
 
 	asset.ServeHTTP(w, r)
