@@ -30,6 +30,7 @@ type ApiAssetHandler struct {
 	ImgProcessOpts *storage.ImgProcessOpts
 	ProjectID      string
 	HasPicoPlus    bool
+	HttpPass       bool
 }
 
 func hasProtocol(url string) bool {
@@ -289,6 +290,17 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			w.Header().Add(hdr.Name, hdr.Value)
 		}
 	}
+
+	// Password-protected (http-pass) projects must never be stored in the
+	// shared cache. Our cache keys on subdomain+method+uri with no auth
+	// component, so a single authenticated request would populate the cache
+	// and let subsequent unauthenticated visitors bypass the password gate
+	// entirely. Force the response to be non-cacheable, overriding any
+	// user-supplied _headers cache-control.
+	if h.HttpPass {
+		w.Header().Set("cache-control", "private, no-store")
+	}
+
 	if w.Header().Get("content-type") == "" {
 		w.Header().Set("content-type", contentType)
 	}
