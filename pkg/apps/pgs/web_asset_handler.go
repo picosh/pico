@@ -153,7 +153,7 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		attempts = append(attempts, fpath)
 		logger = logger.With("object", fpath)
 
-		imgproxy := storage.NewImgProxy(fpath, h.ImgProcessOpts)
+		imgproxy := storage.NewImgProxy(fmt.Sprintf("%s/%s", h.Bucket.Name, fpath), h.ImgProcessOpts)
 		err = imgproxy.CanServe()
 		if err == nil {
 			logger.Info("serving image with imgproxy")

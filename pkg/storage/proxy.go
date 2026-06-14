@@ -25,13 +25,14 @@ type ImgProxy struct {
 }
 
 func NewImgProxy(fp string, opts *ImgProcessOpts) *ImgProxy {
-	return &ImgProxy{
+	img := &ImgProxy{
 		url:      os.Getenv("IMGPROXY_URL"),
 		salt:     os.Getenv("IMGPROXY_SALT"),
 		key:      os.Getenv("IMGPROXY_KEY"),
 		filepath: fp,
 		opts:     opts,
 	}
+	return img
 }
 
 func (img *ImgProxy) CanServe() error {
@@ -90,7 +91,13 @@ func (img *ImgProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, msg, http.StatusInternalServerError)
 		return
 	}
-	proxy := httputil.NewSingleHostReverseProxy(destUrl)
+	proxy := &httputil.ReverseProxy{
+		Rewrite: func(r *httputil.ProxyRequest) {
+			r.SetURL(destUrl)
+			r.Out.URL.Path = destUrl.Path
+			r.Out.URL.RawPath = destUrl.RawPath
+		},
+	}
 	proxy.ServeHTTP(w, r)
 }
 
@@ -189,7 +196,7 @@ func (img *ImgProcessOpts) String() string {
 	// Only 0, 90, 180, 270, etc., degree angles are supported.
 	if img.Rotate != 0 {
 		rot := img.Rotate
-		if rot == 90 || rot == 180 || rot == 280 {
+		if rot == 90 || rot == 180 || rot == 270 {
 			processOpts = fmt.Sprintf(
 				"%s/rotate:%d",
 				processOpts,
