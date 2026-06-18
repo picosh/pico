@@ -490,12 +490,57 @@ func (h *UploadAssetHandler) Delete(s *pssh.SSHServerConnSession, entry *senduti
 	projectName := shared.GetProjectName(entry)
 	logger = logger.With("project", projectName)
 
-	if assetFilepath == filepath.Join("/", projectName, "._pico_keep_dir") {
-		return os.ErrPermission
-	}
-
 	logger.Info("deleting file")
 
+	// Check if this path represents a directory (has a . _pico_keep_dir marker)
+	keepDirPath := filepath.Join(assetFilepath, "._pico_keep_dir")
+	keepDirReader, _, keepDirErr := h.Cfg.Storage.GetObject(bucket, keepDirPath)
+	if keepDirReader != nil {
+		defer func() {
+			_ = keepDirReader.Close()
+		}()
+	}
+
+	if keepDirErr == nil {
+		// This is a directory being deleted. We must delete all nested
+		// . _pico_keep_dir files first, otherwise os.Remove() on the
+		// directory will fail with "directory not empty".
+		nested, err := h.Cfg.Storage.ListObjects(bucket, assetFilepath+"/", true)
+		if err != nil {
+			return err
+		}
+
+		baseDepth := strings.Count(assetFilepath, string(os.PathSeparator))
+		for _, nestedEntry := range nested {
+			if filepath.Base(nestedEntry.Name()) != "._pico_keep_dir" {
+				continue
+			}
+			// Only delete keep_dir files that are direct or nested children
+			nestedDepth := strings.Count(nestedEntry.Name(), string(os.PathSeparator))
+			if nestedDepth <= baseDepth {
+				continue
+			}
+			nestedKeepDirPath := filepath.Join(assetFilepath, nestedEntry.Name())
+			if delErr := h.Cfg.Storage.DeleteObject(bucket, nestedKeepDirPath); delErr != nil {
+				return delErr
+			}
+		}
+
+		// Delete this directory's own . _pico_keep_dir
+		err = h.Cfg.Storage.DeleteObject(bucket, keepDirPath)
+		if err != nil {
+			return err
+		}
+
+		// Delete the directory itself (no-op for S3-style storage, removes the dir for fs storage)
+		_ = h.Cfg.Storage.DeleteObject(bucket, assetFilepath)
+
+		surrogate := getSurrogateKey(user.Name, projectName)
+		h.Cfg.CacheClearingQueue <- surrogate
+		return nil
+	}
+
+	// Regular file deletion: create . _pico_keep_dir if the directory becomes empty
 	pathDir := filepath.Dir(assetFilepath)
 	fileName := filepath.Base(assetFilepath)
 
