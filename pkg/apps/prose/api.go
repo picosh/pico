@@ -989,7 +989,7 @@ func imgRequest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
 		return
 	}
-	fp := filepath.Join(bucket.Path, fname)
+	fp := filepath.Join(bucket.Name, fname)
 	imgproxy := storage.NewImgProxy(fp, opts)
 	imgproxy.ServeHTTP(w, r)
 }
