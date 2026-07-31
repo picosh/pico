@@ -15,6 +15,8 @@ This only removes data from the database, we also have static assets (prose imag
 
 We have a clean bucket script for prose and pgs that we run periodically to remove static assets from orphaned buckets.
 
+SSH into pgs or prose VMs then run:
+
 ```bash
 make scripts
 FS_STORAGE_DIR="./data/storage" go run ./cmd/scripts/clean-buckets
