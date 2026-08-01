@@ -29,6 +29,11 @@ func GetProjectName(entry *utils.FileEntry) string {
 	} else if len(list) == 1 {
 		return list[0]
 	}
+	// When filepath is like "/bin" (root-level file), dir is "/" and
+	// split produces ["", ""]. Use the filename as the project name.
+	if list[1] == "" {
+		return filepath.Base(entry.Filepath)
+	}
 	return list[1]
 }
 
