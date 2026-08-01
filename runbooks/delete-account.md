@@ -21,3 +21,9 @@ SSH into pgs or prose VMs then run:
 make scripts
 FS_STORAGE_DIR="./data/storage" go run ./cmd/scripts/clean-buckets
 ```
+
+Finally, wipe the pgs cache so any sites that were deleted are actually removed:
+
+```bash
+ssh pgs.sh cache-all
+```
