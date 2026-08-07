@@ -263,6 +263,7 @@ func findPlusFF(dbpool pgsdb.PgsDB, cfg *PgsConfig, userID string) (*db.FeatureF
 	if !ff.IsValid() {
 		return nil, fmt.Errorf("your pico+ has expired")
 	}
+	ff.Data.StorageMax = ff.FindStorageMax(cfg.MaxSize)
 	ff.Data.FileMax = ff.FindFileMax(cfg.MaxAssetSize)
 	ff.Data.SpecialFileMax = ff.FindSpecialFileMax(cfg.MaxSpecialFileSize)
 	return ff, nil
