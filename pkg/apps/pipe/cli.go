@@ -700,13 +700,15 @@ func (handler *CliHandler) pub(cmd *CliCmd, topic string, clientID string) error
 	if *block {
 		count := 0
 		for topic, channel := range handler.PubSub.GetChannels() {
-			if topic == name {
+			if topic == name || (psub.HasWildcard(topic) && psub.MatchTopic(topic, name)) {
 				for _, client := range channel.GetClients() {
 					if client.Direction == psub.ChannelDirectionOutput || client.Direction == psub.ChannelDirectionInputOutput {
 						count++
 					}
 				}
-				break
+				if topic == name {
+					break
+				}
 			}
 		}
 
@@ -735,13 +737,15 @@ func (handler *CliHandler) pub(cmd *CliCmd, topic string, clientID string) error
 					case <-time.After(1 * time.Millisecond):
 						count := 0
 						for topic, channel := range handler.PubSub.GetChannels() {
-							if topic == name {
+							if topic == name || (psub.HasWildcard(topic) && psub.MatchTopic(topic, name)) {
 								for _, client := range channel.GetClients() {
 									if client.Direction == psub.ChannelDirectionOutput || client.Direction == psub.ChannelDirectionInputOutput {
 										count++
 									}
 								}
-								break
+								if topic == name {
+									break
+								}
 							}
 						}
 

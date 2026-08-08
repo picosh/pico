@@ -1,6 +1,7 @@
 package pipe
 
 import (
+	"bytes"
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
@@ -9,6 +10,7 @@ import (
 	"log/slog"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -2198,5 +2200,109 @@ func TestMonitor_FixedWindowNonSliding(t *testing.T) {
 			"current: %v",
 			initialWindowEnd.Format(time.RFC3339),
 			monitor.WindowEnd.Format(time.RFC3339))
+	}
+}
+
+func TestSSH_WildcardSub(t *testing.T) {
+	server := NewTestSSHServer(t)
+	defer server.Shutdown()
+
+	user := GenerateUser("alice")
+	dbUser := &db.User{ID: "alice-id", Name: "alice"}
+	server.DBPool.AddUser(dbUser)
+	server.DBPool.AddPubkey(&db.PublicKey{
+		ID:     "alice-pk",
+		UserID: "alice-id",
+		Key:    user.PublicKey(),
+	})
+
+	client, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to dial ssh server: %v", err)
+	}
+	defer func() { _ = client.Close() }()
+
+	// 1. Subscribe to wildcard topic: "sub metric-drain*"
+	subSession, err := client.NewSession()
+	if err != nil {
+		t.Fatalf("failed to create sub session: %v", err)
+	}
+
+	subOut, err := subSession.StdoutPipe()
+	if err != nil {
+		t.Fatalf("failed stdout pipe: %v", err)
+	}
+
+	if err := subSession.Start("sub metric-drain*"); err != nil {
+		t.Fatalf("failed to start sub: %v", err)
+	}
+
+	var buf bytes.Buffer
+	var bufMu sync.Mutex
+	go func() {
+		b := make([]byte, 1024)
+		for {
+			n, err := subOut.Read(b)
+			if n > 0 {
+				bufMu.Lock()
+				buf.Write(b[:n])
+				bufMu.Unlock()
+			}
+			if err != nil {
+				break
+			}
+		}
+	}()
+
+	time.Sleep(100 * time.Millisecond)
+
+	// 2. Publish to "metric-drain-pgs"
+	pubClient1, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to dial pub client 1: %v", err)
+	}
+	defer func() { _ = pubClient1.Close() }()
+
+	pubSession1, err := pubClient1.NewSession()
+	if err != nil {
+		t.Fatalf("failed pub session 1: %v", err)
+	}
+	pubIn1, _ := pubSession1.StdinPipe()
+	go func() {
+		defer func() { _ = pubIn1.Close() }()
+		_, _ = io.WriteString(pubIn1, "pgs-event\n")
+	}()
+	_ = pubSession1.Run("pub metric-drain-pgs -b=false")
+
+	// 3. Publish to "metric-drain-prose"
+	pubClient2, err := user.NewClient()
+	if err != nil {
+		t.Fatalf("failed to dial pub client 2: %v", err)
+	}
+	defer func() { _ = pubClient2.Close() }()
+
+	pubSession2, err := pubClient2.NewSession()
+	if err != nil {
+		t.Fatalf("failed pub session 2: %v", err)
+	}
+	pubIn2, _ := pubSession2.StdinPipe()
+	go func() {
+		defer func() { _ = pubIn2.Close() }()
+		_, _ = io.WriteString(pubIn2, "prose-event\n")
+	}()
+	_ = pubSession2.Run("pub metric-drain-prose -b=false")
+
+	time.Sleep(150 * time.Millisecond)
+	_ = subSession.Close()
+
+	bufMu.Lock()
+	output := buf.String()
+	bufMu.Unlock()
+
+	if !strings.Contains(output, "pgs-event") {
+		t.Errorf("expected SSH wildcard subscriber output to contain 'pgs-event', got: %q", output)
+	}
+	if !strings.Contains(output, "prose-event") {
+		t.Errorf("expected SSH wildcard subscriber output to contain 'prose-event', got: %q", output)
 	}
 }
