@@ -5,12 +5,31 @@ import (
 	"io"
 	"iter"
 	"log/slog"
+	"path"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/antoniomika/syncmap"
 )
+
+// HasWildcard checks if a topic string contains the wildcard character (*).
+func HasWildcard(topic string) bool {
+	return strings.Contains(topic, "*")
+}
+
+// MatchTopic returns true if pattern matches topic exactly or via path.Match wildcarding.
+func MatchTopic(pattern, topic string) bool {
+	if pattern == topic {
+		return true
+	}
+	if HasWildcard(pattern) {
+		matched, err := path.Match(pattern, topic)
+		return err == nil && matched
+	}
+	return false
+}
 
 /*
 Broker receives published messages and dispatches the message to the
@@ -67,7 +86,23 @@ func (b *BaseBroker) Connect(client *Client, channels []*Channel) (error, error)
 		dataChannel := b.ensureChannel(channel)
 		dataChannel.Clients.Store(client.ID, client)
 		client.Channels.Store(dataChannel.Topic, dataChannel)
+
+		// If client is a subscriber and channel.Topic is a wildcard pattern,
+		// attach client to all existing concrete channels matching the pattern.
+		if (client.Direction == ChannelDirectionOutput || client.Direction == ChannelDirectionInputOutput) && HasWildcard(channel.Topic) {
+			for _, existingChannel := range b.GetChannels() {
+				if existingChannel.Topic != channel.Topic && !HasWildcard(existingChannel.Topic) && MatchTopic(channel.Topic, existingChannel.Topic) {
+					existingChannel.Clients.Store(client.ID, client)
+					client.Channels.Store(existingChannel.Topic, existingChannel)
+				}
+			}
+		}
+
 		defer func() {
+			for _, ch := range client.GetChannels() {
+				ch.Clients.Delete(client.ID)
+				client.Channels.Delete(ch.Topic)
+			}
 			client.Channels.Delete(channel.Topic)
 			dataChannel.Clients.Delete(client.ID)
 
@@ -83,7 +118,15 @@ func (b *BaseBroker) Connect(client *Client, channels []*Channel) (error, error)
 			if count == 0 {
 				for _, cl := range dataChannel.GetClients() {
 					if !cl.KeepAlive {
-						cl.Cleanup()
+						otherChannels := 0
+						for _, ch := range cl.GetChannels() {
+							if ch.Topic != dataChannel.Topic {
+								otherChannels++
+							}
+						}
+						if otherChannels == 0 {
+							cl.Cleanup()
+						}
 					}
 				}
 			}
@@ -198,8 +241,24 @@ func (b *BaseBroker) Connect(client *Client, channels []*Channel) (error, error)
 }
 
 func (b *BaseBroker) ensureChannel(channel *Channel) *Channel {
-	dataChannel, _ := b.Channels.LoadOrStore(channel.Topic, channel)
+	dataChannel, loaded := b.Channels.LoadOrStore(channel.Topic, channel)
 	dataChannel.Handle()
+
+	// If this is a concrete (non-wildcard) channel created for the first time,
+	// attach any active wildcard subscribers whose pattern matches dataChannel.Topic.
+	if !loaded && !HasWildcard(channel.Topic) {
+		for _, existingChannel := range b.GetChannels() {
+			if HasWildcard(existingChannel.Topic) && MatchTopic(existingChannel.Topic, channel.Topic) {
+				for _, client := range existingChannel.GetClients() {
+					if client.Direction == ChannelDirectionOutput || client.Direction == ChannelDirectionInputOutput {
+						dataChannel.Clients.Store(client.ID, client)
+						client.Channels.Store(dataChannel.Topic, dataChannel)
+					}
+				}
+			}
+		}
+	}
+
 	return dataChannel
 }
 
