@@ -108,8 +108,10 @@ func (me *PsqlDB) RegisterUser(username, pubkey, comment, ip string) (*db.User, 
 		return nil, err
 	}
 
+	me.Logger.Info("checking if ip is in block list", "ip", ip, "username", username)
 	err = me.shouldBlockSingup(ip)
 	if err != nil {
+		me.Logger.Warn("user has been blocked from signing up", "ip", ip, "username", username, "err", err)
 		return nil, err
 	}
 
