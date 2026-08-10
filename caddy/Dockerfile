@@ -8,7 +8,8 @@ ARG TARGETARCH
 ENV GOOS=${TARGETOS} GOARCH=${TARGETARCH}
 
 RUN xcaddy build \
-    --with github.com/caddy-dns/cloudflare
+    --with github.com/caddy-dns/cloudflare \
+    --with github.com/yroc92/postgres-storage
 
 FROM caddy:alpine
 

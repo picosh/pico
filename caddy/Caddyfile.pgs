@@ -1,4 +1,7 @@
 {
+	storage postgres {
+		connection_string {$DATABASE_URL}
+	}
 	on_demand_tls {
 		ask http://web:3000/check
 	}
