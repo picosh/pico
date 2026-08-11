@@ -27,6 +27,7 @@ import (
 type ctxBucketKey struct{}
 type ctxStorageSizeKey struct{}
 type ctxProjectKey struct{}
+type ctxFeatureFlagKey struct{}
 type ctxDenylistKey struct{}
 
 type DenyList struct {
@@ -57,6 +58,19 @@ func getProject(s *pssh.SSHServerConnSession) *db.Project {
 
 func setProject(s *pssh.SSHServerConnSession, project *db.Project) {
 	s.SetValue(ctxProjectKey{}, project)
+}
+
+func getFeatureFlag(s *pssh.SSHServerConnSession) *db.FeatureFlag {
+	v := s.Context().Value(ctxFeatureFlagKey{})
+	if v == nil {
+		return nil
+	}
+	ff := s.Context().Value(ctxFeatureFlagKey{}).(*db.FeatureFlag)
+	return ff
+}
+
+func setFeatureFlag(s *pssh.SSHServerConnSession, ff *db.FeatureFlag) {
+	s.SetValue(ctxFeatureFlagKey{}, ff)
 }
 
 func getBucket(s *pssh.SSHServerConnSession) (storage.Bucket, error) {
@@ -205,19 +219,23 @@ func (h *UploadAssetHandler) Validate(s *pssh.SSHServerConnSession) error {
 		return err
 	}
 
+	ff, err := findPlusFF(h.Cfg.DB, h.Cfg, user.ID)
+	if err != nil {
+		return err
+	}
+	setFeatureFlag(s, ff)
+
 	assetBucket := shared.GetAssetBucketName(user.ID)
 	bucket, err := h.Cfg.Storage.UpsertBucket(assetBucket)
 	if err != nil {
 		return err
 	}
-
 	s.SetValue(ctxBucketKey{}, bucket)
 
 	totalStorageSize, err := h.Cfg.Storage.GetBucketQuota(bucket)
 	if err != nil {
 		return err
 	}
-
 	s.SetValue(ctxStorageSizeKey{}, totalStorageSize)
 
 	logger.Info(
@@ -337,14 +355,6 @@ func (h *UploadAssetHandler) Write(s *pssh.SSHServerConnSession, entry *sendutil
 		return "", err
 	}
 
-	featureFlag, err := findPlusFF(h.Cfg.DB, h.Cfg, user.ID)
-	if err != nil {
-		return "", err
-	}
-	if !featureFlag.IsValid() && pgsdb.IsProjectPrivate(projectName) {
-		return "", fmt.Errorf("private projects are only allowed for pico+ users")
-	}
-
 	// calculate the filsize difference between the same file already
 	// stored and the updated file being uploaded
 	assetFilename := shared.GetAssetFileName(entry)
@@ -383,6 +393,10 @@ func (h *UploadAssetHandler) Write(s *pssh.SSHServerConnSession, entry *sendutil
 		return "", err
 	}
 
+	featureFlag := getFeatureFlag(s)
+	if featureFlag == nil {
+		return "", fmt.Errorf("pico+ feature flag ctx not set")
+	}
 	// SFTP does not report file size so the more performant way to
 	//   check filesize constraints is to try and upload the file to s3
 	//	 with a specialized reader that raises an error if the filesize limit

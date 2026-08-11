@@ -186,7 +186,6 @@ func (m *ServicesList) getServiceKv() []Kv {
 		{"prose", "active"},
 		{"pipe", "active"},
 		{"pastes", "active"},
-		{"rss-to-email", "active"},
 	}
 
 	if hasPlus {
@@ -195,13 +194,15 @@ func (m *ServicesList) getServiceKv() []Kv {
 			[]string{"pages", "active"},
 			[]string{"tuns", "active"},
 			[]string{"irc bouncer", "active"},
+			[]string{"rss-to-email", "active"},
 		)
 	} else {
 		data = append(
 			data,
-			[]string{"pages", "free tier"},
+			[]string{"pages", "pico+"},
 			[]string{"tuns", "pico+"},
 			[]string{"irc bouncer", "pico+"},
+			[]string{"rss-to-email", "pico+"},
 		)
 	}
 

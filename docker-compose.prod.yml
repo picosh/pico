@@ -194,6 +194,7 @@ services:
     environment:
       APP_DOMAIN: ${PGS_DOMAIN:-pgs.sh}
       APP_EMAIL: ${PGS_EMAIL:-hello@pico.sh}
+      DATABASE_URL: ${DATABASE_URL}
     volumes:
       - ${PGS_CADDYFILE}:/etc/caddy/Caddyfile
       - ./data/pgs-caddy/data:/data
