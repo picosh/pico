@@ -729,19 +729,22 @@ func TestCacheExpires(t *testing.T) {
 // RFC 9111 4.3.4 304 Not Modified
 // https://www.rfc-editor.org/rfc/rfc9111.html#section-4.3.4
 // When a cached entry is validated and the origin responds with 304, the cache:
-// - Returns 304 to the client
 // - Updates header metadata from the 304 response
 // - Retains the cached body for subsequent requests.
+// If the client's conditional headers no longer match the updated cache entry,
+// the cache serves 200 with the full cached body.
 func TestCache304NotModifiedMerge(t *testing.T) {
 	originCalls := 0
 
-	// Validation handler: returns 304 when ETag matches, 200 otherwise
+	// Validation handler: returns 304 when ETag matches, 200 otherwise.
+	// The 304 response includes an updated ETag header (set before WriteHeader).
 	validationMux := http.NewServeMux()
 	validationMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		originCalls++
 		if r.Header.Get("If-None-Match") == "\"abc\"" {
-			w.WriteHeader(http.StatusNotModified)
+			// Set headers before WriteHeader (correct HTTP practice).
 			w.Header().Set("etag", "\"abc-updated\"")
+			w.WriteHeader(http.StatusNotModified)
 			return
 		}
 		w.Header().Set("etag", "\"abc\"")
@@ -766,22 +769,23 @@ func TestCache304NotModifiedMerge(t *testing.T) {
 	cacheData, _ := json.Marshal(staleCv)
 	handler.Cache.Add(cacheKey, cacheData)
 
-	// First request with If-None-Match triggers validation; origin returns 304.
-	// Client sent conditional headers, so if they still match the updated cache
-	// entry, the client gets 304. Here the upstream updated the ETag to "abc-updated"
-	// so the client's If-None-Match "abc" no longer matches — serve cached body as 200.
+	// First request with If-None-Match triggers validation; origin returns 304
+	// with an updated ETag "abc-updated".
+	// The cache merges the new ETag into the stored entry, then re-evaluates
+	// the client's If-None-Match "abc" against the updated ETag "abc-updated".
+	// They no longer match, so the cache serves the full cached body as 200.
 	resp1, _ := tc.DoWithHeaders(req, map[string][]string{
 		"If-None-Match": {"\"abc\""},
 	})
-	if resp1.StatusCode != http.StatusNotModified {
-		t.Errorf("expected 304 (ETag changed after revalidation), got %d", resp1.StatusCode)
+	if resp1.StatusCode != http.StatusOK {
+		t.Errorf("expected 200 (updated ETag no longer matches client If-None-Match), got %d", resp1.StatusCode)
 	}
 	status := resp1.Header.Get("cache-status")
-	if !strings.Contains(status, "fwd=stale") {
-		t.Errorf("expected cache-status hit, got %s", status)
+	if !strings.Contains(status, "hit") {
+		t.Errorf("expected cache-status to contain 'hit', got %s", status)
 	}
 
-	// Second request without conditional headers should still serve the cached body
+	// Second request without conditional headers should still serve the cached body.
 	resp2, _ := tc.Do(req)
 	if resp2.StatusCode != http.StatusOK {
 		t.Errorf("expected 200, got %d", resp2.StatusCode)
@@ -797,7 +801,7 @@ func TestCache304NotModifiedMerge(t *testing.T) {
 		t.Errorf("expected cache-status hit on second request, got %s", status2)
 	}
 
-	// Origin should have been called exactly once (304 validation only)
+	// Origin should have been called exactly once (304 validation only).
 	if originCalls != 1 {
 		t.Errorf("expected 1 origin call, got %d", originCalls)
 	}
