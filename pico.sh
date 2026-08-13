@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-export ZMX_SESSION_PREFIX="${ZMX_SESSION_PREFIX:-ci.pico.}"
+export ZMX_SESSION_PREFIX="${ZMX_SESSION_PREFIX:-local.pico.}"
 JOB_ID="${PICI_JOB:-local}"
 EVENT_TYPE="${PICI_EVENT:-manual}"
 
