@@ -48,5 +48,8 @@ func (c *Client) GetChannels() iter.Seq2[string, *Channel] {
 func (c *Client) Cleanup() {
 	c.once.Do(func() {
 		close(c.Done)
+		if closer, ok := c.ReadWriter.(io.Closer); ok {
+			_ = closer.Close()
+		}
 	})
 }

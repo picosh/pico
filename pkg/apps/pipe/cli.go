@@ -932,6 +932,13 @@ func (t *throttledMonitorRW) Write(p []byte) (int, error) {
 	return n, err
 }
 
+func (t *throttledMonitorRW) Close() error {
+	if closer, ok := t.rw.(io.Closer); ok {
+		return closer.Close()
+	}
+	return nil
+}
+
 func (handler *CliHandler) sub(cmd *CliCmd, topic string, clientID string) error {
 	subCmd := flagSet("sub", cmd.sesh)
 	access := subCmd.String("a", "", "Comma separated list of pico usernames or ssh-key fingerprints to allow access to a topic")

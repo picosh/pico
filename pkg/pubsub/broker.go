@@ -108,14 +108,18 @@ func (b *BaseBroker) Connect(client *Client, channels []*Channel) (error, error)
 
 			client.Cleanup()
 
-			count := 0
+			inputCount := 0
+			pipeCount := 0
 			for _, cl := range dataChannel.GetClients() {
-				if cl.Direction == ChannelDirectionInput || cl.Direction == ChannelDirectionInputOutput {
-					count++
+				switch cl.Direction {
+				case ChannelDirectionInput:
+					inputCount++
+				case ChannelDirectionInputOutput:
+					pipeCount++
 				}
 			}
 
-			if count == 0 {
+			if inputCount == 0 && pipeCount <= 1 {
 				for _, cl := range dataChannel.GetClients() {
 					if !cl.KeepAlive {
 						otherChannels := 0
@@ -200,6 +204,7 @@ func (b *BaseBroker) Connect(client *Client, channels []*Channel) (error, error)
 				sendwg.Wait()
 
 				if err != nil {
+					client.Cleanup()
 					if errors.Is(err, io.EOF) {
 						return
 					}
@@ -222,6 +227,7 @@ func (b *BaseBroker) Connect(client *Client, channels []*Channel) (error, error)
 					_, err := client.ReadWriter.Write(data.Data)
 					if err != nil {
 						outputErr = err
+						client.Cleanup()
 						break mainLoop
 					}
 
@@ -235,7 +241,16 @@ func (b *BaseBroker) Connect(client *Client, channels []*Channel) (error, error)
 		}()
 	}
 
-	wg.Wait()
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-client.Done:
+	}
 
 	return inputErr, outputErr
 }

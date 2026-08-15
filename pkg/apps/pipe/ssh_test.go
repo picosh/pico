@@ -26,6 +26,7 @@ import (
 
 type TestDB struct {
 	*stub.StubDB
+	mu           sync.RWMutex
 	Users        []*db.User
 	Pubkeys      []*db.PublicKey
 	Features     []*db.FeatureFlag
@@ -39,36 +40,51 @@ func NewTestDB(logger *slog.Logger) *TestDB {
 }
 
 func (t *TestDB) FindUserByPubkey(key string) (*db.User, error) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
 	for _, pk := range t.Pubkeys {
 		if pk.Key == key {
-			return t.FindUser(pk.UserID)
+			return t.findUserLocked(pk.UserID)
 		}
 	}
 	return nil, fmt.Errorf("user not found for pubkey")
 }
 
-func (t *TestDB) FindUser(userID string) (*db.User, error) {
+func (t *TestDB) findUserLocked(userID string) (*db.User, error) {
 	for _, user := range t.Users {
 		if user.ID == userID {
-			return user, nil
+			cp := *user
+			return &cp, nil
 		}
 	}
 	return nil, fmt.Errorf("user not found")
 }
 
+func (t *TestDB) FindUser(userID string) (*db.User, error) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.findUserLocked(userID)
+}
+
 func (t *TestDB) FindUserByName(name string) (*db.User, error) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
 	for _, user := range t.Users {
 		if user.Name == name {
-			return user, nil
+			cp := *user
+			return &cp, nil
 		}
 	}
 	return nil, fmt.Errorf("user not found")
 }
 
 func (t *TestDB) FindFeature(userID, name string) (*db.FeatureFlag, error) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
 	for _, ff := range t.Features {
 		if ff.UserID == userID && ff.Name == name {
-			return ff, nil
+			cp := *ff
+			return &cp, nil
 		}
 	}
 	return nil, fmt.Errorf("feature not found")
@@ -91,18 +107,31 @@ func (t *TestDB) Close() error {
 }
 
 func (t *TestDB) AddUser(user *db.User) {
-	t.Users = append(t.Users, user)
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	cp := *user
+	t.Users = append(t.Users, &cp)
 }
 
 func (t *TestDB) AddPubkey(pubkey *db.PublicKey) {
-	t.Pubkeys = append(t.Pubkeys, pubkey)
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	cp := *pubkey
+	t.Pubkeys = append(t.Pubkeys, &cp)
 }
 
 func (t *TestDB) UpsertPipeMonitor(userID, topic string, dur time.Duration, winEnd *time.Time) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	var winEndCopy *time.Time
+	if winEnd != nil {
+		w := *winEnd
+		winEndCopy = &w
+	}
 	for _, m := range t.PipeMonitors {
 		if m.UserId == userID && m.Topic == topic {
 			m.WindowDur = dur
-			m.WindowEnd = winEnd
+			m.WindowEnd = winEndCopy
 			now := time.Now()
 			m.UpdatedAt = &now
 			return nil
@@ -114,7 +143,7 @@ func (t *TestDB) UpsertPipeMonitor(userID, topic string, dur time.Duration, winE
 		UserId:    userID,
 		Topic:     topic,
 		WindowDur: dur,
-		WindowEnd: winEnd,
+		WindowEnd: winEndCopy,
 		CreatedAt: &now,
 		UpdatedAt: &now,
 	})
@@ -122,9 +151,16 @@ func (t *TestDB) UpsertPipeMonitor(userID, topic string, dur time.Duration, winE
 }
 
 func (t *TestDB) UpdatePipeMonitorLastPing(userID, topic string, lastPing *time.Time) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	var lastPingCopy *time.Time
+	if lastPing != nil {
+		p := *lastPing
+		lastPingCopy = &p
+	}
 	for _, m := range t.PipeMonitors {
 		if m.UserId == userID && m.Topic == topic {
-			m.LastPing = lastPing
+			m.LastPing = lastPingCopy
 			now := time.Now()
 			m.UpdatedAt = &now
 			return nil
@@ -134,6 +170,8 @@ func (t *TestDB) UpdatePipeMonitorLastPing(userID, topic string, lastPing *time.
 }
 
 func (t *TestDB) RemovePipeMonitor(userID, topic string) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	for i, m := range t.PipeMonitors {
 		if m.UserId == userID && m.Topic == topic {
 			t.PipeMonitors = append(t.PipeMonitors[:i], t.PipeMonitors[i+1:]...)
@@ -143,20 +181,48 @@ func (t *TestDB) RemovePipeMonitor(userID, topic string) error {
 	return fmt.Errorf("monitor not found")
 }
 
+func copyPipeMonitor(m *db.PipeMonitor) *db.PipeMonitor {
+	if m == nil {
+		return nil
+	}
+	cp := *m
+	if m.WindowEnd != nil {
+		w := *m.WindowEnd
+		cp.WindowEnd = &w
+	}
+	if m.LastPing != nil {
+		p := *m.LastPing
+		cp.LastPing = &p
+	}
+	if m.CreatedAt != nil {
+		c := *m.CreatedAt
+		cp.CreatedAt = &c
+	}
+	if m.UpdatedAt != nil {
+		u := *m.UpdatedAt
+		cp.UpdatedAt = &u
+	}
+	return &cp
+}
+
 func (t *TestDB) FindPipeMonitorByTopic(userID, topic string) (*db.PipeMonitor, error) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
 	for _, m := range t.PipeMonitors {
 		if m.UserId == userID && m.Topic == topic {
-			return m, nil
+			return copyPipeMonitor(m), nil
 		}
 	}
 	return nil, fmt.Errorf("monitor not found")
 }
 
 func (t *TestDB) FindPipeMonitorsByUser(userID string) ([]*db.PipeMonitor, error) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
 	var monitors []*db.PipeMonitor
 	for _, m := range t.PipeMonitors {
 		if m.UserId == userID {
-			monitors = append(monitors, m)
+			monitors = append(monitors, copyPipeMonitor(m))
 		}
 	}
 	return monitors, nil
@@ -642,6 +708,23 @@ func TestPipe_Bidirectional(t *testing.T) {
 	}
 	if !strings.Contains(string(aliceReceived[:n]), "hello from bob") {
 		t.Errorf("alice did not receive bob's message, got: %q", string(aliceReceived[:n]))
+	}
+
+	// When alice disconnects, bob's session should terminate cleanly without hanging
+	_ = aliceStdin.Close()
+	_ = aliceSession.Close()
+	_ = bobStdin.Close()
+
+	bobDone := make(chan error, 1)
+	go func() {
+		bobDone <- bobSession.Wait()
+	}()
+
+	select {
+	case <-bobDone:
+		// Bob's session terminated cleanly
+	case <-time.After(3 * time.Second):
+		t.Fatal("bob's pipe session hung after alice disconnected")
 	}
 }
 
