@@ -230,13 +230,11 @@ This means only you can access the site through a web tunnel or by downloading t
 }
 
 func (c *Cmd) stats(cfgMaxSize uint64) error {
-	ff, err := c.Dbpool.FindFeature(c.User.ID, "plus")
+	ff, err := findFeatureFlag(c.Dbpool, c.Cfg, c.User.ID)
 	if err != nil {
-		ff = db.NewFeatureFlag(c.User.ID, "plus", cfgMaxSize, 0, 0)
+		ff = db.NewFeatureFlag(c.User.ID, "pgs", cfgMaxSize, 0, 0)
 	}
-	// this is jank
-	ff.Data.StorageMax = ff.FindStorageMax(cfgMaxSize)
-	storageMax := ff.Data.StorageMax
+	storageMax := ff.FindStorageMax(cfgMaxSize)
 
 	bucketName := shared.GetAssetBucketName(c.User.ID)
 	bucket, err := c.Store.GetBucket(bucketName)

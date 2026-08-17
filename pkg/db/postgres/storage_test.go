@@ -1081,6 +1081,28 @@ func TestAddPicoPlusUser(t *testing.T) {
 	}
 }
 
+func TestAddFeatureUser(t *testing.T) {
+	cleanupTestData(t)
+
+	user, _ := testDB.RegisterUser("featureuserowner", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI featureuserowner", "comment", "")
+
+	err := testDB.AddFeatureUser("featureuserowner", "pgs")
+	if err != nil {
+		t.Fatalf("AddFeatureUser failed: %v", err)
+	}
+
+	ff, err := testDB.FindFeature(user.ID, "pgs")
+	if err != nil {
+		t.Fatalf("FindFeature failed: %v", err)
+	}
+	if ff.Name != "pgs" {
+		t.Errorf("expected feature name pgs, got %s", ff.Name)
+	}
+	if !ff.IsValid() {
+		t.Errorf("expected feature to be valid")
+	}
+}
+
 // ============ Feed Items Tests ============
 
 func TestInsertFeedItems(t *testing.T) {

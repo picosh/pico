@@ -62,7 +62,7 @@ func (c *PgsConfig) StaticPath(fname string) string {
 	return filepath.Join("pkg", "apps", "pgs", fname)
 }
 
-var maxSize = uint64(25 * shared.MB)
+var maxSize = uint64(50 * shared.MB)
 var maxAssetSize = int64(10 * shared.MB)
 
 // Needs to be small for caching files like _headers and _redirects.

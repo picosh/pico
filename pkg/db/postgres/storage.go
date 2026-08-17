@@ -1902,6 +1902,17 @@ func (me *PsqlDB) AddPicoPlusUser(username, email, paymentType, txId string) err
 	return tx.Commit()
 }
 
+func (me *PsqlDB) AddFeatureUser(username, name string) error {
+	user, err := me.FindUserByName(username)
+	if err != nil {
+		return err
+	}
+
+	expiresAt := me.createFeatureExpiresAt(user.ID, name)
+	_, err = me.InsertFeature(user.ID, name, expiresAt)
+	return err
+}
+
 func (me *PsqlDB) UpsertProject(userID, projectName, projectDir string) (*db.Project, error) {
 	project, err := me.FindProjectByName(userID, projectName)
 	if err == nil {

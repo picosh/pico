@@ -204,6 +204,10 @@ func (me *StubDB) AddPicoPlusUser(username, email, paymentType, txId string) err
 	return errNotImpl
 }
 
+func (me *StubDB) AddFeatureUser(username, name string) error {
+	return errNotImpl
+}
+
 func (me *StubDB) FindUserStats(userID string) (*db.UserStats, error) {
 	return nil, errNotImpl
 }

@@ -16,6 +16,7 @@ type MemoryDB struct {
 	Projects    []*db.Project
 	Pubkeys     []*db.PublicKey
 	Feature     *db.FeatureFlag
+	Features    []*db.FeatureFlag
 	FormEntries []*db.FormEntry
 }
 
@@ -82,7 +83,15 @@ func (me *MemoryDB) FindUserByName(name string) (*db.User, error) {
 }
 
 func (me *MemoryDB) FindFeature(userID, name string) (*db.FeatureFlag, error) {
-	return me.Feature, nil
+	for _, ff := range me.Features {
+		if ff.UserID == userID && ff.Name == name {
+			return ff, nil
+		}
+	}
+	if me.Feature != nil && (me.Feature.Name == name || me.Feature.Name == "") {
+		return me.Feature, nil
+	}
+	return nil, fmt.Errorf("feature flag not found")
 }
 
 func (me *MemoryDB) Close() error {

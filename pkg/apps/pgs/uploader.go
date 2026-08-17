@@ -15,7 +15,6 @@ import (
 	"sync"
 	"time"
 
-	pgsdb "github.com/picosh/pico/pkg/apps/pgs/db"
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/pssh"
 	sendutils "github.com/picosh/pico/pkg/send/utils"
@@ -219,7 +218,7 @@ func (h *UploadAssetHandler) Validate(s *pssh.SSHServerConnSession) error {
 		return err
 	}
 
-	ff, err := findPlusFF(h.Cfg.DB, h.Cfg, user.ID)
+	ff, err := findFeatureFlag(h.Cfg.DB, h.Cfg, user.ID)
 	if err != nil {
 		return err
 	}
@@ -271,20 +270,6 @@ func (h *UploadAssetHandler) findDenylist(bucket storage.Bucket, project *db.Pro
 
 	str := buf.String()
 	return str, nil
-}
-
-func findPlusFF(dbpool pgsdb.PgsDB, cfg *PgsConfig, userID string) (*db.FeatureFlag, error) {
-	ff, err := dbpool.FindFeature(userID, "plus")
-	if err != nil {
-		return nil, err
-	}
-	if !ff.IsValid() {
-		return nil, fmt.Errorf("your pico+ has expired")
-	}
-	ff.Data.StorageMax = ff.FindStorageMax(cfg.MaxSize)
-	ff.Data.FileMax = ff.FindFileMax(cfg.MaxAssetSize)
-	ff.Data.SpecialFileMax = ff.FindSpecialFileMax(cfg.MaxSpecialFileSize)
-	return ff, nil
 }
 
 func mtimeToTime(entry *sendutils.FileEntry) time.Time {

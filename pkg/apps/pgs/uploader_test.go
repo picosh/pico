@@ -557,3 +557,160 @@ func TestNoPlusFlagBlocksUpload(t *testing.T) {
 		t.Errorf("expected 0 projects for non-plus user, got %d (empty project leak)", len(projects))
 	}
 }
+
+func TestFindFeatureFlag(t *testing.T) {
+	logger := slog.Default()
+	cfg := &PgsConfig{
+		MaxSize:            uint64(100 * shared.MB),
+		MaxAssetSize:       int64(10 * shared.MB),
+		MaxSpecialFileSize: int64(5 * shared.KB),
+	}
+
+	validExpires := time.Now().Add(24 * time.Hour)
+	expiredExpires := time.Now().Add(-24 * time.Hour)
+	userID := "user-1"
+
+	t.Run("plus valid returns plus", func(t *testing.T) {
+		dbpool := pgsdb.NewDBMemory(logger)
+		plusFF := db.NewFeatureFlag(userID, "plus", uint64(50*shared.MB), int64(5*shared.MB), int64(2*shared.KB))
+		plusFF.ExpiresAt = &validExpires
+		dbpool.Features = []*db.FeatureFlag{plusFF}
+
+		ff, err := findFeatureFlag(dbpool, cfg, userID)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if ff.Name != "plus" {
+			t.Errorf("expected plus, got %s", ff.Name)
+		}
+	})
+
+	t.Run("pgs valid returns pgs when no plus", func(t *testing.T) {
+		dbpool := pgsdb.NewDBMemory(logger)
+		pgsFF := db.NewFeatureFlag(userID, "pgs", uint64(50*shared.MB), int64(5*shared.MB), int64(2*shared.KB))
+		pgsFF.ExpiresAt = &validExpires
+		dbpool.Features = []*db.FeatureFlag{pgsFF}
+
+		ff, err := findFeatureFlag(dbpool, cfg, userID)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if ff.Name != "pgs" {
+			t.Errorf("expected pgs, got %s", ff.Name)
+		}
+	})
+
+	t.Run("plus preferred over pgs when both valid", func(t *testing.T) {
+		dbpool := pgsdb.NewDBMemory(logger)
+		plusFF := db.NewFeatureFlag(userID, "plus", uint64(50*shared.MB), int64(5*shared.MB), int64(2*shared.KB))
+		plusFF.ExpiresAt = &validExpires
+		pgsFF := db.NewFeatureFlag(userID, "pgs", uint64(30*shared.MB), int64(3*shared.MB), int64(1*shared.KB))
+		pgsFF.ExpiresAt = &validExpires
+		dbpool.Features = []*db.FeatureFlag{plusFF, pgsFF}
+
+		ff, err := findFeatureFlag(dbpool, cfg, userID)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if ff.Name != "plus" {
+			t.Errorf("expected plus to be picked first, got %s", ff.Name)
+		}
+	})
+
+	t.Run("pgs picked when plus is expired", func(t *testing.T) {
+		dbpool := pgsdb.NewDBMemory(logger)
+		plusFF := db.NewFeatureFlag(userID, "plus", uint64(50*shared.MB), int64(5*shared.MB), int64(2*shared.KB))
+		plusFF.ExpiresAt = &expiredExpires
+		pgsFF := db.NewFeatureFlag(userID, "pgs", uint64(30*shared.MB), int64(3*shared.MB), int64(1*shared.KB))
+		pgsFF.ExpiresAt = &validExpires
+		dbpool.Features = []*db.FeatureFlag{plusFF, pgsFF}
+
+		ff, err := findFeatureFlag(dbpool, cfg, userID)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if ff.Name != "pgs" {
+			t.Errorf("expected pgs when plus is expired, got %s", ff.Name)
+		}
+	})
+
+	t.Run("error when both plus and pgs expired", func(t *testing.T) {
+		dbpool := pgsdb.NewDBMemory(logger)
+		plusFF := db.NewFeatureFlag(userID, "plus", uint64(50*shared.MB), int64(5*shared.MB), int64(2*shared.KB))
+		plusFF.ExpiresAt = &expiredExpires
+		pgsFF := db.NewFeatureFlag(userID, "pgs", uint64(30*shared.MB), int64(3*shared.MB), int64(1*shared.KB))
+		pgsFF.ExpiresAt = &expiredExpires
+		dbpool.Features = []*db.FeatureFlag{plusFF, pgsFF}
+
+		_, err := findFeatureFlag(dbpool, cfg, userID)
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+	})
+
+	t.Run("error when neither plus nor pgs exists", func(t *testing.T) {
+		dbpool := pgsdb.NewDBMemory(logger)
+		_, err := findFeatureFlag(dbpool, cfg, userID)
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+	})
+}
+
+func TestPgsFlagAllowsUpload(t *testing.T) {
+	dbpool := pgsdb.NewDBMemory(slog.Default())
+	dbpool.SetupTestData()
+	// Replace default plus flag with a valid pgs flag
+	dbpool.Feature = nil
+	valid := time.Now().Add(24 * time.Hour)
+	pgsFF := db.NewFeatureFlag(
+		dbpool.Users[0].ID,
+		"pgs",
+		uint64(25*shared.MB),
+		int64(10*shared.MB),
+		int64(5*shared.KB),
+	)
+	pgsFF.ExpiresAt = &valid
+	dbpool.Features = []*db.FeatureFlag{pgsFF}
+
+	addr, teardown := setupPgsTestServer(t, dbpool)
+	defer teardown()
+
+	user := GenerateUser()
+	dbpool.Pubkeys = append(dbpool.Pubkeys, &db.PublicKey{
+		ID:     "pgs-user-pubkey",
+		UserID: dbpool.Users[0].ID,
+		Key:    shared.KeyForKeyText(user.signer.PublicKey()),
+	})
+
+	conn, err := user.NewClientAddr(addr)
+	if err != nil {
+		t.Fatalf("ssh dial failed: %v", err)
+	}
+	defer func() { _ = conn.Close() }()
+
+	client, err := sftp.NewClient(conn)
+	if err != nil {
+		t.Fatalf("sftp client failed: %v", err)
+	}
+	defer func() { _ = client.Close() }()
+
+	// Upload should succeed for a pgs user.
+	f, err := client.Create("myproject/index.html")
+	if err != nil {
+		t.Fatalf("pgs user upload was blocked unexpectedly: %v", err)
+	}
+	if _, err := f.Write([]byte("<html>hello from pgs</html>")); err != nil {
+		t.Fatalf("write failed: %v", err)
+	}
+	_ = f.Close()
+
+	// Confirm the file is accessible via SFTP stat.
+	fi, err := client.Lstat("myproject/index.html")
+	if err != nil {
+		t.Fatalf("file not found after upload: %v", err)
+	}
+	if fi.Size() == 0 {
+		t.Errorf("uploaded file has zero size")
+	}
+}

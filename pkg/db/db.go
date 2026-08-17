@@ -609,6 +609,7 @@ type DB interface {
 	VisitUrlNotFound(opts *SummaryOpts) ([]*VisitUrl, error)
 
 	AddPicoPlusUser(username, email, paymentType, txId string) error
+	AddFeatureUser(username, name string) error
 	FindFeature(userID string, feature string) (*FeatureFlag, error)
 	FindFeaturesByUser(userID string) ([]*FeatureFlag, error)
 	HasFeatureByUser(userID string, feature string) bool
