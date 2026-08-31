@@ -5,6 +5,12 @@ services:
     profiles:
       - db
       - all
+  redis:
+    image: redis:7-alpine
+    restart: always
+    profiles:
+      - db
+      - all
   imgproxy:
     image: darthsim/imgproxy:latest
     restart: always

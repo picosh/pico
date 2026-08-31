@@ -1,7 +1,10 @@
 {
-	# storage postgres {
-	# 	connection_string {$DATABASE_URL}
-	# }
+	storage redis {
+		address {$REDIS_ADDR}
+		password {$REDIS_PASSWORD}
+		timeout 5
+		key_prefix "caddy"
+	}
 	on_demand_tls {
 		ask http://web:3000/check
 	}

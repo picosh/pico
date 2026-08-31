@@ -7,6 +7,19 @@ services:
     ports:
       - "5432:5432"
     command: -N 1024 -B 4096MB
+  redis:
+    image: redis:7-alpine
+    restart: always
+    env_file:
+      - .env.prod
+    volumes:
+      - ./data/redis-data:/data
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    networks:
+      - default
+      - pgs
   pipemgr:
     env_file:
       - .env.prod
@@ -194,7 +207,8 @@ services:
     environment:
       APP_DOMAIN: ${PGS_DOMAIN:-pgs.sh}
       APP_EMAIL: ${PGS_EMAIL:-hello@pico.sh}
-      DATABASE_URL: ${DATABASE_URL}
+      REDIS_ADDR: ${REDIS_ADDR:-redis:6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
     volumes:
       - ${PGS_CADDYFILE}:/etc/caddy/Caddyfile
       - ./data/pgs-caddy/data:/data

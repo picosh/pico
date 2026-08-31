@@ -9,7 +9,7 @@ ENV GOOS=${TARGETOS} GOARCH=${TARGETARCH}
 
 RUN xcaddy build \
     --with github.com/caddy-dns/cloudflare \
-    --with github.com/yroc92/postgres-storage
+    --with github.com/pberkel/caddy-storage-redis
 
 FROM caddy:alpine
 
