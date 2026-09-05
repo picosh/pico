@@ -17,8 +17,8 @@ go 1.25.0
 // replace git.sr.ht/~rockorager/vaxis => ../../../src/vaxis
 
 require (
-	git.sr.ht/~delthas/senpai v0.4.1
-	git.sr.ht/~rockorager/vaxis v0.15.1-0.20251218121515-cdf898cf10c7
+	git.sr.ht/~delthas/senpai v0.5.0
+	git.sr.ht/~rockorager/vaxis v0.15.1-0.20260305170555-c3371e09d426
 	github.com/adhocore/gronx v1.19.6
 	github.com/alecthomas/chroma/v2 v2.23.1
 	github.com/antoniomika/syncmap v1.0.0
@@ -78,6 +78,7 @@ require (
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/platforms v0.2.1 // indirect
 	github.com/cpuguy83/dockercfg v0.3.2 // indirect
+	github.com/dave/jennifer v1.7.1 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/delthas/go-libnp v0.2.0 // indirect
 	github.com/delthas/go-localeinfo v0.2.0 // indirect
@@ -96,6 +97,7 @@ require (
 	github.com/dsoprea/go-utility v0.0.0-20221003172846-a3e1774ef349 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/ebitengine/purego v0.8.4 // indirect
+	github.com/emersion/go-varlink v0.0.0-20251006073247-e7ad9f7950c7 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/forPelevin/gomoji v1.4.1 // indirect
 	github.com/gkampitakis/ciinfo v0.3.2 // indirect
