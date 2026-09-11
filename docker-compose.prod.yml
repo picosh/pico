@@ -7,16 +7,16 @@ services:
     ports:
       - "5432:5432"
     command: -N 1024 -B 4096MB
-  redis:
-    image: redis:7-alpine
+  valkey:
+    image: valkey/valkey:9.0-alpine3.24
     restart: always
     env_file:
       - .env.prod
     volumes:
-      - ./data/redis-data:/data
+      - ./data/valkey-data:/data
     ports:
       - "6379:6379"
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    command: valkey-server --appendonly yes --requirepass ${VALKEY_PASSWORD}
     networks:
       - default
       - pgs
@@ -207,8 +207,8 @@ services:
     environment:
       APP_DOMAIN: ${PGS_DOMAIN:-pgs.sh}
       APP_EMAIL: ${PGS_EMAIL:-hello@pico.sh}
-      REDIS_ADDR: ${REDIS_ADDR:-redis:6379}
-      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      VALKEY_ADDR: ${VALKEY_ADDR:-valkey:6379}
+      VALKEY_PASSWORD: ${VALKEY_PASSWORD}
     volumes:
       - ${PGS_CADDYFILE}:/etc/caddy/Caddyfile
       - ./data/pgs-caddy/data:/data

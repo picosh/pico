@@ -1,7 +1,7 @@
 {
 	storage redis {
-		address {$REDIS_ADDR}
-		password {$REDIS_PASSWORD}
+		address {$VALKEY_ADDR}
+		password {$VALKEY_PASSWORD}
 		timeout 5
 		key_prefix "caddy"
 	}

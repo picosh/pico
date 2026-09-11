@@ -5,8 +5,8 @@ services:
     profiles:
       - db
       - all
-  redis:
-    image: redis:7-alpine
+  valkey:
+    image: valkey/valkey:9.0-alpine3.24
     restart: always
     profiles:
       - db
