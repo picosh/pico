@@ -1,7 +1,7 @@
 {
 	storage redis {
 		address {$VALKEY_ADDR}
-		password {$VALKEY_PASSWORD}
+		password "{$VALKEY_PASSWORD}"
 		timeout 5
 		key_prefix "caddy"
 	}

@@ -16,7 +16,7 @@ services:
       - ./data/valkey-data:/data
     ports:
       - "6379:6379"
-    command: valkey-server --appendonly yes --requirepass ${VALKEY_PASSWORD}
+    command: valkey-server --appendonly yes --requirepass "${VALKEY_PASSWORD}"
     networks:
       - default
       - pgs
