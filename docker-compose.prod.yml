@@ -29,8 +29,8 @@ services:
     logging:
       driver: "json-file"
       options:
-        max-file: "3"
-        max-size: "1024m"
+        max-file: "1"
+        max-size: "512m"
   imgproxy:
     env_file:
       - .env.prod
@@ -43,8 +43,8 @@ services:
     logging:
       driver: "json-file"
       options:
-        max-file: "3"
-        max-size: "1024m"
+        max-file: "1"
+        max-size: "512m"
   pastes-caddy:
     image: ghcr.io/picosh/pico/caddy:latest
     restart: always
@@ -71,8 +71,8 @@ services:
     logging:
       driver: "json-file"
       options:
-        max-file: "3"
-        max-size: "1024m"
+        max-file: "1"
+        max-size: "512m"
   pastes-web:
     dns: 1.1.1.1
     networks:
@@ -171,8 +171,8 @@ services:
     logging:
       driver: "json-file"
       options:
-        max-file: "3"
-        max-size: "1024m"
+        max-file: "1"
+        max-size: "512m"
   prose-web:
     dns: 1.1.1.1
     networks:
@@ -232,8 +232,8 @@ services:
     logging:
       driver: "json-file"
       options:
-        max-file: "3"
-        max-size: "1024m"
+        max-file: "1"
+        max-size: "512m"
   pgs-web:
     dns: 1.1.1.1
     networks:
@@ -252,8 +252,8 @@ services:
     logging:
       driver: "json-file"
       options:
-        max-file: "3"
-        max-size: "1024m"
+        max-file: "1"
+        max-size: "512m"
   pgs-cdn:
     dns: 1.1.1.1
     networks:
@@ -271,8 +271,8 @@ services:
     logging:
       driver: "json-file"
       options:
-        max-file: "3"
-        max-size: "1024m"
+        max-file: "1"
+        max-size: "512m"
   pgs-ssh:
     networks:
       pgs:
@@ -294,8 +294,8 @@ services:
     logging:
       driver: "json-file"
       options:
-        max-file: "3"
-        max-size: "1024m"
+        max-file: "1"
+        max-size: "512m"
   feeds-caddy:
     image: ghcr.io/picosh/pico/caddy:latest
     restart: always
@@ -331,8 +331,8 @@ services:
     logging:
       driver: "json-file"
       options:
-        max-file: "3"
-        max-size: "1024m"
+        max-file: "1"
+        max-size: "512m"
   feeds-ssh:
     networks:
       feeds:
@@ -348,8 +348,8 @@ services:
     logging:
       driver: "json-file"
       options:
-        max-file: "3"
-        max-size: "1024m"
+        max-file: "1"
+        max-size: "512m"
   pico-caddy:
     image: ghcr.io/picosh/pico/caddy:latest
     restart: always
@@ -376,8 +376,8 @@ services:
     logging:
       driver: "json-file"
       options:
-        max-file: "3"
-        max-size: "1024m"
+        max-file: "1"
+        max-size: "512m"
   pico-ssh:
     networks:
       pico:
