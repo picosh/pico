@@ -439,6 +439,15 @@ type UptimeResult struct {
 	UptimePercent  float64
 }
 
+type Invite struct {
+	ID           string     `db:"id"`
+	FromUserID   string     `db:"from_user_id"`
+	ToUserID     string     `db:"to_user_id"`
+	CreatedAt    *time.Time `db:"created_at"`
+	FromUserName string     `db:"from_user_name"`
+	ToUserName   string     `db:"to_user_name"`
+}
+
 func ComputeUptime(history []*PipeMonitorHistory, from, to time.Time) UptimeResult {
 	totalDuration := to.Sub(from)
 	if totalDuration <= 0 {
@@ -642,6 +651,10 @@ type DB interface {
 
 	InsertPipeMonitorHistory(monitorID string, windowDur time.Duration, windowEnd, lastPing *time.Time) error
 	FindPipeMonitorHistory(monitorID string, from, to time.Time) ([]*PipeMonitorHistory, error)
+
+	FindWhoInvitedUser(toUserID string) (string, error)
+	FindInvitesByUser(userID string) ([]*Invite, error)
+	InviteUser(fromUserID string, toUserID string) error
 
 	Close() error
 }

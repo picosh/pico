@@ -28,9 +28,11 @@ type SharedModel struct {
 	Dbpool             db.DB
 	PgsDB              pgsdb.PgsDB
 	User               *db.User
+	InvitedBy          string
 	PlusFeatureFlag    *db.FeatureFlag
 	BouncerFeatureFlag *db.FeatureFlag
 	PgsFeatureFlag     *db.FeatureFlag
+	ProseFeatureFlag   *db.FeatureFlag
 	Impersonator       string
 	App                *vxfw.App
 }
@@ -280,6 +282,12 @@ func initData(shrd *SharedModel) error {
 
 	pff, _ := FindFeatureFlag(shrd, "pgs")
 	shrd.PgsFeatureFlag = pff
+
+	prosef, _ := FindFeatureFlag(shrd, "prose")
+	shrd.ProseFeatureFlag = prosef
+
+	invitedBy, _ := shrd.Dbpool.FindWhoInvitedUser(user.ID)
+	shrd.InvitedBy = invitedBy
 	return nil
 }
 
@@ -351,6 +359,7 @@ func NewTui(opts vaxis.Options, shrd *SharedModel) error {
 		HOME:          NewMenuPage(shrd),
 		"pubkeys":     NewPubkeysPage(shrd),
 		"add-pubkey":  NewAddPubkeyPage(shrd),
+		"invite":      NewAddInvitePage(shrd),
 		"tokens":      NewTokensPage(shrd),
 		"add-token":   NewAddTokenPage(shrd),
 		"signup":      NewSignupPage(shrd),

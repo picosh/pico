@@ -57,7 +57,7 @@ func StartSshServer() {
 		".lxt":     filehandlers.NewScpPostHandler(dbh, cfg, hooks),
 		"fallback": uploadimgs.NewUploadImgHandler(dbh, cfg, st),
 	}
-	handler := filehandlers.NewFileHandlerRouter(cfg, dbh, fileMap)
+	handler := NewUploadHandler(cfg, dbh, fileMap)
 
 	sshAuth := shared.NewSshAuthHandler(dbh, logger, "prose")
 

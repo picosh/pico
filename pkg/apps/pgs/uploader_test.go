@@ -646,7 +646,7 @@ func TestFindFeatureFlag(t *testing.T) {
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
-		if !strings.Contains(err.Error(), "https://blog.pico.sh/ann-037-pgs-pico-plus-only") {
+		if !strings.Contains(err.Error(), "https://blog.pico.sh/ann-038-pico-invite-system") {
 			t.Errorf("expected blog link in error, got %v", err)
 		}
 	})
@@ -657,7 +657,7 @@ func TestFindFeatureFlag(t *testing.T) {
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
-		if !strings.Contains(err.Error(), "pico+") || !strings.Contains(err.Error(), "https://blog.pico.sh/ann-037-pgs-pico-plus-only") {
+		if !strings.Contains(err.Error(), "pico+") || !strings.Contains(err.Error(), "https://blog.pico.sh/ann-038-pico-invite-system") {
 			t.Errorf("expected pico+ requirement and blog link in error, got %v", err)
 		}
 	})

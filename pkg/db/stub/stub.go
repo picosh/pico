@@ -275,3 +275,15 @@ func (me *StubDB) InsertPipeMonitorHistory(monitorID string, windowDur time.Dura
 func (me *StubDB) FindPipeMonitorHistory(monitorID string, from, to time.Time) ([]*db.PipeMonitorHistory, error) {
 	return nil, errNotImpl
 }
+
+func (me *StubDB) FindWhoInvitedUser(toUserID string) (string, error) {
+	return "", errNotImpl
+}
+
+func (me *StubDB) FindInvitesByUser(userID string) ([]*db.Invite, error) {
+	return nil, errNotImpl
+}
+
+func (me *StubDB) InviteUser(fromUserID string, toUserID string) error {
+	return errNotImpl
+}

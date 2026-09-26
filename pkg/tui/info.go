@@ -31,7 +31,7 @@ func (m *UsageInfo) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 		Characters: ctx.Characters,
 		Max: vxfw.Size{
 			Width:  30,
-			Height: 3 + 3,
+			Height: 4 + 3,
 		},
 	})
 }
@@ -70,6 +70,10 @@ func (m *UserInfo) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	if m.shared.PlusFeatureFlag != nil {
 		h += 1
 	}
+	if m.shared.InvitedBy != "" {
+		h += 1
+	}
+
 	return brd.Draw(vxfw.DrawContext{
 		Characters: ctx.Characters,
 		Max: vxfw.Size{
@@ -88,6 +92,10 @@ func (m *UserInfo) getKv() []Kv {
 	if m.shared.PlusFeatureFlag != nil {
 		expiresAt := m.shared.PlusFeatureFlag.ExpiresAt.Format(time.DateOnly)
 		kv = append(kv, Kv{Key: "pico+ expires", Value: expiresAt})
+	}
+
+	if m.shared.InvitedBy != "" {
+		kv = append(kv, Kv{Key: "invited by", Value: m.shared.InvitedBy})
 	}
 
 	return kv
@@ -153,12 +161,13 @@ func (m *FeaturesList) getFeaturesKv() []Kv {
 }
 
 type ServicesList struct {
-	plusFf *db.FeatureFlag
-	pgsFf  *db.FeatureFlag
+	plusFf  *db.FeatureFlag
+	pgsFf   *db.FeatureFlag
+	proseFf *db.FeatureFlag
 }
 
-func NewServicesList(plusFf *db.FeatureFlag, pgsFf *db.FeatureFlag) *ServicesList {
-	return &ServicesList{plusFf: plusFf, pgsFf: pgsFf}
+func NewServicesList(plusFf *db.FeatureFlag, pgsFf *db.FeatureFlag, proseFf *db.FeatureFlag) *ServicesList {
+	return &ServicesList{plusFf: plusFf, pgsFf: pgsFf, proseFf: proseFf}
 }
 
 func (m *ServicesList) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
@@ -174,7 +183,7 @@ func (m *ServicesList) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	return brd.Draw(vxfw.DrawContext{
 		Characters: ctx.Characters,
 		Max: vxfw.Size{
-			Width:  30,
+			Width:  32,
 			Height: uint16(servicesHeight) + 3,
 		},
 	})
@@ -183,15 +192,20 @@ func (m *ServicesList) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 func (m *ServicesList) getServiceKv() []Kv {
 	hasPlus := m.plusFf != nil && m.plusFf.IsValid()
 	hasPgs := m.pgsFf != nil && m.pgsFf.IsValid()
-	pagesStatus := "pico+"
+	hasProse := m.proseFf != nil && m.proseFf.IsValid()
+	pagesStatus := "invite/pico+"
 	if hasPlus || hasPgs {
 		pagesStatus = "active"
 	}
+	proseStatus := "invite/pico+"
+	if hasPlus || hasProse {
+		proseStatus = "active"
+	}
 	data := [][]string{
 		{"name", "status"},
-		{"prose", "active"},
 		{"pipe", "active"},
 		{"pastes", "active"},
+		{"prose", proseStatus},
 		{"pages", pagesStatus},
 	}
 
