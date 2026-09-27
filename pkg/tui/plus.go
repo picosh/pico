@@ -54,7 +54,7 @@ func (m *PlusPage) header(ctx vxfw.DrawContext) vxfw.Surface {
 		{Text: "• prose\n"},
 		{Text: "  • blog analytics\n"},
 		{Text: "• irc bouncer\n"},
-		{Text: "• 10GB total storage\n"},
+		{Text: "• 5GB total storage\n"},
 	})
 	brd := NewBorder(intro)
 	brd.Label = "pico+"
