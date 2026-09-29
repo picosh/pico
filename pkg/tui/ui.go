@@ -286,8 +286,10 @@ func initData(shrd *SharedModel) error {
 	prosef, _ := FindFeatureFlag(shrd, "prose")
 	shrd.ProseFeatureFlag = prosef
 
-	invitedBy, _ := shrd.Dbpool.FindWhoInvitedUser(user.ID)
-	shrd.InvitedBy = invitedBy
+	if shrd.User != nil {
+		invitedBy, _ := shrd.Dbpool.FindWhoInvitedUser(user.ID)
+		shrd.InvitedBy = invitedBy
+	}
 	return nil
 }
 
