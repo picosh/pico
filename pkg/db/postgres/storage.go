@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hashicorp/golang-lru/v2/expirable"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 	"github.com/picosh/pico/pkg/db"
@@ -30,6 +31,9 @@ var SelectPost = `
 type PsqlDB struct {
 	Logger *slog.Logger
 	Db     *sqlx.DB
+
+	popularPostsCache *expirable.LRU[string, []*db.Post]
+	popularPostsMu    sync.Mutex
 }
 
 type RowScanner interface {
@@ -79,7 +83,8 @@ func CreatePostWithTagsByRow(r RowScanner) (*db.Post, error) {
 func NewDB(databaseUrl string, logger *slog.Logger) *PsqlDB {
 	var err error
 	d := &PsqlDB{
-		Logger: logger,
+		Logger:            logger,
+		popularPostsCache: expirable.NewLRU[string, []*db.Post](16, nil, 15*time.Minute),
 	}
 	d.Logger.Info("Connecting to postgres", "databaseUrl", databaseUrl)
 
@@ -89,6 +94,12 @@ func NewDB(databaseUrl string, logger *slog.Logger) *PsqlDB {
 	}
 	d.Db = db
 	return d
+}
+
+func (me *PsqlDB) ClearPopularPostsCache() {
+	if me.popularPostsCache != nil {
+		me.popularPostsCache.Purge()
+	}
 }
 
 func (me *PsqlDB) shouldBlockSingup(ip string) error {
@@ -494,11 +505,25 @@ func (me *PsqlDB) postPager(rs *sqlx.Rows, pageNum int, space string, tag string
 	return pager, nil
 }
 
-func (me *PsqlDB) FindPostsByFeed(page *db.Pager, space string) (*db.Paginate[*db.Post], error) {
+func (me *PsqlDB) FindPopularPosts() ([]*db.Post, error) {
+	if me.popularPostsCache != nil {
+		if posts, ok := me.popularPostsCache.Get("popular_posts"); ok {
+			return posts, nil
+		}
+	}
+
+	me.popularPostsMu.Lock()
+	defer me.popularPostsMu.Unlock()
+
+	if me.popularPostsCache != nil {
+		if posts, ok := me.popularPostsCache.Get("popular_posts"); ok {
+			return posts, nil
+		}
+	}
+
 	query := `
-	SELECT *
-	FROM (
-	    SELECT DISTINCT ON (posts.user_id)
+	WITH candidate_posts AS (
+	    SELECT
 	        posts.id,
 	        posts.user_id,
 	        posts.filename,
@@ -515,17 +540,96 @@ func (me *PsqlDB) FindPostsByFeed(page *db.Pager, space string) (*db.Paginate[*d
 	    WHERE
 	        hidden = FALSE
 	        AND publish_at::date <= CURRENT_DATE
-	        AND cur_space = $3
-	    ORDER BY posts.user_id, publish_at DESC
-	) AS latest_posts
-	ORDER BY publish_at DESC
-	LIMIT $1 OFFSET $2`
-	rs, err := me.Db.Queryx(query, page.Num, page.Num*page.Page, space)
+	        AND publish_at >= NOW() - INTERVAL '30 days'
+	        AND cur_space = 'prose'
+	        AND EXISTS (
+	            SELECT 1 FROM feature_flags
+	            WHERE feature_flags.user_id = posts.user_id
+	              AND (name = 'plus' OR name = 'prose')
+	              AND expires_at > NOW()
+	        )
+	),
+	post_visitors AS (
+	    SELECT post_id, COUNT(DISTINCT ip_address) AS unique_visitors
+	    FROM analytics_visits
+	    WHERE post_id IN (SELECT id FROM candidate_posts)
+	      AND status = 200
+	      AND created_at >= NOW() - INTERVAL '30 days'
+	    GROUP BY post_id
+	),
+	scored_posts AS (
+	    SELECT
+	        cp.*,
+	        COALESCE(pv.unique_visitors, 0) AS score,
+	        (
+	            LOG(GREATEST(COALESCE(pv.unique_visitors, 0), 1)) +
+	            (EXTRACT(EPOCH FROM cp.publish_at) - 1700000000) / 345600.0
+	        ) AS rank_score,
+	        ROW_NUMBER() OVER (
+	            PARTITION BY cp.user_id
+	            ORDER BY (
+	                LOG(GREATEST(COALESCE(pv.unique_visitors, 0), 1)) +
+	                (EXTRACT(EPOCH FROM cp.publish_at) - 1700000000) / 345600.0
+	            ) DESC, cp.publish_at DESC
+	        ) AS user_rank
+	    FROM candidate_posts cp
+	    LEFT JOIN post_visitors pv ON pv.post_id = cp.id
+	)
+	SELECT
+	    id,
+	    user_id,
+	    filename,
+	    slug,
+	    title,
+	    text,
+	    description,
+	    publish_at,
+	    username,
+	    updated_at,
+	    mime_type,
+	    score
+	FROM scored_posts
+	WHERE user_rank <= 3
+	ORDER BY rank_score DESC, publish_at DESC
+	LIMIT 30`
+	rs, err := me.Db.Queryx(query)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = rs.Close() }()
-	return me.postPager(rs, page.Num, space, "")
+
+	var posts []*db.Post
+	for rs.Next() {
+		post := &db.Post{}
+		err := rs.Scan(
+			&post.ID,
+			&post.UserID,
+			&post.Filename,
+			&post.Slug,
+			&post.Title,
+			&post.Text,
+			&post.Description,
+			&post.PublishAt,
+			&post.Username,
+			&post.UpdatedAt,
+			&post.MimeType,
+			&post.Score,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		posts = append(posts, post)
+	}
+	if rs.Err() != nil {
+		return nil, rs.Err()
+	}
+
+	if me.popularPostsCache != nil {
+		me.popularPostsCache.Add("popular_posts", posts)
+	}
+
+	return posts, nil
 }
 
 func (me *PsqlDB) InsertPost(post *db.Post) (*db.Post, error) {

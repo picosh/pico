@@ -3,6 +3,7 @@ package auth
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -314,5 +315,95 @@ func testResponse(t *testing.T, responseRecorder *httptest.ResponseRecorder, sta
 func bail(err error) {
 	if err != nil {
 		panic(bail)
+	}
+}
+
+type stubDBWithFeatures struct {
+	*stub.StubDB
+	features map[string]bool
+}
+
+func (s *stubDBWithFeatures) HasFeatureByUser(userID string, feature string) bool {
+	return s.features[feature]
+}
+
+func newStubDBWithFeatures(features ...string) *stubDBWithFeatures {
+	featMap := make(map[string]bool)
+	for _, f := range features {
+		featMap[f] = true
+	}
+	return &stubDBWithFeatures{
+		StubDB:   stub.NewStubDB(shared.CreateLogger("test", false)),
+		features: featMap,
+	}
+}
+
+func TestProsePostMetricDrainFeatureFlags(t *testing.T) {
+	newPostVisit := func() *db.AnalyticsVisits {
+		return &db.AnalyticsVisits{
+			UserID:    testUserID,
+			PostID:    "post-123",
+			Host:      "user-a.prose.sh",
+			Path:      "/my-post",
+			IpAddress: "1.1.1.1",
+			UserAgent: "Mozilla/5.0",
+			Status:    200,
+		}
+	}
+
+	newNonPostVisit := func() *db.AnalyticsVisits {
+		return &db.AnalyticsVisits{
+			UserID:    testUserID,
+			PostID:    "",
+			Host:      "user-a.prose.sh",
+			Path:      "/",
+			IpAddress: "1.1.1.1",
+			UserAgent: "Mozilla/5.0",
+			Status:    200,
+		}
+	}
+
+	// 1. User without any features: both post and non-post should fail
+	noFeaturesDB := newStubDBWithFeatures()
+	err := router.AnalyticsVisitFromVisit(newPostVisit(), noFeaturesDB, "secret")
+	if !errors.Is(err, router.ErrAnalyticsDisabled) {
+		t.Fatalf("expected ErrAnalyticsDisabled for post without prose/plus, got: %v", err)
+	}
+	err = router.AnalyticsVisitFromVisit(newNonPostVisit(), noFeaturesDB, "secret")
+	if !errors.Is(err, router.ErrAnalyticsDisabled) {
+		t.Fatalf("expected ErrAnalyticsDisabled for non-post without analytics, got: %v", err)
+	}
+
+	// 2. User with "prose" feature: post visit succeeds, non-post fails
+	proseDB := newStubDBWithFeatures("prose")
+	err = router.AnalyticsVisitFromVisit(newPostVisit(), proseDB, "secret")
+	if err != nil {
+		t.Fatalf("expected post visit to succeed with prose feature, got: %v", err)
+	}
+	err = router.AnalyticsVisitFromVisit(newNonPostVisit(), proseDB, "secret")
+	if !errors.Is(err, router.ErrAnalyticsDisabled) {
+		t.Fatalf("expected non-post visit to fail without analytics feature, got: %v", err)
+	}
+
+	// 3. User with "plus" feature: post visit succeeds, non-post fails
+	plusDB := newStubDBWithFeatures("plus")
+	err = router.AnalyticsVisitFromVisit(newPostVisit(), plusDB, "secret")
+	if err != nil {
+		t.Fatalf("expected post visit to succeed with plus feature, got: %v", err)
+	}
+	err = router.AnalyticsVisitFromVisit(newNonPostVisit(), plusDB, "secret")
+	if !errors.Is(err, router.ErrAnalyticsDisabled) {
+		t.Fatalf("expected non-post visit to fail without analytics feature, got: %v", err)
+	}
+
+	// 4. User with "analytics" only: post visit fails (requires prose/plus), non-post succeeds
+	analyticsDB := newStubDBWithFeatures("analytics")
+	err = router.AnalyticsVisitFromVisit(newPostVisit(), analyticsDB, "secret")
+	if !errors.Is(err, router.ErrAnalyticsDisabled) {
+		t.Fatalf("expected post visit to fail without prose or plus feature, got: %v", err)
+	}
+	err = router.AnalyticsVisitFromVisit(newNonPostVisit(), analyticsDB, "secret")
+	if err != nil {
+		t.Fatalf("expected non-post visit to succeed with analytics feature, got: %v", err)
 	}
 }

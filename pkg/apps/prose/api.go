@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -38,6 +37,7 @@ type PostItemData struct {
 	UpdatedAtISO   string
 	UpdatedTimeAgo string
 	Padding        string
+	Score          int
 }
 
 type BlogPageData struct {
@@ -566,16 +566,7 @@ func readHandler(w http.ResponseWriter, r *http.Request) {
 	logger := router.GetLogger(r)
 	cfg := router.GetCfg(r)
 
-	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-	tag := r.URL.Query().Get("tag")
-	var pager *db.Paginate[*db.Post]
-	var err error
-	if tag == "" {
-		pager, err = dbpool.FindPostsByFeed(&db.Pager{Num: 30, Page: page}, cfg.Space)
-	} else {
-		pager, err = dbpool.FindPostsByTag(&db.Pager{Num: 30, Page: page}, tag, cfg.Space)
-	}
-
+	posts, err := dbpool.FindPopularPosts()
 	if err != nil {
 		logger.Error("finding posts", "err", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -590,37 +581,12 @@ func readHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
-	nextPage := ""
-	if page < pager.Total-1 {
-		nextPage = fmt.Sprintf("/read?page=%d", page+1)
-		if tag != "" {
-			nextPage = fmt.Sprintf("%s&tag=%s", nextPage, tag)
-		}
-	}
-
-	prevPage := ""
-	if page > 0 {
-		prevPage = fmt.Sprintf("/read?page=%d", page-1)
-		if tag != "" {
-			prevPage = fmt.Sprintf("%s&tag=%s", prevPage, tag)
-		}
-	}
-
-	tags, err := dbpool.FindPopularTags(cfg.Space)
-	if err != nil {
-		logger.Error("find popular tags", "err", err.Error())
-	}
-
 	data := ReadPageData{
-		Site:      *cfg.GetSiteData(),
-		NextPage:  nextPage,
-		PrevPage:  prevPage,
-		Tags:      tags,
-		HasFilter: tag != "",
+		Site: *cfg.GetSiteData(),
 	}
 
 	curl := shared.NewCreateURL(cfg)
-	for _, post := range pager.Data {
+	for _, post := range posts {
 		item := PostItemData{
 			URL:            template.URL(cfg.FullPostURL(curl, post.Username, post.Slug)),
 			BlogURL:        template.URL(cfg.FullBlogURL(curl, post.Username)),
@@ -631,6 +597,7 @@ func readHandler(w http.ResponseWriter, r *http.Request) {
 			PublishAtISO:   post.PublishAt.Format(time.RFC3339),
 			UpdatedTimeAgo: shared.TimeAgo(post.UpdatedAt),
 			UpdatedAtISO:   post.UpdatedAt.Format(time.RFC3339),
+			Score:          post.Score,
 		}
 		data.Posts = append(data.Posts, item)
 	}
@@ -808,7 +775,7 @@ func rssHandler(w http.ResponseWriter, r *http.Request) {
 	logger := router.GetLogger(r)
 	cfg := router.GetCfg(r)
 
-	pager, err := dbpool.FindPostsByFeed(&db.Pager{Num: 25, Page: 0}, cfg.Space)
+	posts, err := dbpool.FindPopularPosts()
 	if err != nil {
 		logger.Error("find all posts", "err", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -836,7 +803,7 @@ func rssHandler(w http.ResponseWriter, r *http.Request) {
 	curl := shared.CreateURLFromRequest(cfg, r)
 
 	var feedItems []*feeds.Item
-	for _, post := range pager.Data {
+	for _, post := range posts {
 		content := ""
 		ext := filepath.Ext(post.Filename)
 		switch ext {

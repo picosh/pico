@@ -158,6 +158,7 @@ type Post struct {
 
 	// computed
 	IsVirtual bool `db:"-"`
+	Score     int  `json:"score" db:"score"`
 }
 
 type Paginate[T any] struct {
@@ -601,10 +602,11 @@ type DB interface {
 	FindExpiredPosts(space string) ([]*Post, error)
 	FindPostWithFilename(filename string, userID string, space string) (*Post, error)
 	FindPostWithSlug(slug string, userID string, space string) (*Post, error)
-	FindPostsByFeed(pager *Pager, space string) (*Paginate[*Post], error)
 	InsertPost(post *Post) (*Post, error)
 	UpdatePost(post *Post) (*Post, error)
 	RemovePosts(postIDs []string) error
+
+	FindPopularPosts() ([]*Post, error)
 
 	ReplaceTagsByPost(tags []string, postID string) error
 	FindUserPostsByTag(pager *Pager, tag, userID, space string) (*Paginate[*Post], error)

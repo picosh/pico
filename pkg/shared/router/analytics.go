@@ -156,7 +156,11 @@ func CleanHost(raw string) (string, error) {
 var ErrAnalyticsDisabled = errors.New("owner does not have site analytics enabled")
 
 func AnalyticsVisitFromVisit(visit *db.AnalyticsVisits, dbpool db.DB, secret string) error {
-	if !dbpool.HasFeatureByUser(visit.UserID, "analytics") {
+	if visit.PostID != "" {
+		if !dbpool.HasFeatureByUser(visit.UserID, "plus") && !dbpool.HasFeatureByUser(visit.UserID, "prose") {
+			return ErrAnalyticsDisabled
+		}
+	} else if !dbpool.HasFeatureByUser(visit.UserID, "analytics") {
 		return ErrAnalyticsDisabled
 	}
 

@@ -717,14 +717,22 @@ func deserializeCaddyAccessLog(dbpool db.DB, access *AccessLog) (*db.AnalyticsVi
 		}
 		projectID = project.ID
 	case "prose": // figure out post ID
-		if path == "" || path == "/" {
-			// ignore
-		} else {
-			cleanPath := strings.TrimPrefix(path, "/")
+		cleanPath := path
+		u, err := url.Parse(path)
+		if err == nil {
+			cleanPath = u.Path
+		}
+		cleanPath, _ = url.PathUnescape(cleanPath)
+		cleanPath = strings.TrimPrefix(cleanPath, "/")
+		cleanPath = strings.TrimSuffix(cleanPath, "/")
+		cleanPath = strings.TrimSuffix(cleanPath, ".html")
+		cleanPath = strings.TrimSuffix(cleanPath, ".md")
+		cleanPath = strings.TrimSuffix(cleanPath, ".lxt")
+		cleanPath = strings.TrimPrefix(cleanPath, "raw/")
+
+		if cleanPath != "" {
 			post, err := dbpool.FindPostWithSlug(cleanPath, user.ID, space)
-			if err != nil {
-				// skip
-			} else {
+			if err == nil {
 				postID = post.ID
 			}
 		}
