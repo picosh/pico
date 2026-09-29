@@ -31,27 +31,33 @@
 {{define "attrs"}}{{end}}
 
 {{define "body"}}
-<header class="text-center">
-    <h1 class="text-2xl font-bold">prose.sh</h1>
-    <p class="text-lg">A blog platform for hackers</p>
-    <div>
-      <a href="https://pico.sh/prose" class="btn-link mt inline-block">LEARN MORE</a>
+<header>
+    <h1>prose.sh</h1>
+    <p>A blog platform for hackers</p>
+    <div class="flex items-center gap my">
+        <span class="box-sm mono text-sm"><span class="text-green">$</span> ssh pico.sh</span>
+        <a href="https://pico.sh/prose" class="mono">[docs]</a>
+        <a href="/rss" class="mono">[rss]</a>
     </div>
-    <hr class="mt-2" />
 </header>
 
 <main>
+    <div class="flex items-center text-sm text-grey mono my">
+        <span class="post-date">DATE</span>
+        <span class="flex-1">POST</span>
+        <span>SCORE</span>
+    </div>
     {{range .Posts}}
     <article class="my">
         <div class="flex items-center">
-            <time datetime="{{.PublishAtISO}}" class="font text-sm post-date">{{.PublishAt}}</time>
+            <time datetime="{{.PublishAtISO}}" class="mono text-sm post-date">{{.PublishAt}}</time>
             <div class="flex-1">
-                <a class="text-md transform-none" href="{{.URL}}" style="text-transform: lowercase;">{{.Title}}</a>
-                <address class="text-sm inline">
-                    <a href="{{.BlogURL}}" class="link-grey">({{.Username}})</a>
-                </address>
+                <a class="text-md transform-none" href="{{.URL}}">{{.Title}}</a>
+                <span class="text-sm mono">
+                    <a href="{{.BlogURL}}" class="text-grey">~{{.Username}}</a>
+                </span>
             </div>
-            <span class="text-sm text-grey font-italic">{{.Score}}</span>
+            <span class="text-sm text-grey mono">[{{.Score}}]</span>
         </div>
     </article>
     {{end}}
