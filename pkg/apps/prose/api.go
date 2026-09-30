@@ -185,7 +185,6 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 
 	ts, err := router.RenderTemplate(cfg, []string{
 		cfg.StaticPath("html/blog-default.partial.tmpl"),
-		cfg.StaticPath("html/blog-aside.partial.tmpl"),
 		cfg.StaticPath("html/blog.page.tmpl"),
 	})
 
@@ -893,9 +892,7 @@ func serveFile(file string, contentType string) http.HandlerFunc {
 
 func createStaticRoutes() []router.Route {
 	return []router.Route{
-		router.NewRoute("GET", "/main.css", serveFile("main.css", "text/css")),
-		router.NewRoute("GET", "/smol.css", serveFile("smol.css", "text/css")),
-		router.NewRoute("GET", "/smol-v2.css", serveFile("smol-v2.css", "text/css")),
+		router.NewRoute("GET", "/reset.css", serveFile("reset.css", "text/css")),
 		router.NewRoute("GET", "/syntax.css", serveFile("syntax.css", "text/css")),
 		router.NewRoute("GET", "/card.png", serveFile("card.png", "image/png")),
 		router.NewRoute("GET", "/favicon-16x16.png", serveFile("favicon-16x16.png", "image/png")),

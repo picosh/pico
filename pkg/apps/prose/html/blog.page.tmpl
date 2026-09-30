@@ -3,61 +3,50 @@
 {{define "title"}}{{.PageTitle}}{{end}}
 
 {{define "meta"}}
-{{if .Header.Favicon}}
-<link rel="icon" href="{{.Header.Favicon}}">
-{{else}}
-<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+  {{if .Header.Favicon}}
+    <link rel="icon" href="{{.Header.Favicon}}">
+  {{else}}
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+  {{end}}
+
+  <meta name="description" content="{{if .Header.Bio}}{{.Header.Bio}}{{else}}{{.Header.Title}}{{end}}" />
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="{{.Site.Domain}}">
+  <meta property="og:url" content="{{.URL}}">
+  <meta property="og:title" content="{{.Header.Title}}">
+  {{if .Header.Bio}}<meta property="og:description" content="{{.Header.Bio}}">{{end}}
+
+  {{if .Header.Image}}
+    <meta itemprop="image" content="{{.Header.Image}}" />
+    <meta property="og:image" content="{{.Header.Image}}" />
+    <meta name="twitter:image" content="{{.Header.Image}}" />
+  {{else}}
+    <meta property="og:image:width" content="300" />
+    <meta property="og:image:height" content="300" />
+    <meta itemprop="image" content="https://{{.Site.Domain}}/card.png" />
+    <meta property="og:image" content="https://{{.Site.Domain}}/card.png" />
+    <meta name="twitter:image" content="https://{{.Site.Domain}}/card.png" />
+  {{end}}
+
+  {{if .Header.ImageCard}}
+    <meta property="twitter:card" content="{{.Header.ImageCard}}">
+  {{else}}
+    <meta property="twitter:card" content="summary">
+  {{end}}
+  <meta property="twitter:url" content="{{.URL}}">
+  <meta property="twitter:title" content="{{.Header.Title}}">
+  {{if .Header.Bio}}<meta property="twitter:description" content="{{.Header.Bio}}">{{end}}
+
+  <link rel="alternate" href="{{.RSSURL}}" type="application/rss+xml" title="RSS feed for {{.Header.Title}}" />
+
+  <link rel="stylesheet" href="/reset.css" />
+  <link rel="stylesheet" href="/syntax.css" />
+  {{if .HasCSS}}<link rel="stylesheet" href="{{.CssURL}}" />{{end}}
 {{end}}
 
-<meta name="description" content="{{if .Header.Bio}}{{.Header.Bio}}{{else}}{{.Header.Title}}{{end}}" />
-
-<meta property="og:type" content="website">
-<meta property="og:site_name" content="{{.Site.Domain}}">
-<meta property="og:url" content="{{.URL}}">
-<meta property="og:title" content="{{.Header.Title}}">
-{{if .Header.Bio}}<meta property="og:description" content="{{.Header.Bio}}">{{end}}
-
-{{if .Header.Image}}
-<meta itemprop="image" content="{{.Header.Image}}" />
-<meta property="og:image" content="{{.Header.Image}}" />
-
-<meta name="twitter:image" content="{{.Header.Image}}" />
-{{else}}
-<meta property="og:image:width" content="300" />
-<meta property="og:image:height" content="300" />
-<meta itemprop="image" content="https://{{.Site.Domain}}/card.png" />
-<meta property="og:image" content="https://{{.Site.Domain}}/card.png" />
-
-<meta name="twitter:image" content="https://{{.Site.Domain}}/card.png" />
-{{end}}
-
-{{if .Header.ImageCard}}
-<meta property="twitter:card" content="{{.Header.ImageCard}}">
-{{else}}
-<meta property="twitter:card" content="summary">
-{{end}}
-<meta property="twitter:url" content="{{.URL}}">
-<meta property="twitter:title" content="{{.Header.Title}}">
-{{if .Header.Bio}}<meta property="twitter:description" content="{{.Header.Bio}}">{{end}}
-
-<link rel="alternate" href="{{.RSSURL}}" type="application/rss+xml" title="RSS feed for {{.Header.Title}}" />
-{{if .WithStyles}}
-  <link rel="stylesheet" href="/smol.css" />
-{{else}}
-{{end}}
-<link rel="stylesheet" href="/syntax.css" />
-{{if .HasCSS}}<link rel="stylesheet" href="{{.CssURL}}" />{{end}}
-{{end}}
-
-{{define "attrs"}}id="blog" class="layout-{{.Header.Layout}}"{{end}}
+{{define "attrs"}}id="blog"{{end}}
 
 {{define "body"}}
-
-{{if eq .Header.Layout "aside"}}
-    {{template "blog-aside" .}}
-{{else}}
-    {{template "blog-default" .}}
-{{end}}
-
-{{template "footer" .}}
+  {{template "blog-default" .}}
+  {{template "footer" .}}
 {{end}}

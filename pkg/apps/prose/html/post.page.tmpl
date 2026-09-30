@@ -3,86 +3,92 @@
 {{define "title"}}{{.PageTitle}}{{end}}
 
 {{define "meta"}}
-{{if .Favicon}}
-<link rel="icon" href="{{.Favicon}}">
-{{else}}
-<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
-{{end}}
+  {{if .Favicon}}
+    <link rel="icon" href="{{.Favicon}}">
+  {{else}}
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+  {{end}}
 
-<meta name="description" content="{{.Description}}" />
+  <meta name="description" content="{{.Description}}" />
 
-<meta property="og:type" content="website">
-<meta property="og:site_name" content="{{.Site.Domain}}">
-<meta property="og:url" content="{{.URL}}">
-<meta property="og:title" content="{{.Title}}">
-{{if .Description}}<meta property="og:description" content="{{.Description}}">{{end}}
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="{{.Site.Domain}}">
+  <meta property="og:url" content="{{.URL}}">
+  <meta property="og:title" content="{{.Title}}">
+  {{if .Description}}<meta property="og:description" content="{{.Description}}">{{end}}
 
-{{if .Image}}
-<meta itemprop="image" content="{{.Image}}" />
-<meta property="og:image" content="{{.Image}}" />
+  {{if .Image}}
+    <meta itemprop="image" content="{{.Image}}" />
+    <meta property="og:image" content="{{.Image}}" />
+    <meta name="twitter:image" content="{{.Image}}" />
+  {{else}}
+    <meta property="og:image:width" content="300" />
+    <meta property="og:image:height" content="300" />
+    <meta itemprop="image" content="https://{{.Site.Domain}}/card.png" />
+    <meta property="og:image" content="https://{{.Site.Domain}}/card.png" />
+    <meta name="twitter:image" content="https://{{.Site.Domain}}/card.png" />
+  {{end}}
 
-<meta name="twitter:image" content="{{.Image}}" />
-{{else}}
-<meta property="og:image:width" content="300" />
-<meta property="og:image:height" content="300" />
-<meta itemprop="image" content="https://{{.Site.Domain}}/card.png" />
-<meta property="og:image" content="https://{{.Site.Domain}}/card.png" />
+  {{if .ImageCard}}
+    <meta property="twitter:card" content="{{.ImageCard}}">
+  {{else}}
+    <meta property="twitter:card" content="summary">
+  {{end}}
+  <meta property="twitter:url" content="{{.URL}}">
+  <meta property="twitter:title" content="{{.Title}}">
+  {{if .Description}}<meta property="twitter:description" content="{{.Description}}">{{end}}
 
-<meta name="twitter:image" content="https://{{.Site.Domain}}/card.png" />
-{{end}}
-
-{{if .ImageCard}}
-<meta property="twitter:card" content="{{.ImageCard}}">
-{{else}}
-<meta property="twitter:card" content="summary">
-{{end}}
-<meta property="twitter:url" content="{{.URL}}">
-<meta property="twitter:title" content="{{.Title}}">
-{{if .Description}}<meta property="twitter:description" content="{{.Description}}">{{end}}
-
-<link rel="stylesheet" href="/syntax.css" />
-{{if .WithStyles}}
-  <link rel="stylesheet" href="/smol.css" />
-{{else}}
-{{end}}
-{{if .HasCSS}}<link rel="stylesheet" href="{{.CssURL}}" />{{end}}
+  <link rel="stylesheet" href="/reset.css" />
+  <link rel="stylesheet" href="/syntax.css" />
+  {{if .HasCSS}}<link rel="stylesheet" href="{{.CssURL}}" />{{end}}
 {{end}}
 
 {{define "attrs"}}id="post" class="{{.Slug}}{{if .Unlisted}} post-draft{{end}}"{{end}}
 
 {{define "body"}}
-<header>
-    <h1 class="text-2xl font-bold">{{.Title}}</h1>
-    <p class="font-bold m-0">
-        <span id="publish-at">
+  <main>
+    <article class="md">
+      <header>
+        <h1>{{.Title}}</h1>
+        <p>
           <time datetime="{{.PublishAtISO}}">{{.PublishAt}}</time>
           <span>&middot;</span>
-        </span>
-        <a href="{{.BlogURL}}">{{.BlogName}}</a>
-    </p>
-    {{if .Description}}<blockquote>{{.Description}}</blockquote>{{end}}
-    <hr />
-</header>
-<main>
-    <article class="md">
-        {{if .List}}
-          {{template "list" .List}}
-        {{else}}
-          {{.Contents}}
+          <a href="{{.BlogURL}}">{{.BlogName}}</a>
+          {{if .Description}}
+            <br />
+            <span>{{.Description}}</span>
+          {{end}}
+        </p>
+
+        <hr />
+      </header>
+
+      {{if .List}}
+        {{template "list" .List}}
+      {{else}}
+        {{.Contents}}
+      {{end}}
+
+      <footer>
+        <hr />
+        {{if or .Tags .UpdatedAt}}
+        <p>
+          {{if .Tags}}
+            {{range .Tags}}
+              <a href="{{$.BlogURL}}?tag={{.}}">#{{.}}</a>&nbsp;
+            {{end}}
+            {{if .UpdatedAt}}<br />{{end}}
+          {{end}}
+          {{if .UpdatedAt}}
+            <span>last updated: <time datetime="{{.UpdatedAtISO}}">{{.UpdatedAt}}</time></span>
+          {{end}}
+        </p>
         {{end}}
 
-        <div class="tags mt-4">
-          {{range .Tags}}
-              <code class="pill tag"><a href="{{$.BlogURL}}?tag={{.}}">#{{.}}</a></code>
-          {{end}}
-        </div>
-
-        <div id="last-updated" class="text-sm">
-          last updated: <time datetime="{{.UpdatedAtISO}}">{{.UpdatedAt}}</time>
-        </div>
-
-        <div id="post-footer">{{.Footer}}</div>
+        {{if .Footer}}<div id="post-footer">{{.Footer}}</div>{{end}}
+      </footer>
     </article>
-</main>
-{{template "footer" .}}
+  </main>
+
+  {{template "footer" .}}
 {{end}}

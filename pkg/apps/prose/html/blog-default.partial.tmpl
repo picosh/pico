@@ -1,18 +1,23 @@
 {{define "blog-default"}}
-<header class="text-center">
-    <h1 class="text-2xl font-bold mt-2">{{.Header.Title}}</h1>
-    {{if .Header.Bio}}<span>{{.Header.Bio}}</span>{{end}}
+<header>
+    <h1>{{.Header.Title}}</h1>
     <nav>
-        {{range .Header.Nav}}
-        <a href="{{.URL}}" class="text-lg transform-none">{{.Text}}</a> |
+        {{if .Header.Bio}}
+        <span>{{.Header.Bio}}</span>
+        <br />
         {{end}}
-        <a href="{{.RSSURL}}" class="text-lg transform-none">rss</a>
+        {{range .Header.Nav}}
+        <a href="{{.URL}}">{{.Text}}</a>&nbsp;
+        {{end}}
+        <a href="{{.RSSURL}}">rss</a>
     </nav>
+
     <hr />
 </header>
+
 <main>
     {{if .Readme.HasText}}
-    <section>
+    <section id="readme">
         <article class="md">
             {{.Readme.Contents}}
         </article>
@@ -20,18 +25,21 @@
     </section>
     {{end}}
 
-    <section class="posts group mt-2">
+    <section id="posts">
         {{if .HasFilter}}
-            <a href={{.URL}}>clear filters</a>
+          <a href="{{.URL}}">clear filters</a>
         {{end}}
+
+        <ul role="list">
         {{range .Posts}}
-        <article>
-            <div class="flex items-center">
-                <time datetime="{{.PublishAtISO}}" class="text-sm post-date">{{.PublishAt}}</time>
-                <span class="text-md flex-1 m-0 transform-none"><a href="{{.URL}}">{{.Title}}</a></span>
-            </div>
-        </article>
+          <li>
+            <article class="post">
+              <time datetime="{{.PublishAtISO}}">{{.PublishAt}}</time>
+              <a href="{{.URL}}">{{.Title}}</a>
+            </article>
+          </li>
         {{end}}
+        </ul>
     </section>
 </main>
 {{end}}
