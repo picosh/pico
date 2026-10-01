@@ -35,12 +35,10 @@ type MetaData struct {
 	Nav         []Link
 	Tags        []string
 	Aliases     []string
-	Layout      string
 	Image       string
 	ImageCard   string
 	Favicon     string
 	Hidden      bool
-	WithStyles  bool
 	Domain      string
 }
 
@@ -215,10 +213,9 @@ func CreateGoldmark(extenders ...goldmark.Extender) goldmark.Markdown {
 func ParseText(text string) (*ParsedText, error) {
 	parsed := ParsedText{
 		MetaData: &MetaData{
-			Tags:       []string{},
-			Aliases:    []string{},
-			WithStyles: true,
-			PublishAt:  &time.Time{},
+			Tags:      []string{},
+			Aliases:   []string{},
+			PublishAt: &time.Time{},
 		},
 	}
 	hili := highlighting.NewHighlighting(
@@ -283,12 +280,6 @@ func ParseText(text string) (*ParsedText, error) {
 	}
 	parsed.Domain = domain
 
-	layout, err := toString(metaData["layout"])
-	if err != nil {
-		return &parsed, fmt.Errorf("front-matter field (%s): %w", "layout", err)
-	}
-	parsed.Layout = layout
-
 	image, err := toString(metaData["image"])
 	if err != nil {
 		return &parsed, fmt.Errorf("front-matter field (%s): %w", "image", err)
@@ -306,12 +297,6 @@ func ParseText(text string) (*ParsedText, error) {
 		return &parsed, fmt.Errorf("front-matter field (%s): %w", "draft", err)
 	}
 	parsed.Hidden = hidden
-
-	withStyles, err := toBool(metaData["with_styles"], true)
-	if err != nil {
-		return &parsed, fmt.Errorf("front-matter field (%s): %w", "with_style", err)
-	}
-	parsed.WithStyles = withStyles
 
 	favicon, err := toString(metaData["favicon"])
 	if err != nil {
