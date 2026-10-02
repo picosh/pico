@@ -22,6 +22,10 @@ lint:
 	golangci-lint run
 .PHONY: lint
 
+deadcode:
+	go tool deadcode -test ./...
+.PHONY: deadcode
+
 test:
 	go test ./...
 .PHONY: test
