@@ -1,4 +1,4 @@
-FROM golang:1.25.0-bookworm
+FROM golang:1.27.0-bookworm
 
 RUN apt-get update && apt-get install -y --no-install-recommends rsync openssh-client make gcc git docker.io && rm -rf /var/lib/apt/lists/*
 
