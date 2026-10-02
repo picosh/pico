@@ -96,7 +96,7 @@ func (c *Cmd) notFound(host, interval string) error {
 	return nil
 }
 
-func (c *Cmd) access_logs(ctx context.Context) error {
+func (c *Cmd) access_logs(_ context.Context) error {
 	fromDate := time.Now().AddDate(0, 0, -30)
 	logs, err := c.Dbpool.FindAccessLogs(c.User.ID, &fromDate)
 	if err != nil {

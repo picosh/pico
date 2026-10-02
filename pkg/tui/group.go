@@ -1,8 +1,8 @@
 package tui
 
 import (
-	"git.sr.ht/~rockorager/vaxis"
-	"git.sr.ht/~rockorager/vaxis/vxfw"
+	"go.rockorager.dev/vaxis"
+	"go.rockorager.dev/vaxis/vxfw"
 )
 
 type GroupStack struct {

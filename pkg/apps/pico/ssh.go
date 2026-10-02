@@ -7,7 +7,6 @@ import (
 	"syscall"
 	"time"
 
-	"git.sr.ht/~rockorager/vaxis"
 	pgsdb "github.com/picosh/pico/pkg/apps/pgs/db"
 	"github.com/picosh/pico/pkg/db/postgres"
 	"github.com/picosh/pico/pkg/pssh"
@@ -19,6 +18,7 @@ import (
 	"github.com/picosh/pico/pkg/send/protocols/sftp"
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/pico/pkg/tui"
+	"go.rockorager.dev/vaxis"
 	"golang.org/x/crypto/ssh"
 )
 

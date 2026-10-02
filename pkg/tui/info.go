@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	"git.sr.ht/~rockorager/vaxis"
-	"git.sr.ht/~rockorager/vaxis/vxfw"
 	"github.com/picosh/pico/pkg/db"
+	"go.rockorager.dev/vaxis"
+	"go.rockorager.dev/vaxis/vxfw"
 )
 
 type UsageInfo struct {

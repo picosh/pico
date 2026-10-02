@@ -1,11 +1,11 @@
 package tui
 
 import (
-	"git.sr.ht/~rockorager/vaxis"
-	"git.sr.ht/~rockorager/vaxis/vxfw"
-	"git.sr.ht/~rockorager/vaxis/vxfw/list"
-	"git.sr.ht/~rockorager/vaxis/vxfw/text"
 	"github.com/picosh/pico/pkg/db"
+	"go.rockorager.dev/vaxis"
+	"go.rockorager.dev/vaxis/vxfw"
+	"go.rockorager.dev/vaxis/vxfw/list"
+	"go.rockorager.dev/vaxis/vxfw/text"
 )
 
 var menuChoices = []string{

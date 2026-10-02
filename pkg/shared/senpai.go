@@ -8,6 +8,7 @@ import (
 	"git.sr.ht/~delthas/senpai"
 	"github.com/containerd/console"
 	"github.com/picosh/pico/pkg/pssh"
+	"go.rockorager.dev/vaxis"
 )
 
 type consoleData struct {
@@ -47,7 +48,7 @@ func (v *VConsole) Read(p []byte) (int, error) {
 		tot += copy(p, []byte("\x1b[?2048h"))
 		v.windowMu.Lock()
 		select {
-		case v.dataChan <- consoleData{[]byte(fmt.Sprintf("\x1b[48;%d;%d;%d;%dt", v.currentWindow.Height, v.currentWindow.Width, v.currentWindow.HeightPixels, v.currentWindow.WidthPixels)), nil}:
+		case v.dataChan <- consoleData{fmt.Appendf(nil, "\x1b[48;%d;%d;%d;%dt", v.currentWindow.Height, v.currentWindow.Width, v.currentWindow.HeightPixels, v.currentWindow.WidthPixels), nil}:
 		case <-v.Session.Context().Done():
 			return
 		}
@@ -98,13 +99,10 @@ func (v *VConsole) Reset() error {
 	return err
 }
 
-func (v *VConsole) Size() (console.WinSize, error) {
+func (v *VConsole) Size() (int, int, int, int, error) {
 	v.windowMu.Lock()
 	defer v.windowMu.Unlock()
-	return console.WinSize{
-		Height: uint16(v.currentWindow.Height),
-		Width:  uint16(v.currentWindow.Width),
-	}, nil
+	return v.currentWindow.Height, v.currentWindow.Width, v.currentWindow.HeightPixels, v.currentWindow.WidthPixels, nil
 }
 
 func (v *VConsole) Fd() uintptr {
@@ -171,7 +169,7 @@ func NewVConsole(sesh *pssh.SSHServerConnSession) (*VConsole, error) {
 				vty.currentWindow = w
 				vty.windowMu.Unlock()
 				select {
-				case vty.dataChan <- consoleData{[]byte(fmt.Sprintf("\x1b[48;%d;%d;%d;%dt", w.Height, w.Width, w.HeightPixels, w.WidthPixels)), nil}:
+				case vty.dataChan <- consoleData{fmt.Appendf(nil, "\x1b[48;%d;%d;%d;%dt", w.Height, w.Width, w.HeightPixels, w.WidthPixels), nil}:
 				case <-sesh.Context().Done():
 					return
 				}
@@ -199,3 +197,5 @@ func NewSenpaiApp(sesh *pssh.SSHServerConnSession, username, pass string) (*senp
 	app, err := senpai.NewApp(senpaiCfg)
 	return app, err
 }
+
+var _ vaxis.Console = (*VConsole)(nil)

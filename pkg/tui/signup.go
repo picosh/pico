@@ -4,14 +4,14 @@ import (
 	"fmt"
 	"net"
 
-	"git.sr.ht/~rockorager/vaxis"
-	"git.sr.ht/~rockorager/vaxis/vxfw"
-	"git.sr.ht/~rockorager/vaxis/vxfw/button"
-	"git.sr.ht/~rockorager/vaxis/vxfw/richtext"
-	"git.sr.ht/~rockorager/vaxis/vxfw/text"
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/pssh"
 	"github.com/picosh/pico/pkg/shared"
+	"go.rockorager.dev/vaxis"
+	"go.rockorager.dev/vaxis/vxfw"
+	"go.rockorager.dev/vaxis/vxfw/button"
+	"go.rockorager.dev/vaxis/vxfw/richtext"
+	"go.rockorager.dev/vaxis/vxfw/text"
 	"golang.org/x/crypto/ssh"
 )
 

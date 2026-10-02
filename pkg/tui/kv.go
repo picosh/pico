@@ -1,9 +1,9 @@
 package tui
 
 import (
-	"git.sr.ht/~rockorager/vaxis"
-	"git.sr.ht/~rockorager/vaxis/vxfw"
-	"git.sr.ht/~rockorager/vaxis/vxfw/text"
+	"go.rockorager.dev/vaxis"
+	"go.rockorager.dev/vaxis/vxfw"
+	"go.rockorager.dev/vaxis/vxfw/text"
 )
 
 type KVBuilder func(uint16) (vxfw.Widget, vxfw.Widget)
