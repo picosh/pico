@@ -385,10 +385,9 @@ func (m *ErrMultiplePublicKeys) Error() string {
 }
 
 type UserStats struct {
-	Prose  UserServiceStats
-	Pastes UserServiceStats
-	Feeds  UserServiceStats
-	Pages  UserServiceStats
+	Prose UserServiceStats
+	Feeds UserServiceStats
+	Pages UserServiceStats
 }
 
 type UserServiceStats struct {

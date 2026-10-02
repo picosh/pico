@@ -33,7 +33,7 @@ zmx run cdn         docker buildx build --push --platform "$DOCKER_PLATFORM" -t 
 zmx run standalone  docker buildx build --push --platform "$DOCKER_PLATFORM" -t "ghcr.io/picosh/pgs:$DOCKER_TAG" --target release -f Dockerfile.standalone .
 zmx wait "*"
 
-apps=("prose" "pastes" "pgs" "feeds" "pipe")
+apps=("prose" "pgs" "feeds" "pipe")
 for APP in "${apps[@]}"; do
   zmx run "$APP-ssh" -d docker buildx build --push --platform "$DOCKER_PLATFORM" -t "ghcr.io/picosh/pico/$APP-ssh:$DOCKER_TAG" --build-arg "APP=$APP" --target release-ssh .
   zmx run "$APP-web" -d docker buildx build --push --platform "$DOCKER_PLATFORM" -t "ghcr.io/picosh/pico/$APP-web:$DOCKER_TAG" --build-arg "APP=$APP" --target release-web .

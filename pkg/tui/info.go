@@ -179,7 +179,7 @@ func (m *ServicesList) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	brd := NewBorder(services)
 	brd.Label = "services"
 	brd.Style = vaxis.Style{Foreground: purp}
-	servicesHeight := 8
+	servicesHeight := 7
 	return brd.Draw(vxfw.DrawContext{
 		Characters: ctx.Characters,
 		Max: vxfw.Size{
@@ -204,7 +204,6 @@ func (m *ServicesList) getServiceKv() []Kv {
 	data := [][]string{
 		{"name", "status"},
 		{"pipe", "active"},
-		{"pastes", "active"},
 		{"prose", proseStatus},
 		{"pages", pagesStatus},
 	}

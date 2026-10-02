@@ -748,11 +748,11 @@ func TestFindExpiredPosts(t *testing.T) {
 		Filename:  "expired.txt",
 		Slug:      "expired",
 		Title:     "Expired",
-		Space:     "pastes",
+		Space:     "prose",
 		ExpiresAt: &expired,
 	})
 
-	posts, err := testDB.FindExpiredPosts("pastes")
+	posts, err := testDB.FindExpiredPosts("prose")
 	if err != nil {
 		t.Fatalf("FindExpiredPosts failed: %v", err)
 	}

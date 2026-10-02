@@ -12,8 +12,7 @@ without needing to install anything. We accomplish this with the `ssh` tools you
 already have installed on your system.
 
 Want to publish a blog post? Use rsync, scp, or sftp. Want to publish a website?
-Use rsync, scp, or sftp. Want to share a code snippet with a colleague? Use
-rsync, scp, or sftp. Hopefully you see the trend.
+Use rsync, scp, or sftp. Hopefully you see the trend.
 
 - [pages](https://pico.sh/pgs): A static site hosting platform using `ssh` for
   site deployments. `ssh`.
@@ -22,8 +21,6 @@ rsync, scp, or sftp. Hopefully you see the trend.
 - [prose](https://pico.sh/prose): A blog platform using `ssh` for content
   management.
 - [rss-to-email](https://pico.sh/feeds): An RSS email notification service using `ssh`.
-- [pastes](https://pico.sh/pastes): Upload code snippets using rsync, scp, and
-  sftp.
 
 ## Deploy a site with a single command
 
@@ -80,16 +77,6 @@ scp hello-world.md prose.sh:/
 
 Congrats! You just published a blog article, accessible here:
 https://{user}.prose.sh/hello-world
-
-## Easily share code snippets
-
-Pipe some stdout to us:
-
-```bash
-git diff | ssh pastes.sh changes.patch
-```
-
-And instantly share your code snippets: https://{user}.pastes.sh/changes.patch
 
 ## Receive email notifications for your favorite rss feeds
 
