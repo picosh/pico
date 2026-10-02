@@ -1,16 +1,13 @@
 package router
 
 import (
-	"encoding/json"
 	"fmt"
 	"html/template"
 	"net/http"
 	"os"
 	"strings"
 
-	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/shared"
-	"golang.org/x/crypto/ssh"
 )
 
 type SubdomainProps struct {
@@ -41,28 +38,6 @@ func CorsHeaders(headers http.Header) {
 
 func UnauthorizedHandler(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "You do not have access to this site", http.StatusUnauthorized)
-}
-
-type errPayload struct {
-	Message string `json:"message"`
-}
-
-func JSONError(w http.ResponseWriter, msg string, code int) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
-	_ = json.NewEncoder(w).Encode(errPayload{Message: msg})
-}
-
-type UserApi struct {
-	*db.User
-	Fingerprint string `json:"fingerprint"`
-}
-
-func NewUserApi(user *db.User, pubkey ssh.PublicKey) *UserApi {
-	return &UserApi{
-		User:        user,
-		Fingerprint: shared.KeyForSha256(pubkey),
-	}
 }
 
 func CheckHandler(w http.ResponseWriter, r *http.Request) {

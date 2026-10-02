@@ -18,10 +18,6 @@ func NewUsageInfo(label string, stats *db.UserServiceStats) *UsageInfo {
 	return &UsageInfo{Label: label, stats: stats}
 }
 
-func (m *UsageInfo) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
-	return nil, nil
-}
-
 func (m *UsageInfo) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	info := NewKv(m.getKv())
 	brd := NewBorder(info)
@@ -55,10 +51,6 @@ type UserInfo struct {
 
 func NewUserInfo(shrd *SharedModel) *UserInfo {
 	return &UserInfo{shrd}
-}
-
-func (m *UserInfo) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
-	return nil, nil
 }
 
 func (m *UserInfo) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
@@ -168,10 +160,6 @@ type ServicesList struct {
 
 func NewServicesList(plusFf *db.FeatureFlag, pgsFf *db.FeatureFlag, proseFf *db.FeatureFlag) *ServicesList {
 	return &ServicesList{plusFf: plusFf, pgsFf: pgsFf, proseFf: proseFf}
-}
-
-func (m *ServicesList) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
-	return nil, nil
 }
 
 func (m *ServicesList) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {

@@ -1,23 +1,16 @@
 package router
 
 import (
-	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net"
-	"net/http"
 	"net/url"
 	"strings"
-	"time"
 
 	"github.com/picosh/pico/pkg/db"
-	"github.com/picosh/pico/pkg/shared"
-	"github.com/picosh/utils/pipe/metrics"
 	"github.com/simplesurance/go-ip-anonymizer/ipanonymizer"
 	"github.com/x-way/crawlerdetect"
 )
@@ -51,11 +44,6 @@ func trackableUserAgent(agent string) error {
 	return nil
 }
 
-func trackableRequest(r *http.Request) error {
-	agent := r.UserAgent()
-	return trackableUserAgent(agent)
-}
-
 func cleanIpAddress(ip string) (string, error) {
 	host, _, err := net.SplitHostPort(ip)
 	if err != nil {
@@ -77,18 +65,6 @@ func cleanUrl(orig string) (string, string) {
 		return "", ""
 	}
 	return u.Host, u.Path
-}
-
-func cleanUrlFromRequest(r *http.Request) (string, string) {
-	host := r.Header.Get("x-forwarded-host")
-	if host == "" {
-		host = r.URL.Host
-	}
-	if host == "" {
-		host = r.Host
-	}
-	// we don't want query params in the url for security reasons
-	return host, r.URL.Path
 }
 
 func CleanUserAgent(ua string) string {
@@ -192,70 +168,4 @@ func AnalyticsVisitFromVisit(visit *db.AnalyticsVisits, dbpool db.DB, secret str
 	visit.ContentType = strings.ToLower(visit.ContentType)
 
 	return nil
-}
-
-func ipFromRequest(r *http.Request) string {
-	// https://caddyserver.com/docs/caddyfile/directives/reverse_proxy#defaults
-	ipOrig := r.Header.Get("x-forwarded-for")
-	if ipOrig == "" {
-		ipOrig = r.RemoteAddr
-	}
-	// probably means this is a web tunnel
-	if ipOrig == "" || ipOrig == "@" {
-		sshCtx, err := GetSshCtx(r)
-		if err == nil {
-			ipOrig = sshCtx.RemoteAddr().String()
-		}
-	}
-
-	return ipOrig
-}
-
-func AnalyticsVisitFromRequest(r *http.Request, dbpool db.DB, userID string) (*db.AnalyticsVisits, error) {
-	if !dbpool.HasFeatureByUser(userID, "analytics") {
-		return nil, ErrAnalyticsDisabled
-	}
-
-	err := trackableRequest(r)
-	if err != nil {
-		return nil, err
-	}
-
-	ipAddress := ipFromRequest(r)
-	host, path := cleanUrlFromRequest(r)
-
-	return &db.AnalyticsVisits{
-		UserID:    userID,
-		Host:      host,
-		Path:      path,
-		IpAddress: ipAddress,
-		UserAgent: r.UserAgent(),
-		Referer:   r.Referer(),
-		Status:    http.StatusOK,
-	}, nil
-}
-
-func AnalyticsCollect(ch chan *db.AnalyticsVisits, dbpool db.DB, logger *slog.Logger) {
-	drain := metrics.RegisterReconnectMetricRecorder(
-		context.Background(),
-		logger,
-		shared.NewPicoPipeClient(),
-		100,
-		10*time.Millisecond,
-	)
-
-	for visit := range ch {
-		data, err := json.Marshal(visit)
-		if err != nil {
-			logger.Error("could not json marshall visit record", "err", err)
-			continue
-		}
-
-		data = append(data, '\n')
-
-		_, err = drain.Write(data)
-		if err != nil {
-			logger.Error("could not write to metric-drain", "err", err)
-		}
-	}
 }

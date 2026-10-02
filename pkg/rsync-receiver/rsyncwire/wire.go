@@ -3,9 +3,7 @@ package rsyncwire
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"io"
-	"log/slog"
 )
 
 const (
@@ -32,59 +30,6 @@ func (w *MultiplexWriter) WriteMsg(tag uint8, p []byte) (n int, err error) {
 		return 0, err
 	}
 	return w.Writer.Write(p)
-}
-
-type MultiplexReader struct {
-	Reader io.Reader
-}
-
-// rsync.h defines IO_BUFFER_SIZE as 32 * 1024, but gokr-rsyncd increases it to
-// 256K. Since we use this as the maximum message size, too, we need to at least
-// match it.
-const ioBufferSize = 256 * 1024
-const maxMessageSize = ioBufferSize
-
-func (w *MultiplexReader) ReadMsg() (tag uint8, p []byte, err error) {
-	var header uint32
-	if err := binary.Read(w.Reader, binary.LittleEndian, &header); err != nil {
-		return 0, nil, err
-	}
-
-	tag = uint8(header>>24) - mplexBase
-	length := header & 0x00FFFFFF
-	if length > maxMessageSize {
-		// NOTE: if you run into this error, one alternative to bumping
-		// maxMessageSize is to restructure the program to work with i/o buffer
-		// windowing.
-		return 0, nil, fmt.Errorf("length %d exceeds max message size (%d)", length, maxMessageSize)
-	}
-	p = make([]byte, int(length))
-	if _, err := io.ReadFull(w.Reader, p); err != nil {
-		return 0, nil, err
-	}
-	// log.Printf("header=%v (%x), tag=%v, length=%v", header, header, tag, length)
-	// log.Printf("payload=%x / %q", p, p)
-	return tag, p, nil
-}
-
-func (w *MultiplexReader) Read(p []byte) (n int, err error) {
-	tag, payload, err := w.ReadMsg()
-	if err != nil {
-		return 0, err
-	}
-	if tag == MsgError {
-		return 0, fmt.Errorf("%s", payload)
-	}
-	if tag == MsgInfo {
-		slog.Debug("info", "payload", payload)
-	}
-	if tag != MsgData {
-		return 0, fmt.Errorf("unexpected tag: got %v, want %v", tag, MsgData)
-	}
-	if len(p) < len(payload) {
-		panic(fmt.Sprintf("not enough buffer space! %d < %d", len(p), len(payload)))
-	}
-	return copy(p, payload), nil
 }
 
 type Buffer struct {

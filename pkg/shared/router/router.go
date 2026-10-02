@@ -12,7 +12,6 @@ import (
 
 	"github.com/hashicorp/golang-lru/v2/expirable"
 	"github.com/picosh/pico/pkg/db"
-	"github.com/picosh/pico/pkg/pssh"
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/pico/pkg/storage"
 )
@@ -30,15 +29,6 @@ func NewRoute(method, pattern string, handler http.HandlerFunc) Route {
 		regexp.MustCompile("^" + pattern + "$"),
 		handler,
 		false,
-	}
-}
-
-func NewCorsRoute(method, pattern string, handler http.HandlerFunc) Route {
-	return Route{
-		method,
-		regexp.MustCompile("^" + pattern + "$"),
-		handler,
-		true,
 	}
 }
 
@@ -175,15 +165,6 @@ type ctxCfg struct{}
 
 type CtxSubdomainKey struct{}
 type ctxKey struct{}
-type CtxSessionKey struct{}
-
-func GetSshCtx(r *http.Request) (*pssh.SSHServerConnSession, error) {
-	payload, ok := r.Context().Value(CtxSessionKey{}).(*pssh.SSHServerConnSession)
-	if payload == nil || !ok {
-		return payload, fmt.Errorf("ssh session not set on `r.Context()` for connection")
-	}
-	return payload, nil
-}
 
 func GetCfg(r *http.Request) *shared.ConfigSite {
 	return r.Context().Value(ctxCfg{}).(*shared.ConfigSite)

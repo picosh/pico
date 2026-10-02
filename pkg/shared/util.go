@@ -58,10 +58,6 @@ func KeyForKeyText(pk ssh.PublicKey) string {
 	return fmt.Sprintf("%s %s", pk.Type(), kb)
 }
 
-func KeyForSha256(pk ssh.PublicKey) string {
-	return ssh.FingerprintSHA256(pk)
-}
-
 func GetEnv(key string, defaultVal string) string {
 	if value, exists := os.LookupEnv(key); exists {
 		return value

@@ -563,18 +563,6 @@ type UserSSH struct {
 	signer   ssh.Signer
 }
 
-func NewUserSSH(username string, signer ssh.Signer) *UserSSH {
-	return &UserSSH{
-		username: username,
-		signer:   signer,
-	}
-}
-
-func (s UserSSH) Public() string {
-	pubkey := s.signer.PublicKey()
-	return string(ssh.MarshalAuthorizedKey(pubkey))
-}
-
 func (s UserSSH) CmdAddr(patch []byte, addr string, cmd string) (string, error) {
 	config := &ssh.ClientConfig{
 		User: s.username,

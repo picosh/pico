@@ -6,13 +6,11 @@ import (
 	"crypto/rand"
 	"encoding/pem"
 	"fmt"
-	"io"
 	"log/slog"
 	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -408,26 +406,6 @@ type UserSSH struct {
 	privateKey []byte
 }
 
-func NewUserSSH(username string, signer ssh.Signer) *UserSSH {
-	return &UserSSH{
-		username: username,
-		signer:   signer,
-	}
-}
-
-func (s UserSSH) Public() string {
-	pubkey := s.signer.PublicKey()
-	return string(ssh.MarshalAuthorizedKey(pubkey))
-}
-
-func (s UserSSH) MustCmd(client *ssh.Client, patch []byte, cmd string) string {
-	res, err := s.Cmd(client, patch, cmd)
-	if err != nil {
-		panic(err)
-	}
-	return res
-}
-
 func (s UserSSH) NewClientAddr(addr string) (*ssh.Client, error) {
 	config := &ssh.ClientConfig{
 		User: s.username,
@@ -439,59 +417,6 @@ func (s UserSSH) NewClientAddr(addr string) (*ssh.Client, error) {
 
 	client, err := ssh.Dial("tcp", addr, config)
 	return client, err
-}
-
-func (s UserSSH) NewClient() (*ssh.Client, error) {
-	// Default to localhost:2222 for backward compatibility
-	return s.NewClientAddr("localhost:2222")
-}
-
-func (s UserSSH) Cmd(client *ssh.Client, patch []byte, cmd string) (string, error) {
-	session, err := client.NewSession()
-	if err != nil {
-		return "", err
-	}
-	defer func() {
-		_ = session.Close()
-	}()
-
-	stdinPipe, err := session.StdinPipe()
-	if err != nil {
-		return "", err
-	}
-
-	stdoutPipe, err := session.StdoutPipe()
-	if err != nil {
-		return "", err
-	}
-
-	if err := session.Start(cmd); err != nil {
-		return "", err
-	}
-
-	if patch != nil {
-		_, err = stdinPipe.Write(patch)
-		if err != nil {
-			return "", err
-		}
-	}
-
-	err = stdinPipe.Close()
-	if err != nil {
-		return "", err
-	}
-
-	if err := session.Wait(); err != nil {
-		return "", err
-	}
-
-	buf := new(strings.Builder)
-	_, err = io.Copy(buf, stdoutPipe)
-	if err != nil {
-		return "", err
-	}
-
-	return buf.String(), nil
 }
 
 func GenerateUser() UserSSH {

@@ -247,10 +247,6 @@ func NewFooterWdt(shrd *SharedModel, cmds []Shortcut) *FooterWdgt {
 	}
 }
 
-func (m *FooterWdgt) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
-	return nil, nil
-}
-
 func (m *FooterWdgt) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	segs := []vaxis.Segment{}
 	for idx, shortcut := range m.cmds {

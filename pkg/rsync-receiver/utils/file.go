@@ -57,11 +57,3 @@ func SortFileList(fileList []*ReceiverFile) {
 		return fileList[i].Name < fileList[j].Name
 	})
 }
-
-// rsync/receiver.c:delete_files.
-func FindInFileList(fileList []*ReceiverFile, name string) bool {
-	i := sort.Search(len(fileList), func(i int) bool {
-		return fileList[i].Name >= name
-	})
-	return i < len(fileList) && fileList[i].Name == name
-}

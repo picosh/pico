@@ -127,7 +127,6 @@ type Options struct {
 	// not directly referenced in the table, but used in the special case code.
 	do_compression int
 	info           [COUNT_INFO]uint16
-	local_server   int
 
 	// order matches long_options order
 	verbose                int
@@ -355,37 +354,20 @@ func (o *Options) setOutputVerbosity(prio priority) {
 	}
 }
 
-func (o *Options) Help() string {
-	return ""
-}
-
-func (o *Options) ShellCommand() string       { return o.shell_cmd }
-func (o *Options) UpdateOnly() bool           { return o.update_only != 0 }
-func (o *Options) DryRun() bool               { return o.dry_run != 0 }
-func (o *Options) PreserveLinks() bool        { return o.preserve_links != 0 }
-func (o *Options) PreserveUid() bool          { return o.preserve_uid != 0 }
-func (o *Options) PreserveGid() bool          { return o.preserve_gid != 0 }
-func (o *Options) PreserveDevices() bool      { return o.preserve_devices != 0 }
-func (o *Options) PreserveMTimes() bool       { return o.preserve_mtimes != 0 }
-func (o *Options) PreservePerms() bool        { return o.preserve_perms != 0 }
-func (o *Options) PreserveSpecials() bool     { return o.preserve_specials != 0 }
-func (o *Options) PreserveHardLinks() bool    { return o.preserve_hard_links != 0 }
-func (o *Options) Recurse() bool              { return o.recurse != 0 }
-func (o *Options) Verbose() bool              { return o.verbose != 0 }
-func (o *Options) DeleteMode() bool           { return o.delete_mode != 0 }
-func (o *Options) Sender() bool               { return o.am_sender != 0 }
-func (o *Options) SetSender()                 { o.am_sender = 1 }
-func (o *Options) LocalServer() bool          { return o.local_server != 0 }
-func (o *Options) SetLocalServer()            { o.local_server = 1 }
-func (o *Options) Server() bool               { return o.am_server != 0 }
-func (o *Options) Daemon() bool               { return o.am_daemon != 0 }
-func (o *Options) ConnectTimeoutSeconds() int { return o.connect_timeout }
-func (o *Options) AlwaysChecksum() bool       { return o.always_checksum != 0 }
-func (o *Options) Compress() bool             { return o.do_compression != 0 }
-func (o *Options) CompressChoice() string     { return o.compress_choice }
-func (o *Options) CompressLevel() int         { return o.do_compression_level }
-func (o *Options) IgnoreTimes() bool          { return o.ignore_times == 1 }
-func (o *Options) SizeOnly() bool             { return o.size_only == 1 }
+func (o *Options) DryRun() bool           { return o.dry_run != 0 }
+func (o *Options) PreserveLinks() bool    { return o.preserve_links != 0 }
+func (o *Options) PreserveUid() bool      { return o.preserve_uid != 0 }
+func (o *Options) PreserveGid() bool      { return o.preserve_gid != 0 }
+func (o *Options) PreserveDevices() bool  { return o.preserve_devices != 0 }
+func (o *Options) PreserveMTimes() bool   { return o.preserve_mtimes != 0 }
+func (o *Options) PreservePerms() bool    { return o.preserve_perms != 0 }
+func (o *Options) PreserveSpecials() bool { return o.preserve_specials != 0 }
+func (o *Options) Recurse() bool          { return o.recurse != 0 }
+func (o *Options) DeleteMode() bool       { return o.delete_mode != 0 }
+func (o *Options) AlwaysChecksum() bool   { return o.always_checksum != 0 }
+func (o *Options) Compress() bool         { return o.do_compression != 0 }
+func (o *Options) IgnoreTimes() bool      { return o.ignore_times == 1 }
+func (o *Options) SizeOnly() bool         { return o.size_only == 1 }
 
 func (o *Options) daemonTable() []poptOption {
 	return []poptOption{

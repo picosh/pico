@@ -1,8 +1,6 @@
 package tui
 
 import (
-	"io"
-
 	"github.com/picosh/pico/pkg/shared"
 )
 
@@ -23,7 +21,3 @@ func (m *SenpaiCmd) Run() error {
 	app.Close()
 	return nil
 }
-
-func (m *SenpaiCmd) SetStdin(io.Reader)  {}
-func (m *SenpaiCmd) SetStdout(io.Writer) {}
-func (m *SenpaiCmd) SetStderr(io.Writer) {}

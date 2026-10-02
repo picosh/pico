@@ -60,10 +60,6 @@ func (tc *TestContext) DoWithHeaders(req *http.Request, headers map[string][]str
 	return http.DefaultClient.Do(reqCopy)
 }
 
-func (tc *TestContext) GetHeader(resp *http.Response, key string) string {
-	return resp.Header.Get(key)
-}
-
 func testCacheValue(afterCreated time.Duration) *CacheValue {
 	return &CacheValue{
 		Header:    map[string][]string{},

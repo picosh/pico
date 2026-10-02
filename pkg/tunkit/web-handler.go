@@ -27,13 +27,6 @@ type WebTunnelHandler struct {
 	Logger      *slog.Logger
 }
 
-func NewWebTunnelHandler(handler HttpHandlerFn, logger *slog.Logger) *WebTunnelHandler {
-	return &WebTunnelHandler{
-		HttpHandler: handler,
-		Logger:      logger,
-	}
-}
-
 func (wt *WebTunnelHandler) GetLogger() *slog.Logger {
 	return wt.Logger
 }
