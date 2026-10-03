@@ -879,6 +879,7 @@ func serveFile(file string, contentType string) http.HandlerFunc {
 
 func createStaticRoutes() []router.Route {
 	return []router.Route{
+		router.NewRoute("GET", "/read.css", serveFile("read.css", "text/css")),
 		router.NewRoute("GET", "/reset.css", serveFile("reset.css", "text/css")),
 		router.NewRoute("GET", "/syntax.css", serveFile("syntax.css", "text/css")),
 		router.NewRoute("GET", "/card.png", serveFile("card.png", "image/png")),
