@@ -74,7 +74,8 @@ blockquote {
   margin: 0;
 }
 
-[role="list"] {
+ul[role="list"],
+ol[role="list"] {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -82,16 +83,15 @@ blockquote {
   padding: 0;
 }
 
-[role="list"] [role="list"] {
-  margin-left: 1.3rem;
+ul, ol {
+  padding-inline-start: 1.5rem;
 }
 
-[role="listitem"] {
-  display: flex;
-  align-items: flex-start;
-  gap: 5px;
+li + li {
+  margin-top: 0.5rem;
 }
 
-[role="listitem"]:has(pre, img, blockquote) {
-  align-items: center;
+li > :is(pre, blockquote) {
+  margin: 0;
 }
+

@@ -2,71 +2,61 @@
 	{{$indent := 0}}
 	{{$mod := 0}}
 
-	<div role="list">
+	<ul>
 		{{range .Items}}
 	    {{if lt $indent .Indent}}
-	    	<div role="list">
+	    	<ul>
 	    {{else if gt $indent .Indent}}
 	    	{{$mod = minus $indent .Indent}}
 	    	{{range $y := intRange 1 $mod}}
-	    		</div>
+	    		</ul>
 	    	{{end}}
 	    {{end}}
 
 	    {{$indent = .Indent}}
 
 			{{if .IsText}}
-				<div role="listitem">
-					<div class="listitem-bullet">•</div>
-					<div class="listitem-text">{{.Value}}</div>
-				</div>
+				<li>{{.Value}}</li>
 			{{end}}
 
 			{{if .IsURL}}
-				<div role="listitem">
-					<div class="listitem-bullet">•</div>
-					<a class="listitem-text" href="{{.URL}}">{{.Value}}</a>
-				</div>
+				<li><a href="{{.URL}}">{{.Value}}</a></li>
 			{{end}}
 
 	    {{if .IsImg}}
-	    	<div role="listitem">
-					<div class="listitem-bullet">•</div>
-		    	<img class="listeitem-text" src="{{.URL}}" alt="{{.Value}}" />
-		    </div>
+	    	<li><img src="{{.URL}}" alt="{{.Value}}" /></li>
 	    {{end}}
 
 	    {{if .IsBlock}}
-	    	<div role="listitem">
-					<div class="listitem-bullet">•</div>
-		    	<blockquote class="listitem-text">{{.Value}}</blockquote>
-		    </div>
+	    	<li><blockquote>{{.Value}}</blockquote></li>
 	    {{end}}
 
 	    {{if .IsPre}}
-	    	<div role="listitem">
-					<div class="listitem-bullet">•</div>
-		    	<pre class="listitem-text">{{.Value}}</pre>
-		    </div>
+	    	<li><pre>{{.Value}}</pre></li>
 	    {{end}}
 
 	    {{if .IsHeaderOne}}
-	    	</div>
-	    	<h2 class="text-xl font-bold">{{.Value}}</h2>
-	    	<div role="list" aria-label="{{.Value}}">
+	    	</ul>
+	    	<h2>{{.Value}}</h2>
+	    	<ul>
 	    {{end}}
 
 	    {{if .IsHeaderTwo}}
-	    	</div>
-	    	<h3 class="text-lg font-bold">{{.Value}}</h3>
-	    	<div role="list" aria-label="{{.Value}}">
+	    	</ul>
+	    	<h3>{{.Value}}</h3>
+	    	<ul>
 	    {{end}}
 
 	    {{if .IsHr}}
-	    	</div>
+	    	</ul>
 	    	<hr />
-	    	<div role="list" aria-label="{{.Value}}">
+	    	<ul>
 	    {{end}}
 		{{end}}
-	</div>
+		{{if gt $indent 0}}
+			{{range $y := intRange 1 $indent}}
+				</ul>
+			{{end}}
+		{{end}}
+	</ul>
 {{end}}
