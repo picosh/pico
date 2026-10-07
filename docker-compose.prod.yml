@@ -1,3 +1,9 @@
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-file: "1"
+    max-size: "256m"
+
 services:
   postgres:
     env_file:
@@ -7,6 +13,7 @@ services:
     ports:
       - "5432:5432"
     command: -N 1024 -B 4096MB
+    logging: *default-logging
   valkey:
     image: valkey/valkey:9.0-alpine3.24
     restart: always
@@ -20,17 +27,14 @@ services:
     networks:
       - default
       - pgs
+    logging: *default-logging
   pipemgr:
     env_file:
       - .env.prod
     volumes:
       - ./data/pipemgr/data/term_info_ed25519:/key:ro
       - ./data/pipemgr/data/term_info_ed25519-cert.pub:/key-cert.pub:ro
-    logging:
-      driver: "json-file"
-      options:
-        max-file: "1"
-        max-size: "512m"
+    logging: *default-logging
   imgproxy:
     env_file:
       - .env.prod
@@ -39,12 +43,9 @@ services:
     networks:
       prose:
       pgs:
+    logging: *default-logging
   auth-web:
-    logging:
-      driver: "json-file"
-      options:
-        max-file: "1"
-        max-size: "512m"
+    logging: *default-logging
   pastes-caddy:
     image: ghcr.io/picosh/pico/caddy:latest
     restart: always
@@ -68,11 +69,7 @@ services:
       - pastes
       - caddy
       - all
-    logging:
-      driver: "json-file"
-      options:
-        max-file: "1"
-        max-size: "512m"
+    logging: *default-logging
   pastes-web:
     dns: 1.1.1.1
     networks:
@@ -83,6 +80,7 @@ services:
       - .env.prod
     volumes:
       - ./data/pastes-ssh/data:/app/ssh_data
+    logging: *default-logging
   pastes-ssh:
     networks:
       pastes:
@@ -95,6 +93,7 @@ services:
     ports:
       - "${PASTES_SSH_V4:-22}:2222"
       - "${PASTES_SSH_V6:-[::1]:22}:2222"
+    logging: *default-logging
   pipe-caddy:
     image: ghcr.io/picosh/pico/caddy:latest
     restart: always
@@ -118,6 +117,7 @@ services:
       - pipe
       - caddy
       - all
+    logging: *default-logging
   pipe-web:
     networks:
       pipe:
@@ -127,6 +127,7 @@ services:
       - .env.prod
     volumes:
       - ./data/pipe-ssh/data:/app/ssh_data
+    logging: *default-logging
   pipe-ssh:
     networks:
       pipe:
@@ -139,6 +140,7 @@ services:
     ports:
       - "${PIPE_SSH_V4:-22}:2222"
       - "${PIPE_SSH_V6:-[::1]:22}:2222"
+    logging: *default-logging
   prose-caddy:
     image: ghcr.io/picosh/pico/caddy:latest
     restart: always
@@ -168,11 +170,7 @@ services:
       - prose
       - caddy
       - all
-    logging:
-      driver: "json-file"
-      options:
-        max-file: "1"
-        max-size: "512m"
+    logging: *default-logging
   prose-web:
     dns: 1.1.1.1
     networks:
@@ -184,6 +182,7 @@ services:
     volumes:
       - ./data/prose-ssh/data:/app/ssh_data
       - ./data/storage:/storage
+    logging: *default-logging
   prose-ssh:
     networks:
       prose:
@@ -197,6 +196,7 @@ services:
     ports:
       - "${PROSE_SSH_V4:-22}:2222"
       - "${PROSE_SSH_V6:-[::1]:22}:2222"
+    logging: *default-logging
   pgs-caddy:
     image: ghcr.io/picosh/pico/caddy:latest
     restart: always
@@ -229,11 +229,7 @@ services:
       - pgs-cdn
       - caddy
       - all
-    logging:
-      driver: "json-file"
-      options:
-        max-file: "1"
-        max-size: "512m"
+    logging: *default-logging
   pgs-web:
     dns: 1.1.1.1
     networks:
@@ -249,11 +245,7 @@ services:
       resources:
         limits:
           memory: 3g
-    logging:
-      driver: "json-file"
-      options:
-        max-file: "1"
-        max-size: "512m"
+    logging: *default-logging
   pgs-cdn:
     dns: 1.1.1.1
     networks:
@@ -268,11 +260,7 @@ services:
       resources:
         limits:
           memory: 3g
-    logging:
-      driver: "json-file"
-      options:
-        max-file: "1"
-        max-size: "512m"
+    logging: *default-logging
   pgs-ssh:
     networks:
       pgs:
@@ -291,11 +279,7 @@ services:
       resources:
         limits:
           memory: 3g
-    logging:
-      driver: "json-file"
-      options:
-        max-file: "1"
-        max-size: "512m"
+    logging: *default-logging
   feeds-caddy:
     image: ghcr.io/picosh/pico/caddy:latest
     restart: always
@@ -319,6 +303,7 @@ services:
       - feeds
       - caddy
       - all
+    logging: *default-logging
   feeds-web:
     networks:
       feeds:
@@ -328,11 +313,7 @@ services:
       - .env.prod
     volumes:
       - ./data/feeds-ssh/data:/app/ssh_data
-    logging:
-      driver: "json-file"
-      options:
-        max-file: "1"
-        max-size: "512m"
+    logging: *default-logging
   feeds-ssh:
     networks:
       feeds:
@@ -345,11 +326,7 @@ services:
     ports:
       - "${FEEDS_SSH_V4:-22}:2222"
       - "${FEEDS_SSH_V6:-[::1]:22}:2222"
-    logging:
-      driver: "json-file"
-      options:
-        max-file: "1"
-        max-size: "512m"
+    logging: *default-logging
   pico-caddy:
     image: ghcr.io/picosh/pico/caddy:latest
     restart: always
@@ -373,11 +350,7 @@ services:
       - pico
       - caddy
       - all
-    logging:
-      driver: "json-file"
-      options:
-        max-file: "1"
-        max-size: "512m"
+    logging: *default-logging
   pico-ssh:
     networks:
       pico:
@@ -390,6 +363,7 @@ services:
     ports:
       - "${PICO_SSH_V4:-22}:2222"
       - "${PICO_SSH_V6:-[::1]:22}:2222"
+    logging: *default-logging
 
 networks:
   default:
