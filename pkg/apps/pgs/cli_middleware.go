@@ -239,12 +239,12 @@ func Middleware(handler *UploadAssetHandler) pssh.SSHServerMiddleware {
 				return err
 			case "acl":
 				aclCmd, write := flagSet("acl", sesh)
-				aclType := aclCmd.String("type", "", "access type: public, pico, pubkeys")
+				aclType := aclCmd.String("type", "", "access type: public, pico, pubkeys, http-pass")
 				var acls arrayFlags
 				aclCmd.Var(
 					&acls,
 					"acl",
-					"list of pico usernames or sha256 public keys, delimited by commas",
+					"list of pico usernames or sha256 public keys, delimited by commas (for http-pass: the password)",
 				)
 				if !flagCheck(aclCmd, projectName, cmdArgs) {
 					return nil
@@ -253,7 +253,7 @@ func Middleware(handler *UploadAssetHandler) pssh.SSHServerMiddleware {
 
 				if !slices.Contains([]string{"public", "pubkeys", "pico", "http-pass"}, *aclType) {
 					err := fmt.Errorf(
-						"acl type must be one of the following: [public, pubkeys, pico], found %s",
+						"acl type must be one of the following: [public, pubkeys, pico, http-pass], found %s",
 						*aclType,
 					)
 					opts.bail(err)
