@@ -1,18 +1,15 @@
-// Package rsyncopts implements a parser for command-line options that
-// implements a subset of popt(3) semantics; just enough to parse typical
-// rsync(1) invocations without the advanced popt features like aliases
-// or option prefix matching (not --del, only --delete).
+// Package rsyncopts parses the command line an rsync client sends to the
+// server. It implements just enough of popt(3) for typical rsync(1)
+// invocations, without aliases or option prefix matching (not --del, only
+// --delete).
 //
 // If we encounter arguments that rsync(1) parses differently compared to this
 // package, then this package should be adjusted to match rsync(1).
 package rsyncopts
 
 import (
-	"errors"
 	"fmt"
-	"log/slog"
 	"math"
-	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -91,42 +88,27 @@ func NewOptions() *Options {
 		relative_paths:       -1,
 		implied_dirs:         1,
 		max_delete:           math.MinInt32,
+		max_size:             -1,
+		min_size:             -1,
 		whole_file:           -1,
 		do_compression_level: math.MinInt32,
 		rsync_path:           "rsync",
 		default_af_hint:      syscall.AF_INET6,
 		blocking_io:          -1,
-		protocol_version:     27,
-	}
-}
-
-// GokrazyOptions contains additional command-line flags, prefixed with
-// gokr. (like --gokr.modulemap) to not clash with rsync flag names.
-type GokrazyOptions struct {
-	Config           string
-	Listen           string
-	MonitoringListen string
-	AnonSSHListen    string
-	ModuleMap        string
-}
-
-func (o *GokrazyOptions) table() []poptOption {
-	return []poptOption{
-		/* longName, shortName, argInfo, arg, val */
-		{"gokr.config", "", POPT_ARG_STRING, &o.Config, 0},
-		{"gokr.listen", "", POPT_ARG_STRING, &o.Listen, 0},
-		{"gokr.monitoring_listen", "", POPT_ARG_STRING, &o.MonitoringListen, 0},
-		{"gokr.anonssh_listen", "", POPT_ARG_STRING, &o.AnonSSHListen, 0},
-		{"gokr.modulemap", "", POPT_ARG_STRING, &o.ModuleMap, 0},
 	}
 }
 
 type Options struct {
-	Gokrazy GokrazyOptions
-
 	// not directly referenced in the table, but used in the special case code.
-	do_compression int
-	info           [COUNT_INFO]uint16
+	do_compression    int
+	info              [COUNT_INFO]uint16
+	version_opt_cnt   int
+	block_size        int64
+	max_size          int64
+	min_size          int64
+	batch_mode        int
+	basis_dirs        []string
+	modify_window_set int
 
 	// order matches long_options order
 	verbose                int
@@ -247,12 +229,6 @@ type Options struct {
 	checksum_seed        int
 	am_server            int
 	am_sender            int
-	am_daemon            int
-
-	daemon_bwlimit int
-	config_file    string
-	daemon_opt     int
-	no_detach      int
 }
 
 type priority int
@@ -351,48 +327,6 @@ func (o *Options) setOutputVerbosity(prio priority) {
 		// if j < len(debugVerbosity) {
 		//     parseOutputWords(debugWords[:], o.debug[:], debugVerbosity[j], prio)
 		// }
-	}
-}
-
-func (o *Options) DryRun() bool           { return o.dry_run != 0 }
-func (o *Options) PreserveLinks() bool    { return o.preserve_links != 0 }
-func (o *Options) PreserveUid() bool      { return o.preserve_uid != 0 }
-func (o *Options) PreserveGid() bool      { return o.preserve_gid != 0 }
-func (o *Options) PreserveDevices() bool  { return o.preserve_devices != 0 }
-func (o *Options) PreserveMTimes() bool   { return o.preserve_mtimes != 0 }
-func (o *Options) PreservePerms() bool    { return o.preserve_perms != 0 }
-func (o *Options) PreserveSpecials() bool { return o.preserve_specials != 0 }
-func (o *Options) Recurse() bool          { return o.recurse != 0 }
-func (o *Options) DeleteMode() bool       { return o.delete_mode != 0 }
-func (o *Options) AlwaysChecksum() bool   { return o.always_checksum != 0 }
-func (o *Options) Compress() bool         { return o.do_compression != 0 }
-func (o *Options) IgnoreTimes() bool      { return o.ignore_times == 1 }
-func (o *Options) SizeOnly() bool         { return o.size_only == 1 }
-
-func (o *Options) daemonTable() []poptOption {
-	return []poptOption{
-		/* longName, shortName, argInfo, arg, val */
-		{"help", "", POPT_ARG_NONE, nil, OPT_HELP},
-		{"address", "", POPT_ARG_STRING, &o.bind_address, 0},
-		{"bwlimit", "", POPT_ARG_INT, &o.daemon_bwlimit, 0},
-		{"config", "", POPT_ARG_STRING, &o.config_file, 0},
-		{"daemon", "", POPT_ARG_NONE, &o.daemon_opt, 0},
-		{"dparam", "M", POPT_ARG_STRING, nil, 'M'},
-		{"ipv4", "4", POPT_ARG_VAL, &o.default_af_hint, syscall.AF_INET},
-		{"ipv6", "6", POPT_ARG_VAL, &o.default_af_hint, syscall.AF_INET6},
-		{"detach", "", POPT_ARG_VAL, &o.no_detach, 0},
-		{"no-detach", "", POPT_ARG_VAL, &o.no_detach, 1},
-		{"log-file", "", POPT_ARG_STRING, &o.logfile_name, 0},
-		{"log-file-format", "", POPT_ARG_STRING, &o.logfile_format, 0},
-		{"port", "", POPT_ARG_INT, &o.rsync_port, 0},
-		{"sockopts", "", POPT_ARG_STRING, &o.sockopts, 0},
-		{"protocol", "", POPT_ARG_INT, &o.protocol_version, 0},
-		{"server", "", POPT_ARG_NONE, &o.am_server, 0},
-		{"temp-dir", "T", POPT_ARG_STRING, &o.tmpdir, 0},
-		{"verbose", "v", POPT_ARG_NONE, 0, 'v'},
-		{"no-verbose", "", POPT_ARG_VAL, &o.verbose, 0},
-		{"no-v", "", POPT_ARG_VAL, &o.verbose, 0},
-		{"help", "h", POPT_ARG_NONE, 0, 'h'},
 	}
 }
 
@@ -631,6 +565,7 @@ func (o *Options) table() []poptOption {
 		{"mkpath", "", POPT_ARG_VAL, &o.mkpath_dest_arg, 1},
 		{"no-mkpath", "", POPT_ARG_VAL, &o.mkpath_dest_arg, 0},
 		{"qsort", "", POPT_ARG_NONE, &o.use_qsort, 0},
+		{"use-qsort", "", POPT_ARG_NONE, &o.use_qsort, 0},
 		{"copy-as", "", POPT_ARG_STRING, &o.copy_as, 0},
 		{"address", "", POPT_ARG_STRING, &o.bind_address, 0},
 		{"port", "", POPT_ARG_INT, &o.rsync_port, 0},
@@ -654,25 +589,13 @@ func (o *Options) table() []poptOption {
 	}
 }
 
-var errNotYetImplemented = errors.New("option not yet implemented in gokrazy/rsync")
-
-// rsync/options.c:parse_arguments.
-func ParseArguments(args []string, gokrazyTable bool) (*Context, error) {
-	// NOTE: We do not implement support for refusing options per rsyncd.conf
-	// here, as we have our own configuration file.
-
-	version_opt_cnt := 0
-
+// ParseArguments parses the arguments that follow "rsync" on the command
+// line (rsync/options.c:parse_arguments).
+func ParseArguments(args []string) (*Context, error) {
 	opts := NewOptions()
-	table := opts.table()
-	if gokrazyTable {
-		// We need to make the --gokr.* flags known, otherwise the first parsing
-		// attempt fails and the daemon mode parsing is never run.
-		table = slices.Concat(opts.Gokrazy.table(), table)
-	}
 	pc := Context{
 		Options: opts,
-		table:   table,
+		table:   opts.table(),
 		args:    args,
 	}
 
@@ -688,7 +611,7 @@ func ParseArguments(args []string, gokrazyTable bool) (*Context, error) {
 		// are returned and handled here.
 		switch opt {
 		case 'V':
-			version_opt_cnt++
+			opts.version_opt_cnt++
 
 		case OPT_SERVER:
 			opts.am_server = 1
@@ -700,47 +623,11 @@ func ParseArguments(args []string, gokrazyTable bool) (*Context, error) {
 			opts.am_sender = 1
 
 		case OPT_DAEMON:
-			// Parse the whole command-line using the daemon options table.
-			table := opts.daemonTable()
-			if gokrazyTable {
-				table = slices.Concat(opts.Gokrazy.table(), table)
-			}
-			pc := Context{
-				Options: opts,
-				table:   table,
-				args:    args,
-			}
+			return nil, fmt.Errorf("daemon mode is not supported")
 
-			for {
-				opt, err := pc.poptGetNextOpt()
-				if err != nil {
-					return nil, err
-				}
-				if opt == -1 {
-					break // done
-				}
-				// Most options are handled by poptGetNextOpt, only special cases
-				// are returned and handled here.
-				switch opt {
-				case 'M':
-					return nil, errNotYetImplemented
-				case 'v':
-					opts.verbose++
-				default:
-					return nil, fmt.Errorf("unhandled special case opt: %v", opt)
-				}
-			}
-
-			opts.am_daemon = 1
-
-			return &pc, nil
-
-		case OPT_FILTER,
-			OPT_EXCLUDE,
-			OPT_INCLUDE,
-			OPT_INCLUDE_FROM,
-			OPT_EXCLUDE_FROM:
-			return nil, errNotYetImplemented
+		case OPT_FILTER, OPT_EXCLUDE, OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_EXCLUDE_FROM, 'F':
+			// Clients send their filter rules over the protocol instead.
+			return nil, fmt.Errorf("filter options are not accepted on the server side")
 
 		case 'a':
 			if opts.recurse == 0 {
@@ -766,7 +653,7 @@ func ParseArguments(args []string, gokrazyTable bool) (*Context, error) {
 			opts.human_readable++
 
 		case 'H':
-			opts.preserve_hard_links = 1
+			opts.preserve_hard_links++
 
 		case 'i':
 			opts.itemize_changes++
@@ -781,16 +668,13 @@ func ParseArguments(args []string, gokrazyTable bool) (*Context, error) {
 			opts.verbose++
 
 		case 'y':
-			return nil, errNotYetImplemented
+			opts.fuzzy_basis++
 
 		case 'q':
 			opts.quiet++
 
 		case 'x':
 			opts.one_file_system++
-
-		case 'F':
-			return nil, errNotYetImplemented
 
 		case 'P':
 			opts.do_progress = 1
@@ -810,57 +694,57 @@ func ParseArguments(args []string, gokrazyTable bool) (*Context, error) {
 			opts.compress_choice = ""
 
 		case OPT_OLD_ARGS:
-			return nil, errNotYetImplemented
+			opts.old_style_args++
 
-		case 'M': // --remote-option
-			return nil, errNotYetImplemented
+		case 'M':
+			return nil, fmt.Errorf("--remote-option is not accepted on the server side")
 
-		case OPT_WRITE_BATCH,
-			OPT_ONLY_WRITE_BATCH,
-			OPT_READ_BATCH:
-			return nil, errNotYetImplemented
+		case OPT_WRITE_BATCH, OPT_ONLY_WRITE_BATCH, OPT_READ_BATCH:
+			opts.batch_mode = 1
 
 		case OPT_BLOCK_SIZE:
-			return nil, errNotYetImplemented
+			size, err := parseSizeArg(pc.poptGetOptArg(), 'b')
+			if err != nil || size < 0 {
+				return nil, fmt.Errorf("invalid --block-size value")
+			}
+			opts.block_size = size
 
-		case OPT_MAX_SIZE, // (needs parse_size_arg)
-			OPT_MIN_SIZE,
-			OPT_BWLIMIT:
-			return nil, errNotYetImplemented
+		case OPT_MAX_SIZE:
+			size, err := parseSizeArg(opts.max_size_arg, 'b')
+			if err != nil {
+				return nil, fmt.Errorf("invalid --max-size value: %s", opts.max_size_arg)
+			}
+			opts.max_size = size
+
+		case OPT_MIN_SIZE:
+			size, err := parseSizeArg(opts.min_size_arg, 'b')
+			if err != nil {
+				return nil, fmt.Errorf("invalid --min-size value: %s", opts.min_size_arg)
+			}
+			opts.min_size = size
 
 		case OPT_APPEND:
-			return nil, errNotYetImplemented
+			opts.append_mode++
 
-		case OPT_LINK_DEST,
-			OPT_COPY_DEST,
-			OPT_COMPARE_DEST:
-			return nil, errNotYetImplemented
-
-		case OPT_CHMOD: // (needs parse_chmod):
-			return nil, errNotYetImplemented
+		case OPT_LINK_DEST, OPT_COPY_DEST, OPT_COMPARE_DEST:
+			opts.basis_dirs = append(opts.basis_dirs, pc.poptGetOptArg())
 
 		case OPT_INFO:
 			parseOutputWords(infoWords[:], opts.info[:], pc.poptGetOptArg(), USER_PRIORITY)
 
-		case OPT_DEBUG:
-			// TODO: plumb the debug level that make sense for our implementation
-			slog.Info("TODO: set debug level", "to", pc.poptGetOptArg())
-
-		case OPT_USERMAP,
-			OPT_GROUPMAP,
-			OPT_CHOWN:
-			return nil, errNotYetImplemented
-
 		case 'A':
-			return nil, fmt.Errorf("ACLs are not supported by gokrazy/rsync")
+			opts.preserve_acls++
 
 		case 'X':
 			opts.preserve_xattrs++
 
-		case OPT_STOP_AFTER,
-			OPT_STOP_AT,
-			OPT_STDERR:
-			return nil, errNotYetImplemented
+		case OPT_MODIFY_WINDOW:
+			opts.modify_window_set = 1
+
+		case OPT_DEBUG, OPT_CHMOD, OPT_USERMAP, OPT_GROUPMAP, OPT_CHOWN,
+			OPT_BWLIMIT, OPT_STOP_AFTER, OPT_STOP_AT, OPT_STDERR, OPT_NO_ICONV:
+			// These don't change what the server does.
+			_ = pc.poptGetOptArg()
 
 		default:
 			return nil, fmt.Errorf("unhandled special case opt: %v", opt)
@@ -871,6 +755,15 @@ func ParseArguments(args []string, gokrazyTable bool) (*Context, error) {
 	// other options
 
 	opts.setOutputVerbosity(DEFAULT_PRIORITY)
+
+	if opts.delete_before+min(opts.delete_during, 1)+opts.delete_after > 1 {
+		return nil, fmt.Errorf("you may not combine multiple --delete-WHEN options")
+	}
+	if opts.delete_before != 0 || opts.delete_during != 0 || opts.delete_after != 0 {
+		opts.delete_mode = 1
+	} else if opts.delete_mode != 0 || opts.delete_excluded != 0 {
+		opts.delete_mode = 1
+	}
 
 	if opts.recurse != 0 {
 		opts.xfer_dirs = 1
@@ -911,7 +804,7 @@ func ParseArguments(args []string, gokrazyTable bool) (*Context, error) {
 		opts.make_backups = 1 // --backup-dir implies --backup
 	}
 
-	if opts.do_progress != 0 /* && !opts.am_server */ {
+	if opts.do_progress != 0 {
 		if opts.info[INFO_NAME] == 0 {
 			opts.info[INFO_NAME] = 1
 		}
@@ -923,3 +816,122 @@ func ParseArguments(args []string, gokrazyTable bool) (*Context, error) {
 
 	return &pc, nil
 }
+
+// parseSizeArg parses a size like 100K or 1.5MB (rsync/options.c
+// parse_size_arg). A bare number is in units of defSuffix.
+func parseSizeArg(arg string, defSuffix byte) (int64, error) {
+	s := arg
+	i := 0
+	for i < len(s) && (s[i] >= '0' && s[i] <= '9' || s[i] == '.') {
+		i++
+	}
+	if i == 0 {
+		return 0, fmt.Errorf("invalid size %q", arg)
+	}
+	num, err := strconv.ParseFloat(s[:i], 64)
+	if err != nil {
+		return 0, err
+	}
+	s = s[i:]
+	suffix := defSuffix
+	if s != "" {
+		suffix = s[0]
+		s = s[1:]
+	}
+	mult := float64(1024)
+	switch {
+	case strings.HasPrefix(strings.ToLower(s), "ib"):
+		s = s[2:]
+	case strings.HasPrefix(strings.ToLower(s), "b"):
+		mult = 1000
+		s = s[1:]
+	}
+	var size float64
+	switch suffix | 0x20 {
+	case 'b':
+		size = num
+	case 'k':
+		size = num * mult
+	case 'm':
+		size = num * mult * mult
+	case 'g':
+		size = num * mult * mult * mult
+	case 't':
+		size = num * mult * mult * mult * mult
+	case 'p':
+		size = num * mult * mult * mult * mult * mult
+	default:
+		return 0, fmt.Errorf("invalid size %q", arg)
+	}
+	switch s {
+	case "":
+	case "+1":
+		size++
+	case "-1":
+		size--
+	default:
+		return 0, fmt.Errorf("invalid size %q", arg)
+	}
+	return int64(size), nil
+}
+
+func (o *Options) Verbose() int             { return o.verbose }
+func (o *Options) Info(level infoLevel) int { return int(o.info[level]) }
+func (o *Options) DryRun() bool             { return o.dry_run != 0 }
+func (o *Options) Server() bool             { return o.am_server != 0 }
+func (o *Options) Sender() bool             { return o.am_sender != 0 }
+func (o *Options) Recurse() bool            { return o.recurse != 0 }
+func (o *Options) XferDirs() bool           { return o.xfer_dirs != 0 }
+func (o *Options) ListOnly() bool           { return o.list_only != 0 }
+func (o *Options) RelativePaths() bool      { return o.relative_paths != 0 }
+func (o *Options) PreserveLinks() bool      { return o.preserve_links != 0 }
+func (o *Options) PreserveHardLinks() bool  { return o.preserve_hard_links != 0 }
+func (o *Options) PreserveUid() bool        { return o.preserve_uid != 0 }
+func (o *Options) PreserveGid() bool        { return o.preserve_gid != 0 }
+func (o *Options) PreserveDevices() bool    { return o.preserve_devices != 0 }
+func (o *Options) PreserveSpecials() bool   { return o.preserve_specials != 0 }
+func (o *Options) PreserveMTimes() bool     { return o.preserve_mtimes != 0 }
+func (o *Options) PreservePerms() bool      { return o.preserve_perms != 0 }
+func (o *Options) PreserveACLs() bool       { return o.preserve_acls != 0 }
+func (o *Options) PreserveXattrs() bool     { return o.preserve_xattrs != 0 }
+func (o *Options) PreserveAtimes() bool     { return o.preserve_atimes != 0 }
+func (o *Options) PreserveCrtimes() bool    { return o.preserve_crtimes != 0 }
+func (o *Options) NumericIDs() bool         { return o.numeric_ids != 0 }
+func (o *Options) DeleteMode() bool         { return o.delete_mode != 0 }
+func (o *Options) DeleteBefore() bool       { return o.delete_before != 0 }
+func (o *Options) DeleteDuring() int        { return o.delete_during }
+func (o *Options) DeleteAfter() bool        { return o.delete_after != 0 }
+func (o *Options) DeleteExcluded() bool     { return o.delete_excluded != 0 }
+func (o *Options) ForceDelete() bool        { return o.force_delete != 0 }
+func (o *Options) MaxDelete() int           { return o.max_delete }
+func (o *Options) IgnoreErrors() bool       { return o.ignore_errors != 0 }
+func (o *Options) PruneEmptyDirs() bool     { return o.prune_empty_dirs != 0 }
+func (o *Options) AlwaysChecksum() bool     { return o.always_checksum != 0 }
+func (o *Options) ChecksumChoice() string   { return o.checksum_choice }
+func (o *Options) ChecksumSeed() int        { return o.checksum_seed }
+func (o *Options) Compress() bool           { return o.do_compression != 0 }
+func (o *Options) CompressChoice() string   { return o.compress_choice }
+func (o *Options) CompressLevel() int       { return o.do_compression_level }
+func (o *Options) IgnoreTimes() bool        { return o.ignore_times != 0 }
+func (o *Options) SizeOnly() bool           { return o.size_only != 0 }
+func (o *Options) UpdateOnly() bool         { return o.update_only != 0 }
+func (o *Options) IgnoreExisting() bool     { return o.ignore_existing != 0 }
+func (o *Options) IgnoreNonExisting() bool  { return o.ignore_non_existing != 0 }
+func (o *Options) WholeFile() bool          { return o.whole_file > 0 }
+func (o *Options) BlockSize() int64         { return o.block_size }
+func (o *Options) MaxSize() int64           { return o.max_size }
+func (o *Options) MinSize() int64           { return o.min_size }
+func (o *Options) Inplace() bool            { return o.inplace != 0 }
+func (o *Options) AppendMode() int          { return o.append_mode }
+func (o *Options) DelayUpdates() bool       { return o.delay_updates != 0 }
+func (o *Options) RemoveSourceFiles() int   { return o.remove_source_files }
+func (o *Options) CvsExclude() bool         { return o.cvs_exclude != 0 }
+func (o *Options) ProtocolVersion() int     { return o.protocol_version }
+func (o *Options) ProtectArgs() bool        { return o.protect_args != 0 }
+func (o *Options) ShellCmd() string         { return o.shell_cmd }
+func (o *Options) FilesFrom() string        { return o.files_from }
+func (o *Options) MissingArgs() int         { return o.missing_args }
+func (o *Options) BatchMode() bool          { return o.batch_mode != 0 }
+func (o *Options) BasisDirs() []string      { return o.basis_dirs }
+func (o *Options) Iconv() string            { return o.iconv_opt }
+func (o *Options) ModifyWindowSet() bool    { return o.modify_window_set != 0 }

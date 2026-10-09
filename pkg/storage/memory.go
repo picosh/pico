@@ -21,6 +21,7 @@ func (s *seekableReader) Close() error { return nil }
 
 type StorageMemory struct {
 	storage map[string]map[string]string
+	mtimes  map[string]map[string]time.Time
 	mu      sync.RWMutex
 }
 
@@ -28,9 +29,25 @@ var _ StorageServe = &StorageMemory{}
 var _ StorageServe = (*StorageMemory)(nil)
 
 func NewStorageMemory(st map[string]map[string]string) (*StorageMemory, error) {
+	now := time.Now()
+	mtimes := map[string]map[string]time.Time{}
+	for bucket, objects := range st {
+		mtimes[bucket] = map[string]time.Time{}
+		for key := range objects {
+			mtimes[bucket][key] = now
+		}
+	}
 	return &StorageMemory{
 		storage: st,
+		mtimes:  mtimes,
 	}, nil
+}
+
+func memoryKey(fpath string) string {
+	if !strings.HasPrefix(fpath, "/") {
+		return "/" + fpath
+	}
+	return fpath
 }
 
 func (s *StorageMemory) GetBucket(name string) (Bucket, error) {
@@ -60,6 +77,7 @@ func (s *StorageMemory) UpsertBucket(name string) (Bucket, error) {
 	defer s.mu.Unlock()
 
 	s.storage[name] = map[string]string{}
+	s.mtimes[name] = map[string]time.Time{}
 	return bucket, nil
 }
 
@@ -80,6 +98,7 @@ func (s *StorageMemory) DeleteBucket(bucket Bucket) error {
 	defer s.mu.Unlock()
 
 	delete(s.storage, bucket.Path)
+	delete(s.mtimes, bucket.Path)
 	return nil
 }
 
@@ -87,13 +106,8 @@ func (s *StorageMemory) GetObject(bucket Bucket, fpath string) (utils.ReadAndRea
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	if !strings.HasPrefix(fpath, "/") {
-		fpath = "/" + fpath
-	}
-
-	objInfo := &ObjectInfo{
-		LastModified: time.Time{},
-	}
+	fpath = memoryKey(fpath)
+	objInfo := &ObjectInfo{}
 
 	dat, ok := s.storage[bucket.Path][fpath]
 	if !ok {
@@ -101,6 +115,7 @@ func (s *StorageMemory) GetObject(bucket Bucket, fpath string) (utils.ReadAndRea
 	}
 
 	objInfo.Size = int64(len([]byte(dat)))
+	objInfo.LastModified = s.mtimes[bucket.Path][fpath]
 	return &seekableReader{bytes.NewReader([]byte(dat))}, objInfo, nil
 }
 
@@ -113,7 +128,16 @@ func (s *StorageMemory) PutObject(bucket Bucket, fpath string, contents io.Reade
 		return "", 0, err
 	}
 
+	fpath = memoryKey(fpath)
+	mtime := info.LastModified
+	if mtime.IsZero() {
+		mtime = time.Now()
+	}
 	s.storage[bucket.Path][fpath] = string(d)
+	if s.mtimes[bucket.Path] == nil {
+		s.mtimes[bucket.Path] = map[string]time.Time{}
+	}
+	s.mtimes[bucket.Path][fpath] = mtime
 	return fmt.Sprintf("%s%s", bucket.Path, fpath), int64(len(d)), nil
 }
 
@@ -121,7 +145,9 @@ func (s *StorageMemory) DeleteObject(bucket Bucket, fpath string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	fpath = memoryKey(fpath)
 	delete(s.storage[bucket.Path], fpath)
+	delete(s.mtimes[bucket.Path], fpath)
 	return nil
 }
 
@@ -136,76 +162,63 @@ func (s *StorageMemory) ListBuckets() ([]string, error) {
 	return buckets, nil
 }
 
+// ListObjects follows StorageFS: a path naming an object lists that object,
+// a directory path without a trailing slash lists only the directory itself,
+// and a path ending in a slash lists its contents relative to it.
 func (s *StorageMemory) ListObjects(bucket Bucket, dir string, recursive bool) ([]os.FileInfo, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	var fileList []os.FileInfo
-
-	resolved := dir
-
-	if !strings.HasPrefix(resolved, "/") {
-		resolved = "/" + resolved
-	}
-
+	fileList := []os.FileInfo{}
+	resolved := memoryKey(dir)
 	objects := s.storage[bucket.Path]
-	// dir is actually an object
-	oval, ok := objects[resolved]
-	if ok {
+	mtimes := s.mtimes[bucket.Path]
+
+	if val, ok := objects[resolved]; ok {
 		fileList = append(fileList, &utils.VirtualFile{
 			FName:    filepath.Base(resolved),
-			FIsDir:   false,
-			FSize:    int64(len([]byte(oval))),
-			FModTime: time.Time{},
+			FSize:    int64(len(val)),
+			FModTime: mtimes[resolved],
 		})
 		return fileList, nil
 	}
 
+	if !strings.HasSuffix(resolved, "/") {
+		for key := range objects {
+			if strings.HasPrefix(key, resolved+"/") {
+				fileList = append(fileList, &utils.VirtualFile{FName: "", FIsDir: true})
+				break
+			}
+		}
+		return fileList, nil
+	}
+
+	seen := map[string]bool{}
+	addDir := func(name string) {
+		if !seen[name] {
+			seen[name] = true
+			fileList = append(fileList, &utils.VirtualFile{FName: name, FIsDir: true})
+		}
+	}
 	for key, val := range objects {
-		if !strings.HasPrefix(key, resolved) {
+		rel, ok := strings.CutPrefix(key, resolved)
+		if !ok || rel == "" {
 			continue
 		}
-
-		rep := strings.Replace(key, resolved, "", 1)
-		fdir := filepath.Dir(rep)
-		fname := filepath.Base(rep)
-		paths := strings.Split(fdir, "/")
-
-		if fdir == "/" {
-			ffname := filepath.Base(resolved)
-			fileList = append(fileList, &utils.VirtualFile{
-				FName:  ffname,
-				FIsDir: true,
-			})
-		}
-
-		for _, p := range paths {
-			if p == "" || p == "/" || p == "." {
+		if !recursive {
+			if d, _, nested := strings.Cut(rel, "/"); nested {
+				addDir(d)
 				continue
 			}
-			fileList = append(fileList, &utils.VirtualFile{
-				FName:  p,
-				FIsDir: true,
-			})
 		}
-
-		trimRes := strings.TrimSuffix(resolved, "/")
-		dirKey := filepath.Dir(key)
-		if recursive {
-			fileList = append(fileList, &utils.VirtualFile{
-				FName:    fname,
-				FIsDir:   false,
-				FSize:    int64(len([]byte(val))),
-				FModTime: time.Time{},
-			})
-		} else if resolved == dirKey || trimRes == dirKey {
-			fileList = append(fileList, &utils.VirtualFile{
-				FName:    fname,
-				FIsDir:   false,
-				FSize:    int64(len([]byte(val))),
-				FModTime: time.Time{},
-			})
+		for d := filepath.Dir(rel); d != "." && !seen[d]; d = filepath.Dir(d) {
+			addDir(d)
 		}
+		fileList = append(fileList, &utils.VirtualFile{
+			FName:    rel,
+			FSize:    int64(len(val)),
+			FModTime: mtimes[key],
+		})
 	}
 
 	return fileList, nil
