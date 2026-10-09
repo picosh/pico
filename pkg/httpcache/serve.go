@@ -1,7 +1,6 @@
 package httpcache
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -52,6 +51,9 @@ type HttpCache struct {
 	Upstream http.Handler
 	Cache    Cacher
 	Logger   *slog.Logger
+	// MaxBodySize is the largest body that is stored. Larger responses
+	// stream through uncached. Zero means no limit.
+	MaxBodySize int64
 }
 
 func NewHttpCache(log *slog.Logger, upstream http.Handler) *HttpCache {
@@ -78,10 +80,23 @@ func (c *HttpCache) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	cacheKey := c.GetCacheKey(r)
 	log := c.Logger.With("cache_key", cacheKey)
 
+	// A partial response must not be stored under the key of the whole
+	// resource, so a range request that misses goes straight upstream.
+	hasRange := r.Header.Get("range") != ""
+
 	err := c.maybeUseCache(cacheKey, w, r)
 	if err == nil {
 		log.Info("cache hit")
 		c.AddCacheHit()
+		return
+	}
+
+	if hasRange {
+		log.Info("cache miss for range request, passing upstream", "err", err)
+		c.AddCacheMiss()
+		w.Header().Set("cache-status", cacheStatusMiss(cacheKey, false))
+		c.Upstream.ServeHTTP(w, r)
+		c.AddUpstreamRequest()
 		return
 	}
 
@@ -105,8 +120,7 @@ func (c *HttpCache) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if errors.Is(err, ErrMustRevalidate) {
 		if cachedData, exists := c.Cache.Get(cacheKey); exists {
-			var cachedValue CacheValue
-			if json.Unmarshal(cachedData, &cachedValue) == nil {
+			if cachedValue, err := decodeCacheValue(cachedData); err == nil {
 				if etag := getHeader(cachedValue.Header, "etag"); etag != "" {
 					r.Header.Set("if-none-match", etag)
 				}
@@ -119,9 +133,17 @@ func (c *HttpCache) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	log.Info("cache miss, requesting upstream", "err", err)
 	c.AddCacheMiss()
-	wrapped := &responseWriter{ResponseWriter: w}
+	wrapped := &responseWriter{
+		ResponseWriter: w,
+		maxBody:        c.MaxBodySize,
+		streamStatus:   cacheStatusMiss(cacheKey, false),
+	}
 	c.Upstream.ServeHTTP(wrapped, r)
 	c.AddUpstreamRequest()
+	if wrapped.streaming {
+		log.Info("not cachable", "err", "response body too large")
+		return
+	}
 
 	// RFC 9111 4.3.4 304 Not Modified
 	// https://www.rfc-editor.org/rfc/rfc9111.html#section-4.3.4
@@ -135,10 +157,9 @@ func (c *HttpCache) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		var cacheValue CacheValue
-		err = json.Unmarshal(existingData, &cacheValue)
+		cacheValue, err := decodeCacheValue(existingData)
 		if err != nil {
-			log.Error("json unmarshal", "err", err)
+			log.Error("decode cache entry", "err", err)
 			wrapped.Send()
 			return
 		}
@@ -161,7 +182,7 @@ func (c *HttpCache) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		// Revalidation refreshes the entry -- reset CreatedAt so it's fresh again.
 		cacheValue.CreatedAt = time.Now()
-		enc, _ := json.Marshal(cacheValue)
+		enc := cacheValue.encode()
 		log.Info("updating cached headers from 304 response")
 		c.Cache.Remove(cacheKey)
 		c.Cache.Add(cacheKey, enc)
@@ -172,9 +193,9 @@ func (c *HttpCache) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			// updated cached entry and return 304 if it still matches.
 			r.Header.Set("if-none-match", clientIfNoneMatch)
 			r.Header.Set("if-modified-since", clientIfModifiedSince)
-			valid := c.handleValidation(r, &cacheValue)
+			valid := c.handleValidation(r, cacheValue)
 			if valid {
-				hdr := stripForbiddenHeaders(w, &cacheValue)
+				hdr := stripForbiddenHeaders(w, cacheValue)
 				ageDur := calcAge(cacheValue.CreatedAt)
 				hdr.Set("age", strconv.Itoa(int(ageDur.Seconds())+1))
 				hdr.Set("cache-status", cacheStatusStale(cacheKey, wrapped.StatusCode()))
@@ -187,15 +208,14 @@ func (c *HttpCache) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// Client request was unconditional (or conditional but no longer matches)
 		// serve the full cached response.
 		log.Info("serving full cached response to client")
-		serveCache(w, c.Ttl, cacheKey, &cacheValue)
+		serveCache(w, c.Ttl, cacheKey, cacheValue)
 		return
 	}
 
 	err = isResponseCachable(r, wrapped)
 	if err == nil {
 		log.Info("storing cache")
-		nextValue := wrapped.ToCacheValue(r)
-		enc, _ := json.Marshal(nextValue)
+		enc := wrapped.ToCacheValue(r).encode()
 		c.Cache.Remove(cacheKey)
 		c.Cache.Add(cacheKey, enc)
 		c.AddCacheItem(float64(len(enc)))
@@ -409,10 +429,11 @@ func isResponseCachable(r *http.Request, resp *responseWriter) error {
 // 206, 300, 301,
 // 308, 404, 405,
 // 410, 414, 501.
+// 206 is left out: the cache key does not include the range.
 func isCacheableStatusCode(code int) bool {
 	switch code {
 	case http.StatusOK, http.StatusNonAuthoritativeInfo, http.StatusNoContent,
-		http.StatusPartialContent, http.StatusMultipleChoices, http.StatusMovedPermanently,
+		http.StatusMultipleChoices, http.StatusMovedPermanently,
 		http.StatusPermanentRedirect, http.StatusNotFound, http.StatusMethodNotAllowed,
 		http.StatusGone, http.StatusRequestURITooLong, http.StatusNotImplemented:
 		return true
@@ -559,14 +580,13 @@ func (c *HttpCache) maybeUseCache(cacheKey string, w http.ResponseWriter, r *htt
 		return fmt.Errorf("no cache stored")
 	}
 
-	var cacheValue CacheValue
-	err := json.Unmarshal(data, &cacheValue)
+	cacheValue, err := decodeCacheValue(data)
 	if err != nil {
-		return fmt.Errorf("json unmarshal: %w", err)
+		return fmt.Errorf("decode cache entry: %w", err)
 	}
 
 	// RFC 9111 4.1 Vary - check if request matches cached Vary values
-	if !matchVary(r, &cacheValue) {
+	if !matchVary(r, cacheValue) {
 		return fmt.Errorf("vary mismatch")
 	}
 
@@ -624,9 +644,9 @@ func (c *HttpCache) maybeUseCache(cacheKey string, w http.ResponseWriter, r *htt
 	// RFC 9111 4.3 Validation - check validation headers first
 	// RFC 9110 13 Conditional Requests
 	// https://www.rfc-editor.org/rfc/rfc9110.html#section-13
-	valid := c.handleValidation(r, &cacheValue)
+	valid := c.handleValidation(r, cacheValue)
 	if valid {
-		hdr := stripForbiddenHeaders(w, &cacheValue)
+		hdr := stripForbiddenHeaders(w, cacheValue)
 		ageDur := calcAge(cacheValue.CreatedAt)
 		hdr.Set("age", strconv.Itoa(int(ageDur.Seconds())+1))
 		hdr.Set("cache-status", cacheStatusHit(cacheKey, freshness.Seconds()))
@@ -658,7 +678,7 @@ func (c *HttpCache) maybeUseCache(cacheKey string, w http.ResponseWriter, r *htt
 		return fmt.Errorf("response older than request max-age")
 	}
 
-	serveCache(w, freshness, cacheKey, &cacheValue)
+	serveCache(w, freshness, cacheKey, cacheValue)
 	return nil
 }
 

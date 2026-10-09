@@ -3,175 +3,109 @@ package rsync
 import (
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path"
-	"slices"
 	"strings"
 
 	"github.com/picosh/pico/pkg/pssh"
-	"github.com/picosh/pico/pkg/rsync-receiver/rsyncopts"
-	"github.com/picosh/pico/pkg/rsync-receiver/rsyncreceiver"
-	"github.com/picosh/pico/pkg/rsync-receiver/rsyncsender"
-	rsyncutils "github.com/picosh/pico/pkg/rsync-receiver/utils"
+	"github.com/picosh/pico/pkg/rsync"
 	"github.com/picosh/pico/pkg/send/utils"
 )
 
-type handler struct {
-	session      *pssh.SSHServerConnSession
-	writeHandler utils.CopyFromClientHandler
-	root         string
-	recursive    bool
-	ignoreTimes  bool
+// storageFS exposes a CopyFromClientHandler as an rsync.FS. Handlers take
+// absolute paths and differ in how they name listing results, so this
+// normalizes both directions.
+type storageFS struct {
+	session *pssh.SSHServerConnSession
+	handler utils.CopyFromClientHandler
 }
 
-func (h *handler) List(rPath string) ([]fs.FileInfo, error) {
-	isDir := false
-	if rPath == "." {
-		rPath = "/"
-		isDir = true
-	}
+func abs(name string) string { return "/" + strings.TrimPrefix(name, "/") }
 
-	list, err := h.writeHandler.List(h.session, rPath, isDir, h.recursive)
+// isSelf reports whether a listing entry stands for the listed path itself
+// rather than something below it.
+func isSelf(info os.FileInfo) bool {
+	switch info.Name() {
+	case "", ".", "/":
+		return info.IsDir()
+	}
+	return false
+}
+
+func (s *storageFS) Stat(name string) (rsync.FileInfo, error) {
+	if name == "" {
+		return rsync.FileInfo{IsDir: true}, nil
+	}
+	entries, err := s.handler.List(s.session, abs(name), false, false)
+	if err != nil {
+		return rsync.FileInfo{}, err
+	}
+	for _, e := range entries {
+		if isSelf(e) {
+			return rsync.FileInfo{Name: name, ModTime: e.ModTime(), IsDir: true}, nil
+		}
+	}
+	switch {
+	case len(entries) == 0:
+		return rsync.FileInfo{}, fmt.Errorf("%s: %w", name, fs.ErrNotExist)
+	case len(entries) == 1 && !entries[0].IsDir() && path.Base(entries[0].Name()) == path.Base(name):
+		e := entries[0]
+		return rsync.FileInfo{Name: name, Size: e.Size(), ModTime: e.ModTime()}, nil
+	default:
+		// The handler listed the contents of a directory.
+		return rsync.FileInfo{Name: name, IsDir: true}, nil
+	}
+}
+
+func (s *storageFS) ReadDir(dir string, recursive bool) ([]rsync.FileInfo, error) {
+	entries, err := s.handler.List(s.session, abs(dir), true, recursive)
 	if err != nil {
 		return nil, err
 	}
-
-	var dirs []string
-
-	var newList []fs.FileInfo
-
-	for _, f := range list {
-		if !f.IsDir() && f.Size() == 0 {
+	out := make([]rsync.FileInfo, 0, len(entries))
+	for _, e := range entries {
+		if isSelf(e) {
 			continue
 		}
-
-		fname := f.Name()
-		if strings.HasPrefix(f.Name(), "/") {
-			fname = path.Join(rPath, f.Name())
+		name := strings.Trim(e.Name(), "/")
+		if name == "" {
+			continue
 		}
-
-		if fname == "" && !f.IsDir() {
-			fname = path.Base(rPath)
-		}
-
-		newFile := &utils.VirtualFile{
-			FName:    fname,
-			FIsDir:   f.IsDir(),
-			FSize:    f.Size(),
-			FModTime: f.ModTime(),
-			FSys:     f.Sys(),
-		}
-
-		newList = append(newList, newFile)
-
-		parts := strings.Split(newFile.Name(), string(os.PathSeparator))
-		lastDir := newFile.Name()
-		for i := 0; i < len(parts); i++ {
-			lastDir, _ = path.Split(lastDir)
-			if lastDir == "" {
-				continue
-			}
-
-			lastDir = lastDir[:len(lastDir)-1]
-			dirs = append(dirs, lastDir)
-		}
+		out = append(out, rsync.FileInfo{Name: name, Size: e.Size(), ModTime: e.ModTime(), IsDir: e.IsDir()})
 	}
-
-	for _, dir := range dirs {
-		newList = append(newList, &utils.VirtualFile{
-			FName:  dir,
-			FIsDir: true,
-		})
-	}
-
-	slices.Reverse(newList)
-
-	onlyEmpty := true
-	for _, f := range newList {
-		if f.Name() != "" {
-			onlyEmpty = false
-		}
-	}
-
-	if len(newList) == 0 || onlyEmpty {
-		return nil, errors.New("no files to send, the directory may not exist or could be empty")
-	}
-
-	return newList, nil
+	return out, nil
 }
 
-func (h *handler) Read(file *rsyncutils.SenderFile) (os.FileInfo, rsyncutils.ReaderAtCloser, error) {
-	filePath := file.WPath
-
-	if strings.HasSuffix(h.root, file.WPath) {
-		filePath = h.root
-	} else if !strings.HasPrefix(filePath, h.root) {
-		filePath = path.Join(h.root, file.Path, file.WPath)
+func (s *storageFS) Open(name string) (rsync.File, rsync.FileInfo, error) {
+	info, r, err := s.handler.Read(s.session, &utils.FileEntry{Filepath: abs(name)})
+	if err != nil {
+		return nil, rsync.FileInfo{}, err
 	}
-
-	return h.writeHandler.Read(h.session, &utils.FileEntry{Filepath: filePath})
+	if r == nil {
+		return nil, rsync.FileInfo{}, fmt.Errorf("%s: %w", name, fs.ErrNotExist)
+	}
+	return r, rsync.FileInfo{Name: name, Size: info.Size(), ModTime: info.ModTime()}, nil
 }
 
-func (h *handler) Put(file *rsyncutils.ReceiverFile) (int64, error) {
-	fileEntry := &utils.FileEntry{
-		Filepath: path.Join("/", h.root, file.Name),
+func (s *storageFS) Put(name string, info rsync.FileInfo, r io.Reader) (string, error) {
+	return s.handler.Write(s.session, &utils.FileEntry{
+		Filepath: abs(name),
 		Mode:     fs.FileMode(0600),
-		Size:     file.Length,
-		Mtime:    file.ModTime.Unix(),
-		Atime:    file.ModTime.Unix(),
-	}
-	fileEntry.Reader = file.Reader
-
-	msg, err := h.writeHandler.Write(h.session, fileEntry)
-	if err != nil {
-		errMsg := fmt.Sprintf("%s\r\n", err.Error())
-		_, err = h.session.Stderr().Write([]byte(errMsg))
-	}
-	if msg != "" {
-		nMsg := fmt.Sprintf("%s\r\n", msg)
-		_, err = h.session.Stderr().Write([]byte(nMsg))
-	}
-	return 0, err
-}
-
-func (h *handler) Remove(willReceive []*rsyncutils.ReceiverFile) error {
-	entries, err := h.writeHandler.List(h.session, path.Join("/", h.root), true, true)
-	if err != nil {
-		return err
-	}
-
-	var toDelete []string
-
-	for _, entry := range entries {
-		exists := slices.ContainsFunc(willReceive, func(rf *rsyncutils.ReceiverFile) bool {
-			return rf.Name == entry.Name()
-		})
-
-		if !exists && path.Base(entry.Name()) != "._pico_keep_dir" {
-			toDelete = append(toDelete, entry.Name())
-		}
-	}
-
-	// Sort by path depth descending so children are deleted before parents.
-	// This ensures directories are empty before we try to remove them.
-	slices.SortFunc(toDelete, func(a, b string) int {
-		depthA := strings.Count(a, "/")
-		depthB := strings.Count(b, "/")
-		return depthB - depthA
+		Size:     info.Size,
+		Mtime:    info.ModTime.Unix(),
+		Atime:    info.ModTime.Unix(),
+		Reader:   r,
 	})
-
-	var errs []error
-
-	for _, file := range toDelete {
-		errs = append(errs, h.writeHandler.Delete(h.session, &utils.FileEntry{Filepath: path.Join("/", h.root, file)}))
-		_, err = fmt.Fprintf(h.session.Stderr(), "deleting %s\r\n", file)
-		errs = append(errs, err)
-	}
-
-	return errors.Join(errs...)
 }
 
+func (s *storageFS) Remove(name string, isDir bool) error {
+	return s.handler.Delete(s.session, &utils.FileEntry{Filepath: abs(name)})
+}
+
+// Middleware serves rsync clients ("rsync --server ...") from the handler's
+// storage.
 func Middleware(writeHandler utils.CopyFromClientHandler) pssh.SSHServerMiddleware {
 	return func(sshHandler pssh.SSHServerHandler) pssh.SSHServerHandler {
 		return func(session *pssh.SSHServerConnSession) error {
@@ -192,66 +126,26 @@ func Middleware(writeHandler utils.CopyFromClientHandler) pssh.SSHServerMiddlewa
 				}
 			}()
 
-			cmdFlags := session.Command()
-			flgs := cmdFlags[1:]
-			for idx, f := range flgs {
-				// openrsync sends "delete-before" when the client provided "delete"
-				flgs[idx] = strings.ReplaceAll(f, "delete-before", "delete")
+			err := rsync.Serve(rsync.Config{
+				FS:     &storageFS{session: session, handler: writeHandler},
+				Logger: logger,
+				Stderr: session.Stderr(),
+			}, session, cmd[1:])
+			if err == nil {
+				return nil
 			}
 
-			optsCtx, err := rsyncopts.ParseArguments(cmdFlags[1:], true)
-			if err != nil {
-				_, _ = fmt.Fprintf(session.Stderr(), "ERROR: error parsing rsync arguments: %s\r\n", err.Error())
-				return err
+			// The client has already been told what went wrong; what is
+			// left is to hand it rsync's exit code.
+			code := 1
+			var exit *rsync.ExitError
+			if errors.As(err, &exit) {
+				code = exit.Code
 			}
-
-			if optsCtx.Options.Compress() {
-				err := fmt.Errorf("compression is currently unsupported")
-				_, _ = fmt.Fprintf(session.Stderr(), "error: %s\r\n", err.Error())
-				return err
-			}
-
-			if optsCtx.Options.AlwaysChecksum() {
-				err := fmt.Errorf("checksum is currently unsupported")
-				_, _ = fmt.Fprintf(session.Stderr(), "error: %s\r\n", err.Error())
-				return err
-			}
-
-			if len(optsCtx.RemainingArgs) != 2 {
-				err := fmt.Errorf("missing source and destination arguments")
-				_, _ = fmt.Fprintf(session.Stderr(), "error: %s\r\n", err.Error())
-				return err
-			}
-
-			root := strings.TrimPrefix(optsCtx.RemainingArgs[len(optsCtx.RemainingArgs)-1], "/")
-			if root == "" {
-				root = "/"
-			}
-
-			fileHandler := &handler{
-				session:      session,
-				writeHandler: writeHandler,
-				root:         root,
-				recursive:    optsCtx.Options.Recurse(),
-				ignoreTimes:  !optsCtx.Options.PreserveMTimes(),
-			}
-
-			for _, arg := range cmd {
-				if arg == "--sender" {
-					err := rsyncsender.ClientRun(logger, optsCtx.Options, session, fileHandler, []string{fileHandler.root}, true)
-					if err != nil {
-						logger.Error("error running rsync sender", "err", err)
-					}
-					return err
-				}
-			}
-
-			err = rsyncreceiver.ClientRun(logger, optsCtx.Options, session, fileHandler, []string{fileHandler.root}, true)
-			if err != nil {
-				logger.Error("error running rsync receiver", "err", err)
-			}
-
-			return err
+			logger.Error("rsync transfer failed", "err", err, "code", code)
+			_ = session.Exit(code)
+			_ = session.Close()
+			return nil
 		}
 	}
 }

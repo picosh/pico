@@ -92,24 +92,20 @@ func toDisplayEntries(entries []os.FileInfo) []dirEntryDisplay {
 	return displayEntries
 }
 
-func shouldGenerateListing(st storage.StorageServe, bucket storage.Bucket, projectDir string, path string) bool {
+// dirListing returns the entries to list for a path, and false when the path
+// is not a directory or has an index.html to serve instead.
+func dirListing(st storage.StorageServe, bucket storage.Bucket, projectDir string, path string) ([]os.FileInfo, bool) {
 	dirPath := projectDir + path
-	if path == "/" {
-		dirPath = projectDir + "/"
-	}
 
 	entries, err := st.ListObjects(bucket, dirPath, false)
 	if err != nil || len(entries) == 0 {
-		return false
+		return nil, false
 	}
 
-	indexPath := dirPath + "index.html"
-	obj, _, err := st.GetObject(bucket, indexPath)
-	if err != nil {
-		return true
+	if _, err := st.StatObject(bucket, dirPath+"index.html"); err == nil {
+		return nil, false
 	}
-	_ = obj.Close()
-	return false
+	return entries, true
 }
 
 func generateDirectoryHTML(path string, entries []os.FileInfo) string {

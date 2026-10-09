@@ -13,7 +13,7 @@ var menuChoices = []string{
 	"invite",
 	"tokens",
 	"logs",
-	"access_logs",
+	"access-logs",
 	"analytics",
 	"pages",
 	"tuns",

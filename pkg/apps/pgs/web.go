@@ -109,10 +109,10 @@ func (p *PromCacheMetrics) AddUpstreamRequest() {
 	p.UpstreamReq.Add(1)
 }
 
-func NewPgsHttpCache(cfg *PgsConfig, upstream http.Handler) *httpcache.HttpCache {
+func NewPgsHttpCache(cfg *PgsConfig, upstream http.Handler) (*httpcache.HttpCache, *SiteCache) {
 	ttl := cfg.CacheTTL
 	metrics := NewPromCacheMetrics(cfg.Logger, prometheus.DefaultRegisterer)
-	cache := expirable.NewLRU(cfg.CacheMaxItems, metrics.EvictCacheItem, ttl)
+	cache := NewSiteCache(cfg.CacheMaxItems, ttl, metrics.EvictCacheItem)
 	httpCache := &httpcache.HttpCache{
 		Ttl:      ttl,
 		Logger:   cfg.Logger,
@@ -123,22 +123,24 @@ func NewPgsHttpCache(cfg *PgsConfig, upstream http.Handler) *httpcache.HttpCache
 			TxtPrefix: cfg.TxtPrefix,
 		},
 		CacheMetrics: metrics,
+		MaxBodySize:  cfg.CacheMaxBodySize,
 	}
 	httpCache.Logger.Info(
 		"httpcache initiated",
 		"storageType", "expirable.LRU",
 		"ttl", ttl,
 		"maxItems", cfg.CacheMaxItems,
+		"maxBodySize", cfg.CacheMaxBodySize,
 	)
-	return httpCache
+	return httpCache, cache
 }
 
 func StartApiServer(cfg *PgsConfig) {
 	ctx := context.Background()
 
 	router := NewWebRouter(cfg)
-	httpCache := NewPgsHttpCache(router.Cfg, router)
-	go CacheMgmt(ctx, cfg.CacheClearingQueue, cfg, httpCache.Cache)
+	httpCache, cache := NewPgsHttpCache(router.Cfg, router)
+	go CacheMgmt(ctx, cfg, cache, router.clearSiteCache)
 
 	portStr := fmt.Sprintf(":%s", cfg.WebPort)
 	cfg.Logger.Info(
@@ -160,20 +162,32 @@ type WebRouter struct {
 	RootRouter     *http.ServeMux
 	UserRouter     *http.ServeMux
 	RedirectsCache *expirable.LRU[string, []*RedirectRule]
-	HeadersCache   *expirable.LRU[string, []*HeaderRule]
+	HeadersCache   *expirable.LRU[string, []headerMatcher]
+	SiteCache      *expirable.LRU[string, *siteInfo]
+}
+
+// siteInfo is what serving a site needs from the database and storage.
+type siteInfo struct {
+	user    *db.User
+	project *db.Project
+	bucket  storage.Bucket
+	plus    *db.FeatureFlag
+}
+
+func (s *siteInfo) hasPicoPlus() bool {
+	return s.plus != nil && s.plus.ExpiresAt.After(time.Now())
 }
 
 func NewWebRouter(cfg *PgsConfig) *WebRouter {
-	router := newWebRouter(cfg)
-	go router.WatchCacheClear()
-	return router
+	return newWebRouter(cfg)
 }
 
 func newWebRouter(cfg *PgsConfig) *WebRouter {
 	router := &WebRouter{
 		Cfg:            cfg,
 		RedirectsCache: expirable.NewLRU[string, []*RedirectRule](2048, nil, shared.CacheTimeout),
-		HeadersCache:   expirable.NewLRU[string, []*HeaderRule](2048, nil, shared.CacheTimeout),
+		HeadersCache:   expirable.NewLRU[string, []headerMatcher](2048, nil, shared.CacheTimeout),
+		SiteCache:      expirable.NewLRU[string, *siteInfo](2048, nil, shared.CacheTimeout),
 	}
 	router.initRouters()
 	return router
@@ -199,14 +213,51 @@ func (web *WebRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	mux.ServeHTTP(w, r.WithContext(ctx))
 }
 
-func (web *WebRouter) WatchCacheClear() {
-	for key := range web.Cfg.CacheClearingQueue {
-		web.Cfg.Logger.Info("lru cache clear request", "key", key)
-		rKey := filepath.Join(key, "_redirects")
-		web.RedirectsCache.Remove(rKey)
-		hKey := filepath.Join(key, "_headers")
-		web.HeadersCache.Remove(hKey)
+// clearSiteCache drops what is cached about a site: its database records and
+// its parsed _redirects and _headers. The key is the surrogate key that
+// uploads and the CLI purge, or "*" for every site.
+func (web *WebRouter) clearSiteCache(key string) {
+	web.Cfg.Logger.Info("lru cache clear request", "key", key)
+	if key == "*" {
+		web.SiteCache.Purge()
+		web.RedirectsCache.Purge()
+		web.HeadersCache.Purge()
+		return
 	}
+	web.SiteCache.Remove(key)
+	web.RedirectsCache.Remove(filepath.Join(key, "_redirects"))
+	web.HeadersCache.Remove(filepath.Join(key, "_headers"))
+}
+
+// findSite looks up the user, project, bucket and pico+ flag behind a
+// subdomain. Only complete results are cached, so a site that is created or
+// fixed later is found on its next request.
+func (web *WebRouter) findSite(props *router.SubdomainProps, logger *slog.Logger) (*siteInfo, int, string) {
+	key := getSurrogateKey(props.Username, props.ProjectName)
+	if site, ok := web.SiteCache.Get(key); ok {
+		return site, http.StatusOK, ""
+	}
+
+	user, err := web.Cfg.DB.FindUserByName(props.Username)
+	if err != nil {
+		logger.Info("user not found")
+		return nil, http.StatusNotFound, "user not found"
+	}
+	project, err := web.Cfg.DB.FindProjectByName(user.ID, props.ProjectName)
+	if err != nil {
+		logger.Info("project not found")
+		return nil, http.StatusNotFound, "project not found"
+	}
+	bucket, err := web.Cfg.Storage.GetBucket(shared.GetAssetBucketName(user.ID))
+	if err != nil {
+		logger.Error("bucket not found", "err", err)
+		return nil, http.StatusNotFound, "bucket not found"
+	}
+	plus, _ := web.Cfg.DB.FindFeature(user.ID, "plus")
+
+	site := &siteInfo{user: user, project: project, bucket: bucket, plus: plus}
+	web.SiteCache.Add(key, site)
+	return site, http.StatusOK, ""
 }
 
 func (web *WebRouter) initRouters() {
@@ -376,7 +427,10 @@ func (web *WebRouter) checkHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotFound)
 }
 
-func CacheMgmt(ctx context.Context, notify chan string, cfg *PgsConfig, cacher httpcache.Cacher) {
+// CacheMgmt applies the purges published on the cache-drain pipe. onPurge,
+// when set, clears whatever else is cached about the site; it runs first so
+// the http cache isn't refilled from stale records.
+func CacheMgmt(ctx context.Context, cfg *PgsConfig, cache *SiteCache, onPurge func(site string)) {
 	cfg.Logger.Info("cache mgmt initiated")
 	for {
 		scanner := bufio.NewScanner(cfg.Pubsub)
@@ -384,20 +438,16 @@ func CacheMgmt(ctx context.Context, notify chan string, cfg *PgsConfig, cacher h
 		for scanner.Scan() {
 			subdomain := strings.TrimSpace(scanner.Text())
 			cfg.Logger.Info("received cache-drain item", "subdomain", subdomain)
-			notify <- subdomain
+			if onPurge != nil {
+				onPurge(subdomain)
+			}
 
 			if subdomain == "*" {
-				cacher.Purge()
+				cache.Purge()
 				cfg.Logger.Info("successfully cleared cache from remote cli request")
 				continue
 			}
-
-			for _, key := range cacher.Keys() {
-				if strings.HasPrefix(key, subdomain) {
-					cfg.Logger.Info("deleting cache item", "subdomain", subdomain, "key", key)
-					_ = cacher.Remove(key)
-				}
-			}
+			cache.PurgeSite(subdomain)
 		}
 	}
 }
@@ -533,27 +583,15 @@ func (web *WebRouter) ServeAsset(fname string, opts *storage.ImgProcessOpts, has
 		"user", props.Username,
 	)
 
-	user, err := web.Cfg.DB.FindUserByName(props.Username)
-	if err != nil {
-		logger.Info("user not found")
-		http.Error(w, "user not found", http.StatusNotFound)
+	site, status, msg := web.findSite(props, logger)
+	if site == nil {
+		http.Error(w, msg, status)
 		return
 	}
+	user, project, bucket := site.user, site.project, site.bucket
 
 	logger = logger.With(
 		"userId", user.ID,
-	)
-
-	var bucket storage.Bucket
-	bucket, err = web.Cfg.Storage.GetBucket(shared.GetAssetBucketName(user.ID))
-	project, perr := web.Cfg.DB.FindProjectByName(user.ID, props.ProjectName)
-	if perr != nil {
-		logger.Info("project not found")
-		http.Error(w, "project not found", http.StatusNotFound)
-		return
-	}
-
-	logger = logger.With(
 		"projectId", project.ID,
 		"project", project.Name,
 	)
@@ -589,20 +627,6 @@ func (web *WebRouter) ServeAsset(fname string, opts *storage.ImgProcessOpts, has
 		return
 	}
 
-	if err != nil {
-		logger.Error("bucket not found", "err", err)
-		http.Error(w, "bucket not found", http.StatusNotFound)
-		return
-	}
-
-	hasPicoPlus := false
-	ff, _ := web.Cfg.DB.FindFeature(user.ID, "plus")
-	if ff != nil {
-		if ff.ExpiresAt.After(time.Now()) {
-			hasPicoPlus = true
-		}
-	}
-
 	asset := &ApiAssetHandler{
 		WebRouter: web,
 		Logger:    logger,
@@ -615,7 +639,7 @@ func (web *WebRouter) ServeAsset(fname string, opts *storage.ImgProcessOpts, has
 		Filepath:       fname,
 		Bucket:         bucket,
 		ImgProcessOpts: opts,
-		HasPicoPlus:    hasPicoPlus,
+		HasPicoPlus:    site.hasPicoPlus(),
 		HttpPass:       project.Acl.Type == "http-pass",
 	}
 

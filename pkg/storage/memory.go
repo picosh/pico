@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -21,6 +23,7 @@ func (s *seekableReader) Close() error { return nil }
 
 type StorageMemory struct {
 	storage map[string]map[string]string
+	mtimes  map[string]map[string]time.Time
 	mu      sync.RWMutex
 }
 
@@ -28,9 +31,41 @@ var _ StorageServe = &StorageMemory{}
 var _ StorageServe = (*StorageMemory)(nil)
 
 func NewStorageMemory(st map[string]map[string]string) (*StorageMemory, error) {
+	now := time.Now()
+	mtimes := map[string]map[string]time.Time{}
+	for bucket, objects := range st {
+		mtimes[bucket] = map[string]time.Time{}
+		for key := range objects {
+			mtimes[bucket][key] = now
+		}
+	}
 	return &StorageMemory{
 		storage: st,
+		mtimes:  mtimes,
 	}, nil
+}
+
+func memoryKey(fpath string) string {
+	if !strings.HasPrefix(fpath, "/") {
+		return "/" + fpath
+	}
+	return fpath
+}
+
+// dirKey is the key that keeps a directory listed while it's empty. Keys are
+// flat like S3's, so a directory is a "dir/" key with no contents.
+func dirKey(dir string) string {
+	return strings.TrimSuffix(memoryKey(dir), "/") + "/"
+}
+
+// hasPrefix reports whether any key other than skip starts with prefix.
+func hasPrefix(objects map[string]string, prefix, skip string) bool {
+	for key := range objects {
+		if key != skip && strings.HasPrefix(key, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *StorageMemory) GetBucket(name string) (Bucket, error) {
@@ -60,6 +95,7 @@ func (s *StorageMemory) UpsertBucket(name string) (Bucket, error) {
 	defer s.mu.Unlock()
 
 	s.storage[name] = map[string]string{}
+	s.mtimes[name] = map[string]time.Time{}
 	return bucket, nil
 }
 
@@ -80,6 +116,7 @@ func (s *StorageMemory) DeleteBucket(bucket Bucket) error {
 	defer s.mu.Unlock()
 
 	delete(s.storage, bucket.Path)
+	delete(s.mtimes, bucket.Path)
 	return nil
 }
 
@@ -87,21 +124,32 @@ func (s *StorageMemory) GetObject(bucket Bucket, fpath string) (utils.ReadAndRea
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	if !strings.HasPrefix(fpath, "/") {
-		fpath = "/" + fpath
-	}
-
-	objInfo := &ObjectInfo{
-		LastModified: time.Time{},
-	}
+	fpath = memoryKey(fpath)
+	objInfo := &ObjectInfo{}
 
 	dat, ok := s.storage[bucket.Path][fpath]
-	if !ok {
+	if !ok || strings.HasSuffix(fpath, "/") {
 		return nil, objInfo, fmt.Errorf("object does not exist: %s", fpath)
 	}
 
 	objInfo.Size = int64(len([]byte(dat)))
+	objInfo.LastModified = s.mtimes[bucket.Path][fpath]
 	return &seekableReader{bytes.NewReader([]byte(dat))}, objInfo, nil
+}
+
+func (s *StorageMemory) StatObject(bucket Bucket, fpath string) (*ObjectInfo, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	fpath = memoryKey(fpath)
+	dat, ok := s.storage[bucket.Path][fpath]
+	if !ok || strings.HasSuffix(fpath, "/") {
+		return nil, fmt.Errorf("object does not exist: %s: %w", fpath, fs.ErrNotExist)
+	}
+	return &ObjectInfo{
+		Size:         int64(len(dat)),
+		LastModified: s.mtimes[bucket.Path][fpath],
+	}, nil
 }
 
 func (s *StorageMemory) PutObject(bucket Bucket, fpath string, contents io.Reader, info *ObjectInfo) (string, int64, error) {
@@ -113,15 +161,55 @@ func (s *StorageMemory) PutObject(bucket Bucket, fpath string, contents io.Reade
 		return "", 0, err
 	}
 
+	fpath = memoryKey(fpath)
+	mtime := info.LastModified
+	if mtime.IsZero() {
+		mtime = time.Now()
+	}
 	s.storage[bucket.Path][fpath] = string(d)
+	if s.mtimes[bucket.Path] == nil {
+		s.mtimes[bucket.Path] = map[string]time.Time{}
+	}
+	s.mtimes[bucket.Path][fpath] = mtime
 	return fmt.Sprintf("%s%s", bucket.Path, fpath), int64(len(d)), nil
+}
+
+func (s *StorageMemory) PutDir(bucket Bucket, dir string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	key := dirKey(dir)
+	if key == "/" {
+		return nil
+	}
+	s.storage[bucket.Path][key] = ""
+	s.mtimes[bucket.Path][key] = time.Now()
+	return nil
 }
 
 func (s *StorageMemory) DeleteObject(bucket Bucket, fpath string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	delete(s.storage[bucket.Path], fpath)
+	objects := s.storage[bucket.Path]
+	mtimes := s.mtimes[bucket.Path]
+	fpath = memoryKey(fpath)
+	if _, ok := objects[fpath]; ok && !strings.HasSuffix(fpath, "/") {
+		delete(objects, fpath)
+		delete(mtimes, fpath)
+		if parent := dirKey(path.Dir(fpath)); parent != "/" && !hasPrefix(objects, parent, "") {
+			objects[parent] = ""
+			mtimes[parent] = time.Now()
+		}
+		return nil
+	}
+
+	key := dirKey(fpath)
+	if hasPrefix(objects, key, key) {
+		return fmt.Errorf("%s: directory not empty", fpath)
+	}
+	delete(objects, key)
+	delete(mtimes, key)
 	return nil
 }
 
@@ -136,76 +224,71 @@ func (s *StorageMemory) ListBuckets() ([]string, error) {
 	return buckets, nil
 }
 
+// ListObjects follows StorageFS: a path naming an object lists that object,
+// a directory path without a trailing slash lists only the directory itself,
+// and a path ending in a slash lists its contents relative to it.
 func (s *StorageMemory) ListObjects(bucket Bucket, dir string, recursive bool) ([]os.FileInfo, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	var fileList []os.FileInfo
-
-	resolved := dir
-
-	if !strings.HasPrefix(resolved, "/") {
-		resolved = "/" + resolved
-	}
-
+	fileList := []os.FileInfo{}
+	resolved := memoryKey(dir)
 	objects := s.storage[bucket.Path]
-	// dir is actually an object
-	oval, ok := objects[resolved]
-	if ok {
+	mtimes := s.mtimes[bucket.Path]
+
+	if val, ok := objects[resolved]; ok && !strings.HasSuffix(resolved, "/") {
 		fileList = append(fileList, &utils.VirtualFile{
 			FName:    filepath.Base(resolved),
-			FIsDir:   false,
-			FSize:    int64(len([]byte(oval))),
-			FModTime: time.Time{},
+			FSize:    int64(len(val)),
+			FModTime: mtimes[resolved],
 		})
 		return fileList, nil
 	}
 
+	if !strings.HasSuffix(resolved, "/") {
+		for key := range objects {
+			if strings.HasPrefix(key, resolved+"/") {
+				fileList = append(fileList, &utils.VirtualFile{FName: "", FIsDir: true})
+				break
+			}
+		}
+		return fileList, nil
+	}
+
+	seen := map[string]bool{}
+	addDir := func(name string) {
+		if !seen[name] {
+			seen[name] = true
+			fileList = append(fileList, &utils.VirtualFile{FName: name, FIsDir: true})
+		}
+	}
 	for key, val := range objects {
-		if !strings.HasPrefix(key, resolved) {
+		rel, ok := strings.CutPrefix(key, resolved)
+		if !ok || rel == "" {
 			continue
 		}
-
-		rep := strings.Replace(key, resolved, "", 1)
-		fdir := filepath.Dir(rep)
-		fname := filepath.Base(rep)
-		paths := strings.Split(fdir, "/")
-
-		if fdir == "/" {
-			ffname := filepath.Base(resolved)
-			fileList = append(fileList, &utils.VirtualFile{
-				FName:  ffname,
-				FIsDir: true,
-			})
-		}
-
-		for _, p := range paths {
-			if p == "" || p == "/" || p == "." {
+		if !recursive {
+			if d, _, nested := strings.Cut(rel, "/"); nested {
+				addDir(d)
 				continue
 			}
-			fileList = append(fileList, &utils.VirtualFile{
-				FName:  p,
-				FIsDir: true,
-			})
 		}
-
-		trimRes := strings.TrimSuffix(resolved, "/")
-		dirKey := filepath.Dir(key)
-		if recursive {
-			fileList = append(fileList, &utils.VirtualFile{
-				FName:    fname,
-				FIsDir:   false,
-				FSize:    int64(len([]byte(val))),
-				FModTime: time.Time{},
-			})
-		} else if resolved == dirKey || trimRes == dirKey {
-			fileList = append(fileList, &utils.VirtualFile{
-				FName:    fname,
-				FIsDir:   false,
-				FSize:    int64(len([]byte(val))),
-				FModTime: time.Time{},
-			})
+		name, isDir := strings.CutSuffix(rel, "/")
+		start := filepath.Dir(name)
+		if isDir {
+			start = name
 		}
+		for d := start; d != "." && !seen[d]; d = filepath.Dir(d) {
+			addDir(d)
+		}
+		if isDir {
+			continue
+		}
+		fileList = append(fileList, &utils.VirtualFile{
+			FName:    rel,
+			FSize:    int64(len(val)),
+			FModTime: mtimes[key],
+		})
 	}
 
 	return fileList, nil

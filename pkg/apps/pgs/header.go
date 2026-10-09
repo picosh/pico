@@ -2,6 +2,8 @@ package pgs
 
 import (
 	"fmt"
+	"log/slog"
+	"regexp"
 	"slices"
 	"strings"
 )
@@ -80,6 +82,27 @@ func parseHeaderText(text string) ([]*HeaderRule, error) {
 	}
 
 	return rules, nil
+}
+
+// headerMatcher is a _headers rule with its path compiled.
+type headerMatcher struct {
+	path    *regexp.Regexp
+	headers []*HeaderLine
+}
+
+// compileHeaderRules compiles each rule's path once, when the rules are
+// cached, and drops rules whose path is not a valid pattern.
+func compileHeaderRules(rules []*HeaderRule, logger *slog.Logger) []headerMatcher {
+	matchers := make([]headerMatcher, 0, len(rules))
+	for _, rule := range rules {
+		re, err := regexp.Compile(rule.Path)
+		if err != nil {
+			logger.Error("skipping _headers rule with invalid path", "path", rule.Path, "err", err)
+			continue
+		}
+		matchers = append(matchers, headerMatcher{path: re, headers: rule.Headers})
+	}
+	return matchers
 }
 
 func parseLine(line string) (*HeaderLine, error) {

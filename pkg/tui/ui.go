@@ -366,7 +366,7 @@ func NewTui(opts vaxis.Options, shrd *SharedModel) error {
 		"analytics":   NewAnalyticsPage(shrd),
 		"chat":        NewChatPage(shrd),
 		"tuns":        NewTunsPage(shrd),
-		"access_logs": NewAccessLogsPage(shrd),
+		"access-logs": NewAccessLogsPage(shrd),
 		"pages":       NewPagesPage(shrd),
 	}
 	root := &App{

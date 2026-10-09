@@ -3,6 +3,7 @@ package pgsdb
 import (
 	"fmt"
 	"log/slog"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -149,11 +150,22 @@ func (me *MemoryDB) UpsertProject(userID, projectName, projectDir string) (*db.P
 }
 
 func (me *MemoryDB) LinkToProject(userID, projectID, projectDir string, commit bool) error {
-	return errNotImpl
+	for _, project := range me.Projects {
+		if project.ID == projectID && project.UserID == userID {
+			if commit {
+				project.ProjectDir = projectDir
+			}
+			return nil
+		}
+	}
+	return fmt.Errorf("project not found by id %s", projectID)
 }
 
 func (me *MemoryDB) RemoveProject(projectID string) error {
-	return errNotImpl
+	me.Projects = slices.DeleteFunc(me.Projects, func(project *db.Project) bool {
+		return project.ID == projectID
+	})
+	return nil
 }
 
 func (me *MemoryDB) FindProjectByName(userID, name string) (*db.Project, error) {
@@ -172,7 +184,13 @@ func (me *MemoryDB) FindProjectByName(userID, name string) (*db.Project, error) 
 }
 
 func (me *MemoryDB) FindProjectLinks(userID, name string) ([]*db.Project, error) {
-	return []*db.Project{}, errNotImpl
+	links := []*db.Project{}
+	for _, project := range me.Projects {
+		if project.UserID == userID && project.ProjectDir == name && project.Name != name {
+			links = append(links, project)
+		}
+	}
+	return links, nil
 }
 
 func (me *MemoryDB) FindProjectsByPrefix(userID, prefix string) ([]*db.Project, error) {
@@ -195,7 +213,12 @@ func (me *MemoryDB) FindProjects(userID string) ([]*db.Project, error) {
 }
 
 func (me *MemoryDB) UpdateProjectAcl(userID, name string, acl db.ProjectAcl) error {
-	return errNotImpl
+	project, err := me.FindProjectByName(userID, name)
+	if err != nil {
+		return err
+	}
+	project.Acl = acl
+	return nil
 }
 
 func (me *MemoryDB) RegisterAdmin(username, pubkey, pubkeyName string) error {

@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"path/filepath"
+	"slices"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -80,6 +81,12 @@ func (c *Cmd) notice() {
 	}
 }
 
+// purge clears what the web servers cache about a project after a command
+// changed it.
+func (c *Cmd) purge(projectName string) {
+	c.Cfg.CacheClearingQueue <- getSurrogateKey(c.User.Name, projectName)
+}
+
 func (c *Cmd) RmProjectAssets(projectName string) error {
 	bucketName := shared.GetAssetBucketName(c.User.ID)
 	bucket, err := c.Store.GetBucket(bucketName)
@@ -95,9 +102,15 @@ func (c *Cmd) RmProjectAssets(projectName string) error {
 
 	if len(fileList) == 0 {
 		c.output(fmt.Sprintf("no assets found for project (%s)", projectName))
+		if c.Write {
+			return c.Store.DeleteObject(bucket, projectName)
+		}
 		return nil
 	}
 	c.output(fmt.Sprintf("found (%d) assets for project (%s), removing", len(fileList), projectName))
+	if c.Write {
+		defer c.purge(projectName)
+	}
 
 	for _, file := range fileList {
 		if file.IsDir() {
@@ -122,6 +135,25 @@ func (c *Cmd) RmProjectAssets(projectName string) error {
 			}
 		} else {
 			c.output(intent)
+		}
+	}
+	if !c.Write {
+		return nil
+	}
+
+	// Directories outlive their files, so remove them deepest first.
+	dirs := []string{projectName}
+	for _, file := range fileList {
+		if file.IsDir() {
+			dirs = append(dirs, filepath.Join(projectName, file.Name()))
+		}
+	}
+	slices.SortStableFunc(dirs, func(a, b string) int {
+		return strings.Count(b, "/") - strings.Count(a, "/")
+	})
+	for _, dir := range dirs {
+		if err := c.Store.DeleteObject(bucket, dir); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -291,6 +323,9 @@ func (c *Cmd) unlink(projectName string) error {
 	if err != nil {
 		return err
 	}
+	if c.Write {
+		c.purge(project.Name)
+	}
 	c.output(fmt.Sprintf("(%s) unlinked", project.Name))
 
 	return nil
@@ -313,9 +348,6 @@ func (c *Cmd) fzf(projectName string) error {
 	}
 
 	for _, obj := range objs {
-		if strings.Contains(obj.Name(), "._pico_keep_dir") {
-			continue
-		}
 		url := c.Cfg.AssetURL(
 			c.User.Name,
 			project.Name,
@@ -364,6 +396,9 @@ func (c *Cmd) link(projectName, linkTo string) error {
 	err = c.Dbpool.LinkToProject(c.User.ID, projectID, projectDir, c.Write)
 	if err != nil {
 		return err
+	}
+	if c.Write {
+		c.purge(projectName)
 	}
 
 	out := fmt.Sprintf("(%s) might have orphaned assets, removing", projectName)
@@ -463,6 +498,7 @@ func (c *Cmd) prune(prefix string, keepNumLatest int) error {
 			if err != nil {
 				return err
 			}
+			c.purge(project.Name)
 		}
 	}
 
@@ -500,6 +536,7 @@ func (c *Cmd) rm(projectName string) error {
 			if err != nil {
 				return err
 			}
+			c.purge(project.Name)
 		}
 	} else {
 		msg := fmt.Sprintf("(%s) project record not found for user (%s)", projectName, c.User.Name)
@@ -524,7 +561,10 @@ func (c *Cmd) acl(projectName, aclType string, acls []string) error {
 		Data: acls,
 	}
 	if c.Write {
-		return c.Dbpool.UpdateProjectAcl(c.User.ID, projectName, acl)
+		if err := c.Dbpool.UpdateProjectAcl(c.User.ID, projectName, acl); err != nil {
+			return err
+		}
+		c.purge(projectName)
 	}
 	return nil
 }
