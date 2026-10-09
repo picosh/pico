@@ -5,23 +5,25 @@ import (
 	"io"
 	"slices"
 	"testing"
+	"time"
 )
 
 type loopback struct {
 	bytes.Buffer
 }
 
-func newTestConn(protocol int) (*conn, *loopback) {
+func newTestConn(t *testing.T, protocol int) (*conn, *loopback) {
 	var buf loopback
 	c := newConn(&buf)
 	c.protocol = protocol
+	t.Cleanup(func() { _ = c.close() })
 	return c, &buf
 }
 
 func TestVarintRoundTrip(t *testing.T) {
 	values := []int32{0, 1, 0x7f, 0x80, 0xff, 0x3fff, 0x4000, 0x1fffff, 0x200000, 0x0fffffff, 0x10000000, 0x7fffffff, -1, -2, -0x80000000}
 	for _, v := range values {
-		c, _ := newTestConn(31)
+		c, _ := newTestConn(t, 31)
 		if err := c.writeVarint(v); err != nil {
 			t.Fatal(err)
 		}
@@ -42,7 +44,7 @@ func TestVarlongRoundTrip(t *testing.T) {
 	values := []int64{0, 1, 0xffffff, 0x1000000, 0x7fffffff, 0x80000000, 1 << 40, 1<<62 + 12345, -1}
 	for _, min := range []int{3, 4} {
 		for _, v := range values {
-			c, _ := newTestConn(31)
+			c, _ := newTestConn(t, 31)
 			if err := c.writeVarlong(v, min); err != nil {
 				t.Fatal(err)
 			}
@@ -59,7 +61,7 @@ func TestVarlongRoundTrip(t *testing.T) {
 
 func TestLongintRoundTrip(t *testing.T) {
 	for _, v := range []int64{0, 0x7fffffff, 0x80000000, 1 << 40, -5} {
-		c, _ := newTestConn(29)
+		c, _ := newTestConn(t, 29)
 		if err := c.writeLongint(v); err != nil {
 			t.Fatal(err)
 		}
@@ -76,7 +78,7 @@ func TestLongintRoundTrip(t *testing.T) {
 func TestNdxRoundTrip(t *testing.T) {
 	seq := []int32{0, 1, 2, 5, 300, 299, 40000, 70000, 3, ndxDone, ndxDelStats, ndxFlistEOF, 7, ndxDone}
 	for _, proto := range []int{29, 30} {
-		c, _ := newTestConn(proto)
+		c, _ := newTestConn(t, proto)
 		for _, v := range seq {
 			if err := c.writeNdx(v); err != nil {
 				t.Fatal(err)
@@ -95,7 +97,7 @@ func TestNdxRoundTrip(t *testing.T) {
 }
 
 func TestMultiplexedMessages(t *testing.T) {
-	c, buf := newTestConn(31)
+	c, buf := newTestConn(t, 31)
 	if err := c.w.setMultiplex(true); err != nil {
 		t.Fatal(err)
 	}
@@ -106,7 +108,7 @@ func TestMultiplexedMessages(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	r, _ := newTestConn(31)
+	r, _ := newTestConn(t, 31)
 	r.r.r.Reset(bytes.NewReader(buf.Bytes()))
 	r.r.multiplex = true
 	var msgs []string
@@ -127,6 +129,34 @@ func TestMultiplexedMessages(t *testing.T) {
 	}
 	if _, err := r.readByte(); err != io.ErrUnexpectedEOF {
 		t.Fatalf("want EOF, got %v", err)
+	}
+}
+
+// A generator can still be writing when the session gives up and closes the
+// writer; it has to get an error instead of waiting on a queue nobody drains.
+func TestMuxWriterAfterClose(t *testing.T) {
+	m := newMuxWriter(io.Discard)
+	if err := m.Close(); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		chunk := make([]byte, muxBatchSize)
+		for range 2 * muxMaxQueued / muxBatchSize {
+			if _, err := m.Write(chunk); err != nil {
+				done <- err
+				return
+			}
+		}
+		done <- m.Flush()
+	}()
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("writes after Close succeeded")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("write after Close blocked")
 	}
 }
 

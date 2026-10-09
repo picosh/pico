@@ -32,7 +32,6 @@ type muxWriter struct {
 	multiplex bool
 	written   int64
 	err       error
-	closed    bool
 }
 
 type muxItem struct {
@@ -115,11 +114,16 @@ func (m *muxWriter) Flush() error {
 	return m.err
 }
 
-// Close flushes and stops the writer goroutine.
+// errMuxClosed is returned to writers that outlive Close.
+var errMuxClosed = errors.New("rsync: write after close")
+
+// Close flushes and stops the writer goroutine. Later writes fail.
 func (m *muxWriter) Close() error {
 	err := m.Flush()
 	m.mu.Lock()
-	m.closed = true
+	if m.err == nil {
+		m.err = errMuxClosed
+	}
 	m.cond.Broadcast()
 	m.mu.Unlock()
 	return err
@@ -139,10 +143,10 @@ func (m *muxWriter) pump() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for {
-		for !m.closed && m.err == nil && (!m.kick || len(m.queue) == 0) {
+		for m.err == nil && (!m.kick || len(m.queue) == 0) {
 			m.cond.Wait()
 		}
-		if m.closed || m.err != nil {
+		if m.err != nil {
 			m.queue = nil
 			m.cond.Broadcast()
 			return

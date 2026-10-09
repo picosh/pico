@@ -205,6 +205,9 @@ func (g *generator) run() error {
 		if f.inactive {
 			continue
 		}
+		if err := g.ctx.Err(); err != nil {
+			return err
+		}
 		if err := g.recvGenerator(int32(i), f, false); err != nil {
 			return err
 		}
