@@ -204,7 +204,7 @@ This means only you can access the site through a web tunnel or by downloading t
 		},
 		{
 			fmt.Sprintf("acl %s", projectName),
-			"Access control for project",
+			"Access control for project (--type public, pico, pubkeys, http-pass)",
 		},
 		{
 			fmt.Sprintf("cache %s", projectName),
