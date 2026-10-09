@@ -14,9 +14,6 @@ import (
 	"github.com/picosh/pico/pkg/send/utils"
 )
 
-// keepDirName marks an otherwise empty directory in object storage.
-const keepDirName = "._pico_keep_dir"
-
 // storageFS exposes a CopyFromClientHandler as an rsync.FS. Handlers take
 // absolute paths and differ in how they name listing results, so this
 // normalizes both directions.
@@ -73,7 +70,7 @@ func (s *storageFS) ReadDir(dir string, recursive bool) ([]rsync.FileInfo, error
 			continue
 		}
 		name := strings.Trim(e.Name(), "/")
-		if name == "" || path.Base(name) == keepDirName {
+		if name == "" {
 			continue
 		}
 		out = append(out, rsync.FileInfo{Name: name, Size: e.Size(), ModTime: e.ModTime(), IsDir: e.IsDir()})

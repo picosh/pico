@@ -133,7 +133,6 @@ func TestReadDirNormalizesListing(t *testing.T) {
 			&mockFileInfo{name: "index.html", size: 10},
 			&mockFileInfo{name: "/css/site.css", size: 5},
 			&mockFileInfo{name: "css", isDir: true},
-			&mockFileInfo{name: "empty/._pico_keep_dir"},
 			&mockFileInfo{name: "empty.txt"},
 		},
 	}}

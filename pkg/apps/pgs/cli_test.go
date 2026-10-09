@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"io"
 	"log/slog"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/picosh/pico/pkg/shared"
@@ -59,5 +62,41 @@ func TestCliPurges(t *testing.T) {
 		for len(cfg.CacheClearingQueue) > 0 {
 			<-cfg.CacheClearingQueue
 		}
+	}
+}
+
+// Removing a project's assets also removes its directories, which storage
+// keeps after their last file is deleted.
+func TestRmProjectAssetsRemovesDirs(t *testing.T) {
+	logger := slog.New(slog.DiscardHandler)
+	dbpool := NewPgsDb(logger)
+	user := dbpool.Users[0]
+	st, err := storage.NewStorageFS(logger, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	bucket, err := st.UpsertBucket(shared.GetAssetBucketName(user.ID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"test/index.html", "test/css/deep/site.css", "other/index.html"} {
+		if _, _, err := st.PutObject(bucket, name, strings.NewReader("x"), &storage.ObjectInfo{}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := st.PutDir(bucket, "test/empty/nested"); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := NewPgsConfig(logger, dbpool, st, discardPubsub{})
+	cmd := &Cmd{User: user, Session: &fakeCmdSession{}, Log: logger, Store: st, Dbpool: dbpool, Write: true, Cfg: cfg}
+	if err := cmd.RmProjectAssets("test"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(bucket.Path, "test")); !os.IsNotExist(err) {
+		t.Fatalf("project directory still exists: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(bucket.Path, "other/index.html")); err != nil {
+		t.Fatalf("another project was touched: %v", err)
 	}
 }

@@ -34,6 +34,11 @@ type ObjectStorage interface {
 	// StatObject returns an object's info without opening it.
 	StatObject(bucket Bucket, fpath string) (*ObjectInfo, error)
 	PutObject(bucket Bucket, fpath string, contents io.Reader, info *ObjectInfo) (string, int64, error)
+	// PutDir creates a directory, and its parents, that is listed even
+	// while it's empty.
+	PutDir(bucket Bucket, dir string) error
+	// DeleteObject removes a file or an empty directory. Deleting a missing
+	// path succeeds. A directory stays after its last file is deleted.
 	DeleteObject(bucket Bucket, fpath string) error
 	ListObjects(bucket Bucket, dir string, recursive bool) ([]os.FileInfo, error)
 }

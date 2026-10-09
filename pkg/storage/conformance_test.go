@@ -235,9 +235,50 @@ func TestStorageConformance(t *testing.T) {
 					t.Fatalf("StatObject after delete returned %v", err)
 				}
 				got := list(t, st, b, "/proj/css/", true)
-				want := []string{entry("site.css", false, 15, t1)}
+				want := []string{"deep/", entry("site.css", false, 15, t1)}
 				if !slices.Equal(got, want) {
 					t.Fatalf("after delete got %q, want %q", got, want)
+				}
+			})
+
+			t.Run("directories", func(t *testing.T) {
+				if err := st.PutDir(b, "/proj/empty/nested"); err != nil {
+					t.Fatal(err)
+				}
+				if got, want := list(t, st, b, "/proj/empty/", true), []string{"nested/"}; !slices.Equal(got, want) {
+					t.Fatalf("list after PutDir got %q, want %q", got, want)
+				}
+				if got := list(t, st, b, "/proj/empty/nested", false); !slices.Equal(got, []string{"/"}) {
+					t.Fatalf("empty directory not found: %q", got)
+				}
+				if _, err := st.StatObject(b, "/proj/empty/nested"); !errors.Is(err, fs.ErrNotExist) {
+					t.Fatalf("StatObject on a directory returned %v", err)
+				}
+
+				if err := st.DeleteObject(b, "/proj/empty"); err == nil {
+					t.Fatal("deleting a non-empty directory succeeded")
+				}
+				for _, dir := range []string{"/proj/empty/nested", "/proj/empty", "/proj/css/deep"} {
+					if err := st.DeleteObject(b, dir); err != nil {
+						t.Fatalf("delete %s: %v", dir, err)
+					}
+					if got := list(t, st, b, dir, false); len(got) != 0 {
+						t.Fatalf("%s still listed as %q", dir, got)
+					}
+				}
+
+				put(t, st, b, "/solo/only.txt", []byte("x"), t1)
+				if err := st.DeleteObject(b, "/solo/only.txt"); err != nil {
+					t.Fatal(err)
+				}
+				if got := list(t, st, b, "/", false); !slices.Contains(got, "solo/") {
+					t.Fatalf("directory went with its last file: %q", got)
+				}
+				if err := st.DeleteObject(b, "/solo"); err != nil {
+					t.Fatal(err)
+				}
+				if got := list(t, st, b, "/", false); slices.Contains(got, "solo/") {
+					t.Fatalf("deleted directory still listed: %q", got)
 				}
 			})
 

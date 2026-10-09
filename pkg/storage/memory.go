@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -49,6 +50,22 @@ func memoryKey(fpath string) string {
 		return "/" + fpath
 	}
 	return fpath
+}
+
+// dirKey is the key that keeps a directory listed while it's empty. Keys are
+// flat like S3's, so a directory is a "dir/" key with no contents.
+func dirKey(dir string) string {
+	return strings.TrimSuffix(memoryKey(dir), "/") + "/"
+}
+
+// hasPrefix reports whether any key other than skip starts with prefix.
+func hasPrefix(objects map[string]string, prefix, skip string) bool {
+	for key := range objects {
+		if key != skip && strings.HasPrefix(key, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *StorageMemory) GetBucket(name string) (Bucket, error) {
@@ -111,7 +128,7 @@ func (s *StorageMemory) GetObject(bucket Bucket, fpath string) (utils.ReadAndRea
 	objInfo := &ObjectInfo{}
 
 	dat, ok := s.storage[bucket.Path][fpath]
-	if !ok {
+	if !ok || strings.HasSuffix(fpath, "/") {
 		return nil, objInfo, fmt.Errorf("object does not exist: %s", fpath)
 	}
 
@@ -126,7 +143,7 @@ func (s *StorageMemory) StatObject(bucket Bucket, fpath string) (*ObjectInfo, er
 
 	fpath = memoryKey(fpath)
 	dat, ok := s.storage[bucket.Path][fpath]
-	if !ok {
+	if !ok || strings.HasSuffix(fpath, "/") {
 		return nil, fmt.Errorf("object does not exist: %s: %w", fpath, fs.ErrNotExist)
 	}
 	return &ObjectInfo{
@@ -157,13 +174,42 @@ func (s *StorageMemory) PutObject(bucket Bucket, fpath string, contents io.Reade
 	return fmt.Sprintf("%s%s", bucket.Path, fpath), int64(len(d)), nil
 }
 
+func (s *StorageMemory) PutDir(bucket Bucket, dir string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	key := dirKey(dir)
+	if key == "/" {
+		return nil
+	}
+	s.storage[bucket.Path][key] = ""
+	s.mtimes[bucket.Path][key] = time.Now()
+	return nil
+}
+
 func (s *StorageMemory) DeleteObject(bucket Bucket, fpath string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	objects := s.storage[bucket.Path]
+	mtimes := s.mtimes[bucket.Path]
 	fpath = memoryKey(fpath)
-	delete(s.storage[bucket.Path], fpath)
-	delete(s.mtimes[bucket.Path], fpath)
+	if _, ok := objects[fpath]; ok && !strings.HasSuffix(fpath, "/") {
+		delete(objects, fpath)
+		delete(mtimes, fpath)
+		if parent := dirKey(path.Dir(fpath)); parent != "/" && !hasPrefix(objects, parent, "") {
+			objects[parent] = ""
+			mtimes[parent] = time.Now()
+		}
+		return nil
+	}
+
+	key := dirKey(fpath)
+	if hasPrefix(objects, key, key) {
+		return fmt.Errorf("%s: directory not empty", fpath)
+	}
+	delete(objects, key)
+	delete(mtimes, key)
 	return nil
 }
 
@@ -190,7 +236,7 @@ func (s *StorageMemory) ListObjects(bucket Bucket, dir string, recursive bool) (
 	objects := s.storage[bucket.Path]
 	mtimes := s.mtimes[bucket.Path]
 
-	if val, ok := objects[resolved]; ok {
+	if val, ok := objects[resolved]; ok && !strings.HasSuffix(resolved, "/") {
 		fileList = append(fileList, &utils.VirtualFile{
 			FName:    filepath.Base(resolved),
 			FSize:    int64(len(val)),
@@ -227,8 +273,16 @@ func (s *StorageMemory) ListObjects(bucket Bucket, dir string, recursive bool) (
 				continue
 			}
 		}
-		for d := filepath.Dir(rel); d != "." && !seen[d]; d = filepath.Dir(d) {
+		name, isDir := strings.CutSuffix(rel, "/")
+		start := filepath.Dir(name)
+		if isDir {
+			start = name
+		}
+		for d := start; d != "." && !seen[d]; d = filepath.Dir(d) {
 			addDir(d)
+		}
+		if isDir {
+			continue
 		}
 		fileList = append(fileList, &utils.VirtualFile{
 			FName:    rel,

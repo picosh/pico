@@ -35,6 +35,10 @@ func dirSize(path string) (int64, error) {
 	return size, err
 }
 
+// legacyKeepDir is the marker pgs used to write to keep empty directories.
+// Listings hide it until cmd/scripts/clean-keep-dirs has removed them all.
+const legacyKeepDir = "._pico_keep_dir"
+
 type StorageFS struct {
 	Dir    string
 	Logger *slog.Logger
@@ -172,51 +176,18 @@ func (s *StorageFS) PutObject(bucket Bucket, fpath string, contents io.Reader, i
 	return loc, size, nil
 }
 
+func (s *StorageFS) PutDir(bucket Bucket, dir string) error {
+	return os.MkdirAll(filepath.Join(bucket.Path, dir), os.ModePerm)
+}
+
 func (s *StorageFS) DeleteObject(bucket Bucket, fpath string) error {
 	loc := filepath.Join(bucket.Path, fpath)
+	// A leftover marker would keep an otherwise empty directory in place.
+	_ = os.Remove(filepath.Join(loc, legacyKeepDir))
 	err := os.Remove(loc)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
+	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
-
-	// traverse up the folder tree and remove all empty folders
-	dir := filepath.Dir(loc)
-	for dir != "" {
-		f, err := os.Open(dir)
-		if err != nil {
-			s.Logger.Info("open dir", "dir", dir, "err", err)
-			break
-		}
-		defer func() {
-			_ = f.Close()
-		}()
-
-		// https://stackoverflow.com/a/30708914
-		contents, err := f.Readdirnames(-1)
-		if err != nil {
-			s.Logger.Info("read dir", "dir", dir, "err", err)
-			break
-		}
-		if len(contents) > 0 {
-			break
-		}
-
-		err = os.Remove(dir)
-		if err != nil {
-			s.Logger.Info("remove dir", "dir", dir, "err", err)
-			break
-		}
-		fp := strings.Split(dir, "/")
-		prefix := ""
-		if strings.HasPrefix(loc, "/") {
-			prefix = "/"
-		}
-		dir = prefix + filepath.Join(fp[:len(fp)-1]...)
-	}
-
 	return nil
 }
 
@@ -267,6 +238,9 @@ func (s *StorageFS) ListObjects(bucket Bucket, dir string, recursive bool) ([]os
 			if err != nil {
 				return err
 			}
+			if d.Name() == legacyKeepDir {
+				return nil
+			}
 			info, err := d.Info()
 			if err != nil {
 				return nil
@@ -296,6 +270,9 @@ func (s *StorageFS) ListObjects(bucket Bucket, dir string, recursive bool) ([]os
 			return fileList, nil
 		}
 		for _, d := range fls {
+			if d.Name() == legacyKeepDir {
+				continue
+			}
 			info, err := d.Info()
 			if err != nil {
 				continue

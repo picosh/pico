@@ -4,6 +4,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
+	"io/fs"
 	"log/slog"
 	"net"
 	"os"
@@ -22,13 +23,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// TestRsyncDeleteDirectoryWithKeepDir verifies that rsync --delete can
-// successfully delete a directory that contains . _pico_keep_dir markers.
-//
-// Regression test for: "remove /storage/.../project/... directory not empty"
-// The bug occurred because . _pico_keep_dir files were not cleaned up when
-// their parent directory was explicitly deleted, causing os.Remove() to fail.
-func TestRsyncDeleteDirectoryWithKeepDir(t *testing.T) {
+// TestRsyncDeleteDirectory verifies that rsync --delete removes a directory
+// tree on filesystem storage without failing with "directory not empty".
+func TestRsyncDeleteDirectory(t *testing.T) {
 	opts := &slog.HandlerOptions{
 		AddSource: true,
 		Level:     slog.LevelDebug,
@@ -205,12 +202,6 @@ func TestRsyncDeleteDirectoryWithKeepDir(t *testing.T) {
 		t.Fatalf("expected 'not found' error, got: %v", err)
 	}
 
-	// Verify the . _pico_keep_dir markers are also cleaned up
-	_, err = client.Lstat("/testdir/subdir/._pico_keep_dir")
-	if err == nil {
-		t.Fatal("subdir/._pico_keep_dir should have been deleted but still exists")
-	}
-
 	// Verify index.html still exists (it wasn't deleted)
 	fi, err := client.Lstat("/testdir/index.html")
 	if err != nil {
@@ -225,8 +216,7 @@ func TestRsyncDeleteDirectoryWithKeepDir(t *testing.T) {
 }
 
 // TestRsyncDeleteNestedEmptyDirectories verifies that rsync --delete handles
-// deeply nested directory structures where intermediate directories become empty
-// and need . _pico_keep_dir markers managed correctly.
+// deeply nested directory structures where intermediate directories become empty.
 func TestRsyncDeleteNestedEmptyDirectories(t *testing.T) {
 	opts := &slog.HandlerOptions{
 		AddSource: true,
@@ -718,5 +708,98 @@ func TestPgsFlagAllowsUpload(t *testing.T) {
 	}
 	if fi.Size() == 0 {
 		t.Errorf("uploaded file has zero size")
+	}
+}
+
+// SFTP directories behave like a filesystem's on storage that has real
+// directories, with no marker files left behind.
+func TestSftpDirectories(t *testing.T) {
+	logger := slog.New(slog.DiscardHandler)
+	dbpool := pgsdb.NewDBMemory(logger)
+	dbpool.SetupTestData()
+	storageDir := t.TempDir()
+	st, err := storage.NewStorageFS(logger, storageDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = os.Setenv("PGS_SSH_PORT", "0")
+	cfg := NewPgsConfig(logger, dbpool, st, discardPubsub{})
+	done := make(chan error)
+	defer close(done)
+	readyCh := make(chan *pssh.SSHServer)
+	prometheus.DefaultRegisterer = prometheus.NewRegistry()
+	go StartSshServerForTesting(cfg, done, readyCh)
+	server := <-readyCh
+	if server == nil {
+		t.Fatal("failed to create ssh server")
+	}
+	var addr string
+	for range 100 {
+		server.Mu.Lock()
+		listener := server.Listener
+		server.Mu.Unlock()
+		if listener != nil {
+			addr = listener.Addr().String()
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	user := GenerateUser()
+	dbpool.Pubkeys = append(dbpool.Pubkeys, &db.PublicKey{
+		ID:     "test-pubkey-dirs",
+		UserID: dbpool.Users[0].ID,
+		Key:    shared.KeyForKeyText(user.signer.PublicKey()),
+	})
+	conn, err := user.NewClientAddr(addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = conn.Close() }()
+	client, err := sftp.NewClient(conn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = client.Close() }()
+
+	if err := client.MkdirAll("/site/empty"); err != nil {
+		t.Fatal(err)
+	}
+	f, err := client.Create("/site/css/site.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.Write([]byte("body{}")); err != nil {
+		t.Fatal(err)
+	}
+	_ = f.Close()
+
+	if err := client.RemoveDirectory("/site/css"); err == nil {
+		t.Fatal("removing a non-empty directory succeeded")
+	}
+	if err := client.Remove("/site/css/site.css"); err != nil {
+		t.Fatal(err)
+	}
+	for _, dir := range []string{"/site/empty", "/site/css"} {
+		fi, err := client.Stat(dir)
+		if err != nil || !fi.IsDir() {
+			t.Fatalf("%s should be an empty directory: %v", dir, err)
+		}
+		if err := client.RemoveDirectory(dir); err != nil {
+			t.Fatalf("rmdir %s: %v", dir, err)
+		}
+		if _, err := client.Stat(dir); err == nil {
+			t.Fatalf("%s still exists after rmdir", dir)
+		}
+	}
+
+	err = filepath.WalkDir(storageDir, func(p string, d fs.DirEntry, err error) error {
+		if err == nil && !d.IsDir() {
+			t.Errorf("unexpected file left in storage: %s", p)
+		}
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }

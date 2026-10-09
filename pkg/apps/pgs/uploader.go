@@ -1,16 +1,12 @@
 package pgs
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
-	"io/fs"
 	"log/slog"
 	"os"
-	"path"
 	"path/filepath"
-	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -307,17 +303,8 @@ func (h *UploadAssetHandler) Write(s *pssh.SSHServerConnSession, entry *sendutil
 		return "", fmt.Errorf(msg, project.Blocked)
 	}
 
-	info := &storage.ObjectInfo{
-		LastModified: mtimeToTime(entry),
-	}
 	if entry.Mode.IsDir() {
-		_, _, err := h.Cfg.Storage.PutObject(
-			bucket,
-			path.Join(shared.GetAssetFileName(entry), "._pico_keep_dir"),
-			bytes.NewReader([]byte{}),
-			info,
-		)
-		return "", err
+		return "", h.Cfg.Storage.PutDir(bucket, shared.GetAssetFileName(entry))
 	}
 
 	// calculate the filsize difference between the same file already
@@ -448,74 +435,6 @@ func (h *UploadAssetHandler) Delete(s *pssh.SSHServerConnSession, entry *senduti
 
 	logger.Info("deleting file")
 
-	// Check if this path represents a directory (has a . _pico_keep_dir marker)
-	keepDirPath := filepath.Join(assetFilepath, "._pico_keep_dir")
-	if _, err := h.Cfg.Storage.StatObject(bucket, keepDirPath); err == nil {
-		// This is a directory being deleted. We must delete all nested
-		// . _pico_keep_dir files first, otherwise os.Remove() on the
-		// directory will fail with "directory not empty".
-		nested, err := h.Cfg.Storage.ListObjects(bucket, assetFilepath+"/", true)
-		if err != nil {
-			return err
-		}
-
-		baseDepth := strings.Count(assetFilepath, string(os.PathSeparator))
-		for _, nestedEntry := range nested {
-			if filepath.Base(nestedEntry.Name()) != "._pico_keep_dir" {
-				continue
-			}
-			// Only delete keep_dir files that are direct or nested children
-			nestedDepth := strings.Count(nestedEntry.Name(), string(os.PathSeparator))
-			if nestedDepth <= baseDepth {
-				continue
-			}
-			nestedKeepDirPath := filepath.Join(assetFilepath, nestedEntry.Name())
-			if delErr := h.Cfg.Storage.DeleteObject(bucket, nestedKeepDirPath); delErr != nil {
-				return delErr
-			}
-		}
-
-		// Delete this directory's own . _pico_keep_dir
-		err = h.Cfg.Storage.DeleteObject(bucket, keepDirPath)
-		if err != nil {
-			return err
-		}
-
-		// Delete the directory itself (no-op for S3-style storage, removes the dir for fs storage)
-		_ = h.Cfg.Storage.DeleteObject(bucket, assetFilepath)
-
-		surrogate := getSurrogateKey(user.Name, projectName)
-		h.Cfg.CacheClearingQueue <- surrogate
-		return nil
-	}
-
-	// Regular file deletion: create . _pico_keep_dir if the directory becomes empty
-	pathDir := filepath.Dir(assetFilepath)
-	fileName := filepath.Base(assetFilepath)
-
-	sibs, err := h.Cfg.Storage.ListObjects(bucket, pathDir+"/", false)
-	if err != nil {
-		return err
-	}
-
-	sibs = slices.DeleteFunc(sibs, func(sib fs.FileInfo) bool {
-		return sib.Name() == fileName
-	})
-
-	if len(sibs) == 0 {
-		info := &storage.ObjectInfo{
-			LastModified: mtimeToTime(entry),
-		}
-		_, _, err := h.Cfg.Storage.PutObject(
-			bucket,
-			filepath.Join(pathDir, "._pico_keep_dir"),
-			bytes.NewReader([]byte{}),
-			info,
-		)
-		if err != nil {
-			return err
-		}
-	}
 	info, statErr := h.Cfg.Storage.StatObject(bucket, assetFilepath)
 	err = h.Cfg.Storage.DeleteObject(bucket, assetFilepath)
 	if err == nil && statErr == nil {
