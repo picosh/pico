@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -117,6 +118,21 @@ func (s *StorageMemory) GetObject(bucket Bucket, fpath string) (utils.ReadAndRea
 	objInfo.Size = int64(len([]byte(dat)))
 	objInfo.LastModified = s.mtimes[bucket.Path][fpath]
 	return &seekableReader{bytes.NewReader([]byte(dat))}, objInfo, nil
+}
+
+func (s *StorageMemory) StatObject(bucket Bucket, fpath string) (*ObjectInfo, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	fpath = memoryKey(fpath)
+	dat, ok := s.storage[bucket.Path][fpath]
+	if !ok {
+		return nil, fmt.Errorf("object does not exist: %s: %w", fpath, fs.ErrNotExist)
+	}
+	return &ObjectInfo{
+		Size:         int64(len(dat)),
+		LastModified: s.mtimes[bucket.Path][fpath],
+	}, nil
 }
 
 func (s *StorageMemory) PutObject(bucket Bucket, fpath string, contents io.Reader, info *ObjectInfo) (string, int64, error) {

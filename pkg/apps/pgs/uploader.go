@@ -23,82 +23,41 @@ import (
 	ignore "github.com/sabhiram/go-gitignore"
 )
 
-type ctxBucketKey struct{}
-type ctxStorageSizeKey struct{}
-type ctxProjectKey struct{}
-type ctxFeatureFlagKey struct{}
-type ctxDenylistKey struct{}
+type ctxUploadStateKey struct{}
 
-type DenyList struct {
-	Denylist string
+// uploadState is what a session's uploads share. It is set on the session
+// once because every SetValue nests the session context one level deeper,
+// and SFTP can run several writes at a time.
+type uploadState struct {
+	mu          sync.Mutex
+	bucket      storage.Bucket
+	featureFlag *db.FeatureFlag
+	storageSize int64
+	project     *db.Project
+	denylist    *ignore.GitIgnore
 }
 
-func getDenylist(s *pssh.SSHServerConnSession) *DenyList {
-	v := s.Context().Value(ctxDenylistKey{})
-	if v == nil {
-		return nil
+func getUploadState(s *pssh.SSHServerConnSession) (*uploadState, error) {
+	state, ok := s.Context().Value(ctxUploadStateKey{}).(*uploadState)
+	if !ok {
+		return nil, fmt.Errorf("upload state not set on `ssh.Context()` for connection")
 	}
-	denylist := s.Context().Value(ctxDenylistKey{}).(*DenyList)
-	return denylist
+	return state, nil
 }
 
-func setDenylist(s *pssh.SSHServerConnSession, denylist string) {
-	s.SetValue(ctxDenylistKey{}, &DenyList{Denylist: denylist})
+func (u *uploadState) getStorageSize() int64 {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	return u.storageSize
 }
 
-func getProject(s *pssh.SSHServerConnSession) *db.Project {
-	v := s.Context().Value(ctxProjectKey{})
-	if v == nil {
-		return nil
-	}
-	project := s.Context().Value(ctxProjectKey{}).(*db.Project)
-	return project
-}
-
-func setProject(s *pssh.SSHServerConnSession, project *db.Project) {
-	s.SetValue(ctxProjectKey{}, project)
-}
-
-func getFeatureFlag(s *pssh.SSHServerConnSession) *db.FeatureFlag {
-	v := s.Context().Value(ctxFeatureFlagKey{})
-	if v == nil {
-		return nil
-	}
-	ff := s.Context().Value(ctxFeatureFlagKey{}).(*db.FeatureFlag)
-	return ff
-}
-
-func setFeatureFlag(s *pssh.SSHServerConnSession, ff *db.FeatureFlag) {
-	s.SetValue(ctxFeatureFlagKey{}, ff)
-}
-
-func getBucket(s *pssh.SSHServerConnSession) (storage.Bucket, error) {
-	bucket := s.Context().Value(ctxBucketKey{}).(storage.Bucket)
-	if bucket.Name == "" {
-		return bucket, fmt.Errorf("bucket not set on `ssh.Context()` for connection")
-	}
-	return bucket, nil
-}
-
-func getStorageSize(s *pssh.SSHServerConnSession) uint64 {
-	return s.Context().Value(ctxStorageSizeKey{}).(uint64)
-}
-
-func incrementStorageSize(s *pssh.SSHServerConnSession, fileSize int64) uint64 {
-	curSize := getStorageSize(s)
-	var nextStorageSize uint64
-	if fileSize < 0 {
-		nextStorageSize = curSize - uint64(fileSize)
-	} else {
-		nextStorageSize = curSize + uint64(fileSize)
-	}
-	s.SetValue(ctxStorageSizeKey{}, nextStorageSize)
-	return nextStorageSize
-}
-
-func shouldIgnoreFile(fp, ignoreStr string) bool {
-	object := ignore.CompileIgnoreLines(strings.Split(ignoreStr, "\n")...)
-	return object.MatchesPath(fp)
+// addStorageSize adds delta bytes to the bucket's size and returns the new
+// size.
+func (u *uploadState) addStorageSize(delta int64) int64 {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	u.storageSize = max(u.storageSize+delta, 0)
+	return u.storageSize
 }
 
 type FileData struct {
@@ -106,7 +65,7 @@ type FileData struct {
 	User     *db.User
 	Bucket   storage.Bucket
 	Project  *db.Project
-	DenyList string
+	DenyList *ignore.GitIgnore
 }
 
 type UploadAssetHandler struct {
@@ -222,20 +181,22 @@ func (h *UploadAssetHandler) Validate(s *pssh.SSHServerConnSession) error {
 	if err != nil {
 		return err
 	}
-	setFeatureFlag(s, ff)
 
 	assetBucket := shared.GetAssetBucketName(user.ID)
 	bucket, err := h.Cfg.Storage.UpsertBucket(assetBucket)
 	if err != nil {
 		return err
 	}
-	s.SetValue(ctxBucketKey{}, bucket)
 
 	totalStorageSize, err := h.Cfg.Storage.GetBucketQuota(bucket)
 	if err != nil {
 		return err
 	}
-	s.SetValue(ctxStorageSizeKey{}, totalStorageSize)
+	s.SetValue(ctxUploadStateKey{}, &uploadState{
+		bucket:      bucket,
+		featureFlag: ff,
+		storageSize: int64(totalStorageSize),
+	})
 
 	logger.Info(
 		"bucket size",
@@ -250,6 +211,33 @@ func (h *UploadAssetHandler) Validate(s *pssh.SSHServerConnSession) error {
 	)
 
 	return nil
+}
+
+// sessionProject returns the project being uploaded to and its compiled
+// _pgs_ignore, finding or creating the project when it changes. A session
+// can upload to many projects because SFTP connections are kept alive.
+func (h *UploadAssetHandler) sessionProject(state *uploadState, user *db.User, projectName string, logger *slog.Logger) (*db.Project, *ignore.GitIgnore, error) {
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	if state.project != nil && state.project.Name == projectName {
+		return state.project, state.denylist, nil
+	}
+
+	project, err := h.Cfg.DB.UpsertProject(user.ID, projectName, projectName)
+	if err != nil {
+		logger.Error("upsert project", "err", err.Error())
+		return nil, nil, err
+	}
+
+	dlist, err := h.findDenylist(state.bucket, project, logger)
+	if err != nil {
+		logger.Info("failed to get denylist, setting default (.*)", "err", err.Error())
+		dlist = ".*"
+	}
+
+	state.project = project
+	state.denylist = ignore.CompileIgnoreLines(strings.Split(dlist, "\n")...)
+	return state.project, state.denylist, nil
 }
 
 func (h *UploadAssetHandler) findDenylist(bucket storage.Bucket, project *db.Project, logger *slog.Logger) (string, error) {
@@ -299,27 +287,19 @@ func (h *UploadAssetHandler) Write(s *pssh.SSHServerConnSession, entry *sendutil
 		"size", entry.Size,
 	)
 
-	bucket, err := getBucket(s)
+	state, err := getUploadState(s)
 	if err != nil {
-		logger.Error("could not find bucket in ctx", "err", err.Error())
+		logger.Error("could not find upload state in ctx", "err", err.Error())
 		return "", err
 	}
+	bucket := state.bucket
 
-	project := getProject(s)
 	projectName := shared.GetProjectName(entry)
 	logger = logger.With("project", projectName)
 
-	// find, create, or update project if we haven't already done it
-	// we need to also check if the project stored in ctx is the same project
-	// being uploaded since users can keep an ssh connection alive via sftp
-	// and created many projects in a single session
-	if project == nil || project.Name != projectName {
-		project, err = h.Cfg.DB.UpsertProject(user.ID, projectName, projectName)
-		if err != nil {
-			logger.Error("upsert project", "err", err.Error())
-			return "", err
-		}
-		setProject(s, project)
+	project, denylist, err := h.sessionProject(state, user, projectName, logger)
+	if err != nil {
+		return "", err
 	}
 
 	if project.Blocked != "" {
@@ -343,33 +323,16 @@ func (h *UploadAssetHandler) Write(s *pssh.SSHServerConnSession, entry *sendutil
 	// calculate the filsize difference between the same file already
 	// stored and the updated file being uploaded
 	assetFilename := shared.GetAssetFileName(entry)
-	obj, info, _ := h.Cfg.Storage.GetObject(bucket, assetFilename)
 	var curFileSize int64
-	if info != nil {
+	if info, err := h.Cfg.Storage.StatObject(bucket, assetFilename); err == nil {
 		curFileSize = info.Size
-	}
-	if obj != nil {
-		defer func() {
-			_ = obj.Close()
-		}()
-	}
-
-	denylist := getDenylist(s)
-	if denylist == nil {
-		dlist, err := h.findDenylist(bucket, project, logger)
-		if err != nil {
-			logger.Info("failed to get denylist, setting default (.*)", "err", err.Error())
-			dlist = ".*"
-		}
-		setDenylist(s, dlist)
-		denylist = &DenyList{Denylist: dlist}
 	}
 
 	data := &FileData{
 		FileEntry: entry,
 		User:      user,
 		Bucket:    bucket,
-		DenyList:  denylist.Denylist,
+		DenyList:  denylist,
 		Project:   project,
 	}
 
@@ -378,18 +341,15 @@ func (h *UploadAssetHandler) Write(s *pssh.SSHServerConnSession, entry *sendutil
 		return "", err
 	}
 
-	featureFlag := getFeatureFlag(s)
-	if featureFlag == nil {
-		return "", fmt.Errorf("pico+ feature flag ctx not set")
-	}
+	featureFlag := state.featureFlag
 	// SFTP does not report file size so the more performant way to
 	//   check filesize constraints is to try and upload the file to s3
 	//	 with a specialized reader that raises an error if the filesize limit
 	//	 has been reached
 	storageMax := featureFlag.Data.StorageMax
 	fileMax := featureFlag.Data.FileMax
-	curStorageSize := getStorageSize(s)
-	remaining := int64(storageMax) - int64(curStorageSize)
+	curStorageSize := state.getStorageSize()
+	remaining := int64(storageMax) - curStorageSize
 	sizeRemaining := min(remaining+curFileSize, fileMax)
 	if sizeRemaining <= 0 {
 		_, _ = fmt.Fprintln(s.Stderr(), "storage quota reached")
@@ -428,8 +388,7 @@ func (h *UploadAssetHandler) Write(s *pssh.SSHServerConnSession, entry *sendutil
 		return "", cerr
 	}
 
-	deltaFileSize := curFileSize - fsize
-	nextStorageSize := incrementStorageSize(s, deltaFileSize)
+	nextStorageSize := state.addStorageSize(fsize - curFileSize)
 
 	url := h.Cfg.AssetURL(
 		user.Name,
@@ -477,11 +436,12 @@ func (h *UploadAssetHandler) Delete(s *pssh.SSHServerConnSession, entry *senduti
 		"file", assetFilepath,
 	)
 
-	bucket, err := getBucket(s)
+	state, err := getUploadState(s)
 	if err != nil {
-		logger.Error("could not find bucket in ctx", "err", err.Error())
+		logger.Error("could not find upload state in ctx", "err", err.Error())
 		return err
 	}
+	bucket := state.bucket
 
 	projectName := shared.GetProjectName(entry)
 	logger = logger.With("project", projectName)
@@ -490,14 +450,7 @@ func (h *UploadAssetHandler) Delete(s *pssh.SSHServerConnSession, entry *senduti
 
 	// Check if this path represents a directory (has a . _pico_keep_dir marker)
 	keepDirPath := filepath.Join(assetFilepath, "._pico_keep_dir")
-	keepDirReader, _, keepDirErr := h.Cfg.Storage.GetObject(bucket, keepDirPath)
-	if keepDirReader != nil {
-		defer func() {
-			_ = keepDirReader.Close()
-		}()
-	}
-
-	if keepDirErr == nil {
+	if _, err := h.Cfg.Storage.StatObject(bucket, keepDirPath); err == nil {
 		// This is a directory being deleted. We must delete all nested
 		// . _pico_keep_dir files first, otherwise os.Remove() on the
 		// directory will fail with "directory not empty".
@@ -563,7 +516,11 @@ func (h *UploadAssetHandler) Delete(s *pssh.SSHServerConnSession, entry *senduti
 			return err
 		}
 	}
+	info, statErr := h.Cfg.Storage.StatObject(bucket, assetFilepath)
 	err = h.Cfg.Storage.DeleteObject(bucket, assetFilepath)
+	if err == nil && statErr == nil {
+		state.addStorageSize(-info.Size)
+	}
 
 	surrogate := getSurrogateKey(user.Name, projectName)
 	h.Cfg.CacheClearingQueue <- surrogate
@@ -589,7 +546,7 @@ func (h *UploadAssetHandler) validateAsset(data *FileData) (bool, error) {
 	}
 
 	fpath := strings.Replace(data.Filepath, "/"+projectName, "", 1)
-	if shouldIgnoreFile(fpath, data.DenyList) {
+	if data.DenyList.MatchesPath(fpath) {
 		err := fmt.Errorf(
 			"ERROR: (%s) file rejected, https://pico.sh/pgs#-pgs-ignore",
 			data.Filepath,

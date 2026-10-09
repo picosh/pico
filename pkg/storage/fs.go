@@ -1,8 +1,6 @@
 package storage
 
 import (
-	"crypto/md5"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"io/fs"
@@ -120,31 +118,30 @@ func (s *StorageFS) GetObject(bucket Bucket, fpath string) (utils.ReadAndReaderA
 		_ = dat.Close()
 		return nil, objInfo, err
 	}
+	fillObjectInfo(objInfo, info)
+	return dat, objInfo, nil
+}
+
+// fillObjectInfo sets an object's size, mtime and ETag from its file. The
+// ETag is built from size and mtime, as web servers do, so serving a file
+// doesn't mean reading it twice.
+func fillObjectInfo(objInfo *ObjectInfo, info os.FileInfo) {
 	objInfo.Size = info.Size()
 	objInfo.LastModified = info.ModTime()
+	objInfo.ETag = fmt.Sprintf("%x-%x", info.ModTime().UnixNano(), info.Size())
+}
 
-	etag := ""
-	// only generate etag if file is less than 10MB
-	if info.Size() <= int64(10*MB) {
-		// calculate etag
-		h := md5.New()
-		if _, err := io.Copy(h, dat); err != nil {
-			_ = dat.Close()
-			return nil, objInfo, err
-		}
-		md5Sum := h.Sum(nil)
-		etag = hex.EncodeToString(md5Sum)
-
-		// reset os.File reader
-		_, err = dat.Seek(0, io.SeekStart)
-		if err != nil {
-			_ = dat.Close()
-			return nil, objInfo, err
-		}
+func (s *StorageFS) StatObject(bucket Bucket, fpath string) (*ObjectInfo, error) {
+	info, err := os.Stat(filepath.Join(bucket.Path, fpath))
+	if err != nil {
+		return nil, err
 	}
-
-	objInfo.ETag = etag
-	return dat, objInfo, nil
+	if info.IsDir() {
+		return nil, fmt.Errorf("%s is a directory: %w", fpath, fs.ErrNotExist)
+	}
+	objInfo := &ObjectInfo{ContentType: mime.GetMimeType(fpath)}
+	fillObjectInfo(objInfo, info)
+	return objInfo, nil
 }
 
 func (s *StorageFS) PutObject(bucket Bucket, fpath string, contents io.Reader, info *ObjectInfo) (string, int64, error) {

@@ -31,6 +31,8 @@ type BucketStorage interface {
 
 type ObjectStorage interface {
 	GetObject(bucket Bucket, fpath string) (utils.ReadAndReaderAtCloser, *ObjectInfo, error)
+	// StatObject returns an object's info without opening it.
+	StatObject(bucket Bucket, fpath string) (*ObjectInfo, error)
 	PutObject(bucket Bucket, fpath string, contents io.Reader, info *ObjectInfo) (string, int64, error)
 	DeleteObject(bucket Bucket, fpath string) error
 	ListObjects(bucket Bucket, dir string, recursive bool) ([]os.FileInfo, error)

@@ -33,10 +33,11 @@ const rsyncFileMax = 24 << 20
 // rsyncEnv is a pgs SSH server backed by one storage implementation, and a
 // real rsync client set up to talk to it.
 type rsyncEnv struct {
-	t      *testing.T
-	st     storage.StorageServe
-	bucket storage.Bucket
-	rsh    string
+	t       *testing.T
+	st      storage.StorageServe
+	bucket  storage.Bucket
+	rsh     string
+	feature *db.FeatureFlag
 }
 
 func newRsyncEnv(t *testing.T, st storage.StorageServe) *rsyncEnv {
@@ -94,7 +95,7 @@ func newRsyncEnv(t *testing.T, st storage.StorageServe) *rsyncEnv {
 		"ssh -p %s -i %s -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR",
 		port, keyFile,
 	)
-	return &rsyncEnv{t: t, st: st, bucket: bucket, rsh: rsh}
+	return &rsyncEnv{t: t, st: st, bucket: bucket, rsh: rsh, feature: dbpool.Feature}
 }
 
 // discardPubsub drops cache purges, which pgs sends from goroutines that can
@@ -392,6 +393,42 @@ func TestRsyncStorage(t *testing.T) {
 					t.Fatalf("site.css is %q", got)
 				}
 			})
+		})
+	}
+}
+
+// TestRsyncStorageQuota checks that shrinking and deleting files frees quota
+// for files later in the same run.
+func TestRsyncStorageQuota(t *testing.T) {
+	for name, newStorage := range rsyncStorageBackends() {
+		t.Run(name, func(t *testing.T) {
+			env := newRsyncEnv(t, newStorage(t))
+			env.feature.Data.StorageMax = 3 << 20
+			src := tree{t, t.TempDir()}
+			remote := "localhost:/site"
+			t0 := time.Unix(1_600_000_000, 0)
+
+			src.write("a.bin", randomBytes(2<<20), t0)
+			env.rsync("-rt", src.dir+"/", remote)
+
+			// a.bin is sent before b.bin, which only fits once a.bin's
+			// shrink is counted.
+			src.write("a.bin", randomBytes(512<<10), t0)
+			src.write("b.bin", randomBytes(2<<20), t0)
+			if s := env.rsync("-rt", src.dir+"/", remote); s.transferred != 2 {
+				t.Fatalf("transferred %d files, want 2\n%s", s.transferred, s.output)
+			}
+
+			if err := os.Remove(filepath.Join(src.dir, "a.bin")); err != nil {
+				t.Fatal(err)
+			}
+			src.write("c.bin", randomBytes(768<<10), t0)
+			if s := env.rsync("-rt", "--delete-before", src.dir+"/", remote); s.deleted != 1 || s.transferred != 1 {
+				t.Fatalf("deleted %d and transferred %d files, want 1 and 1\n%s", s.deleted, s.transferred, s.output)
+			}
+			if _, _, ok := env.stored("/site/c.bin"); !ok {
+				t.Fatal("c.bin was not stored")
+			}
 		})
 	}
 }

@@ -3,8 +3,10 @@ package storage_test
 import (
 	"bytes"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log/slog"
 	"slices"
 	"strings"
@@ -103,6 +105,21 @@ func TestStorageConformance(t *testing.T) {
 
 				if _, _, err := st.GetObject(b, "/proj/missing.txt"); err == nil {
 					t.Fatal("missing object returned no error")
+				}
+			})
+
+			t.Run("stat", func(t *testing.T) {
+				info, err := st.StatObject(b, "/proj/css/site.css")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if info.Size != 6 || !info.LastModified.Equal(t2) {
+					t.Fatalf("size=%d mtime=%v", info.Size, info.LastModified)
+				}
+				for _, missing := range []string{"/proj/missing.txt", "/proj/css", "/proj/css/"} {
+					if _, err := st.StatObject(b, missing); !errors.Is(err, fs.ErrNotExist) {
+						t.Errorf("StatObject(%q) returned %v, want fs.ErrNotExist", missing, err)
+					}
 				}
 			})
 
@@ -213,6 +230,9 @@ func TestStorageConformance(t *testing.T) {
 				}
 				if _, _, err := st.GetObject(b, "/proj/css/deep/x.css"); err == nil {
 					t.Fatal("deleted object still readable")
+				}
+				if _, err := st.StatObject(b, "/proj/css/deep/x.css"); !errors.Is(err, fs.ErrNotExist) {
+					t.Fatalf("StatObject after delete returned %v", err)
 				}
 				got := list(t, st, b, "/proj/css/", true)
 				want := []string{entry("site.css", false, 15, t1)}
