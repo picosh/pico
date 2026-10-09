@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -42,7 +41,7 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	logger := h.Logger
 	var redirects []*RedirectRule
 
-	redirectsCacheKey := filepath.Join(getSurrogateKey(h.UserID, h.ProjectDir), "_redirects")
+	redirectsCacheKey := filepath.Join(getSurrogateKey(h.Username, h.ProjectDir), "_redirects")
 	logger.Info("looking for _redirects in lru cache", "key", redirectsCacheKey)
 	if cachedRedirects, found := h.RedirectsCache.Get(redirectsCacheKey); found {
 		logger.Info("_redirects found in lru cache", "key", redirectsCacheKey)
@@ -104,11 +103,9 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			// before redirecting, this saves a hop that will just end up a 404
 			if !hasProtocol(fp.Filepath) && strings.HasSuffix(fp.Filepath, "/") {
 				next := filepath.Join(h.ProjectDir, fp.Filepath, "index.html")
-				obj, _, err := h.Cfg.Storage.GetObject(h.Bucket, next)
-				if err != nil {
+				if _, err := h.Cfg.Storage.StatObject(h.Bucket, next); err != nil {
 					continue
 				}
-				_ = obj.Close()
 			}
 			logger.Info(
 				"redirecting request",
@@ -177,25 +174,21 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if assetFilepath == "" {
-		if shouldGenerateListing(h.Cfg.Storage, h.Bucket, h.ProjectDir, "/"+fpath) {
+		if entries, ok := dirListing(h.Cfg.Storage, h.Bucket, h.ProjectDir, "/"+fpath); ok {
 			logger.Info(
 				"generating directory listing",
 				"path", fpath,
 			)
-			dirPath := h.ProjectDir + "/" + fpath
-			entries, err := h.Cfg.Storage.ListObjects(h.Bucket, dirPath, false)
-			if err == nil {
-				requestPath := "/" + fpath
-				if !strings.HasSuffix(requestPath, "/") {
-					requestPath += "/"
-				}
-
-				html := generateDirectoryHTML(requestPath, entries)
-				w.Header().Set("content-type", "text/html")
-				w.WriteHeader(http.StatusOK)
-				_, _ = w.Write([]byte(html))
-				return
+			requestPath := "/" + fpath
+			if !strings.HasSuffix(requestPath, "/") {
+				requestPath += "/"
 			}
+
+			html := generateDirectoryHTML(requestPath, entries)
+			w.Header().Set("content-type", "text/html")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(html))
+			return
 		}
 
 		logger.Info(
@@ -210,9 +203,9 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		_ = contents.Close()
 	}()
 
-	var headers []*HeaderRule
+	var headers []headerMatcher
 
-	headersCacheKey := filepath.Join(getSurrogateKey(h.UserID, h.ProjectDir), "_headers")
+	headersCacheKey := filepath.Join(getSurrogateKey(h.Username, h.ProjectDir), "_headers")
 	logger.Info("looking for _headers in lru cache", "key", headersCacheKey)
 	if cachedHeaders, found := h.HeadersCache.Get(headersCacheKey); found {
 		logger.Info("_headers found in lru", "key", headersCacheKey)
@@ -238,21 +231,20 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			headers, err = parseHeaderText(buf.String())
+			rules, err := parseHeaderText(buf.String())
 			if err != nil {
 				logger.Error("could not parse header text", "err", err.Error())
 			}
+			headers = compileHeaderRules(rules, logger)
 		}
 
 		h.HeadersCache.Add(headersCacheKey, headers)
 	}
 
 	userHeaders := []*HeaderLine{}
-	for _, headerRule := range headers {
-		rr := regexp.MustCompile(headerRule.Path)
-		match := rr.FindStringSubmatch(assetFilepath)
-		if len(match) > 0 {
-			userHeaders = headerRule.Headers
+	for _, rule := range headers {
+		if rule.path.MatchString(assetFilepath) {
+			userHeaders = rule.headers
 		}
 	}
 

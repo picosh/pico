@@ -2,6 +2,7 @@ package router
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -9,6 +10,7 @@ import (
 	"net/http/pprof"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/hashicorp/golang-lru/v2/expirable"
 	"github.com/picosh/pico/pkg/db"
@@ -196,25 +198,66 @@ func GetSubdomain(r *http.Request) string {
 
 var txtCache = expirable.NewLRU[string, string](2048, nil, shared.CacheTimeout)
 
+// txtMissCache remembers hosts without a TXT record for a short time, so
+// unknown hosts don't cost a lookup per request and a record that was just
+// added starts working quickly.
+var txtMissCache = expirable.NewLRU[string, struct{}](2048, nil, 30*time.Second)
+
+var lookupTXT = net.LookupTXT
+
+// ErrNoTXTRecord is returned when a host has no TXT record for a service.
+var ErrNoTXTRecord = errors.New("no TXT record")
+
+// TXTRecordName is the record that points host at a site on space.
+func TXTRecordName(host, space string) string {
+	return fmt.Sprintf("_%s.%s", space, host)
+}
+
+// LookupTXTRecords asks DNS for host's records on space, bypassing the
+// cache. No records returns ErrNoTXTRecord.
+func LookupTXTRecords(host, space string) ([]string, error) {
+	records, err := lookupTXT(TXTRecordName(host, space))
+	var dnsErr *net.DNSError
+	if errors.As(err, &dnsErr) && dnsErr.IsNotFound {
+		return nil, ErrNoTXTRecord
+	}
+	if err != nil {
+		return nil, err
+	}
+	if len(records) == 0 {
+		return nil, ErrNoTXTRecord
+	}
+	return records, nil
+}
+
+// LookupCustomDomain returns the site host's first record on space names,
+// bypassing the cache.
+func LookupCustomDomain(host, space string) (string, error) {
+	records, err := LookupTXTRecords(host, space)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(records[0]), nil
+}
+
 func GetCustomDomain(host string, space string) string {
-	txt := fmt.Sprintf("_%s.%s", space, host)
-	record, found := txtCache.Get(txt)
-	if found {
+	txt := TXTRecordName(host, space)
+	if record, found := txtCache.Get(txt); found {
 		return record
 	}
-
-	records, err := net.LookupTXT(txt)
-	if err != nil {
+	if _, missed := txtMissCache.Get(txt); missed {
 		return ""
 	}
 
-	for _, v := range records {
-		rec := strings.TrimSpace(v)
-		txtCache.Add(txt, rec)
-		return rec
+	record, err := LookupCustomDomain(host, space)
+	if errors.Is(err, ErrNoTXTRecord) {
+		txtMissCache.Add(txt, struct{}{})
 	}
-
-	return ""
+	if err != nil {
+		return ""
+	}
+	txtCache.Add(txt, record)
+	return record
 }
 
 func GetApiToken(r *http.Request) string {
