@@ -191,6 +191,11 @@ func Serve(cfg Config, rw io.ReadWriter, args []string) error {
 		infoDel:        o.Info(rsyncopts.INFO_DEL),
 		infoNonreg:     o.Info(rsyncopts.INFO_NONREG),
 	}
+	s.filters.deleteExcluded = s.opts.deleteExcluded
+	s.filters.otherSide = ruleSenderSide
+	if s.opts.sender {
+		s.filters.otherSide = ruleReceiverSide
+	}
 
 	if err := s.setupProtocol(o); err != nil {
 		var exit *ExitError
@@ -199,6 +204,7 @@ func Serve(cfg Config, rw io.ReadWriter, args []string) error {
 		}
 		return early(exitProtocol, err)
 	}
+	s.filters.cvsPerishable = s.c.protocol >= 30
 
 	if err := c.w.setMultiplex(true); err != nil {
 		return &ExitError{Code: exitStreamIO, Err: err}
@@ -663,9 +669,10 @@ func (s *session) recvFilterList() error {
 		}
 	}
 	if s.opts.cvsExclude && (s.opts.sender || s.c.protocol < 29) {
-		for _, pat := range strings.Fields(defaultCVSIgnore) {
-			s.filters.add(pat, ruleNoPrefixes)
+		if err := s.filters.parse(":C", false); err != nil {
+			return s.fatal(exitSyntax, err)
 		}
+		s.filters.rules = append(s.filters.rules, s.filters.cvsIgnoreRules()...)
 	}
 	return nil
 }

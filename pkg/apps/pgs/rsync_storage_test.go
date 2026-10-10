@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -38,6 +39,10 @@ type rsyncEnv struct {
 	bucket  storage.Bucket
 	rsh     string
 	feature *db.FeatureFlag
+	// sshArgs are the client options scp and sftp need to reach the server.
+	sshArgs []string
+	addr    string
+	user    UserSSH
 }
 
 func newRsyncEnv(t *testing.T, st storage.StorageServe) *rsyncEnv {
@@ -95,7 +100,8 @@ func newRsyncEnv(t *testing.T, st storage.StorageServe) *rsyncEnv {
 		"ssh -p %s -i %s -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR",
 		port, keyFile,
 	)
-	return &rsyncEnv{t: t, st: st, bucket: bucket, rsh: rsh, feature: dbpool.Feature}
+	sshArgs := []string{"-P", port, "-i", keyFile, "-o", "IdentitiesOnly=yes", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", "-o", "LogLevel=ERROR"}
+	return &rsyncEnv{t: t, st: st, bucket: bucket, rsh: rsh, feature: dbpool.Feature, sshArgs: sshArgs, addr: addr, user: user}
 }
 
 // discardPubsub drops cache purges, which pgs sends from goroutines that can
@@ -123,10 +129,23 @@ var statPatterns = map[string]*regexp.Regexp{
 
 func (e *rsyncEnv) rsync(args ...string) rsyncStats {
 	e.t.Helper()
+	return e.rsyncExit(0, args...)
+}
+
+func (e *rsyncEnv) rsyncExit(want int, args ...string) rsyncStats {
+	e.t.Helper()
 	args = append([]string{"-e", e.rsh, "--stats"}, args...)
 	out, err := exec.Command("rsync", args...).CombinedOutput()
+	code := 0
 	if err != nil {
-		e.t.Fatalf("rsync %q: %v\n%s", args, err, out)
+		var exit *exec.ExitError
+		if !errors.As(err, &exit) {
+			e.t.Fatalf("rsync %q: %v\n%s", args, err, out)
+		}
+		code = exit.ExitCode()
+	}
+	if code != want {
+		e.t.Fatalf("rsync %q: exit %d, want %d\n%s", args, code, want, out)
 	}
 	stat := func(name string) int {
 		m := statPatterns[name].FindSubmatch(out)
@@ -308,7 +327,7 @@ func TestRsyncStorage(t *testing.T) {
 
 			t.Run("oversized file is rejected", func(t *testing.T) {
 				src.write("huge.bin", randomBytes(rsyncFileMax+1), t0)
-				s := env.rsync("-rt", src.dir+"/", remote)
+				s := env.rsyncExit(23, "-rt", src.dir+"/", remote)
 				if !strings.Contains(s.output, "huge.bin") {
 					t.Fatalf("no warning about huge.bin\n%s", s.output)
 				}
@@ -397,6 +416,60 @@ func TestRsyncStorage(t *testing.T) {
 	}
 }
 
+func TestRsyncStorageRejections(t *testing.T) {
+	for name, newStorage := range rsyncStorageBackends() {
+		t.Run(name, func(t *testing.T) {
+			for _, reason := range []string{"ignore", "file limit", "storage quota"} {
+				t.Run(reason, func(t *testing.T) {
+					env := newRsyncEnv(t, newStorage(t))
+					src := tree{t, t.TempDir()}
+					remote := "localhost:/site"
+					mtime := time.Unix(1_600_000_000, 0)
+					wantExit := 23
+					accepted := map[string]string{"z.txt": "ok"}
+					switch reason {
+					case "ignore":
+						src.write("_pgs_ignore", []byte("a.txt\n"), mtime)
+						env.rsync("-rt", src.dir+"/", remote)
+						wantExit = 0
+					case "file limit":
+						env.feature.Data.FileMax = 3
+					case "storage quota":
+						src.write("z.txt", []byte("full"), mtime)
+						env.rsync("-rt", src.dir+"/", remote)
+						env.feature.Data.StorageMax = 4
+						accepted["zz.txt"] = "x"
+						src.write("zz.txt", []byte("x"), mtime)
+					}
+					src.write("a.txt", []byte("rejected"), mtime)
+					src.write("z.txt", []byte("ok"), mtime)
+					s := env.rsyncExit(wantExit, "-rt", "--remove-source-files", src.dir+"/", remote)
+					if !strings.Contains(s.output, "a.txt") {
+						t.Fatalf("missing per-file rejection message\n%s", s.output)
+					}
+					if reason == "ignore" && !strings.Contains(s.output, "a.txt skipped: file ignored: (/site/a.txt), https://pico.sh/pgs#-pgs-ignore\n") {
+						t.Fatalf("unexpected ignore message\n%s", s.output)
+					}
+					if _, _, ok := env.stored("/site/a.txt"); ok {
+						t.Fatal("rejected file was stored")
+					}
+					if data, _ := src.read("a.txt"); string(data) != "rejected" {
+						t.Fatal("rejected source file changed")
+					}
+					for file, contents := range accepted {
+						if data, _, ok := env.stored("/site/" + file); !ok || string(data) != contents {
+							t.Errorf("accepted file %s not stored correctly", file)
+						}
+						if _, err := os.Stat(filepath.Join(src.dir, file)); !errors.Is(err, os.ErrNotExist) {
+							t.Errorf("accepted file %s not removed from source: %v", file, err)
+						}
+					}
+				})
+			}
+		})
+	}
+}
+
 // TestRsyncStorageQuota checks that shrinking and deleting files frees quota
 // for files later in the same run.
 func TestRsyncStorageQuota(t *testing.T) {
@@ -428,6 +501,60 @@ func TestRsyncStorageQuota(t *testing.T) {
 			}
 			if _, _, ok := env.stored("/site/c.bin"); !ok {
 				t.Fatal("c.bin was not stored")
+			}
+		})
+	}
+}
+
+// TestRsyncStorageMergeFilters checks rsync's per-directory filter files
+// against pgs storage, where dotfiles are only stored when _pgs_ignore
+// allows them.
+func TestRsyncStorageMergeFilters(t *testing.T) {
+	for name, newStorage := range rsyncStorageBackends() {
+		t.Run(name, func(t *testing.T) {
+			for _, allowDotfiles := range []bool{true, false} {
+				t.Run(fmt.Sprintf("dotfiles=%v", allowDotfiles), func(t *testing.T) {
+					env := newRsyncEnv(t, newStorage(t))
+					src := tree{t, t.TempDir()}
+					remote := "localhost:/site"
+					mtime := time.Unix(1_600_000_000, 0)
+					if allowDotfiles {
+						src.write("_pgs_ignore", []byte("_private\n"), mtime)
+						env.rsync("-rt", src.dir+"/", remote)
+					}
+					src.write(".rsync-filter", []byte("- keep.txt\n"), mtime)
+					src.write("sub/.rsync-filter", []byte("- *.tmp\n"), mtime)
+					for _, f := range []string{"index.html", "keep.txt", "stale.txt", "sub/a.tmp", "sub/b.html"} {
+						src.write(f, []byte(f), mtime)
+					}
+					env.rsync("-rt", src.dir+"/", remote)
+					_, _, stored := env.stored("/site/.rsync-filter")
+					if stored != allowDotfiles {
+						t.Fatalf(".rsync-filter stored=%v with dotfiles allowed=%v", stored, allowDotfiles)
+					}
+
+					dst := tree{t, t.TempDir()}
+					env.rsync("-rt", "-F", remote+"/", dst.dir+"/")
+					for f, filtered := range map[string]bool{"keep.txt": true, "sub/a.tmp": true, "index.html": false, "sub/b.html": false} {
+						_, err := os.Stat(filepath.Join(dst.dir, f))
+						if got := err == nil; got != (!filtered || !allowDotfiles) {
+							t.Errorf("download: %s present=%v", f, got)
+						}
+					}
+
+					for _, f := range []string{"keep.txt", "stale.txt", "sub/a.tmp"} {
+						if err := os.Remove(filepath.Join(src.dir, f)); err != nil {
+							t.Fatal(err)
+						}
+					}
+					s := env.rsync("-rt", "-F", "--delete", src.dir+"/", remote)
+					for f, protected := range map[string]bool{"keep.txt": true, "sub/a.tmp": true, "stale.txt": false} {
+						_, _, ok := env.stored("/site/" + f)
+						if ok != (protected && allowDotfiles) {
+							t.Errorf("upload: %s stored=%v\n%s", f, ok, s.output)
+						}
+					}
+				})
 			}
 		})
 	}

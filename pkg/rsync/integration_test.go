@@ -91,6 +91,18 @@ func (d dirFS) Put(name string, info FileInfo, r io.Reader) (string, error) {
 
 func (d dirFS) Remove(name string, isDir bool) error { return os.Remove(d.full(name)) }
 
+type rejectingFS struct {
+	dirFS
+	err error
+}
+
+func (d rejectingFS) Put(name string, info FileInfo, r io.Reader) (string, error) {
+	if filepath.Base(name) == "skip.txt" {
+		return "", d.err
+	}
+	return d.dirFS.Put(name, info, r)
+}
+
 // TestHelperProcess is the remote shell rsync runs in these tests. It serves
 // the directory in RSYNC_TEST_ROOT on stdin and stdout.
 func TestHelperProcess(t *testing.T) {
@@ -111,7 +123,14 @@ func TestHelperProcess(t *testing.T) {
 		io.Reader
 		io.Writer
 	}{os.Stdin, os.Stdout}
-	err := Serve(Config{FS: dirFS{root: root}, Stderr: os.Stderr}, rw, args)
+	var fsys FS = dirFS{root: root}
+	switch os.Getenv("RSYNC_TEST_PUT_RESULT") {
+	case "ignored":
+		fsys = rejectingFS{dirFS{root: root}, fmt.Errorf("policy: %w", ErrFileIgnored)}
+	case "failed":
+		fsys = rejectingFS{dirFS{root: root}, errors.New("storage backend failed")}
+	}
+	err := Serve(Config{FS: fsys, Stderr: os.Stderr}, rw, args)
 	code := 0
 	var exit *ExitError
 	if errors.As(err, &exit) {
@@ -667,6 +686,235 @@ func TestRsyncSkipOptions(t *testing.T) {
 	}
 	if _, ok := got["huge.txt"]; ok {
 		t.Error("--max-size let a large file through")
+	}
+}
+
+func TestRsyncPutResults(t *testing.T) {
+	for _, proto := range protocols {
+		for _, result := range []string{"ignored", "failed"} {
+			t.Run("protocol_"+proto+"/"+result, func(t *testing.T) {
+				t.Setenv("RSYNC_TEST_PUT_RESULT", result)
+				e := newRsyncEnv(t)
+				for _, name := range []string{"a.txt", "skip.txt", "z.txt"} {
+					writeFile(t, filepath.Join(e.local, name), textBytes(100_000, name))
+				}
+				writeFile(t, filepath.Join(e.remote, "site/skip.txt"), []byte("original"))
+				out, err := e.run(append(protoArgs(proto), "-r", "--remove-source-files", e.local+"/", "host:site")...)
+				if result == "ignored" {
+					if err != nil {
+						t.Fatalf("ignored file failed the batch: %v\n%s", err, out)
+					}
+				} else {
+					var exit *exec.ExitError
+					if !errors.As(err, &exit) || exit.ExitCode() != 23 {
+						t.Fatalf("want exit 23, got %v\n%s", err, out)
+					}
+				}
+				got := tree(t, filepath.Join(e.remote, "site"))
+				if len(got) != 3 || got["skip.txt"] != "original" {
+					t.Fatalf("rejected file changed: %v", got)
+				}
+				for _, name := range []string{"a.txt", "z.txt"} {
+					if got[name] != string(textBytes(100_000, name)) {
+						t.Errorf("accepted file %s not stored", name)
+					}
+					if _, err := os.Stat(filepath.Join(e.local, name)); !errors.Is(err, os.ErrNotExist) {
+						t.Errorf("accepted file %s not removed from source: %v", name, err)
+					}
+				}
+				if data, err := os.ReadFile(filepath.Join(e.local, "skip.txt")); err != nil || !bytes.Equal(data, textBytes(100_000, "skip.txt")) {
+					t.Fatalf("rejected source file changed: %v", err)
+				}
+			})
+		}
+	}
+}
+
+// writeTree writes files, named relative to root.
+func writeTree(t *testing.T, root string, files map[string]string) {
+	t.Helper()
+	for name, contents := range files {
+		writeFile(t, filepath.Join(root, name), []byte(contents))
+	}
+}
+
+// mergeFilterTree has per-directory merge files covering inheritance,
+// overrides, anchoring, clearing and protect rules.
+var mergeFilterTree = map[string]string{
+	".rsync-filter":              "- keep.log\nP precious/\n- *.tmp\n-p *.perish\n",
+	"keep.log":                   "keep",
+	"stale.txt":                  "stale",
+	"x.tmp":                      "tmp",
+	"precious/a.txt":             "precious",
+	"sub/.rsync-filter":          "+ sub-only.tmp\n- /anchored.txt\n",
+	"sub/a.tmp":                  "tmp",
+	"sub/sub-only.tmp":           "kept by include",
+	"sub/anchored.txt":           "anchored",
+	"sub/deeper/anchored.txt":    "not anchored here",
+	"sub/deeper/keep.log":        "inherited",
+	"cleared/.rsync-filter":      "!\n- only.txt\n",
+	"cleared/keep.log":           "no longer excluded",
+	"cleared/only.txt":           "only",
+	"gone/.rsync-filter":         "- inside.log\n",
+	"gone/inside.log":            "protects its directory",
+	"gone/other.txt":             "other",
+	".cvsignore":                 "precious.dat\n",
+	"precious.dat":               "cvs",
+	"obj.o":                      "default cvs pattern",
+	"nested/.cvsignore":          "nested.dat",
+	"nested/nested.dat":          "nested",
+	"nested/deeper/nested.dat":   "cvsignore does not inherit",
+	"nested/deeper/precious.dat": "nor does the parent's",
+	"top.perish":                 "perishable rules protect a kept directory's entries",
+	"perish/keep.perish":         "but not a deleted directory's",
+	"perish/deeper/keep.perish":  "at any depth",
+	"objdir/x.o":                 "default CVS patterns are perishable from protocol 30",
+}
+
+// TestRsyncMergeFiltersMatchRsync runs the same transfer against real rsync
+// and against our server, each from a copy of mergeFilterTree, and expects
+// the same result.
+func TestRsyncMergeFiltersMatchRsync(t *testing.T) {
+	local := map[string]string{"index.html": "new", "sub/new.txt": "new"}
+	pushes := [][]string{
+		{"-F", "--delete"},
+		{"-F", "--delete-before"},
+		{"-F", "--delete-during"},
+		{"-F", "--delete-after"},
+		{"-F", "--delete-delay"},
+		{"-FF", "--delete"},
+		{"-F", "--delete", "--delete-excluded"},
+		{"-C", "--delete"},
+		{"-CF", "--delete"},
+		{"--filter=:e .rsync-filter", "--delete"},
+		{"--filter=:n- .rsync-filter", "--delete"},
+		{"--filter=dir-merge,- .rsync-filter", "--delete"},
+	}
+	for _, proto := range []string{"29", "30", "31", ""} {
+		for _, flags := range pushes {
+			t.Run(fmt.Sprintf("push/proto=%s/%s", proto, strings.Join(flags, " ")), func(t *testing.T) {
+				if proto == "29" && slices.Contains(flags, "--delete-delay") {
+					t.Skip("needs protocol 30")
+				}
+				e := newRsyncEnv(t)
+				writeTree(t, e.local, local)
+				ref := filepath.Join(t.TempDir(), "site")
+				writeTree(t, ref, mergeFilterTree)
+				writeTree(t, filepath.Join(e.remote, "site"), mergeFilterTree)
+				args := append(protoArgs(proto), "-r")
+				args = append(args, flags...)
+
+				refCmd := exec.Command("rsync", append(slices.Clone(args), e.local+"/", ref)...)
+				if out, err := refCmd.CombinedOutput(); err != nil {
+					t.Fatalf("reference rsync: %v\n%s", err, out)
+				}
+				e.mustRun(append(args, e.local+"/", "host:site")...)
+				if slices.Contains(flags, "--delete-delay") {
+					// rsync drops inherited per-directory rules before its
+					// delayed deletions, so it removes this file. We keep it.
+					inherited := filepath.Join(e.remote, "site/sub/deeper/keep.log")
+					if err := os.Remove(inherited); err != nil {
+						t.Fatalf("file protected by an inherited rule was deleted: %v", err)
+					}
+				}
+				assertSameTree(t, ref, filepath.Join(e.remote, "site"))
+			})
+		}
+	}
+
+	pulls := [][]string{{"-F"}, {"-FF"}, {"-C"}, {"--filter=:n .rsync-filter"}}
+	for _, proto := range []string{"29", "30", "31", ""} {
+		for _, flags := range pulls {
+			for _, src := range []string{"site/", "site"} {
+				t.Run(fmt.Sprintf("pull/proto=%s/%s/%s", proto, strings.Join(flags, " "), src), func(t *testing.T) {
+					e := newRsyncEnv(t)
+					writeTree(t, filepath.Join(e.remote, "site"), mergeFilterTree)
+					refSrc := t.TempDir()
+					writeTree(t, filepath.Join(refSrc, "site"), mergeFilterTree)
+					ref := t.TempDir()
+					args := append(protoArgs(proto), "-r")
+					args = append(args, flags...)
+
+					refCmd := exec.Command("rsync", append(slices.Clone(args), filepath.Join(refSrc, src), ref+"/")...)
+					if strings.HasSuffix(src, "/") {
+						refCmd.Args[len(refCmd.Args)-2] += "/"
+					}
+					if out, err := refCmd.CombinedOutput(); err != nil {
+						t.Fatalf("reference rsync: %v\n%s", err, out)
+					}
+					e.mustRun(append(args, "host:"+src, e.local+"/")...)
+					assertSameTree(t, ref, e.local)
+				})
+			}
+		}
+	}
+}
+
+// TestRsyncMergeFilterParentScan checks that "-F" reads .rsync-filter in
+// the directories above the transfer, as rsync does up to "/".
+func TestRsyncMergeFilterParentScan(t *testing.T) {
+	e := newRsyncEnv(t)
+	writeFile(t, filepath.Join(e.local, "index.html"), []byte("new"))
+	writeTree(t, e.remote, map[string]string{
+		".rsync-filter":     "- /site/scanned.txt\n",
+		"site/scanned.txt":  "protected from above",
+		"site/stale.txt":    "stale",
+		"other/scanned.txt": "outside the transfer",
+	})
+	e.mustRun("-r", "-F", "--delete", e.local+"/", "host:site")
+	got := tree(t, filepath.Join(e.remote, "site"))
+	if _, ok := got["scanned.txt"]; !ok {
+		t.Error("rule from the parent directory's merge file was ignored")
+	}
+	if _, ok := got["stale.txt"]; ok {
+		t.Error("unprotected file survived --delete")
+	}
+}
+
+// TestRsyncMergeFilterErrors checks that a merge file we can't use stops
+// deletions on upload and the whole transfer on download.
+func TestRsyncMergeFilterErrors(t *testing.T) {
+	for _, contents := range []string{"merge other\n", "bogus rule\n"} {
+		t.Run("push/"+contents, func(t *testing.T) {
+			e := newRsyncEnv(t)
+			writeFile(t, filepath.Join(e.local, "index.html"), []byte("new"))
+			writeTree(t, filepath.Join(e.remote, "site"), map[string]string{
+				"sub/.rsync-filter": contents,
+				"sub/stale.txt":     "stale",
+				"stale.txt":         "stale",
+			})
+			out, err := e.run("-r", "-F", "--delete-after", e.local+"/", "host:site")
+			var exit *exec.ExitError
+			if !errors.As(err, &exit) || exit.ExitCode() != exitPartial {
+				t.Fatalf("want exit %d, got %v\n%s", exitPartial, err, out)
+			}
+			if !strings.Contains(out, "skipping file deletion") {
+				t.Errorf("no explanation for skipped deletion\n%s", out)
+			}
+			got := tree(t, filepath.Join(e.remote, "site"))
+			if got["index.html"] != "new" {
+				t.Error("file was not transferred")
+			}
+			for _, name := range []string{"stale.txt", "sub/stale.txt"} {
+				if _, ok := got[name]; !ok {
+					t.Errorf("%s was deleted despite the unusable merge file", name)
+				}
+			}
+		})
+		t.Run("pull/"+contents, func(t *testing.T) {
+			e := newRsyncEnv(t)
+			writeTree(t, filepath.Join(e.remote, "site"), map[string]string{
+				"sub/.rsync-filter": contents,
+				"index.html":        "index",
+			})
+			out, err := e.run("-r", "-F", "host:site/", e.local+"/")
+			if err == nil || !strings.Contains(out, "per-directory filter file") {
+				t.Fatalf("want a merge-file error, got %v\n%s", err, out)
+			}
+			if got := tree(t, e.local); len(got) != 0 {
+				t.Errorf("files transferred despite the error: %v", got)
+			}
+		})
 	}
 }
 

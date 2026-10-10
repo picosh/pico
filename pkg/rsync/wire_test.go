@@ -2,8 +2,11 @@ package rsync
 
 import (
 	"bytes"
+	"errors"
 	"io"
+	"path"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 )
@@ -297,6 +300,161 @@ func TestWildmatch(t *testing.T) {
 	}
 }
 
+func mapReader(files map[string]string) func(string) ([]byte, error) {
+	return func(name string) ([]byte, error) {
+		data, ok := files[name]
+		if !ok {
+			return nil, nil
+		}
+		return []byte(data), nil
+	}
+}
+
+func TestPerDirMergeRules(t *testing.T) {
+	files := map[string]string{
+		".rsync-filter":            "- /site/scanned.txt\n- /outside.txt\n",
+		"site/.rsync-filter":       "# comment\n; comment\n- *.log\nP protected.txt\nH hidden.txt\nexclude long.txt\r\n",
+		"site/sub/.rsync-filter":   "+ important.log\n- /anchored.txt\n",
+		"site/clear/.rsync-filter": "!\n- z\n",
+		"site/.cvsignore":          "a.o  b.o\n",
+		"site/sub/.cvsignore":      "! c.o",
+	}
+	tests := []struct {
+		otherSide int
+		name      string
+		want      int
+	}{
+		{ruleSenderSide, "a.log", -1},
+		{ruleSenderSide, "sub/x.log", -1},
+		{ruleSenderSide, "sub/important.log", 1},
+		{ruleSenderSide, "long.txt", -1},
+		{ruleSenderSide, "scanned.txt", -1},
+		{ruleSenderSide, "outside.txt", 0},
+		{ruleSenderSide, "sub/anchored.txt", -1},
+		{ruleSenderSide, "anchored.txt", 0},
+		{ruleSenderSide, "sub/deeper/anchored.txt", 0},
+		{ruleSenderSide, "clear/a.log", 0},
+		{ruleSenderSide, "clear/z", -1},
+		{ruleSenderSide, ".rsync-filter", -1},
+		{ruleSenderSide, "a.o", -1},
+		{ruleSenderSide, "sub/a.o", 0},
+		{ruleSenderSide, "sub/c.o", -1},
+		{ruleSenderSide, "protected.txt", -1},
+		{ruleSenderSide, "hidden.txt", 0},
+		{ruleReceiverSide, "protected.txt", 0},
+		{ruleReceiverSide, "hidden.txt", -1},
+	}
+	for _, tt := range tests {
+		l := filterList{otherSide: tt.otherSide}
+		for _, rule := range []string{":e /.rsync-filter", ": .rsync-filter", ":C"} {
+			if err := l.parse(rule, false); err != nil {
+				t.Fatalf("parse %q: %v", rule, err)
+			}
+		}
+		if len(l.merges) != 2 {
+			t.Fatalf("duplicate merge rule kept: %d merges", len(l.merges))
+		}
+		sc, err := l.newScopeTree("site", "site", mapReader(files)).scope(path.Dir(tt.name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := l.check(tt.name, false, sc); got != tt.want {
+			t.Errorf("otherSide=%d check(%q) = %d, want %d", tt.otherSide, tt.name, got, tt.want)
+		}
+	}
+}
+
+func TestPerDirMergeDeleteExcluded(t *testing.T) {
+	l := filterList{otherSide: ruleSenderSide, deleteExcluded: true}
+	if err := l.parse(": .rsync-filter", false); err != nil {
+		t.Fatal(err)
+	}
+	files := map[string]string{"site/.rsync-filter": "- excluded.txt\nP protected.txt\n"}
+	sc, err := l.newScopeTree("site", "site", mapReader(files)).scope(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if l.excluded("excluded.txt", false, sc) {
+		t.Error("--delete-excluded should let the receiver delete excluded files")
+	}
+	if !l.excluded("protected.txt", false, sc) {
+		t.Error("protect rules still apply with --delete-excluded")
+	}
+}
+
+func TestPerDirMergeNoInherit(t *testing.T) {
+	l := filterList{otherSide: ruleSenderSide}
+	if err := l.parse(":n /.rsync-filter", false); err != nil {
+		t.Fatal(err)
+	}
+	files := map[string]string{
+		".rsync-filter":      "- *.root\n",
+		"site/.rsync-filter": "- *.tmp\n",
+	}
+	scopes := l.newScopeTree("site", "site", mapReader(files))
+	for _, tt := range []struct {
+		name string
+		want int
+	}{{"x.tmp", -1}, {"sub/x.tmp", 0}, {"x.root", 0}} {
+		sc, err := scopes.scope(path.Dir(tt.name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := l.check(tt.name, false, sc); got != tt.want {
+			t.Errorf("check(%q) = %d, want %d", tt.name, got, tt.want)
+		}
+	}
+}
+
+func TestPerDirMergeErrors(t *testing.T) {
+	for _, rule := range []string{". rules", "merge rules", ":! .rsync-filter", ": x/"} {
+		var l filterList
+		if err := l.parse(rule, false); err == nil {
+			t.Errorf("parse %q: want an error", rule)
+		}
+	}
+	for _, contents := range []string{
+		"merge other\n",
+		": .nested\n",
+		"dir-merge .nested\n",
+		"bogus\n",
+		"-foo\n",
+		"! trailing\n",
+		"- " + strings.Repeat("x", maxPathLen) + "\n",
+	} {
+		l := filterList{otherSide: ruleSenderSide}
+		if err := l.parse(": .rsync-filter", false); err != nil {
+			t.Fatal(err)
+		}
+		files := map[string]string{"site/.rsync-filter": contents}
+		_, err := l.newScopeTree("site", "site", mapReader(files)).scope(".")
+		var mergeErr *mergeFileError
+		if !errors.As(err, &mergeErr) {
+			t.Errorf("merge file %q: want a mergeFileError, got %v", contents, err)
+		}
+	}
+
+	l := filterList{otherSide: ruleSenderSide}
+	if err := l.parse(": .rsync-filter", false); err != nil {
+		t.Fatal(err)
+	}
+	readErr := errors.New("backend down")
+	_, err := l.newScopeTree("site", "site", func(string) ([]byte, error) { return nil, readErr }).scope(".")
+	if !errors.Is(err, readErr) {
+		t.Errorf("read error not reported: %v", err)
+	}
+
+	for _, pattern := range []string{". rules", ": rules"} {
+		var l filterList
+		if err := l.parse(pattern, true); err != nil {
+			t.Fatal(err)
+		}
+		if l.check(pattern, false, nil) != -1 {
+			t.Errorf("protocol 28 pattern %q should remain an exclusion", pattern)
+		}
+	}
+}
+
 func TestFilterRules(t *testing.T) {
 	var l filterList
 	for _, rule := range []string{"+ keep.log", "- *.log", "- /build/", "- node_modules/", "- docs/*.tmp", "-! *.html"} {
@@ -321,7 +479,7 @@ func TestFilterRules(t *testing.T) {
 		{"index.html", false, 0},
 	}
 	for _, tt := range tests {
-		if got := l.check(tt.name, tt.isDir); got != tt.want {
+		if got := l.check(tt.name, tt.isDir, nil); got != tt.want {
 			t.Errorf("check(%q, dir=%v) = %d, want %d", tt.name, tt.isDir, got, tt.want)
 		}
 	}
@@ -329,7 +487,7 @@ func TestFilterRules(t *testing.T) {
 	var old filterList
 	_ = old.parse("*.o", true)
 	_ = old.parse("+ keep.o", true)
-	if old.check("x.o", false) != -1 {
+	if old.check("x.o", false, nil) != -1 {
 		t.Error("protocol 28 bare pattern is an exclude")
 	}
 	_ = old.parse("!", true)

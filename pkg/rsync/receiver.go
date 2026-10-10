@@ -508,6 +508,14 @@ func (g *generator) deletePass() error {
 		return f.flags&flagContentDir != 0
 	}
 
+	files := make(map[string]bool, len(existing))
+	for _, e := range existing {
+		if name, err := cleanSourcePath(e.Name); err == nil && !e.IsDir {
+			files[name] = true
+		}
+	}
+	scopes := s.filters.newScopeTree(g.dest.dir, g.dest.dir, s.mergeReader(g.dest.dir, files))
+
 	type victim struct {
 		name  string
 		isDir bool
@@ -538,11 +546,21 @@ func (g *generator) deletePass() error {
 		if !contentDir(anc) {
 			continue
 		}
+		// Walk down from the ancestor so merge files are only read in
+		// directories rsync would enter. Below it everything is inside a
+		// directory being deleted.
 		protected := false
-		for i, p := range chain {
-			if s.filters.excluded(p, i > 0 || e.IsDir) {
-				protected = true
-				break
+		for i := len(chain) - 1; i >= 0 && !protected; i-- {
+			sc, err := scopes.scope(path.Dir(chain[i]))
+			if err != nil {
+				s.xferError("%v -- skipping file deletion", err)
+				return nil
+			}
+			isDir := i > 0 || e.IsDir
+			if i == len(chain)-1 {
+				protected = s.filters.excluded(chain[i], isDir, sc)
+			} else {
+				protected = s.filters.protectsInDeletedDir(chain[i], isDir, sc)
 			}
 		}
 		if protected {
@@ -702,9 +720,11 @@ func (r *receiver) run() error {
 			if !errors.As(err, &putErr) {
 				return err
 			}
-			// Storage refusing a file (pgs rejecting a dotfile, say) is
-			// reported without failing the whole run.
-			s.warning("rsync: [receiver] %s not stored: %v", f.name(), putErr.err)
+			if errors.Is(putErr.err, ErrFileIgnored) {
+				s.warning("rsync: [receiver] %s skipped: %v", f.name(), putErr.err)
+			} else {
+				s.xferError("%s not stored: %v", f.name(), putErr.err)
+			}
 		}
 	}
 	if err := r.notify(recvEvent{done: true}); err != nil {

@@ -65,6 +65,17 @@ func (r *FileHandlerRouter) Write(s *pssh.SSHServerConnSession, entry *utils.Fil
 	return handler.Write(s, entry)
 }
 
+func (r *FileHandlerRouter) ValidateWrite(s *pssh.SSHServerConnSession, entry *utils.FileEntry) error {
+	handler, err := r.findHandler(entry.Filepath)
+	if err != nil {
+		return err
+	}
+	if v, ok := handler.(utils.WriteValidator); ok {
+		return v.ValidateWrite(s, entry)
+	}
+	return nil
+}
+
 func (r *FileHandlerRouter) Delete(s *pssh.SSHServerConnSession, entry *utils.FileEntry) error {
 	handler, err := r.findHandler(entry.Filepath)
 	if err != nil {

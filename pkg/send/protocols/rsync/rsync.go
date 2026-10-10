@@ -90,7 +90,7 @@ func (s *storageFS) Open(name string) (rsync.File, rsync.FileInfo, error) {
 }
 
 func (s *storageFS) Put(name string, info rsync.FileInfo, r io.Reader) (string, error) {
-	return s.handler.Write(s.session, &utils.FileEntry{
+	msg, err := s.handler.Write(s.session, &utils.FileEntry{
 		Filepath: abs(name),
 		Mode:     fs.FileMode(0600),
 		Size:     info.Size,
@@ -98,7 +98,19 @@ func (s *storageFS) Put(name string, info rsync.FileInfo, r io.Reader) (string, 
 		Atime:    info.ModTime.Unix(),
 		Reader:   r,
 	})
+	if errors.Is(err, utils.ErrFileIgnored) {
+		return msg, ignoredError{err}
+	}
+	return msg, err
 }
+
+// ignoredError marks a handler's ignored file for rsync, keeping the
+// handler's message.
+type ignoredError struct{ error }
+
+func (e ignoredError) Is(target error) bool { return target == rsync.ErrFileIgnored }
+
+func (e ignoredError) Unwrap() error { return e.error }
 
 func (s *storageFS) Remove(name string, isDir bool) error {
 	return s.handler.Delete(s.session, &utils.FileEntry{Filepath: abs(name)})

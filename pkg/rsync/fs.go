@@ -1,9 +1,14 @@
 package rsync
 
 import (
+	"errors"
 	"io"
 	"time"
 )
+
+// ErrFileIgnored lets Put skip a file without failing the transfer or
+// acknowledging it for --remove-source-files.
+var ErrFileIgnored = errors.New("file ignored")
 
 // FileInfo describes an entry in an FS.
 type FileInfo struct {
@@ -34,6 +39,7 @@ type FS interface {
 	// Put stores a regular file with the data read from r. If the transfer
 	// fails, r returns an error instead of io.EOF and Put must not keep
 	// what it read. The returned message, if any, is shown to the user.
+	// Return an error wrapping ErrFileIgnored for an intentional skip.
 	Put(name string, info FileInfo, r io.Reader) (string, error)
 	// Remove deletes a file or an empty directory.
 	Remove(name string, isDir bool) error

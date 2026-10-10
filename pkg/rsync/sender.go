@@ -69,7 +69,7 @@ func (s *session) buildFileList(args []string) ([]*fileEntry, error) {
 			}
 			continue
 		}
-		if nameType != nameDotDir && s.filters.excluded(fn, info.IsDir) {
+		if nameType != nameDotDir && s.filters.excluded(fn, info.IsDir, nil) {
 			continue
 		}
 		if info.IsDir && !s.opts.xferDirs {
@@ -81,7 +81,11 @@ func (s *session) buildFileList(args []string) ([]*fileEntry, error) {
 			top := s.newEntry(fn, src, info, flagTopDir|flagContentDir|flags)
 			files = append(files, top)
 			if info.IsDir {
-				children, err := s.listDir(fn, src, flags)
+				children, err := s.listDir(fn, src, dir, flags)
+				var mergeErr *mergeFileError
+				if errors.As(err, &mergeErr) {
+					return nil, err
+				}
 				if err != nil {
 					s.ioError |= ioErrGeneral
 					s.xferError("opendir %q failed: %v", "/"+src, err)
@@ -98,8 +102,9 @@ func (s *session) buildFileList(args []string) ([]*fileEntry, error) {
 
 // listDir returns the entries below a source directory, with names under
 // prefix. Directories missing from the listing are implied by their
-// contents, as object stores don't keep them.
-func (s *session) listDir(prefix, src string, flags int) ([]*fileEntry, error) {
+// contents, as object stores don't keep them. root is the storage path of
+// the transfer root.
+func (s *session) listDir(prefix, src, root string, flags int) ([]*fileEntry, error) {
 	entries, err := s.fs.ReadDir(src, s.opts.recurse)
 	if err != nil {
 		return nil, err
@@ -132,10 +137,13 @@ func (s *session) listDir(prefix, src string, flags int) ([]*fileEntry, error) {
 		}
 	}
 	names := make([]string, 0, len(byName))
-	for name := range byName {
+	regular := make(map[string]bool, len(byName))
+	for name, e := range byName {
 		names = append(names, name)
+		regular[name] = !e.IsDir
 	}
 	slices.Sort(names)
+	scopes := s.filters.newScopeTree(root, src, s.mergeReader(src, regular))
 
 	var files []*fileEntry
 	var excludedDirs []string
@@ -145,7 +153,11 @@ func (s *session) listDir(prefix, src string, flags int) ([]*fileEntry, error) {
 			continue
 		}
 		full := join(name)
-		if s.filters.excluded(full, e.IsDir) {
+		sc, err := scopes.scope(path.Dir(name))
+		if err != nil {
+			return nil, err
+		}
+		if s.filters.excluded(full, e.IsDir, sc) {
 			if e.IsDir {
 				excludedDirs = append(excludedDirs, name)
 			}

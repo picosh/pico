@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/picosh/pico/pkg/pssh"
 	"github.com/picosh/pico/pkg/send/utils"
@@ -85,19 +86,27 @@ func copyFromClient(session *pssh.SSHServerConnSession, info Info, handler utils
 			// accepts the header
 			_, _ = session.Write(utils.NULL)
 
+			reader := utils.NewLimitReader(r, int(size))
 			result, err := handler.Write(session, &utils.FileEntry{
 				Filepath: filepath.Join(path, name),
 				Mode:     fs.FileMode(mode),
 				Size:     size,
 				Mtime:    mtime,
 				Atime:    atime,
-				Reader:   utils.NewLimitReader(r, int(size)),
+				Reader:   reader,
 			})
+			// A handler that rejects a file may not read all of it. Skip
+			// the rest so the next header is read from the right place.
+			if _, derr := io.Copy(io.Discard, reader); derr != nil {
+				return fmt.Errorf("failed to read file: %q: %w", name, derr)
+			}
 
-			if err == nil {
+			switch {
+			case err == nil:
 				writeSuccess = append(writeSuccess, result)
-			} else {
+			case errors.Is(err, utils.ErrFileIgnored):
 				writeErrors = append(writeErrors, err)
+			default:
 				fmt.Printf("failed to write file: %q: %v\n", name, err)
 			}
 
@@ -106,6 +115,13 @@ func copyFromClient(session *pssh.SSHServerConnSession, info Info, handler utils
 
 			mtime = 0
 			atime = 0
+			if err != nil && !errors.Is(err, utils.ErrFileIgnored) {
+				// A warning reply makes the client report the file and
+				// exit non-zero once the rest are sent.
+				msg := strings.ReplaceAll(err.Error(), "\n", " ")
+				_, _ = fmt.Fprintf(session, "\x01%s\n", msg)
+				continue
+			}
 			// says 'hey im done'
 			_, _ = session.Write(utils.NULL)
 			continue

@@ -81,6 +81,28 @@ func (h *ScpUploadHandler) Read(s *pssh.SSHServerConnSession, entry *sendutils.F
 	return fileInfo, reader, nil
 }
 
+// ValidateWrite runs the hooks' validation on the file before its
+// contents arrive.
+func (h *ScpUploadHandler) ValidateWrite(s *pssh.SSHServerConnSession, entry *sendutils.FileEntry) error {
+	user := pssh.GetUser(s)
+	if user == nil {
+		return fmt.Errorf("could not get user from ctx")
+	}
+	if entry.Mode.IsDir() {
+		return fmt.Errorf("file entry is directory, but only files are supported: %s", entry.Filepath)
+	}
+	filename := filepath.Base(entry.Filepath)
+	metadata := PostMetaData{
+		Post:      &db.Post{Filename: filename, Slug: shared.SanitizeFileExt(filename)},
+		User:      user,
+		FileEntry: entry,
+	}
+	if valid, err := h.Hooks.FileValidate(s, &metadata); !valid {
+		return err
+	}
+	return nil
+}
+
 func (h *ScpUploadHandler) Write(s *pssh.SSHServerConnSession, entry *sendutils.FileEntry) (string, error) {
 	logger := pssh.GetLogger(s)
 	user := pssh.GetUser(s)
@@ -102,9 +124,9 @@ func (h *ScpUploadHandler) Write(s *pssh.SSHServerConnSession, entry *sendutils.
 		return "", fmt.Errorf("file entry is directory, but only files are supported: %s", filename)
 	}
 
-	var origText []byte
-	if b, err := io.ReadAll(entry.Reader); err == nil {
-		origText = b
+	origText, err := io.ReadAll(entry.Reader)
+	if err != nil {
+		return "", fmt.Errorf("could not read file (%s): %w", filename, err)
 	}
 
 	mimeType := http.DetectContentType(origText)

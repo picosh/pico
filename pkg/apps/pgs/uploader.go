@@ -265,6 +265,19 @@ func mtimeToTime(entry *sendutils.FileEntry) time.Time {
 }
 
 func (h *UploadAssetHandler) Write(s *pssh.SSHServerConnSession, entry *sendutils.FileEntry) (string, error) {
+	return h.write(s, entry, false)
+}
+
+// ValidateWrite runs the checks Write makes before reading the file.
+func (h *UploadAssetHandler) ValidateWrite(s *pssh.SSHServerConnSession, entry *sendutils.FileEntry) error {
+	if entry.Mode.IsDir() {
+		return nil
+	}
+	_, err := h.write(s, entry, true)
+	return err
+}
+
+func (h *UploadAssetHandler) write(s *pssh.SSHServerConnSession, entry *sendutils.FileEntry, validateOnly bool) (string, error) {
 	logger := pssh.GetLogger(s)
 	user := pssh.GetUser(s)
 
@@ -339,11 +352,10 @@ func (h *UploadAssetHandler) Write(s *pssh.SSHServerConnSession, entry *sendutil
 	remaining := int64(storageMax) - curStorageSize
 	sizeRemaining := min(remaining+curFileSize, fileMax)
 	if sizeRemaining <= 0 {
-		_, _ = fmt.Fprintln(s.Stderr(), "storage quota reached")
-		_, _ = fmt.Fprintf(s.Stderr(), "\r")
-		_ = s.Exit(1)
-		_ = s.Close()
 		return "", fmt.Errorf("storage quota reached")
+	}
+	if validateOnly {
+		return "", nil
 	}
 	logger = logger.With(
 		"storageMax", storageMax,
@@ -467,7 +479,8 @@ func (h *UploadAssetHandler) validateAsset(data *FileData) (bool, error) {
 	fpath := strings.Replace(data.Filepath, "/"+projectName, "", 1)
 	if data.DenyList.MatchesPath(fpath) {
 		err := fmt.Errorf(
-			"ERROR: (%s) file rejected, https://pico.sh/pgs#-pgs-ignore",
+			"%w: (%s), https://pico.sh/pgs#-pgs-ignore",
+			sendutils.ErrFileIgnored,
 			data.Filepath,
 		)
 		return false, err

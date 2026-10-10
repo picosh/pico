@@ -37,9 +37,8 @@ func (p *FeedHooks) FileValidate(s *pssh.SSHServerConnSession, data *filehandler
 		return false, err
 	}
 
-	// Because we need to support sshfs, sftp runs our Write handler twice
-	// and on the first pass we do not have access to the file data.
-	// In that case we should skip the parsing validation
+	// SFTP validates a file when it is opened, before its contents
+	// arrive, so there is nothing to parse yet.
 	if data.Text == "" {
 		return true, nil
 	}

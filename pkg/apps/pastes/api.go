@@ -192,11 +192,12 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 		// we dont want to syntax highlight huge files
 		if post.FileSize > 1*shared.MB {
 			logger.Warn("paste too large to parse and apply syntax highlighting")
-			parsedText = post.Text
+			parsedText = "<pre>" + template.HTMLEscapeString(post.Text) + "</pre>"
 		} else {
 			parsedText, err = ParseText(post.Filename, post.Text)
 			if err != nil {
 				logger.Error("could not parse text", "err", err)
+				parsedText = "<pre>" + template.HTMLEscapeString(post.Text) + "</pre>"
 			}
 			if post.ExpiresAt != nil {
 				expiresAt = post.ExpiresAt.Format(time.DateOnly)
