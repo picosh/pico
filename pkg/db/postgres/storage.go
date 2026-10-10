@@ -2101,6 +2101,8 @@ func (me *PsqlDB) FindUserStats(userID string) (*db.UserStats, error) {
 		switch stat.Service {
 		case "prose":
 			stats.Prose = stat
+		case "pastes":
+			stats.Pastes = stat
 		case "feeds":
 			stats.Feeds = stat
 		}

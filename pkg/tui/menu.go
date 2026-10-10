@@ -127,10 +127,12 @@ func (m *MenuPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	if m.stats != nil {
 		pages, _ := NewUsageInfo("pages", &m.stats.Pages).Draw(ctx)
 		prose, _ := NewUsageInfo("prose", &m.stats.Prose).Draw(ctx)
+		pastes, _ := NewUsageInfo("pastes", &m.stats.Pastes).Draw(ctx)
 		feeds, _ := NewUsageInfo("rss-to-email", &m.stats.Feeds).Draw(ctx)
 		right = append(right,
 			pages,
 			prose,
+			pastes,
 			feeds,
 		)
 	}
