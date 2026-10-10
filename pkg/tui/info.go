@@ -39,10 +39,17 @@ func (m *UsageInfo) getKv() []Kv {
 	}
 	kv := []Kv{
 		{Key: label, Value: fmt.Sprintf("%d", m.stats.Num)},
-		{Key: "oldest", Value: m.stats.FirstCreatedAt.Format(time.DateOnly)},
-		{Key: "newest", Value: m.stats.LastestCreatedAt.Format(time.DateOnly)},
+		{Key: "oldest", Value: formatUsageDate(m.stats.FirstCreatedAt)},
+		{Key: "newest", Value: formatUsageDate(m.stats.LastestCreatedAt)},
 	}
 	return kv
+}
+
+func formatUsageDate(t time.Time) string {
+	if t.IsZero() {
+		return "-"
+	}
+	return t.Format(time.DateOnly)
 }
 
 type UserInfo struct {

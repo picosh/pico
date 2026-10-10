@@ -2041,13 +2041,18 @@ func (me *PsqlDB) findPagesStats(userID string) (*db.UserServiceStats, error) {
 	stats := db.UserServiceStats{
 		Service: "pgs",
 	}
+	// the aggregates are NULL when the user has no projects
+	var first, latestCreated, latestUpdated sql.NullTime
 	err := me.Db.QueryRow(
 		`SELECT count(id), min(created_at), max(created_at), max(updated_at) FROM projects WHERE user_id=$1`,
 		userID,
-	).Scan(&stats.Num, &stats.FirstCreatedAt, &stats.LastestCreatedAt, &stats.LatestUpdatedAt)
+	).Scan(&stats.Num, &first, &latestCreated, &latestUpdated)
 	if err != nil {
 		return nil, err
 	}
+	stats.FirstCreatedAt = first.Time
+	stats.LastestCreatedAt = latestCreated.Time
+	stats.LatestUpdatedAt = latestUpdated.Time
 
 	return &stats, nil
 }

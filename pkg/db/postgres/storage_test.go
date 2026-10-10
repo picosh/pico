@@ -1278,6 +1278,23 @@ func TestFindUserStats(t *testing.T) {
 	}
 }
 
+func TestFindUserStats_NoProjects(t *testing.T) {
+	cleanupTestData(t)
+
+	user, _ := testDB.RegisterUser("statsempty", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI statsempty", "comment", "")
+
+	stats, err := testDB.FindUserStats(user.ID)
+	if err != nil {
+		t.Fatalf("FindUserStats failed: %v", err)
+	}
+	if stats.Pages.Num != 0 {
+		t.Errorf("expected 0 projects, got %d", stats.Pages.Num)
+	}
+	if !stats.Pages.FirstCreatedAt.IsZero() {
+		t.Errorf("expected zero first created at, got %s", stats.Pages.FirstCreatedAt)
+	}
+}
+
 // ============ Tuns Event Logs Tests ============
 
 func TestInsertTunsEventLog(t *testing.T) {
