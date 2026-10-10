@@ -28,6 +28,7 @@ type MenuPage struct {
 
 	list     list.Dynamic
 	features *FeaturesList
+	services *ServicesList
 	stats    *db.UserStats
 }
 
@@ -50,6 +51,7 @@ func NewMenuPage(shrd *SharedModel) *MenuPage {
 	m := &MenuPage{shared: shrd}
 	m.list = list.Dynamic{Builder: getMenuWidget, DrawCursor: true}
 	m.features = NewFeaturesList(shrd)
+	m.services = NewServicesList(shrd)
 	return m
 }
 
@@ -74,8 +76,10 @@ func (m *MenuPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Comm
 	case PageIn:
 		_ = m.fetchUsageStats()
 		cmd, _ := m.features.HandleEvent(vxfw.Init{}, phase)
+		servicesCmd, _ := m.services.HandleEvent(vxfw.Init{}, phase)
 		return vxfw.BatchCmd([]vxfw.Command{
 			cmd,
+			servicesCmd,
 			vxfw.FocusWidgetCmd(&m.list),
 		}), nil
 	case vaxis.Key:
@@ -105,12 +109,7 @@ func (m *MenuPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 		},
 	})
 
-	services, _ := NewServicesList(
-		m.shared.PlusFeatureFlag,
-		m.shared.PgsFeatureFlag,
-		m.shared.ProseFeatureFlag,
-		m.shared.PastesFeatureFlag,
-	).Draw(ctx)
+	services, _ := m.services.Draw(ctx)
 	features, _ := m.features.Draw(ctx)
 
 	leftPane := NewGroupStack([]vxfw.Surface{
@@ -129,7 +128,7 @@ func (m *MenuPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 		pages, _ := NewUsageInfo("pages", &m.stats.Pages).Draw(ctx)
 		prose, _ := NewUsageInfo("prose", &m.stats.Prose).Draw(ctx)
 		pastes, _ := NewUsageInfo("pastes", &m.stats.Pastes).Draw(ctx)
-		feeds, _ := NewUsageInfo("rss-to-email", &m.stats.Feeds).Draw(ctx)
+		feeds, _ := NewUsageInfo("feeds", &m.stats.Feeds).Draw(ctx)
 		right = append(right,
 			pages,
 			prose,

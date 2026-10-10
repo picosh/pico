@@ -336,16 +336,9 @@ func (f *Fetcher) RunUser(user *db.User, now time.Time) error {
 	if err != nil {
 		return err
 	}
-	isPicoPlus := false
-	ff, _ := f.db.FindFeature(user.ID, "plus")
-	if ff != nil {
-		if ff.IsValid() {
-			isPicoPlus = true
-		}
-	}
-
+	isPicoPlus := db.HasPlusOrSpace(f.db, user.ID, "feeds")
 	if !isPicoPlus {
-		return fmt.Errorf("must be pico+ user to receive rss digests")
+		return fmt.Errorf("must have pico+ or feeds access to receive rss digests")
 	}
 
 	if len(posts.Data) > 0 {

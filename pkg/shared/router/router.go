@@ -77,7 +77,7 @@ func (hc *ApiConfig) HasPrivilegedAccess(apiToken string) bool {
 }
 
 func (hc *ApiConfig) HasPlusOrSpace(user *db.User, space string) bool {
-	return hc.Dbpool.HasFeatureByUser(user.ID, "plus") || hc.Dbpool.HasFeatureByUser(user.ID, space)
+	return db.HasPlusOrSpace(hc.Dbpool, user.ID, space)
 }
 
 func (hc *ApiConfig) CreateCtx(prevCtx context.Context, subdomain string) context.Context {

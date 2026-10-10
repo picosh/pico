@@ -21,7 +21,7 @@ rsync, scp, or sftp. Hopefully you see the trend.
 - [pipe](https://pipe.pico.sh): Authenticated `*nix` pipes over `ssh`
 - [prose](https://pico.sh/prose): A blog platform using `ssh` for content
   management.
-- [rss-to-email](https://pico.sh/feeds): An RSS email notification service using `ssh`.
+- [feeds](https://pico.sh/feeds): An RSS email notification service using `ssh`.
 - [pastes](https://pico.sh/pastes): Upload code snippets using rsync, scp, and
   sftp.
 

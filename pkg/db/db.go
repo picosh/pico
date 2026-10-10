@@ -660,3 +660,7 @@ type DB interface {
 
 	Close() error
 }
+
+func HasPlusOrSpace(dbpool DB, userID, space string) bool {
+	return dbpool.HasFeatureByUser(userID, "plus") || dbpool.HasFeatureByUser(userID, space)
+}
