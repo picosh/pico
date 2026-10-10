@@ -33,6 +33,7 @@ type SharedModel struct {
 	BouncerFeatureFlag *db.FeatureFlag
 	PgsFeatureFlag     *db.FeatureFlag
 	ProseFeatureFlag   *db.FeatureFlag
+	PastesFeatureFlag  *db.FeatureFlag
 	Impersonator       string
 	App                *vxfw.App
 }
@@ -281,6 +282,9 @@ func initData(shrd *SharedModel) error {
 
 	prosef, _ := FindFeatureFlag(shrd, "prose")
 	shrd.ProseFeatureFlag = prosef
+
+	pastesf, _ := FindFeatureFlag(shrd, "pastes")
+	shrd.PastesFeatureFlag = pastesf
 
 	if shrd.User != nil {
 		invitedBy, _ := shrd.Dbpool.FindWhoInvitedUser(user.ID)

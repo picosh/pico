@@ -1716,3 +1716,83 @@ func TestFindPipeMonitorsByUser_Empty(t *testing.T) {
 		t.Errorf("expected 0 monitors for user with none, got %d", len(monitors))
 	}
 }
+
+func TestInviteUser_PlusMember(t *testing.T) {
+	cleanupTestData(t)
+
+	from, _ := testDB.RegisterUser("inviteplus", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI inviteplus", "comment", "")
+	to, _ := testDB.RegisterUser("inviteplusto", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI inviteplusto", "comment", "")
+	_, _ = testDB.InsertFeature(from.ID, "plus", time.Now().Add(365*24*time.Hour))
+
+	if err := testDB.InviteUser(from.ID, to.ID); err != nil {
+		t.Fatalf("InviteUser failed: %v", err)
+	}
+
+	for _, name := range []string{"prose", "pgs", "pastes"} {
+		if !testDB.HasFeatureByUser(to.ID, name) {
+			t.Errorf("expected invitee to have %s", name)
+		}
+	}
+
+	inviter, err := testDB.FindWhoInvitedUser(to.ID)
+	if err != nil {
+		t.Fatalf("FindWhoInvitedUser failed: %v", err)
+	}
+	if inviter != "inviteplus" {
+		t.Errorf("expected inviter inviteplus, got %s", inviter)
+	}
+}
+
+func TestInviteUser_InvitedUserCanInvite(t *testing.T) {
+	cleanupTestData(t)
+
+	plus, _ := testDB.RegisterUser("invitechaina", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI invitechaina", "comment", "")
+	mid, _ := testDB.RegisterUser("invitechainb", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI invitechainb", "comment", "")
+	last, _ := testDB.RegisterUser("invitechainc", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI invitechainc", "comment", "")
+	_, _ = testDB.InsertFeature(plus.ID, "plus", time.Now().Add(365*24*time.Hour))
+
+	if err := testDB.InviteUser(plus.ID, mid.ID); err != nil {
+		t.Fatalf("InviteUser from plus failed: %v", err)
+	}
+	if err := testDB.InviteUser(mid.ID, last.ID); err != nil {
+		t.Fatalf("InviteUser from invited user failed: %v", err)
+	}
+	if !testDB.HasFeatureByUser(last.ID, "pastes") {
+		t.Error("expected second invitee to have pastes")
+	}
+}
+
+func TestInviteUser_Unauthorized(t *testing.T) {
+	cleanupTestData(t)
+
+	from, _ := testDB.RegisterUser("invitenone", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI invitenone", "comment", "")
+	to, _ := testDB.RegisterUser("invitenoneto", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI invitenoneto", "comment", "")
+
+	if err := testDB.InviteUser(from.ID, to.ID); err == nil {
+		t.Fatal("expected error for user without pico+ or invite")
+	}
+	if testDB.HasFeatureByUser(to.ID, "prose") {
+		t.Error("expected invitee not to have prose")
+	}
+}
+
+func TestInviteUser_ExpiredInvite(t *testing.T) {
+	cleanupTestData(t)
+
+	plus, _ := testDB.RegisterUser("inviteexpa", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI inviteexpa", "comment", "")
+	expired, _ := testDB.RegisterUser("inviteexpb", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI inviteexpb", "comment", "")
+	to, _ := testDB.RegisterUser("inviteexpc", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI inviteexpc", "comment", "")
+
+	_, err := testDB.Db.Exec(`INSERT INTO invites (from_user_id, to_user_id) VALUES ($1, $2)`, plus.ID, expired.ID)
+	if err != nil {
+		t.Fatalf("insert invite failed: %v", err)
+	}
+	past := time.Now().Add(-24 * time.Hour)
+	for _, name := range []string{"prose", "pgs", "pastes"} {
+		_, _ = testDB.InsertFeature(expired.ID, name, past)
+	}
+
+	if err := testDB.InviteUser(expired.ID, to.ID); err == nil {
+		t.Fatal("expected error for user whose invite access expired")
+	}
+}

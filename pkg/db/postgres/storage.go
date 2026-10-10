@@ -2262,16 +2262,35 @@ func (me *PsqlDB) FindInvitesByUser(userID string) ([]*db.Invite, error) {
 	return invites, nil
 }
 
+// inviteFeatures are the services an invite grants access to.
+var inviteFeatures = []string{"prose", "pgs", "pastes"}
+
+func (me *PsqlDB) hasActiveInvite(userID string) (bool, error) {
+	var invited bool
+	err := me.Db.Get(&invited, `SELECT EXISTS (SELECT 1 FROM invites WHERE to_user_id = $1)`, userID)
+	if err != nil || !invited {
+		return false, err
+	}
+	for _, name := range inviteFeatures {
+		if me.HasFeatureByUser(userID, name) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (me *PsqlDB) InviteUser(fromUserID string, toUserID string) error {
-	ff, _ := me.FindFeature(fromUserID, "plus")
-	hasPlus := ff != nil && ff.IsValid()
+	canInvite := me.HasFeatureByUser(fromUserID, "plus")
+	if !canInvite {
+		invited, err := me.hasActiveInvite(fromUserID)
+		if err != nil {
+			return err
+		}
+		canInvite = invited
+	}
 
-	var invite *db.Invite
-	_ = me.Db.Select(&invite, "SELECT * from invites WHERE to_user_id=?", fromUserID)
-	hasBeenInvited := invite != nil
-
-	if !hasBeenInvited && !hasPlus {
-		return fmt.Errorf("must have valid pico+ membership or have already been invited by someone")
+	if !canInvite {
+		return fmt.Errorf("must have valid pico+ membership or an active invite from someone")
 	}
 
 	_, err := me.Db.Exec(
@@ -2283,10 +2302,10 @@ func (me *PsqlDB) InviteUser(fromUserID string, toUserID string) error {
 	}
 
 	expiresAt := time.Now().Add(5 * 365 * 24 * time.Hour)
-	_, err = me.InsertFeature(toUserID, "prose", expiresAt)
-	if err != nil {
-		return err
+	for _, name := range inviteFeatures {
+		if _, err := me.InsertFeature(toUserID, name, expiresAt); err != nil {
+			return err
+		}
 	}
-	_, err = me.InsertFeature(toUserID, "pgs", expiresAt)
-	return err
+	return nil
 }

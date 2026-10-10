@@ -153,13 +153,14 @@ func (m *FeaturesList) getFeaturesKv() []Kv {
 }
 
 type ServicesList struct {
-	plusFf  *db.FeatureFlag
-	pgsFf   *db.FeatureFlag
-	proseFf *db.FeatureFlag
+	plusFf   *db.FeatureFlag
+	pgsFf    *db.FeatureFlag
+	proseFf  *db.FeatureFlag
+	pastesFf *db.FeatureFlag
 }
 
-func NewServicesList(plusFf *db.FeatureFlag, pgsFf *db.FeatureFlag, proseFf *db.FeatureFlag) *ServicesList {
-	return &ServicesList{plusFf: plusFf, pgsFf: pgsFf, proseFf: proseFf}
+func NewServicesList(plusFf *db.FeatureFlag, pgsFf *db.FeatureFlag, proseFf *db.FeatureFlag, pastesFf *db.FeatureFlag) *ServicesList {
+	return &ServicesList{plusFf: plusFf, pgsFf: pgsFf, proseFf: proseFf, pastesFf: pastesFf}
 }
 
 func (m *ServicesList) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
@@ -181,6 +182,7 @@ func (m *ServicesList) getServiceKv() []Kv {
 	hasPlus := m.plusFf != nil && m.plusFf.IsValid()
 	hasPgs := m.pgsFf != nil && m.pgsFf.IsValid()
 	hasProse := m.proseFf != nil && m.proseFf.IsValid()
+	hasPastes := m.pastesFf != nil && m.pastesFf.IsValid()
 	pagesStatus := "invite/pico+"
 	if hasPlus || hasPgs {
 		pagesStatus = "active"
@@ -189,10 +191,14 @@ func (m *ServicesList) getServiceKv() []Kv {
 	if hasPlus || hasProse {
 		proseStatus = "active"
 	}
+	pastesStatus := "invite/pico+"
+	if hasPlus || hasPastes {
+		pastesStatus = "active"
+	}
 	data := [][]string{
 		{"name", "status"},
 		{"pipe", "active"},
-		{"pastes", "active"},
+		{"pastes", pastesStatus},
 		{"prose", proseStatus},
 		{"pages", pagesStatus},
 	}

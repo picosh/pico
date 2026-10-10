@@ -43,7 +43,7 @@ func StartSshServer() {
 	fileMap := map[string]filehandlers.ReadWriteHandler{
 		"fallback": filehandlers.NewScpPostHandler(dbh, cfg, hooks),
 	}
-	handler := filehandlers.NewFileHandlerRouter(cfg, dbh, fileMap)
+	handler := NewUploadHandler(cfg, dbh, fileMap)
 	sshAuth := shared.NewSshAuthHandler(dbh, logger, "pastes")
 
 	// Create a new SSH server

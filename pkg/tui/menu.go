@@ -109,6 +109,7 @@ func (m *MenuPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 		m.shared.PlusFeatureFlag,
 		m.shared.PgsFeatureFlag,
 		m.shared.ProseFeatureFlag,
+		m.shared.PastesFeatureFlag,
 	).Draw(ctx)
 	features, _ := m.features.Draw(ctx)
 
