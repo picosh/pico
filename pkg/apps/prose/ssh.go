@@ -8,8 +8,6 @@ import (
 	"time"
 
 	"github.com/picosh/pico/pkg/db/postgres"
-	"github.com/picosh/pico/pkg/filehandlers"
-	uploadimgs "github.com/picosh/pico/pkg/filehandlers/imgs"
 	"github.com/picosh/pico/pkg/pssh"
 	"github.com/picosh/pico/pkg/send/auth"
 	"github.com/picosh/pico/pkg/send/list"
@@ -38,11 +36,6 @@ func StartSshServer() {
 		_ = dbh.Close()
 	}()
 
-	hooks := &MarkdownHooks{
-		Cfg: cfg,
-		Db:  dbh,
-	}
-
 	adapter := storage.GetStorageTypeFromEnv()
 	st, err := storage.NewStorage(cfg.Logger, adapter)
 	if err != nil {
@@ -50,14 +43,7 @@ func StartSshServer() {
 		return
 	}
 
-	fileMap := map[string]filehandlers.ReadWriteHandler{
-		".md":      filehandlers.NewScpPostHandler(dbh, cfg, hooks),
-		".txt":     filehandlers.NewScpPostHandler(dbh, cfg, hooks),
-		".css":     filehandlers.NewScpPostHandler(dbh, cfg, hooks),
-		".lxt":     filehandlers.NewScpPostHandler(dbh, cfg, hooks),
-		"fallback": uploadimgs.NewUploadImgHandler(dbh, cfg, st),
-	}
-	handler := NewUploadHandler(cfg, dbh, fileMap)
+	handler := NewFileHandler(cfg, dbh, st)
 
 	sshAuth := shared.NewSshAuthHandler(dbh, logger, "prose")
 

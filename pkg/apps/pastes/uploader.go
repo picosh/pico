@@ -48,6 +48,14 @@ func NewUploadHandler(cfg *shared.ConfigSite, dbpool db.DB, fileMap map[string]f
 	}
 }
 
+// NewFileHandler stores every file as a paste.
+func NewFileHandler(cfg *shared.ConfigSite, dbpool db.DB) *UploadHandler {
+	hooks := &FileHooks{Cfg: cfg, Db: dbpool}
+	return NewUploadHandler(cfg, dbpool, map[string]filehandlers.ReadWriteHandler{
+		"fallback": filehandlers.NewScpPostHandler(dbpool, cfg, hooks),
+	})
+}
+
 func (h *UploadHandler) GetLogger(s *pssh.SSHServerConnSession) *slog.Logger {
 	logger := pssh.GetLogger(s)
 	if logger == nil {

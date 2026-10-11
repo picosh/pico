@@ -693,6 +693,95 @@ func (me *PsqlDB) UpdatePost(post *db.Post) (*db.Post, error) {
 	return me.FindPost(post.ID)
 }
 
+func (me *PsqlDB) RenamePost(cur, next, replaced *db.Post, tags, aliases []string) (*db.Post, error) {
+	tx, err := me.Db.Beginx()
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	affected := func(res sql.Result, err error) error {
+		if err != nil {
+			return err
+		}
+		n, err := res.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return db.ErrPostChanged
+		}
+		return nil
+	}
+
+	// A save of the replaced post since it was read is kept.
+	if replaced != nil {
+		err := affected(tx.Exec(
+			`DELETE FROM posts WHERE id = $1 AND filename = $2 AND text = $3 AND updated_at IS NOT DISTINCT FROM $4`,
+			replaced.ID, replaced.Filename, replaced.Text, replaced.UpdatedAt,
+		))
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// The update only applies to the post as the caller read it, so a save
+	// in between is never overwritten. It sets only what a new name can
+	// change, which leaves data that other writers keep, like feed digests.
+	query := `
+	UPDATE posts
+	SET filename = $1, slug = $2, title = $3, description = $4, publish_at = $5, hidden = $6,
+		expires_at = $7, mime_type = $8
+	WHERE id = $9 AND filename = $10 AND slug = $11 AND title = $12 AND text = $13
+		AND description = $14 AND updated_at IS NOT DISTINCT FROM $15
+		AND publish_at IS NOT DISTINCT FROM $16 AND hidden = $17
+		AND expires_at IS NOT DISTINCT FROM $18`
+	err = affected(tx.Exec(
+		query,
+		next.Filename,
+		next.Slug,
+		next.Title,
+		next.Description,
+		next.PublishAt,
+		next.Hidden,
+		next.ExpiresAt,
+		next.MimeType,
+		cur.ID,
+		cur.Filename,
+		cur.Slug,
+		cur.Title,
+		cur.Text,
+		cur.Description,
+		cur.UpdatedAt,
+		cur.PublishAt,
+		cur.Hidden,
+		cur.ExpiresAt,
+	))
+	if err != nil {
+		return nil, err
+	}
+
+	if err := me.removeTagsByPost(tx, cur.ID); err != nil {
+		return nil, err
+	}
+	if _, err := me.insertTagsByPost(tx, tags, cur.ID); err != nil {
+		return nil, err
+	}
+	if err := me.removeAliasesByPost(tx, cur.ID); err != nil {
+		return nil, err
+	}
+	if _, err := me.insertAliasesByPost(tx, aliases, cur.ID); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return me.FindPost(cur.ID)
+}
+
 func (me *PsqlDB) RemovePosts(postIDs []string) error {
 	param := "{" + strings.Join(postIDs, ",") + "}"
 	_, err := me.Db.Exec(`DELETE FROM posts WHERE id = ANY($1::uuid[])`, param)

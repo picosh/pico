@@ -88,6 +88,10 @@ func (me *StubDB) UpdatePost(post *db.Post) (*db.Post, error) {
 	return nil, errNotImpl
 }
 
+func (me *StubDB) RenamePost(cur, next, replaced *db.Post, tags, aliases []string) (*db.Post, error) {
+	return nil, errNotImpl
+}
+
 func (me *StubDB) RemovePosts(postIDs []string) error {
 	return errNotImpl
 }

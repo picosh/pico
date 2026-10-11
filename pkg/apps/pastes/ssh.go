@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/picosh/pico/pkg/db/postgres"
-	"github.com/picosh/pico/pkg/filehandlers"
 	"github.com/picosh/pico/pkg/pssh"
 	"github.com/picosh/pico/pkg/send/auth"
 	"github.com/picosh/pico/pkg/send/list"
@@ -35,15 +34,7 @@ func StartSshServer() {
 	defer func() {
 		_ = dbh.Close()
 	}()
-	hooks := &FileHooks{
-		Cfg: cfg,
-		Db:  dbh,
-	}
-
-	fileMap := map[string]filehandlers.ReadWriteHandler{
-		"fallback": filehandlers.NewScpPostHandler(dbh, cfg, hooks),
-	}
-	handler := NewUploadHandler(cfg, dbh, fileMap)
+	handler := NewFileHandler(cfg, dbh)
 	sshAuth := shared.NewSshAuthHandler(dbh, logger, "pastes")
 
 	// Create a new SSH server

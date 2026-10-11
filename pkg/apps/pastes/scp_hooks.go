@@ -46,13 +46,18 @@ func (p *FileHooks) FileMeta(s *pssh.SSHServerConnSession, data *filehandlers.Po
 	// we want the slug to be the filename for pastes
 	data.Slug = data.Filename
 
-	if data.ExpiresAt == nil || data.ExpiresAt.IsZero() {
-		// mark posts for deletion a X days after creation
-		expiresAt := time.Now().AddDate(0, 0, DEFAULT_EXPIRES_AT)
-		data.ExpiresAt = &expiresAt
+	// mark posts for deletion a X days after creation
+	expiresAt := time.Now().AddDate(0, 0, DEFAULT_EXPIRES_AT)
+	data.ExpiresAt = &expiresAt
+	var hidden bool
+	// A paste written without arguments, as over sftp, keeps its settings.
+	if cur := data.Cur; cur != nil {
+		hidden = cur.Hidden
+		if cur.ExpiresAt == nil || cur.ExpiresAt.After(time.Now()) {
+			data.ExpiresAt = cur.ExpiresAt
+		}
 	}
 
-	var hidden bool
 	var expiresFound bool
 	var expires *time.Time
 
@@ -76,7 +81,11 @@ func (p *FileHooks) FileMeta(s *pssh.SSHServerConnSession, data *filehandlers.Po
 			case "expires":
 				val, err := strconv.ParseBool(splitArg[1])
 				if err == nil {
-					expiresFound = !val
+					expiresFound = true
+					expires = nil
+					if val {
+						expires = &expiresAt
+					}
 					continue
 				}
 

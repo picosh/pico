@@ -190,9 +190,10 @@ func (f *handler) PosixRename(r *sftp.Request) error {
 	return f.rename(r.Filepath, r.Target, true)
 }
 
-// rename moves a file or a directory. Storage has no move, so each file
-// is written to its new path through the handler, which applies its usual
-// checks, and the sources are deleted once every write succeeded.
+// rename moves a file or a directory. A handler that implements
+// utils.FileRenamer moves a file in place. Otherwise each file is written
+// to its new path through the handler, which applies its usual checks, and
+// the sources are deleted once every write succeeded.
 func (f *handler) rename(from, to string, replace bool) error {
 	if from == to {
 		return nil
@@ -235,6 +236,20 @@ func (f *handler) rename(from, to string, replace bool) error {
 		}
 		if exists || len(belowFiles)+len(belowDirs) > 0 {
 			return os.ErrExist
+		}
+	}
+
+	if isFile {
+		if r, ok := f.writeHandler.(utils.FileRenamer); ok {
+			err := r.Rename(f.session, &utils.FileEntry{Filepath: from}, &utils.FileEntry{Filepath: to})
+			if !errors.Is(err, errors.ErrUnsupported) {
+				if err == nil {
+					f.mu.Lock()
+					delete(f.hidden, to)
+					f.mu.Unlock()
+				}
+				return err
+			}
 		}
 	}
 

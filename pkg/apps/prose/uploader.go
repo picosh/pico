@@ -7,9 +7,11 @@ import (
 
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/filehandlers"
+	uploadimgs "github.com/picosh/pico/pkg/filehandlers/imgs"
 	"github.com/picosh/pico/pkg/pssh"
 	sendutils "github.com/picosh/pico/pkg/send/utils"
 	"github.com/picosh/pico/pkg/shared"
+	"github.com/picosh/pico/pkg/storage"
 )
 
 type ctxFeatureFlagKey struct{}
@@ -77,6 +79,21 @@ func NewUploadHandler(cfg *shared.ConfigSite, dbpool db.DB, fileMap map[string]f
 		Cfg:               cfg,
 		DB:                dbpool,
 	}
+}
+
+// NewFileHandler routes prose's text files to posts and the rest to images.
+func NewFileHandler(cfg *shared.ConfigSite, dbpool db.DB, st storage.StorageServe) *UploadHandler {
+	hooks := &MarkdownHooks{Cfg: cfg, Db: dbpool}
+	// One post handler serves every text extension, so a post can be
+	// renamed in place from one to another.
+	posts := filehandlers.NewScpPostHandler(dbpool, cfg, hooks)
+	return NewUploadHandler(cfg, dbpool, map[string]filehandlers.ReadWriteHandler{
+		".md":      posts,
+		".txt":     posts,
+		".css":     posts,
+		".lxt":     posts,
+		"fallback": uploadimgs.NewUploadImgHandler(dbpool, cfg, st),
+	})
 }
 
 func (h *UploadHandler) GetLogger(s *pssh.SSHServerConnSession) *slog.Logger {

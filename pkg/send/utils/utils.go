@@ -76,6 +76,14 @@ type WriteValidator interface {
 	ValidateWrite(*pssh.SSHServerConnSession, *FileEntry) error
 }
 
+// FileRenamer is implemented by handlers that can move a stored file in
+// place, replacing any file at the destination. It returns
+// errors.ErrUnsupported for a move it can't make, and SFTP copies the file
+// instead.
+type FileRenamer interface {
+	Rename(s *pssh.SSHServerConnSession, from, to *FileEntry) error
+}
+
 func KeyText(session *pssh.SSHServerConnSession) (string, error) {
 	if session.PublicKey() == nil {
 		return "", fmt.Errorf("session doesn't have public key")
