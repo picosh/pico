@@ -143,7 +143,7 @@ func (m *AddInvitePage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	root := vxfw.NewSurface(w, h, m)
 	ah := 0
 
-	header := text.New("Invite a user to pico!  Invitee must already have a pico account.  This grants them `pgs` and `prose` access on their respective free tiers. Only pico+ members or users that received an invite can invite other users.")
+	header := text.New("Invite a user to pico!  Invitee must already have a pico account.  This grants them `pgs`, `prose` and `pastes` access on their respective free tiers. Only pico+ members or users with an active invite can invite other users.")
 	headerSurf, _ := header.Draw(ctx)
 	root.AddChild(0, ah, headerSurf)
 	ah += int(headerSurf.Size.Height) + 1

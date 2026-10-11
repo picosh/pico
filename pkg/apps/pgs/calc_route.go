@@ -233,8 +233,11 @@ func calcRoutes(projectName, fp string, userRedirects []*RedirectRule) []*HttpRe
 		case "wildcard":
 			fallthrough
 		case "variable":
-			rr := regexp.MustCompile(fromMatcher)
-			match = rr.FindStringSubmatch(fp)
+			// The pattern comes from the user's _redirects, so an invalid one
+			// is a rule that never matches.
+			if rr, err := regexp.Compile(fromMatcher); err == nil {
+				match = rr.FindStringSubmatch(fp)
+			}
 		case "none":
 			fallthrough
 		default:

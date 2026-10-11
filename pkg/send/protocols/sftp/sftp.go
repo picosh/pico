@@ -45,6 +45,9 @@ func Middleware(writeHandler utils.CopyFromClientHandler) pssh.SSHServerMiddlewa
 				Handler: &handler{
 					session:      session,
 					writeHandler: writeHandler,
+					pending:      map[string]*pendingFile{},
+					ignored:      map[string]int{},
+					hidden:       map[string]*pendingFile{},
 				},
 			}
 

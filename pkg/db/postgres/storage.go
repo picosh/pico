@@ -693,6 +693,95 @@ func (me *PsqlDB) UpdatePost(post *db.Post) (*db.Post, error) {
 	return me.FindPost(post.ID)
 }
 
+func (me *PsqlDB) RenamePost(cur, next, replaced *db.Post, tags, aliases []string) (*db.Post, error) {
+	tx, err := me.Db.Beginx()
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	affected := func(res sql.Result, err error) error {
+		if err != nil {
+			return err
+		}
+		n, err := res.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return db.ErrPostChanged
+		}
+		return nil
+	}
+
+	// A save of the replaced post since it was read is kept.
+	if replaced != nil {
+		err := affected(tx.Exec(
+			`DELETE FROM posts WHERE id = $1 AND filename = $2 AND text = $3 AND updated_at IS NOT DISTINCT FROM $4`,
+			replaced.ID, replaced.Filename, replaced.Text, replaced.UpdatedAt,
+		))
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// The update only applies to the post as the caller read it, so a save
+	// in between is never overwritten. It sets only what a new name can
+	// change, which leaves data that other writers keep, like feed digests.
+	query := `
+	UPDATE posts
+	SET filename = $1, slug = $2, title = $3, description = $4, publish_at = $5, hidden = $6,
+		expires_at = $7, mime_type = $8
+	WHERE id = $9 AND filename = $10 AND slug = $11 AND title = $12 AND text = $13
+		AND description = $14 AND updated_at IS NOT DISTINCT FROM $15
+		AND publish_at IS NOT DISTINCT FROM $16 AND hidden = $17
+		AND expires_at IS NOT DISTINCT FROM $18`
+	err = affected(tx.Exec(
+		query,
+		next.Filename,
+		next.Slug,
+		next.Title,
+		next.Description,
+		next.PublishAt,
+		next.Hidden,
+		next.ExpiresAt,
+		next.MimeType,
+		cur.ID,
+		cur.Filename,
+		cur.Slug,
+		cur.Title,
+		cur.Text,
+		cur.Description,
+		cur.UpdatedAt,
+		cur.PublishAt,
+		cur.Hidden,
+		cur.ExpiresAt,
+	))
+	if err != nil {
+		return nil, err
+	}
+
+	if err := me.removeTagsByPost(tx, cur.ID); err != nil {
+		return nil, err
+	}
+	if _, err := me.insertTagsByPost(tx, tags, cur.ID); err != nil {
+		return nil, err
+	}
+	if err := me.removeAliasesByPost(tx, cur.ID); err != nil {
+		return nil, err
+	}
+	if _, err := me.insertAliasesByPost(tx, aliases, cur.ID); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return me.FindPost(cur.ID)
+}
+
 func (me *PsqlDB) RemovePosts(postIDs []string) error {
 	param := "{" + strings.Join(postIDs, ",") + "}"
 	_, err := me.Db.Exec(`DELETE FROM posts WHERE id = ANY($1::uuid[])`, param)
@@ -2041,13 +2130,18 @@ func (me *PsqlDB) findPagesStats(userID string) (*db.UserServiceStats, error) {
 	stats := db.UserServiceStats{
 		Service: "pgs",
 	}
+	// the aggregates are NULL when the user has no projects
+	var first, latestCreated, latestUpdated sql.NullTime
 	err := me.Db.QueryRow(
 		`SELECT count(id), min(created_at), max(created_at), max(updated_at) FROM projects WHERE user_id=$1`,
 		userID,
-	).Scan(&stats.Num, &stats.FirstCreatedAt, &stats.LastestCreatedAt, &stats.LatestUpdatedAt)
+	).Scan(&stats.Num, &first, &latestCreated, &latestUpdated)
 	if err != nil {
 		return nil, err
 	}
+	stats.FirstCreatedAt = first.Time
+	stats.LastestCreatedAt = latestCreated.Time
+	stats.LatestUpdatedAt = latestUpdated.Time
 
 	return &stats, nil
 }
@@ -2101,6 +2195,8 @@ func (me *PsqlDB) FindUserStats(userID string) (*db.UserStats, error) {
 		switch stat.Service {
 		case "prose":
 			stats.Prose = stat
+		case "pastes":
+			stats.Pastes = stat
 		case "feeds":
 			stats.Feeds = stat
 		}
@@ -2260,16 +2356,35 @@ func (me *PsqlDB) FindInvitesByUser(userID string) ([]*db.Invite, error) {
 	return invites, nil
 }
 
+// inviteFeatures are the services an invite grants access to.
+var inviteFeatures = []string{"prose", "pgs", "pastes"}
+
+func (me *PsqlDB) hasActiveInvite(userID string) (bool, error) {
+	var invited bool
+	err := me.Db.Get(&invited, `SELECT EXISTS (SELECT 1 FROM invites WHERE to_user_id = $1)`, userID)
+	if err != nil || !invited {
+		return false, err
+	}
+	for _, name := range inviteFeatures {
+		if me.HasFeatureByUser(userID, name) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (me *PsqlDB) InviteUser(fromUserID string, toUserID string) error {
-	ff, _ := me.FindFeature(fromUserID, "plus")
-	hasPlus := ff != nil && ff.IsValid()
+	canInvite := me.HasFeatureByUser(fromUserID, "plus")
+	if !canInvite {
+		invited, err := me.hasActiveInvite(fromUserID)
+		if err != nil {
+			return err
+		}
+		canInvite = invited
+	}
 
-	var invite *db.Invite
-	_ = me.Db.Select(&invite, "SELECT * from invites WHERE to_user_id=?", fromUserID)
-	hasBeenInvited := invite != nil
-
-	if !hasBeenInvited && !hasPlus {
-		return fmt.Errorf("must have valid pico+ membership or have already been invited by someone")
+	if !canInvite {
+		return fmt.Errorf("must have valid pico+ membership or an active invite from someone")
 	}
 
 	_, err := me.Db.Exec(
@@ -2281,10 +2396,10 @@ func (me *PsqlDB) InviteUser(fromUserID string, toUserID string) error {
 	}
 
 	expiresAt := time.Now().Add(5 * 365 * 24 * time.Hour)
-	_, err = me.InsertFeature(toUserID, "prose", expiresAt)
-	if err != nil {
-		return err
+	for _, name := range inviteFeatures {
+		if _, err := me.InsertFeature(toUserID, name, expiresAt); err != nil {
+			return err
+		}
 	}
-	_, err = me.InsertFeature(toUserID, "pgs", expiresAt)
-	return err
+	return nil
 }

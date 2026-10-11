@@ -15,6 +15,7 @@ import (
 type PgsConfig struct {
 	CacheTTL           time.Duration
 	CacheMaxItems      int
+	CacheMaxBodySize   int64
 	Domain             string
 	MaxAssetSize       int64
 	MaxSize            uint64
@@ -65,6 +66,10 @@ func (c *PgsConfig) StaticPath(fname string) string {
 var maxSize = uint64(50 * shared.MB)
 var maxAssetSize = int64(10 * shared.MB)
 
+// Larger responses stream from storage instead of being held in the cache.
+// Zero means no limit.
+var cacheMaxBodySize = int64(0)
+
 // Needs to be small for caching files like _headers and _redirects.
 var maxSpecialFileSize = int64(5 * shared.KB)
 
@@ -81,6 +86,10 @@ func NewPgsConfig(logger *slog.Logger, dbpool pgsdb.PgsDB, st storage.StorageSer
 	if cacheMaxItemsStr != "" {
 		cacheMaxItems, _ = strconv.Atoi(cacheMaxItemsStr)
 	}
+	cacheMaxBody, err := strconv.ParseInt(shared.GetEnv("PGS_CACHE_MAX_BODY_SIZE", ""), 10, 64)
+	if err != nil {
+		cacheMaxBody = cacheMaxBodySize
+	}
 
 	sshHost := shared.GetEnv("PGS_SSH_HOST", "0.0.0.0")
 	sshPort := shared.GetEnv("PGS_SSH_PORT", "2222")
@@ -88,6 +97,7 @@ func NewPgsConfig(logger *slog.Logger, dbpool pgsdb.PgsDB, st storage.StorageSer
 	cfg := PgsConfig{
 		CacheTTL:           cacheTTL,
 		CacheMaxItems:      cacheMaxItems,
+		CacheMaxBodySize:   cacheMaxBody,
 		Domain:             domain,
 		MaxAssetSize:       maxAssetSize,
 		MaxSize:            maxSize,

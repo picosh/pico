@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -413,6 +414,34 @@ func TestApiBasic(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:          "headers-invalid-path-skipped",
+			path:          "/test.html",
+			want:          "hello world!",
+			status:        http.StatusOK,
+			contentType:   "text/html",
+			wantCacheCtrl: "public, max-age=31536000, immutable",
+
+			storage: map[string]map[string]string{
+				bucketName: {
+					"/test/test.html": "hello world!",
+					"/test/_headers":  "/[\n\tx-broken: yes\n/*\n\tcache-control: public, max-age=31536000, immutable",
+				},
+			},
+		},
+		{
+			name:        "redirects-invalid-pattern-skipped",
+			path:        "/foo(",
+			want:        "404 not found",
+			status:      http.StatusNotFound,
+			contentType: "text/plain; charset=utf-8",
+
+			storage: map[string]map[string]string{
+				bucketName: {
+					"/test/_redirects": "/foo( /index.html 301",
+				},
+			},
+		},
 	}
 
 	for _, tc := range tt {
@@ -748,3 +777,106 @@ func TestDirectoryListing(t *testing.T) {
 // 		})
 // 	}
 // }
+
+// The purge an upload sends must drop the site's parsed _redirects, or the
+// old rules keep being served and cached.
+func TestRulesCacheClearedByUploadPurge(t *testing.T) {
+	logger := slog.New(slog.DiscardHandler)
+	dbpool := NewPgsDb(logger)
+	user := dbpool.Users[0]
+	bucketName := shared.GetAssetBucketName(user.ID)
+	st, err := storage.NewStorageMemory(map[string]map[string]string{
+		bucketName: {
+			"/test/old.html":   "old",
+			"/test/new.html":   "new",
+			"/test/_redirects": "/page /old.html 200",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := NewPgsConfig(logger, dbpool, st, discardPubsub{})
+	cfg.Domain = "pgs.test"
+	router := newWebRouter(cfg)
+
+	get := func() string {
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, httptest.NewRequest("GET", dbpool.mkpath("/page"), nil))
+		return strings.TrimSpace(rec.Body.String())
+	}
+	if got := get(); got != "old" {
+		t.Fatalf("before upload got %q", got)
+	}
+
+	bucket, err := st.GetBucket(bucketName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := st.PutObject(bucket, "/test/_redirects", strings.NewReader("/page /new.html 200"), &storage.ObjectInfo{}); err != nil {
+		t.Fatal(err)
+	}
+	router.clearSiteCache(getSurrogateKey(user.Name, "test"))
+	if got := get(); got != "new" {
+		t.Fatalf("after upload got %q", got)
+	}
+}
+
+// countingDB counts the lookups serving a site makes.
+type countingDB struct {
+	*PgsDb
+	lookups atomic.Int64
+}
+
+func (c *countingDB) FindUserByName(name string) (*db.User, error) {
+	c.lookups.Add(1)
+	return c.PgsDb.FindUserByName(name)
+}
+
+func (c *countingDB) FindProjectByName(userID, name string) (*db.Project, error) {
+	c.lookups.Add(1)
+	return c.PgsDb.FindProjectByName(userID, name)
+}
+
+func (c *countingDB) FindFeature(userID, name string) (*db.FeatureFlag, error) {
+	c.lookups.Add(1)
+	return c.PgsDb.FindFeature(userID, name)
+}
+
+// A site's database records are looked up once and again only after a purge.
+func TestSiteCache(t *testing.T) {
+	logger := slog.New(slog.DiscardHandler)
+	dbpool := &countingDB{PgsDb: NewPgsDb(logger)}
+	user := dbpool.Users[0]
+	st, err := storage.NewStorageMemory(map[string]map[string]string{
+		shared.GetAssetBucketName(user.ID): {"/test/index.html": "hello"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := NewPgsConfig(logger, dbpool, st, discardPubsub{})
+	cfg.Domain = "pgs.test"
+	router := newWebRouter(cfg)
+
+	get := func() {
+		t.Helper()
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, httptest.NewRequest("GET", dbpool.mkpath("/"), nil))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("got status %d", rec.Code)
+		}
+	}
+	get()
+	first := dbpool.lookups.Load()
+	if first == 0 {
+		t.Fatal("serving made no lookups")
+	}
+	get()
+	if n := dbpool.lookups.Load(); n != first {
+		t.Fatalf("second request made %d more lookups", n-first)
+	}
+	router.clearSiteCache(getSurrogateKey(user.Name, "test"))
+	get()
+	if n := dbpool.lookups.Load(); n != 2*first {
+		t.Fatalf("request after purge made %d lookups, want %d", n-first, first)
+	}
+}

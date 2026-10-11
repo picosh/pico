@@ -179,10 +179,10 @@ func TestFsAdapter(t *testing.T) {
 		t.Fatal("file should have been deleted")
 	}
 
-	// ensure containing folder was also deleted
+	// the containing folder stays, as it would on any filesystem
 	_, err = os.Stat(filepath.Join(bucket.Path, "nice"))
-	if !os.IsNotExist(err) {
-		t.Fatal("containing folder should have been deleted")
+	if err != nil {
+		t.Fatal("containing folder should have been kept")
 	}
 
 	// it should not error if file doesn't exist
@@ -200,23 +200,54 @@ func TestFsAdapter(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// delete deeply nested file and all parent folders that are now empty
+	// delete deeply nested file; its now empty parent folders stay
 	err = st.DeleteObject(bucket, "here/yes/we/can.txt")
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = os.Stat(filepath.Join(bucket.Path, "here"))
-	if os.IsNotExist(err) {
-		t.Fatal("this folder had multiple files and should not have been deleted")
-	}
-	_, err = os.Stat(filepath.Join(bucket.Path, "here/yes"))
-	if !os.IsNotExist(err) {
-		t.Fatal("containing folder should have been deleted")
+	_, err = os.Stat(filepath.Join(bucket.Path, "here/yes/we"))
+	if err != nil {
+		t.Fatal("containing folder should have been kept")
 	}
 
 	// delete bucket even with file contents
 	err = st.DeleteBucket(bucket)
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestFsLegacyKeepDir(t *testing.T) {
+	st, err := NewStorageFS(slog.New(slog.DiscardHandler), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	bucket, err := st.UpsertBucket("legacy")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"proj/empty/" + legacyKeepDir, "proj/index.html"} {
+		if _, _, err := st.PutObject(bucket, name, strings.NewReader(""), &ObjectInfo{}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	for _, recursive := range []bool{false, true} {
+		infos, err := st.ListObjects(bucket, "proj/", recursive)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, info := range infos {
+			if strings.Contains(info.Name(), legacyKeepDir) {
+				t.Fatalf("listing (recursive=%v) shows %s", recursive, info.Name())
+			}
+		}
+	}
+
+	if err := st.DeleteObject(bucket, "proj/empty"); err != nil {
+		t.Fatalf("deleting a directory holding only a marker: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(bucket.Path, "proj/empty")); !os.IsNotExist(err) {
+		t.Fatalf("directory still exists: %v", err)
 	}
 }

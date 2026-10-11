@@ -1,7 +1,9 @@
 package filehandlers
 
 import (
+	"database/sql"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -81,6 +83,28 @@ func (h *ScpUploadHandler) Read(s *pssh.SSHServerConnSession, entry *sendutils.F
 	return fileInfo, reader, nil
 }
 
+// ValidateWrite runs the hooks' validation on the file before its
+// contents arrive.
+func (h *ScpUploadHandler) ValidateWrite(s *pssh.SSHServerConnSession, entry *sendutils.FileEntry) error {
+	user := pssh.GetUser(s)
+	if user == nil {
+		return fmt.Errorf("could not get user from ctx")
+	}
+	if entry.Mode.IsDir() {
+		return fmt.Errorf("file entry is directory, but only files are supported: %s", entry.Filepath)
+	}
+	filename := filepath.Base(entry.Filepath)
+	metadata := PostMetaData{
+		Post:      &db.Post{Filename: filename, Slug: shared.SanitizeFileExt(filename)},
+		User:      user,
+		FileEntry: entry,
+	}
+	if valid, err := h.Hooks.FileValidate(s, &metadata); !valid {
+		return err
+	}
+	return nil
+}
+
 func (h *ScpUploadHandler) Write(s *pssh.SSHServerConnSession, entry *sendutils.FileEntry) (string, error) {
 	logger := pssh.GetLogger(s)
 	user := pssh.GetUser(s)
@@ -102,33 +126,12 @@ func (h *ScpUploadHandler) Write(s *pssh.SSHServerConnSession, entry *sendutils.
 		return "", fmt.Errorf("file entry is directory, but only files are supported: %s", filename)
 	}
 
-	var origText []byte
-	if b, err := io.ReadAll(entry.Reader); err == nil {
-		origText = b
+	origText, err := io.ReadAll(entry.Reader)
+	if err != nil {
+		return "", fmt.Errorf("could not read file (%s): %w", filename, err)
 	}
 
-	mimeType := http.DetectContentType(origText)
-	ext := filepath.Ext(filename)
-	// DetectContentType does not detect markdown
-	if ext == ".md" {
-		mimeType = "text/markdown; charset=UTF-8"
-	}
-
-	now := time.Now()
-	slug := shared.SanitizeFileExt(filename)
-	fileSize := binary.Size(origText)
-	shasum := shared.Shasum(origText)
-
-	nextPost := db.Post{
-		Filename:  filename,
-		Slug:      slug,
-		PublishAt: &now,
-		Text:      string(origText),
-		MimeType:  mimeType,
-		FileSize:  fileSize,
-		Shasum:    shasum,
-	}
-
+	nextPost := newPost(filename, origText)
 	metadata := PostMetaData{
 		Post:      &nextPost,
 		User:      user,
@@ -267,6 +270,94 @@ func (h *ScpUploadHandler) Write(s *pssh.SSHServerConnSession, entry *sendutils.
 
 	curl := shared.NewCreateURL(h.Cfg)
 	return h.Cfg.FullPostURL(curl, user.Name, metadata.Slug), nil
+}
+
+// newPost is the post a file makes before the hooks fill in the rest.
+func newPost(filename string, text []byte) db.Post {
+	mimeType := http.DetectContentType(text)
+	// DetectContentType does not detect markdown
+	if filepath.Ext(filename) == ".md" {
+		mimeType = "text/markdown; charset=UTF-8"
+	}
+	now := time.Now()
+	return db.Post{
+		Filename:  filename,
+		Slug:      shared.SanitizeFileExt(filename),
+		PublishAt: &now,
+		Text:      string(text),
+		MimeType:  mimeType,
+		FileSize:  binary.Size(text),
+		Shasum:    shared.Shasum(text),
+	}
+}
+
+// Rename moves a post to a new filename in place, so it keeps its ID,
+// publish date and settings. A post at the new filename is replaced.
+func (h *ScpUploadHandler) Rename(s *pssh.SSHServerConnSession, from, to *sendutils.FileEntry) error {
+	user := pssh.GetUser(s)
+	if user == nil {
+		return fmt.Errorf("could not get user from ctx")
+	}
+	fromName, toName := filepath.Base(from.Filepath), filepath.Base(to.Filepath)
+	// A save to either post while it is being renamed starts it over.
+	var err error
+	for range 3 {
+		if err = h.rename(s, user, fromName, toName, to); !errors.Is(err, db.ErrPostChanged) {
+			break
+		}
+	}
+	if err != nil {
+		return err
+	}
+	pssh.GetLogger(s).Info("renamed post", "from", fromName, "to", toName)
+	return nil
+}
+
+func (h *ScpUploadHandler) rename(s *pssh.SSHServerConnSession, user *db.User, fromName, toName string, to *sendutils.FileEntry) error {
+	post, err := h.DBPool.FindPostWithFilename(fromName, user.ID, h.Cfg.Space)
+	if errors.Is(err, sql.ErrNoRows) {
+		return os.ErrNotExist
+	}
+	if err != nil {
+		return err
+	}
+	if fromName == toName {
+		return nil
+	}
+	replaced, err := h.DBPool.FindPostWithFilename(toName, user.ID, h.Cfg.Space)
+	if errors.Is(err, sql.ErrNoRows) {
+		replaced = nil
+	} else if err != nil {
+		return err
+	}
+
+	next := newPost(toName, []byte(post.Text))
+	metadata := PostMetaData{
+		Post:      &next,
+		Cur:       post,
+		User:      user,
+		FileEntry: to,
+	}
+	if valid, err := h.Hooks.FileValidate(s, &metadata); !valid {
+		return err
+	}
+	metadata.Data = post.Data
+	metadata.PublishAt = post.PublishAt
+	if err := h.Hooks.FileMeta(s, &metadata); err != nil {
+		return err
+	}
+	if other, err := h.DBPool.FindPostWithSlug(metadata.Slug, user.ID, h.Cfg.Space); err == nil &&
+		other.ID != post.ID && (replaced == nil || other.ID != replaced.ID) {
+		return fmt.Errorf("%s: %s already uses its slug (%s): %w", toName, other.Filename, metadata.Slug, os.ErrExist)
+	}
+
+	metadata.UpdatedAt = post.UpdatedAt
+	// The new name can parse the text differently, as .md and .lxt do.
+	_, err = h.DBPool.RenamePost(post, metadata.Post, replaced, metadata.Tags, metadata.Aliases)
+	if err != nil && !errors.Is(err, db.ErrPostChanged) {
+		return fmt.Errorf("error for %s: %w", toName, err)
+	}
+	return err
 }
 
 func (h *ScpUploadHandler) Delete(s *pssh.SSHServerConnSession, entry *sendutils.FileEntry) error {

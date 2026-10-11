@@ -14,6 +14,7 @@ var ErrNameTaken = errors.New("username has already been claimed")
 var ErrNameDenied = errors.New("username is on the denylist")
 var ErrNameInvalid = errors.New("username has invalid characters in it")
 var ErrPublicKeyTaken = errors.New("public key is already associated with another user")
+var ErrPostChanged = errors.New("post changed while it was being updated")
 
 // sqlite uses string to BLOB type and postgres uses []uint8 for JSONB.
 func tcast(value any) ([]byte, error) {
@@ -385,9 +386,10 @@ func (m *ErrMultiplePublicKeys) Error() string {
 }
 
 type UserStats struct {
-	Prose UserServiceStats
-	Feeds UserServiceStats
-	Pages UserServiceStats
+	Prose  UserServiceStats
+	Pastes UserServiceStats
+	Feeds  UserServiceStats
+	Pages  UserServiceStats
 }
 
 type UserServiceStats struct {
@@ -603,6 +605,12 @@ type DB interface {
 	FindPostWithSlug(slug string, userID string, space string) (*Post, error)
 	InsertPost(post *Post) (*Post, error)
 	UpdatePost(post *Post) (*Post, error)
+	// RenamePost moves cur to next's filename, with the slug, title,
+	// description, publish date, hidden flag, expiry, mime type, tags and
+	// aliases that name gives it, and removes replaced when it is set, all
+	// in one transaction. It returns ErrPostChanged when either post no
+	// longer matches what the caller read.
+	RenamePost(cur, next, replaced *Post, tags, aliases []string) (*Post, error)
 	RemovePosts(postIDs []string) error
 
 	FindPopularPosts() ([]*Post, error)
@@ -658,4 +666,8 @@ type DB interface {
 	InviteUser(fromUserID string, toUserID string) error
 
 	Close() error
+}
+
+func HasPlusOrSpace(dbpool DB, userID, space string) bool {
+	return dbpool.HasFeatureByUser(userID, "plus") || dbpool.HasFeatureByUser(userID, space)
 }

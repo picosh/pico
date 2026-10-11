@@ -39,10 +39,17 @@ func (m *UsageInfo) getKv() []Kv {
 	}
 	kv := []Kv{
 		{Key: label, Value: fmt.Sprintf("%d", m.stats.Num)},
-		{Key: "oldest", Value: m.stats.FirstCreatedAt.Format(time.DateOnly)},
-		{Key: "newest", Value: m.stats.LastestCreatedAt.Format(time.DateOnly)},
+		{Key: "oldest", Value: formatUsageDate(m.stats.FirstCreatedAt)},
+		{Key: "newest", Value: formatUsageDate(m.stats.LastestCreatedAt)},
 	}
 	return kv
+}
+
+func formatUsageDate(t time.Time) string {
+	if t.IsZero() {
+		return "-"
+	}
+	return t.Format(time.DateOnly)
 }
 
 type UserInfo struct {
@@ -153,13 +160,42 @@ func (m *FeaturesList) getFeaturesKv() []Kv {
 }
 
 type ServicesList struct {
-	plusFf  *db.FeatureFlag
-	pgsFf   *db.FeatureFlag
-	proseFf *db.FeatureFlag
+	shared *SharedModel
+	data   [][]string
 }
 
-func NewServicesList(plusFf *db.FeatureFlag, pgsFf *db.FeatureFlag, proseFf *db.FeatureFlag) *ServicesList {
-	return &ServicesList{plusFf: plusFf, pgsFf: pgsFf, proseFf: proseFf}
+func NewServicesList(shrd *SharedModel) *ServicesList {
+	return &ServicesList{shared: shrd}
+}
+
+func (m *ServicesList) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
+	switch ev.(type) {
+	case vxfw.Init:
+		m.fetchServices()
+		return vxfw.RedrawCmd{}, nil
+	}
+	return nil, nil
+}
+
+func (m *ServicesList) fetchServices() {
+	dbpool := m.shared.Dbpool
+	userID := m.shared.User.ID
+	status := func(space, missing string) string {
+		if db.HasPlusOrSpace(dbpool, userID, space) {
+			return "active"
+		}
+		return missing
+	}
+	m.data = [][]string{
+		{"name", "status"},
+		{"pipe", "active"},
+		{"pastes", status("pastes", "invite/pico+")},
+		{"prose", status("prose", "invite/pico+")},
+		{"pages", status("pgs", "invite/pico+")},
+		{"tuns", status("tuns", "pico+")},
+		{"irc bouncer", status("bouncer", "pico+")},
+		{"feeds", status("feeds", "pico+")},
+	}
 }
 
 func (m *ServicesList) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
@@ -167,7 +203,7 @@ func (m *ServicesList) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	brd := NewBorder(services)
 	brd.Label = "services"
 	brd.Style = vaxis.Style{Foreground: purp}
-	servicesHeight := 7
+	servicesHeight := 8
 	return brd.Draw(vxfw.DrawContext{
 		Characters: ctx.Characters,
 		Max: vxfw.Size{
@@ -178,42 +214,8 @@ func (m *ServicesList) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 }
 
 func (m *ServicesList) getServiceKv() []Kv {
-	hasPlus := m.plusFf != nil && m.plusFf.IsValid()
-	hasPgs := m.pgsFf != nil && m.pgsFf.IsValid()
-	hasProse := m.proseFf != nil && m.proseFf.IsValid()
-	pagesStatus := "invite/pico+"
-	if hasPlus || hasPgs {
-		pagesStatus = "active"
-	}
-	proseStatus := "invite/pico+"
-	if hasPlus || hasProse {
-		proseStatus = "active"
-	}
-	data := [][]string{
-		{"name", "status"},
-		{"pipe", "active"},
-		{"prose", proseStatus},
-		{"pages", pagesStatus},
-	}
-
-	if hasPlus {
-		data = append(
-			data,
-			[]string{"tuns", "active"},
-			[]string{"irc bouncer", "active"},
-			[]string{"rss-to-email", "active"},
-		)
-	} else {
-		data = append(
-			data,
-			[]string{"tuns", "pico+"},
-			[]string{"irc bouncer", "pico+"},
-			[]string{"rss-to-email", "pico+"},
-		)
-	}
-
 	kv := []Kv{}
-	for idx, d := range data {
+	for idx, d := range m.data {
 		value := d[1]
 		var style vaxis.Style
 		if idx == 0 {

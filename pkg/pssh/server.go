@@ -349,10 +349,12 @@ func (s *SSHServer) ListenAndServe() error {
 			},
 		}, []string{"command"})
 
-		go func() {
-			mux := http.NewServeMux()
-			mux.Handle("/metrics", promhttp.Handler())
+		// The handler reads the default registerer, so build it before the
+		// listener is published rather than in the goroutine.
+		mux := http.NewServeMux()
+		mux.Handle("/metrics", promhttp.Handler())
 
+		go func() {
 			srv := &http.Server{Addr: s.Config.PromListenAddr, Handler: mux}
 
 			go func() {

@@ -2,6 +2,7 @@ package utils
 
 import (
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -15,6 +16,9 @@ import (
 
 // NULL is an array with a single NULL byte.
 var NULL = []byte{'\x00'}
+
+// ErrFileIgnored marks a file deliberately excluded by upload policy.
+var ErrFileIgnored = errors.New("file ignored")
 
 // FileEntry is an Entry that reads from a Reader, defining a file and
 // its contents.
@@ -64,6 +68,20 @@ type CopyFromClientHandler interface {
 	List(*pssh.SSHServerConnSession, string, bool, bool) ([]os.FileInfo, error)
 	GetLogger(*pssh.SSHServerConnSession) *slog.Logger
 	Validate(*pssh.SSHServerConnSession) error
+}
+
+// WriteValidator is implemented by handlers that can check a write before
+// its contents arrive, so SFTP can refuse a file when it is opened.
+type WriteValidator interface {
+	ValidateWrite(*pssh.SSHServerConnSession, *FileEntry) error
+}
+
+// FileRenamer is implemented by handlers that can move a stored file in
+// place, replacing any file at the destination. It returns
+// errors.ErrUnsupported for a move it can't make, and SFTP copies the file
+// instead.
+type FileRenamer interface {
+	Rename(s *pssh.SSHServerConnSession, from, to *FileEntry) error
 }
 
 func KeyText(session *pssh.SSHServerConnSession) (string, error) {

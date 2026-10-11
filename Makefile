@@ -12,9 +12,11 @@ WRITE?=0
 smol:
 	curl https://pico.sh/smol.css -o ./pkg/apps/prose/public/smol-v2.css
 	cat ./pkg/apps/prose/artifacts/main.css >> ./pkg/apps/prose/public/smol-v2.css
+	curl https://pico.sh/smol.css -o ./pkg/apps/pastes/public/smol.css
 .PHONY: smol
 
 css:
+	cp ./syntax.css ./pkg/apps/pastes/public/syntax.css
 	cp ./syntax.css ./pkg/apps/prose/public/syntax.css
 .PHONY: css
 
@@ -80,7 +82,7 @@ bp-%: bp-setup
 	$(DOCKER_BUILDX_BUILD) "ghcr.io/picosh/pico/$*-web:$(DOCKER_TAG)" --build-arg "APP=$*" --target release-web .
 .PHONY: bp-%
 
-bp-all: bp-prose bp-feeds bp-pgs bp-auth bp-bouncer bp-pipe bp-pgs-cdn
+bp-all: bp-prose bp-pastes bp-feeds bp-pgs bp-auth bp-bouncer bp-pipe bp-pgs-cdn
 .PHONY: bp-all
 
 LDFLAGS?=-s -w
@@ -102,7 +104,7 @@ build-%:
 	go build -ldflags="$(LDFLAGS)" -o "build/$*-ssh" "./cmd/$*/ssh"
 .PHONY: build-%
 
-build: build-prose build-feeds build-pgs build-pgs-cdn build-auth build-pico build-pipe
+build: build-prose build-pastes build-feeds build-pgs build-pgs-cdn build-auth build-pico build-pipe
 .PHONY: build
 
 scripts:
@@ -162,10 +164,11 @@ migrate:
 	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20260504_add_analytics_summary_indexes.sql
 	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20260716_block_signups.sql
 	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20260925_add_invites.sql
+	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20261010_add_pastes_invite_feature.sql
 .PHONY: migrate
 
 latest:
-	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20260925_add_invites.sql
+	$(DOCKER_CMD) exec -i $(DB_CONTAINER) psql -U $(PGUSER) -d $(PGDATABASE) < ./sql/migrations/20261010_add_pastes_invite_feature.sql
 .PHONY: latest
 
 psql:

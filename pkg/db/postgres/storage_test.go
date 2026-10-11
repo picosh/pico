@@ -2,12 +2,14 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"testing"
 	"time"
@@ -578,6 +580,125 @@ func TestUpdatePost(t *testing.T) {
 	}
 }
 
+func TestRenamePost(t *testing.T) {
+	cleanupTestData(t)
+
+	user, _ := testDB.RegisterUser("renamepostowner", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI renamepostowner", "comment", "")
+	mustInsertPost(t, &db.Post{UserID: user.ID, Filename: "a.md", Slug: "a", Text: "a", Space: "prose", Hidden: true})
+	mustInsertPost(t, &db.Post{UserID: user.ID, Filename: "b.md", Slug: "b", Text: "b", Space: "prose"})
+	third := mustInsertPost(t, &db.Post{UserID: user.ID, Filename: "c.md", Slug: "c", Text: "c", Space: "prose"})
+	// Posts made before data was written on insert have the column default.
+	if _, err := testDB.Db.Exec(`UPDATE posts SET data = '{}'::jsonb`); err != nil {
+		t.Fatal(err)
+	}
+	find := func(filename string) *db.Post {
+		t.Helper()
+		p, err := testDB.FindPostWithFilename(filename, user.ID, "prose")
+		if err != nil {
+			t.Fatalf("%s: %v", filename, err)
+		}
+		return p
+	}
+	renamed := func(cur *db.Post, filename, slug string) *db.Post {
+		next := *cur
+		next.Filename, next.Slug, next.MimeType = filename, slug, "text/plain"
+		return &next
+	}
+
+	a := find("a.md")
+	got, err := testDB.RenamePost(a, renamed(a, "a.lxt", "a"), nil, []string{"x", "y"}, []string{"old-a"})
+	if err != nil {
+		t.Fatalf("RenamePost failed: %v", err)
+	}
+	if got.ID != a.ID || got.Filename != "a.lxt" || got.MimeType != "text/plain" || !got.Hidden {
+		t.Errorf("unexpected post after rename: %+v", got)
+	}
+	a = find("a.lxt")
+	if slices.Sort(a.Tags); !slices.Equal(a.Tags, []string{"x", "y"}) {
+		t.Errorf("tags = %q", a.Tags)
+	}
+	if p, err := testDB.FindPostWithSlug("old-a", user.ID, "prose"); err != nil || p.ID != a.ID {
+		t.Errorf("alias old-a = %+v, %v", p, err)
+	}
+
+	// A save after the post was read stops the rename and is kept.
+	stale := *a
+	saved := *a
+	saved.Text = "saved"
+	if _, err := testDB.UpdatePost(&saved); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := testDB.RenamePost(&stale, renamed(&stale, "d.md", "d"), nil, nil, nil); !errors.Is(err, db.ErrPostChanged) {
+		t.Fatalf("rename of a changed post: %v", err)
+	}
+	if p := find("a.lxt"); p.Text != "saved" {
+		t.Errorf("a.lxt text = %q, want the save", p.Text)
+	}
+
+	// So does a save to the post it replaces.
+	a = find("a.lxt")
+	b := find("b.md")
+	bSaved := *b
+	bSaved.Text = "b saved"
+	if _, err := testDB.UpdatePost(&bSaved); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := testDB.RenamePost(a, renamed(a, "b.md", "b"), b, nil, nil); !errors.Is(err, db.ErrPostChanged) {
+		t.Fatalf("rename over a changed post: %v", err)
+	}
+	if p := find("b.md"); p.Text != "b saved" {
+		t.Errorf("b.md text = %q, want the save", p.Text)
+	}
+	if p := find("a.lxt"); p.ID != a.ID {
+		t.Errorf("a.lxt moved by a failed rename")
+	}
+
+	// Taking another post's slug fails and keeps the post it would replace.
+	b = find("b.md")
+	if _, err := testDB.RenamePost(a, renamed(a, "c2.md", "c"), b, nil, nil); err == nil {
+		t.Fatal("expected a slug conflict")
+	}
+	find("b.md")
+
+	if _, err := testDB.RenamePost(a, renamed(a, "b.md", "b"), b, nil, nil); err != nil {
+		t.Fatalf("RenamePost over b.md failed: %v", err)
+	}
+	if p := find("b.md"); p.ID != a.ID || p.Text != "saved" {
+		t.Errorf("b.md = %+v", p)
+	}
+	if _, err := testDB.FindPost(b.ID); err == nil {
+		t.Error("replaced post still exists")
+	}
+	if _, err := testDB.FindPost(third.ID); err != nil {
+		t.Errorf("unrelated post removed: %v", err)
+	}
+
+	// Data written after the post was read, like a feed digest, is kept.
+	moved := find("b.md")
+	if _, err := testDB.Db.Exec(`UPDATE posts SET data = '{"attempts": 2}'::jsonb WHERE id = $1`, moved.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := testDB.RenamePost(moved, renamed(moved, "e.md", "e"), nil, nil, nil); err != nil {
+		t.Fatalf("rename after a data change: %v", err)
+	}
+	if p := find("e.md"); p.Data.Attempts != 2 {
+		t.Errorf("data = %+v, want the later write", p.Data)
+	}
+
+	// A post moved to another name after it was read isn't replaced.
+	e := find("e.md")
+	c := find("c.md")
+	if _, err := testDB.Db.Exec(`UPDATE posts SET filename = 'f.md' WHERE id = $1`, c.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := testDB.RenamePost(e, renamed(e, "c.md", "c"), c, nil, nil); !errors.Is(err, db.ErrPostChanged) {
+		t.Fatalf("rename over a moved post: %v", err)
+	}
+	if p := find("f.md"); p.ID != c.ID {
+		t.Errorf("f.md = %+v", p)
+	}
+}
+
 func TestRemovePosts(t *testing.T) {
 	cleanupTestData(t)
 
@@ -748,11 +869,11 @@ func TestFindExpiredPosts(t *testing.T) {
 		Filename:  "expired.txt",
 		Slug:      "expired",
 		Title:     "Expired",
-		Space:     "prose",
+		Space:     "pastes",
 		ExpiresAt: &expired,
 	})
 
-	posts, err := testDB.FindExpiredPosts("prose")
+	posts, err := testDB.FindExpiredPosts("pastes")
 	if err != nil {
 		t.Fatalf("FindExpiredPosts failed: %v", err)
 	}
@@ -1278,6 +1399,23 @@ func TestFindUserStats(t *testing.T) {
 	}
 }
 
+func TestFindUserStats_NoProjects(t *testing.T) {
+	cleanupTestData(t)
+
+	user, _ := testDB.RegisterUser("statsempty", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI statsempty", "comment", "")
+
+	stats, err := testDB.FindUserStats(user.ID)
+	if err != nil {
+		t.Fatalf("FindUserStats failed: %v", err)
+	}
+	if stats.Pages.Num != 0 {
+		t.Errorf("expected 0 projects, got %d", stats.Pages.Num)
+	}
+	if !stats.Pages.FirstCreatedAt.IsZero() {
+		t.Errorf("expected zero first created at, got %s", stats.Pages.FirstCreatedAt)
+	}
+}
+
 // ============ Tuns Event Logs Tests ============
 
 func TestInsertTunsEventLog(t *testing.T) {
@@ -1714,5 +1852,85 @@ func TestFindPipeMonitorsByUser_Empty(t *testing.T) {
 
 	if len(monitors) != 0 {
 		t.Errorf("expected 0 monitors for user with none, got %d", len(monitors))
+	}
+}
+
+func TestInviteUser_PlusMember(t *testing.T) {
+	cleanupTestData(t)
+
+	from, _ := testDB.RegisterUser("inviteplus", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI inviteplus", "comment", "")
+	to, _ := testDB.RegisterUser("inviteplusto", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI inviteplusto", "comment", "")
+	_, _ = testDB.InsertFeature(from.ID, "plus", time.Now().Add(365*24*time.Hour))
+
+	if err := testDB.InviteUser(from.ID, to.ID); err != nil {
+		t.Fatalf("InviteUser failed: %v", err)
+	}
+
+	for _, name := range []string{"prose", "pgs", "pastes"} {
+		if !testDB.HasFeatureByUser(to.ID, name) {
+			t.Errorf("expected invitee to have %s", name)
+		}
+	}
+
+	inviter, err := testDB.FindWhoInvitedUser(to.ID)
+	if err != nil {
+		t.Fatalf("FindWhoInvitedUser failed: %v", err)
+	}
+	if inviter != "inviteplus" {
+		t.Errorf("expected inviter inviteplus, got %s", inviter)
+	}
+}
+
+func TestInviteUser_InvitedUserCanInvite(t *testing.T) {
+	cleanupTestData(t)
+
+	plus, _ := testDB.RegisterUser("invitechaina", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI invitechaina", "comment", "")
+	mid, _ := testDB.RegisterUser("invitechainb", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI invitechainb", "comment", "")
+	last, _ := testDB.RegisterUser("invitechainc", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI invitechainc", "comment", "")
+	_, _ = testDB.InsertFeature(plus.ID, "plus", time.Now().Add(365*24*time.Hour))
+
+	if err := testDB.InviteUser(plus.ID, mid.ID); err != nil {
+		t.Fatalf("InviteUser from plus failed: %v", err)
+	}
+	if err := testDB.InviteUser(mid.ID, last.ID); err != nil {
+		t.Fatalf("InviteUser from invited user failed: %v", err)
+	}
+	if !testDB.HasFeatureByUser(last.ID, "pastes") {
+		t.Error("expected second invitee to have pastes")
+	}
+}
+
+func TestInviteUser_Unauthorized(t *testing.T) {
+	cleanupTestData(t)
+
+	from, _ := testDB.RegisterUser("invitenone", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI invitenone", "comment", "")
+	to, _ := testDB.RegisterUser("invitenoneto", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI invitenoneto", "comment", "")
+
+	if err := testDB.InviteUser(from.ID, to.ID); err == nil {
+		t.Fatal("expected error for user without pico+ or invite")
+	}
+	if testDB.HasFeatureByUser(to.ID, "prose") {
+		t.Error("expected invitee not to have prose")
+	}
+}
+
+func TestInviteUser_ExpiredInvite(t *testing.T) {
+	cleanupTestData(t)
+
+	plus, _ := testDB.RegisterUser("inviteexpa", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI inviteexpa", "comment", "")
+	expired, _ := testDB.RegisterUser("inviteexpb", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI inviteexpb", "comment", "")
+	to, _ := testDB.RegisterUser("inviteexpc", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI inviteexpc", "comment", "")
+
+	_, err := testDB.Db.Exec(`INSERT INTO invites (from_user_id, to_user_id) VALUES ($1, $2)`, plus.ID, expired.ID)
+	if err != nil {
+		t.Fatalf("insert invite failed: %v", err)
+	}
+	past := time.Now().Add(-24 * time.Hour)
+	for _, name := range []string{"prose", "pgs", "pastes"} {
+		_, _ = testDB.InsertFeature(expired.ID, name, past)
+	}
+
+	if err := testDB.InviteUser(expired.ID, to.ID); err == nil {
+		t.Fatal("expected error for user whose invite access expired")
 	}
 }

@@ -3,15 +3,18 @@ package rsync
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"io/fs"
 	"log/slog"
 	"os"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/picosh/pico/pkg/pssh"
-	rsyncutils "github.com/picosh/pico/pkg/rsync-receiver/utils"
+	"github.com/picosh/pico/pkg/rsync"
 	"github.com/picosh/pico/pkg/send/utils"
 	"golang.org/x/crypto/ssh"
 )
@@ -20,46 +23,62 @@ import (
 type mockFileInfo struct {
 	name    string
 	size    int64
-	mode    fs.FileMode
 	modTime time.Time
 	isDir   bool
 }
 
-func (m *mockFileInfo) Name() string       { return m.name }
-func (m *mockFileInfo) Size() int64        { return m.size }
-func (m *mockFileInfo) Mode() fs.FileMode  { return m.mode }
+func (m *mockFileInfo) Name() string { return m.name }
+func (m *mockFileInfo) Size() int64  { return m.size }
+func (m *mockFileInfo) Mode() fs.FileMode {
+	if m.isDir {
+		return fs.ModeDir | 0o755
+	}
+	return 0o644
+}
 func (m *mockFileInfo) ModTime() time.Time { return m.modTime }
 func (m *mockFileInfo) IsDir() bool        { return m.isDir }
 func (m *mockFileInfo) Sys() any           { return nil }
 
-// mockWriteHandler implements utils.CopyFromClientHandler for testing.
-// It records the order of Delete calls to verify deletion order.
+// mockWriteHandler implements utils.CopyFromClientHandler and records the
+// paths it was called with.
 type mockWriteHandler struct {
-	entries      []os.FileInfo
-	deleteCalls  []string
-	deleteErrors map[string]error
+	lists   map[string][]os.FileInfo
+	files   map[string]string
+	calls   []string
+	written map[string]string
 }
 
 func (m *mockWriteHandler) Delete(_ *pssh.SSHServerConnSession, entry *utils.FileEntry) error {
-	m.deleteCalls = append(m.deleteCalls, entry.Filepath)
-	if m.deleteErrors != nil {
-		if err, ok := m.deleteErrors[entry.Filepath]; ok {
-			return err
-		}
-	}
+	m.calls = append(m.calls, "delete "+entry.Filepath)
 	return nil
 }
 
-func (m *mockWriteHandler) Write(_ *pssh.SSHServerConnSession, _ *utils.FileEntry) (string, error) {
+func (m *mockWriteHandler) Write(_ *pssh.SSHServerConnSession, entry *utils.FileEntry) (string, error) {
+	m.calls = append(m.calls, "write "+entry.Filepath)
+	b, err := io.ReadAll(entry.Reader)
+	if err != nil {
+		return "", err
+	}
+	if m.written == nil {
+		m.written = map[string]string{}
+	}
+	m.written[entry.Filepath] = string(b)
 	return "", nil
 }
 
-func (m *mockWriteHandler) Read(_ *pssh.SSHServerConnSession, _ *utils.FileEntry) (os.FileInfo, utils.ReadAndReaderAtCloser, error) {
-	return nil, nil, nil
+func (m *mockWriteHandler) Read(_ *pssh.SSHServerConnSession, entry *utils.FileEntry) (os.FileInfo, utils.ReadAndReaderAtCloser, error) {
+	m.calls = append(m.calls, "read "+entry.Filepath)
+	data, ok := m.files[entry.Filepath]
+	if !ok {
+		return nil, nil, os.ErrNotExist
+	}
+	info := &mockFileInfo{name: entry.Filepath, size: int64(len(data))}
+	return info, utils.NopReadAndReaderAtCloser(strings.NewReader(data)), nil
 }
 
-func (m *mockWriteHandler) List(_ *pssh.SSHServerConnSession, _ string, _ bool, _ bool) ([]os.FileInfo, error) {
-	return m.entries, nil
+func (m *mockWriteHandler) List(_ *pssh.SSHServerConnSession, fpath string, isDir bool, recursive bool) ([]os.FileInfo, error) {
+	m.calls = append(m.calls, "list "+fpath)
+	return m.lists[fpath], nil
 }
 
 func (m *mockWriteHandler) GetLogger(_ *pssh.SSHServerConnSession) *slog.Logger {
@@ -87,9 +106,8 @@ func (m *mockChannel) Stderr() io.ReadWriter { return m.stderr }
 var _ ssh.Channel = (*mockChannel)(nil)
 
 // newMockSession creates a mock SSHServerConnSession for testing.
-func newMockSession() (*pssh.SSHServerConnSession, *bytes.Buffer) {
-	stderr := &bytes.Buffer{}
-	channel := &mockChannel{stderr: stderr}
+func newMockSession() *pssh.SSHServerConnSession {
+	channel := &mockChannel{stderr: &bytes.Buffer{}}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	logger := slog.Default()
@@ -100,138 +118,93 @@ func newMockSession() (*pssh.SSHServerConnSession, *bytes.Buffer) {
 		},
 	}, server)
 
-	session := &pssh.SSHServerConnSession{
+	return &pssh.SSHServerConnSession{
 		Channel:       channel,
 		SSHServerConn: serverConn,
 		Ctx:           ctx,
 		CancelFunc:    cancel,
 	}
-
-	return session, stderr
 }
 
-func TestRemove_DeletesChildrenBeforeParents(t *testing.T) {
-	session, _ := newMockSession()
-	mockHandler := &mockWriteHandler{
-		entries: []os.FileInfo{
-			&mockFileInfo{name: "a", isDir: true},
-			&mockFileInfo{name: "a/file.txt", size: 100},
-			&mockFileInfo{name: "b/c", isDir: true},
-			&mockFileInfo{name: "b/c/deep.txt", size: 50},
-			&mockFileInfo{name: "b", isDir: true},
+func TestReadDirNormalizesListing(t *testing.T) {
+	handler := &mockWriteHandler{lists: map[string][]os.FileInfo{
+		"/site": {
+			&mockFileInfo{name: "", isDir: true},
+			&mockFileInfo{name: "index.html", size: 10},
+			&mockFileInfo{name: "/css/site.css", size: 5},
+			&mockFileInfo{name: "css", isDir: true},
+			&mockFileInfo{name: "empty.txt"},
 		},
-	}
+	}}
+	fsys := &storageFS{session: newMockSession(), handler: handler}
 
-	h := &handler{
-		session:      session,
-		writeHandler: mockHandler,
-		root:         "test",
-	}
-
-	err := h.Remove([]*rsyncutils.ReceiverFile{})
+	entries, err := fsys.ReadDir("site", true)
 	if err != nil {
-		t.Fatalf("Remove() returned error: %v", err)
+		t.Fatal(err)
 	}
-
-	if len(mockHandler.deleteCalls) != 5 {
-		t.Fatalf("expected 5 delete calls, got %d: %v", len(mockHandler.deleteCalls), mockHandler.deleteCalls)
+	var names []string
+	for _, e := range entries {
+		names = append(names, e.Name)
 	}
-
-	indexOfA := -1
-	indexOfAFile := -1
-	indexOfB := -1
-	indexOfBC := -1
-	indexOfBCDeep := -1
-
-	for i, path := range mockHandler.deleteCalls {
-		switch path {
-		case "/test/a":
-			indexOfA = i
-		case "/test/a/file.txt":
-			indexOfAFile = i
-		case "/test/b":
-			indexOfB = i
-		case "/test/b/c":
-			indexOfBC = i
-		case "/test/b/c/deep.txt":
-			indexOfBCDeep = i
-		}
-	}
-
-	if indexOfAFile > indexOfA {
-		t.Errorf("a/file.txt (index %d) should be deleted before a (index %d)", indexOfAFile, indexOfA)
-	}
-	if indexOfBCDeep > indexOfBC {
-		t.Errorf("b/c/deep.txt (index %d) should be deleted before b/c (index %d)", indexOfBCDeep, indexOfBC)
-	}
-	if indexOfBC > indexOfB {
-		t.Errorf("b/c (index %d) should be deleted before b (index %d)", indexOfBC, indexOfB)
+	want := []string{"index.html", "css/site.css", "css", "empty.txt"}
+	if !slices.Equal(names, want) {
+		t.Errorf("got %q, want %q", names, want)
 	}
 }
 
-func TestRemove_IgnoresPicoKeepDir(t *testing.T) {
-	session, _ := newMockSession()
-	mockHandler := &mockWriteHandler{
-		entries: []os.FileInfo{
-			&mockFileInfo{name: "dir", isDir: true},
-			&mockFileInfo{name: "dir/._pico_keep_dir", size: 0},
-			&mockFileInfo{name: "dir/file.txt", size: 100},
-		},
-	}
+func TestStat(t *testing.T) {
+	handler := &mockWriteHandler{lists: map[string][]os.FileInfo{
+		"/site":            {&mockFileInfo{name: "", isDir: true}},
+		"/site/index.html": {&mockFileInfo{name: "index.html", size: 42}},
+		"/":                {&mockFileInfo{name: "/", isDir: true}, &mockFileInfo{name: "hello.md"}},
+		"/posts":           {&mockFileInfo{name: "a.md"}, &mockFileInfo{name: "b.md"}},
+	}}
+	fsys := &storageFS{session: newMockSession(), handler: handler}
 
-	h := &handler{
-		session:      session,
-		writeHandler: mockHandler,
-		root:         "test",
+	if info, err := fsys.Stat("site"); err != nil || !info.IsDir {
+		t.Errorf("site: %+v, %v", info, err)
 	}
-
-	err := h.Remove([]*rsyncutils.ReceiverFile{})
-	if err != nil {
-		t.Fatalf("Remove() returned error: %v", err)
+	if info, err := fsys.Stat("site/index.html"); err != nil || info.IsDir || info.Size != 42 {
+		t.Errorf("site/index.html: %+v, %v", info, err)
 	}
-
-	for _, path := range mockHandler.deleteCalls {
-		if path == "/test/dir/._pico_keep_dir" {
-			t.Error("._pico_keep_dir should not be in delete list")
-		}
+	if info, err := fsys.Stat(""); err != nil || !info.IsDir {
+		t.Errorf("root: %+v, %v", info, err)
 	}
-
-	if len(mockHandler.deleteCalls) != 2 {
-		t.Errorf("expected 2 delete calls (dir, dir/file.txt), got %d: %v", len(mockHandler.deleteCalls), mockHandler.deleteCalls)
+	if info, err := fsys.Stat("posts"); err != nil || !info.IsDir {
+		t.Errorf("posts: %+v, %v", info, err)
+	}
+	if _, err := fsys.Stat("nope"); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("nope: %v", err)
 	}
 }
 
-func TestRemove_OnlyDeletesFilesNotInWillReceive(t *testing.T) {
-	session, _ := newMockSession()
-	mockHandler := &mockWriteHandler{
-		entries: []os.FileInfo{
-			&mockFileInfo{name: "a.txt", size: 100},
-			&mockFileInfo{name: "b.txt", size: 100},
-			&mockFileInfo{name: "c.txt", size: 100},
-		},
-	}
+func TestHandlerPathsAreAbsolute(t *testing.T) {
+	handler := &mockWriteHandler{files: map[string]string{"/site/a.txt": "hello"}}
+	fsys := &storageFS{session: newMockSession(), handler: handler}
 
-	h := &handler{
-		session:      session,
-		writeHandler: mockHandler,
-		root:         "test",
-	}
-
-	willReceive := []*rsyncutils.ReceiverFile{
-		{Name: "a.txt"},
-		{Name: "c.txt"},
-	}
-
-	err := h.Remove(willReceive)
+	f, info, err := fsys.Open("site/a.txt")
 	if err != nil {
-		t.Fatalf("Remove() returned error: %v", err)
+		t.Fatal(err)
 	}
+	buf := make([]byte, info.Size)
+	if _, err := f.ReadAt(buf, 0); err != nil || string(buf) != "hello" {
+		t.Fatalf("read %q, %v", buf, err)
+	}
+	if _, err := fsys.Put("site/b.txt", fsInfo(5), strings.NewReader("world")); err != nil {
+		t.Fatal(err)
+	}
+	if err := fsys.Remove("site/c.txt", false); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"read /site/a.txt", "write /site/b.txt", "delete /site/c.txt"}
+	if !slices.Equal(handler.calls, want) {
+		t.Errorf("calls %q, want %q", handler.calls, want)
+	}
+	if handler.written["/site/b.txt"] != "world" {
+		t.Errorf("written %q", handler.written)
+	}
+}
 
-	if len(mockHandler.deleteCalls) != 1 {
-		t.Fatalf("expected 1 delete call, got %d: %v", len(mockHandler.deleteCalls), mockHandler.deleteCalls)
-	}
-
-	if mockHandler.deleteCalls[0] != "/test/b.txt" {
-		t.Errorf("expected to delete /test/b.txt, got %s", mockHandler.deleteCalls[0])
-	}
+func fsInfo(size int64) rsync.FileInfo {
+	return rsync.FileInfo{Size: size, ModTime: time.Unix(1700000000, 0)}
 }

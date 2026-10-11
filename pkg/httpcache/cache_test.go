@@ -1,7 +1,6 @@
 package httpcache
 
 import (
-	"encoding/json"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -241,7 +240,7 @@ func TestCacheVary(t *testing.T) {
 	// VaryRequestHeaders snapshots the request header values that were present
 	// when this entry was cached, keyed by the lowercase header name.
 	cv.VaryRequestHeaders = map[string]string{"accept-encoding": "gzip"}
-	cacheValue, _ := json.Marshal(cv)
+	cacheValue := cv.encode()
 	handler.Cache.Add(cacheKey, cacheValue)
 
 	respMatch, _ := tc.DoWithHeaders(req, map[string][]string{
@@ -385,7 +384,7 @@ func TestCacheValidation(t *testing.T) {
 		cv := testCacheValue(250 * time.Second)
 		cv.Header["ETag"] = []string{"ccc"}
 		cv.Header["Last-Modified"] = []string{actualStr}
-		cacheValue, _ := json.Marshal(cv)
+		cacheValue := cv.encode()
 		handler.Cache.Add(cacheKey, cacheValue)
 
 		t.Run(tt.name, func(t *testing.T) {
@@ -423,7 +422,7 @@ func TestCacheAge(t *testing.T) {
 
 	req, _ := http.NewRequest("GET", tc.cachedServer.URL+"/test", nil)
 	cacheKey := handler.GetCacheKey(req)
-	cacheValue, _ := json.Marshal(testCacheValue(250 * time.Second))
+	cacheValue := testCacheValue(250 * time.Second).encode()
 	handler.Cache.Add(cacheKey, cacheValue)
 
 	resp, _ := tc.Do(req)
@@ -509,7 +508,7 @@ func TestCacheRequestDirectives(t *testing.T) {
 
 		req, _ := http.NewRequest("GET", tc.cachedServer.URL+"/test", nil)
 		cacheKey := handler.GetCacheKey(req)
-		cacheValue, _ := json.Marshal(testCacheValue(250 * time.Second))
+		cacheValue := testCacheValue(250 * time.Second).encode()
 		handler.Cache.Add(cacheKey, cacheValue)
 
 		t.Run(tt.name, func(t *testing.T) {
@@ -762,7 +761,7 @@ func TestCache304NotModifiedMerge(t *testing.T) {
 	staleCv.Header["ETag"] = []string{"\"abc\""}
 	staleCv.Header["Cache-Control"] = []string{"max-age=60, must-revalidate"}
 	staleCv.Body = []byte("original body")
-	cacheData, _ := json.Marshal(staleCv)
+	cacheData := staleCv.encode()
 	handler.Cache.Add(cacheKey, cacheData)
 
 	// First request with If-None-Match triggers validation; origin returns 304
@@ -890,7 +889,7 @@ func TestCache304NoBody(t *testing.T) {
 	cv.Header["ETag"] = []string{"\"abc\""}
 	cv.Header["Cache-Control"] = []string{"max-age=60, must-revalidate"}
 	cv.Body = []byte("original body")
-	cacheData, _ := json.Marshal(cv)
+	cacheData := cv.encode()
 	handler.Cache.Add(cacheKey, cacheData)
 
 	// Trigger revalidation — upstream returns 304 with a spurious body.
@@ -944,7 +943,7 @@ func TestCache304IncludesCachedHeaders(t *testing.T) {
 	cv.Header["Content-Type"] = []string{"text/html; charset=utf-8"}
 	cv.Header["Cache-Control"] = []string{"max-age=300"}
 	cv.Body = []byte("<h1>hello</h1>")
-	cacheData, _ := json.Marshal(cv)
+	cacheData := cv.encode()
 	handler.Cache.Add(cacheKey, cacheData)
 
 	// Send conditional request that triggers a 304 from the cache layer
@@ -1075,7 +1074,7 @@ func TestCacheMustRevalidateRevalidationHeaders(t *testing.T) {
 			}
 			cv.Header["Cache-Control"] = []string{"max-age=60, must-revalidate"}
 			cv.Body = []byte("cached body")
-			cacheData, _ := json.Marshal(cv)
+			cacheData := cv.encode()
 			handler.Cache.Add(cacheKey, cacheData)
 
 			resp, _ := tc.Do(req)
@@ -1099,6 +1098,69 @@ func TestCacheMustRevalidateRevalidationHeaders(t *testing.T) {
 			}
 			if tt.expectedIfModified != "" && receivedIfModifiedSince != tt.expectedIfModified {
 				t.Errorf("expected If-Modified-Since %q, got %q", tt.expectedIfModified, receivedIfModifiedSince)
+			}
+		})
+	}
+}
+
+// A range request that misses must not leave a partial response cached for
+// requests of the whole resource.
+func TestCacheRangeNotStored(t *testing.T) {
+	body := strings.Repeat("0123456789", 100)
+	upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.ServeContent(w, r, "file.txt", time.Unix(1_700_000_000, 0), strings.NewReader(body))
+	})
+	handler := NewHttpCache(slog.New(slog.DiscardHandler), upstream)
+
+	req := httptest.NewRequest("GET", "http://example.com/file.txt", nil)
+	req.Header.Set("Range", "bytes=0-9")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusPartialContent || rec.Body.String() != body[:10] {
+		t.Fatalf("range request got %d %q", rec.Code, rec.Body.String())
+	}
+
+	for _, want := range []string{"miss", "hit"} {
+		rec = httptest.NewRecorder()
+		handler.ServeHTTP(rec, httptest.NewRequest("GET", "http://example.com/file.txt", nil))
+		if rec.Code != http.StatusOK || rec.Body.String() != body {
+			t.Fatalf("full request got %d with %d bytes", rec.Code, rec.Body.Len())
+		}
+		if status := rec.Header().Get("cache-status"); !strings.Contains(status, want) {
+			t.Fatalf("full request cache-status %q, want %s", status, want)
+		}
+	}
+}
+
+// Bodies over MaxBodySize stream through and are not stored, whether or not
+// upstream announces their length.
+func TestCacheMaxBodySize(t *testing.T) {
+	body := strings.Repeat("x", 1000)
+	for name, setLength := range map[string]bool{"content-length": true, "chunked": false} {
+		t.Run(name, func(t *testing.T) {
+			upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if setLength {
+					w.Header().Set("content-length", strconv.Itoa(len(body)))
+				}
+				for i := 0; i < len(body); i += 100 {
+					_, _ = w.Write([]byte(body[i : i+100]))
+				}
+			})
+			handler := NewHttpCache(slog.New(slog.DiscardHandler), upstream)
+			handler.MaxBodySize = 250
+
+			for range 2 {
+				rec := httptest.NewRecorder()
+				handler.ServeHTTP(rec, httptest.NewRequest("GET", "http://example.com/big", nil))
+				if rec.Code != http.StatusOK || rec.Body.String() != body {
+					t.Fatalf("got %d with %d bytes", rec.Code, rec.Body.Len())
+				}
+				if status := rec.Header().Get("cache-status"); !strings.Contains(status, "miss") {
+					t.Fatalf("cache-status %q, want a miss", status)
+				}
+			}
+			if handler.Cache.Len() != 0 {
+				t.Fatalf("stored %d entries", handler.Cache.Len())
 			}
 		})
 	}

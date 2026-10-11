@@ -1,8 +1,6 @@
 package storage
 
 import (
-	"crypto/md5"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"io/fs"
@@ -36,6 +34,10 @@ func dirSize(path string) (int64, error) {
 
 	return size, err
 }
+
+// legacyKeepDir is the marker pgs used to write to keep empty directories.
+// Listings hide it until cmd/scripts/clean-keep-dirs has removed them all.
+const legacyKeepDir = "._pico_keep_dir"
 
 type StorageFS struct {
 	Dir    string
@@ -120,31 +122,30 @@ func (s *StorageFS) GetObject(bucket Bucket, fpath string) (utils.ReadAndReaderA
 		_ = dat.Close()
 		return nil, objInfo, err
 	}
+	fillObjectInfo(objInfo, info)
+	return dat, objInfo, nil
+}
+
+// fillObjectInfo sets an object's size, mtime and ETag from its file. The
+// ETag is built from size and mtime, as web servers do, so serving a file
+// doesn't mean reading it twice.
+func fillObjectInfo(objInfo *ObjectInfo, info os.FileInfo) {
 	objInfo.Size = info.Size()
 	objInfo.LastModified = info.ModTime()
+	objInfo.ETag = fmt.Sprintf("%x-%x", info.ModTime().UnixNano(), info.Size())
+}
 
-	etag := ""
-	// only generate etag if file is less than 10MB
-	if info.Size() <= int64(10*MB) {
-		// calculate etag
-		h := md5.New()
-		if _, err := io.Copy(h, dat); err != nil {
-			_ = dat.Close()
-			return nil, objInfo, err
-		}
-		md5Sum := h.Sum(nil)
-		etag = hex.EncodeToString(md5Sum)
-
-		// reset os.File reader
-		_, err = dat.Seek(0, io.SeekStart)
-		if err != nil {
-			_ = dat.Close()
-			return nil, objInfo, err
-		}
+func (s *StorageFS) StatObject(bucket Bucket, fpath string) (*ObjectInfo, error) {
+	info, err := os.Stat(filepath.Join(bucket.Path, fpath))
+	if err != nil {
+		return nil, err
 	}
-
-	objInfo.ETag = etag
-	return dat, objInfo, nil
+	if info.IsDir() {
+		return nil, fmt.Errorf("%s is a directory: %w", fpath, fs.ErrNotExist)
+	}
+	objInfo := &ObjectInfo{ContentType: mime.GetMimeType(fpath)}
+	fillObjectInfo(objInfo, info)
+	return objInfo, nil
 }
 
 func (s *StorageFS) PutObject(bucket Bucket, fpath string, contents io.Reader, info *ObjectInfo) (string, int64, error) {
@@ -175,51 +176,18 @@ func (s *StorageFS) PutObject(bucket Bucket, fpath string, contents io.Reader, i
 	return loc, size, nil
 }
 
+func (s *StorageFS) PutDir(bucket Bucket, dir string) error {
+	return os.MkdirAll(filepath.Join(bucket.Path, dir), os.ModePerm)
+}
+
 func (s *StorageFS) DeleteObject(bucket Bucket, fpath string) error {
 	loc := filepath.Join(bucket.Path, fpath)
+	// A leftover marker would keep an otherwise empty directory in place.
+	_ = os.Remove(filepath.Join(loc, legacyKeepDir))
 	err := os.Remove(loc)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
+	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
-
-	// traverse up the folder tree and remove all empty folders
-	dir := filepath.Dir(loc)
-	for dir != "" {
-		f, err := os.Open(dir)
-		if err != nil {
-			s.Logger.Info("open dir", "dir", dir, "err", err)
-			break
-		}
-		defer func() {
-			_ = f.Close()
-		}()
-
-		// https://stackoverflow.com/a/30708914
-		contents, err := f.Readdirnames(-1)
-		if err != nil {
-			s.Logger.Info("read dir", "dir", dir, "err", err)
-			break
-		}
-		if len(contents) > 0 {
-			break
-		}
-
-		err = os.Remove(dir)
-		if err != nil {
-			s.Logger.Info("remove dir", "dir", dir, "err", err)
-			break
-		}
-		fp := strings.Split(dir, "/")
-		prefix := ""
-		if strings.HasPrefix(loc, "/") {
-			prefix = "/"
-		}
-		dir = prefix + filepath.Join(fp[:len(fp)-1]...)
-	}
-
 	return nil
 }
 
@@ -270,6 +238,9 @@ func (s *StorageFS) ListObjects(bucket Bucket, dir string, recursive bool) ([]os
 			if err != nil {
 				return err
 			}
+			if d.Name() == legacyKeepDir {
+				return nil
+			}
 			info, err := d.Info()
 			if err != nil {
 				return nil
@@ -299,6 +270,9 @@ func (s *StorageFS) ListObjects(bucket Bucket, dir string, recursive bool) ([]os
 			return fileList, nil
 		}
 		for _, d := range fls {
+			if d.Name() == legacyKeepDir {
+				continue
+			}
 			info, err := d.Info()
 			if err != nil {
 				continue

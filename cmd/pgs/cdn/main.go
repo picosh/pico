@@ -28,13 +28,13 @@ func main() {
 	}()
 	cfg := pgs.NewPgsConfig(logger, nil, nil, drain)
 	proxy := newProxyServe(cfg.Logger)
-	httpCache := pgs.NewPgsHttpCache(cfg, proxy)
+	httpCache, cache := pgs.NewPgsHttpCache(cfg, proxy)
 	cacher := &cachedHttp{
 		Logger: cfg.Logger,
 		Cache:  httpCache,
 	}
 
-	go pgs.CacheMgmt(ctx, cfg.CacheClearingQueue, cfg, httpCache.Cache)
+	go pgs.CacheMgmt(ctx, cfg, cache, nil)
 
 	portStr := fmt.Sprintf(":%s", cfg.WebPort)
 	cfg.Logger.Info(

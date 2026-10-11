@@ -211,10 +211,10 @@ func TestShouldGenerateListing(t *testing.T) {
 			st, _ := storage.NewStorageMemory(fixture.Storage)
 			bucket := storage.Bucket{Name: "testbucket", Path: "testbucket"}
 
-			result := shouldGenerateListing(st, bucket, "project", fixture.Path)
+			_, result := dirListing(st, bucket, "project", fixture.Path)
 
 			if result != fixture.Expected {
-				t.Errorf("shouldGenerateListing(%q) = %v, want %v", fixture.Path, result, fixture.Expected)
+				t.Errorf("dirListing(%q) = %v, want %v", fixture.Path, result, fixture.Expected)
 			}
 		})
 	}

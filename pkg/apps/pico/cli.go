@@ -42,6 +42,8 @@ type Cmd struct {
 	Log        *slog.Logger
 	Dbpool     db.DB
 	Write      bool
+
+	lookupTXT func(host, space string) ([]string, error)
 }
 
 func (c *Cmd) output(out string) {
@@ -49,13 +51,14 @@ func (c *Cmd) output(out string) {
 }
 
 func (c *Cmd) help() {
-	helpStr := "Commands: [help, user, logs, access_logs, chat, not-found]\n"
+	helpStr := "Commands: [help, user, logs, access-logs, chat, not-found, dns-check]\n"
 	helpStr += "help - this message\n"
 	helpStr += "user - display user information (returns name, id, account created, pico+ expiration)\n"
 	helpStr += "logs - stream user logs\n"
-	helpStr += "access_logs - fetch access logs from the last 30 days\n"
+	helpStr += "access-logs - fetch access logs from the last 30 days\n"
 	helpStr += "chat - IRC chat (must enable pty with `-t` to the SSH command)\n"
 	helpStr += "not-found - return all status 404 requests for a host (hostname.com [year|month])\n"
+	helpStr += "dns-check - check a domain's TXT records for pgs, prose and tuns custom domains (hostname.com or *.hostname.com)\n"
 	c.output(helpStr)
 }
 
@@ -96,7 +99,7 @@ func (c *Cmd) notFound(host, interval string) error {
 	return nil
 }
 
-func (c *Cmd) access_logs(_ context.Context) error {
+func (c *Cmd) accessLogs(_ context.Context) error {
 	fromDate := time.Now().AddDate(0, 0, -30)
 	logs, err := c.Dbpool.FindAccessLogs(c.User.ID, &fromDate)
 	if err != nil {
@@ -264,8 +267,12 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 						sesh.Fatal(err)
 					}
 					return nil
-				case "access_logs":
-					err = opts.access_logs(sesh.Context())
+				case "dns-check":
+					sesh.Fatal(fmt.Errorf("must provide a domain name (`dns-check example.com`)"))
+					return nil
+				// access_logs is the command's old name.
+				case "access-logs", "access_logs":
+					err = opts.accessLogs(sesh.Context())
 					if err != nil {
 						sesh.Fatal(err)
 					}
@@ -273,6 +280,14 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 				default:
 					return next(sesh)
 				}
+			}
+
+			if cmd == "dns-check" {
+				err = opts.dnsCheck(args[1])
+				if err != nil {
+					sesh.Fatal(err)
+				}
+				return nil
 			}
 
 			if cmd == "not-found" {

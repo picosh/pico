@@ -65,12 +65,40 @@ func (r *FileHandlerRouter) Write(s *pssh.SSHServerConnSession, entry *utils.Fil
 	return handler.Write(s, entry)
 }
 
+func (r *FileHandlerRouter) ValidateWrite(s *pssh.SSHServerConnSession, entry *utils.FileEntry) error {
+	handler, err := r.findHandler(entry.Filepath)
+	if err != nil {
+		return err
+	}
+	if v, ok := handler.(utils.WriteValidator); ok {
+		return v.ValidateWrite(s, entry)
+	}
+	return nil
+}
+
 func (r *FileHandlerRouter) Delete(s *pssh.SSHServerConnSession, entry *utils.FileEntry) error {
 	handler, err := r.findHandler(entry.Filepath)
 	if err != nil {
 		return err
 	}
 	return handler.Delete(s, entry)
+}
+
+// Rename moves a file in place when one handler serves both names.
+func (r *FileHandlerRouter) Rename(s *pssh.SSHServerConnSession, from, to *utils.FileEntry) error {
+	handler, err := r.findHandler(from.Filepath)
+	if err != nil {
+		return err
+	}
+	target, err := r.findHandler(to.Filepath)
+	if err != nil {
+		return err
+	}
+	renamer, ok := handler.(utils.FileRenamer)
+	if !ok || handler != target {
+		return errors.ErrUnsupported
+	}
+	return renamer.Rename(s, from, to)
 }
 
 func (r *FileHandlerRouter) Read(s *pssh.SSHServerConnSession, entry *utils.FileEntry) (os.FileInfo, utils.ReadAndReaderAtCloser, error) {
@@ -83,18 +111,28 @@ func (r *FileHandlerRouter) Read(s *pssh.SSHServerConnSession, entry *utils.File
 
 func (r *FileHandlerRouter) List(s *pssh.SSHServerConnSession, fpath string, isDir bool, recursive bool) ([]os.FileInfo, error) {
 	files := []os.FileInfo{}
-	for key, handler := range r.FileMap {
-		// TODO: hack because we have duplicate keys for .md and .css
-		if key == ".css" {
+	// Several extensions can share a handler, and handlers can list the
+	// same entries, such as the root directory.
+	listed := map[ReadWriteHandler]bool{}
+	seen := map[string]bool{}
+	for _, handler := range r.FileMap {
+		if listed[handler] {
 			continue
 		}
+		listed[handler] = true
 
 		ff, err := handler.List(s, fpath, isDir, recursive)
 		if err != nil {
 			r.GetLogger(s).Error("handler list", "err", err)
 			continue
 		}
-		files = append(files, ff...)
+		for _, f := range ff {
+			key := fmt.Sprintf("%s:%v", f.Name(), f.IsDir())
+			if !seen[key] {
+				seen[key] = true
+				files = append(files, f)
+			}
+		}
 	}
 	return files, nil
 }
