@@ -160,10 +160,6 @@ func (me *StubDB) FindFeaturesByUser(userID string) ([]*db.FeatureFlag, error) {
 	return []*db.FeatureFlag{}, errNotImpl
 }
 
-func (me *StubDB) HasFeatureByUser(userID string, feature string) bool {
-	return false
-}
-
 func (me *StubDB) InsertFeedItems(postID string, items []*db.FeedItem) error {
 	return errNotImpl
 }

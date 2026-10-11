@@ -24,7 +24,7 @@ const (
 type SharedModel struct {
 	Logger             *slog.Logger
 	Session            *pssh.SSHServerConnSession
-	Cfg                *shared.ConfigSite
+	TunsSecret         string
 	Dbpool             db.DB
 	PgsDB              pgsdb.PgsDB
 	User               *db.User
@@ -282,7 +282,7 @@ func initData(shrd *SharedModel) error {
 }
 
 func FindUser(shrd *SharedModel) (*db.User, error) {
-	logger := shrd.Cfg.Logger
+	logger := shrd.Logger
 	var user *db.User
 	usr := shrd.Session.User()
 
@@ -307,7 +307,7 @@ func FindUser(shrd *SharedModel) (*db.User, error) {
 
 	// impersonation
 	if strings.HasPrefix(usr, adminPrefix) {
-		hasFeature := shrd.Dbpool.HasFeatureByUser(user.ID, "admin")
+		hasFeature := db.HasFeature(shrd.Dbpool, user.ID, "admin")
 		if hasFeature {
 			impersonate := strings.TrimPrefix(usr, adminPrefix)
 			user, err = shrd.Dbpool.FindUserByName(impersonate)

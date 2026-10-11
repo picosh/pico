@@ -1,7 +1,6 @@
 package pgs
 
 import (
-	"context"
 	"net/http"
 	"strings"
 	"time"
@@ -29,8 +28,7 @@ func tunnelPerm(proj *db.Project) bool {
 }
 
 func (web *TunnelWebRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	ctx = context.WithValue(ctx, router.CtxSubdomainKey{}, web.subdomain)
+	ctx := router.WithSubdomain(r.Context(), web.subdomain)
 	web.UserRouter.ServeHTTP(w, r.WithContext(ctx))
 }
 
@@ -45,7 +43,7 @@ func getInfoFromUser(user string) (string, string) {
 	return "", user
 }
 
-func CreateHttpHandler(cfg *PgsConfig) CtxHttpBridge {
+func CreateHttpHandler(cfg *Config) CtxHttpBridge {
 	return func(ctx *pssh.SSHServerConnSession) http.Handler {
 		logger := cfg.Logger
 		asUser, subdomain := getInfoFromUser(ctx.User())

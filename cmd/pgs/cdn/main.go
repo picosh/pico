@@ -26,7 +26,7 @@ func main() {
 	defer func() {
 		_ = pubsub.Close()
 	}()
-	cfg := pgs.NewPgsConfig(logger, nil, nil, drain)
+	cfg := pgs.NewConfig(logger, nil, nil, drain)
 	proxy := newProxyServe(cfg.Logger)
 	httpCache, cache := pgs.NewPgsHttpCache(cfg, proxy)
 	cacher := &cachedHttp{

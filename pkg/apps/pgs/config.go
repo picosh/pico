@@ -2,6 +2,7 @@ package pgs
 
 import (
 	"fmt"
+	"html/template"
 	"log/slog"
 	"path/filepath"
 	"strconv"
@@ -9,10 +10,11 @@ import (
 
 	pgsdb "github.com/picosh/pico/pkg/apps/pgs/db"
 	"github.com/picosh/pico/pkg/shared"
+	"github.com/picosh/pico/pkg/shared/router"
 	"github.com/picosh/pico/pkg/storage"
 )
 
-type PgsConfig struct {
+type Config struct {
 	CacheTTL           time.Duration
 	CacheMaxItems      int
 	CacheMaxBodySize   int64
@@ -38,7 +40,7 @@ type PgsConfig struct {
 	Pubsub  PicoPubsub
 }
 
-func (c *PgsConfig) AssetURL(username, projectName, fpath string) string {
+func (c *Config) AssetURL(username, projectName, fpath string) string {
 	if username == projectName {
 		return fmt.Sprintf(
 			"%s://%s.%s/%s",
@@ -59,8 +61,19 @@ func (c *PgsConfig) AssetURL(username, projectName, fpath string) string {
 	)
 }
 
-func (c *PgsConfig) StaticPath(fname string) string {
-	return filepath.Join("pkg", "apps", "pgs", fname)
+// staticDir holds pgs's templates and public files.
+const staticDir = "pkg/apps/pgs"
+
+func (c *Config) StaticPath(fname string) string {
+	return filepath.Join(staticDir, fname)
+}
+
+func (c *Config) Static() router.Static {
+	return router.Static{
+		Dir:    staticDir,
+		Logger: c.Logger,
+		Site:   shared.SitePageData{Domain: template.URL(c.Domain), HomeURL: "/"},
+	}
 }
 
 var maxSize = uint64(50 * shared.MB)
@@ -73,7 +86,7 @@ var cacheMaxBodySize = int64(0)
 // Needs to be small for caching files like _headers and _redirects.
 var maxSpecialFileSize = int64(5 * shared.KB)
 
-func NewPgsConfig(logger *slog.Logger, dbpool pgsdb.PgsDB, st storage.StorageServe, pubsub PicoPubsub) *PgsConfig {
+func NewConfig(logger *slog.Logger, dbpool pgsdb.PgsDB, st storage.StorageServe, pubsub PicoPubsub) *Config {
 	domain := shared.GetEnv("PGS_DOMAIN", "pgs.sh")
 	port := shared.GetEnv("PGS_WEB_PORT", "3000")
 	protocol := shared.GetEnv("PGS_PROTOCOL", "https")
@@ -94,7 +107,7 @@ func NewPgsConfig(logger *slog.Logger, dbpool pgsdb.PgsDB, st storage.StorageSer
 	sshHost := shared.GetEnv("PGS_SSH_HOST", "0.0.0.0")
 	sshPort := shared.GetEnv("PGS_SSH_PORT", "2222")
 
-	cfg := PgsConfig{
+	cfg := Config{
 		CacheTTL:           cacheTTL,
 		CacheMaxItems:      cacheMaxItems,
 		CacheMaxBodySize:   cacheMaxBody,

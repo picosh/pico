@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"github.com/picosh/pico/pkg/db/postgres"
-	"github.com/picosh/pico/pkg/shared"
 )
 
 func bail(err error) {
@@ -18,10 +17,7 @@ func bail(err error) {
 func main() {
 	logger := slog.Default()
 
-	picoCfg := shared.NewConfigSite()
-	picoCfg.Logger = logger
-	picoCfg.DbURL = os.Getenv("DATABASE_URL")
-	picoDb := postgres.NewDB(picoCfg.DbURL, picoCfg.Logger)
+	picoDb := postgres.NewDB(os.Getenv("DATABASE_URL"), logger)
 
 	posts, err := picoDb.FindPosts()
 	bail(err)

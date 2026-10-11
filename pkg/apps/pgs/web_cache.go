@@ -105,13 +105,13 @@ func CreateSubCacheDrain(ctx context.Context, logger *slog.Logger) *pipe.Reconne
 // cached assets for a given subdomain are grouped under a single key (which is
 // separate from the "GET-https-example.com-/path" key used for serving files
 // from the cache).
-func purgeCache(cfg *PgsConfig, writer io.Writer, surrogate string) error {
+func purgeCache(cfg *Config, writer io.Writer, surrogate string) error {
 	cfg.Logger.Info("purging cache", "surrogate", surrogate)
 	_, err := writer.Write([]byte(surrogate + "\n"))
 	return err
 }
 
-func purgeAllCache(cfg *PgsConfig, writer io.Writer) error {
+func purgeAllCache(cfg *Config, writer io.Writer) error {
 	return purgeCache(cfg, writer, "*")
 }
 

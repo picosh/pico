@@ -54,7 +54,7 @@ type Cmd struct {
 	Write   bool
 	Width   int
 	Height  int
-	Cfg     *PgsConfig
+	Cfg     *Config
 }
 
 func (c *Cmd) output(out string) {

@@ -17,7 +17,7 @@ import (
 	"github.com/picosh/pico/pkg/tunkit"
 )
 
-func createSshServer(cfg *PgsConfig, ctx context.Context, cacheClearingQueue chan string) (*pssh.SSHServer, error) {
+func createSshServer(cfg *Config, ctx context.Context, cacheClearingQueue chan string) (*pssh.SSHServer, error) {
 	host := shared.GetEnv("PGS_HOST", "0.0.0.0")
 	port := shared.GetEnv("PGS_SSH_PORT", "2222")
 	promPort := shared.GetEnv("PGS_PROM_PORT", "9222")
@@ -67,7 +67,7 @@ func createSshServer(cfg *PgsConfig, ctx context.Context, cacheClearingQueue cha
 	return server, err
 }
 
-func StartSshServer(cfg *PgsConfig, killCh chan error) {
+func StartSshServer(cfg *Config, killCh chan error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

@@ -34,7 +34,7 @@ func TestCliPurges(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg := NewPgsConfig(logger, dbpool, st, discardPubsub{})
+	cfg := NewConfig(logger, dbpool, st, discardPubsub{})
 	cmd := &Cmd{User: user, Session: &fakeCmdSession{}, Log: logger, Store: st, Dbpool: dbpool, Write: true, Cfg: cfg}
 
 	tests := []struct {
@@ -88,7 +88,7 @@ func TestRmProjectAssetsRemovesDirs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cfg := NewPgsConfig(logger, dbpool, st, discardPubsub{})
+	cfg := NewConfig(logger, dbpool, st, discardPubsub{})
 	cmd := &Cmd{User: user, Session: &fakeCmdSession{}, Log: logger, Store: st, Dbpool: dbpool, Write: true, Cfg: cfg}
 	if err := cmd.RmProjectAssets("test"); err != nil {
 		t.Fatal(err)

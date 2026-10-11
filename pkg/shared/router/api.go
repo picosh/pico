@@ -1,12 +1,14 @@
 package router
 
 import (
-	"fmt"
 	"html/template"
+	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 
+	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/shared"
 )
 
@@ -40,57 +42,37 @@ func UnauthorizedHandler(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "You do not have access to this site", http.StatusUnauthorized)
 }
 
-func CheckHandler(w http.ResponseWriter, r *http.Request) {
-	dbpool := GetDB(r)
-	cfg := GetCfg(r)
-
-	if cfg.IsCustomdomains() {
+// CheckHandler reports whether a custom domain points at a user's site on
+// domain, through its TXT record for txtPrefix.
+func CheckHandler(domain, txtPrefix string, users interface {
+	FindUserByName(name string) (*db.User, error)
+}) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		hostDomain := r.URL.Query().Get("domain")
-		appDomain := strings.Split(cfg.Domain, ":")[0]
+		appDomain := strings.Split(domain, ":")[0]
 
 		if !strings.Contains(hostDomain, appDomain) {
-			subdomain := GetCustomDomain(hostDomain, cfg.Space)
+			subdomain := GetCustomDomain(hostDomain, txtPrefix)
 			if subdomain != "" {
-				u, err := dbpool.FindUserByName(subdomain)
+				u, err := users.FindUserByName(subdomain)
 				if u != nil && err == nil {
 					w.WriteHeader(http.StatusOK)
 					return
 				}
 			}
 		}
-	}
 
-	w.WriteHeader(http.StatusNotFound)
+		w.WriteHeader(http.StatusNotFound)
+	}
 }
 
+// GetUsernameFromRequest is the user whose site a request is for: the
+// subdomain, or the path's {user} on the main domain.
 func GetUsernameFromRequest(r *http.Request) string {
-	subdomain := GetSubdomain(r)
-	cfg := GetCfg(r)
-
-	if !cfg.IsSubdomains() || subdomain == "" {
-		return GetField(r, 0)
+	if subdomain := GetSubdomain(r); subdomain != "" {
+		return subdomain
 	}
-	return subdomain
-}
-
-func ServeFile(file string, contentType string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := GetLogger(r)
-		cfg := GetCfg(r)
-
-		contents, err := os.ReadFile(cfg.StaticPath(fmt.Sprintf("public/%s", file)))
-		if err != nil {
-			logger.Error(err.Error())
-			http.Error(w, "file not found", 404)
-		}
-
-		w.Header().Add("Content-Type", contentType)
-
-		_, err = w.Write(contents)
-		if err != nil {
-			logger.Error(err.Error())
-		}
-	}
+	return r.PathValue("user")
 }
 
 func minus(a, b int) int {
@@ -111,14 +93,16 @@ var FuncMap = template.FuncMap{
 	"intRange": intRange,
 }
 
-func RenderTemplate(cfg *shared.ConfigSite, templates []string) (*template.Template, error) {
+// RenderTemplate parses templates with the layout and footers in an app's
+// dir.
+func RenderTemplate(dir string, templates []string) (*template.Template, error) {
 	files := make([]string, len(templates))
 	copy(files, templates)
 	files = append(
 		files,
-		cfg.StaticPath("html/footer.partial.tmpl"),
-		cfg.StaticPath("html/marketing-footer.partial.tmpl"),
-		cfg.StaticPath("html/base.layout.tmpl"),
+		filepath.Join(dir, "html/footer.partial.tmpl"),
+		filepath.Join(dir, "html/marketing-footer.partial.tmpl"),
+		filepath.Join(dir, "html/base.layout.tmpl"),
 	)
 
 	ts, err := template.New("base").Funcs(FuncMap).ParseFiles(files...)
@@ -128,24 +112,45 @@ func RenderTemplate(cfg *shared.ConfigSite, templates []string) (*template.Templ
 	return ts, nil
 }
 
-func CreatePageHandler(fname string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := GetLogger(r)
-		cfg := GetCfg(r)
-		ts, err := RenderTemplate(cfg, []string{cfg.StaticPath(fname)})
+// Static serves an app's files from Dir/public and its pages from Dir/html.
+type Static struct {
+	Dir    string
+	Logger *slog.Logger
+	Site   shared.SitePageData
+}
 
+// File serves the file name in Dir/public.
+func (s Static) File(name string, contentType string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		contents, err := os.ReadFile(filepath.Join(s.Dir, "public", name))
 		if err != nil {
-			logger.Error(err.Error())
+			s.Logger.Error("could not read file", "fname", name, "err", err.Error())
+			http.Error(w, "file not found", http.StatusNotFound)
+			return
+		}
+
+		w.Header().Add("Content-Type", contentType)
+
+		_, err = w.Write(contents)
+		if err != nil {
+			s.Logger.Error("could not write http response", "file", name, "err", err.Error())
+		}
+	}
+}
+
+// Page renders the template fname in Dir with the site's data.
+func (s Static) Page(fname string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ts, err := RenderTemplate(s.Dir, []string{filepath.Join(s.Dir, fname)})
+		if err != nil {
+			s.Logger.Error("could not render template", "fname", fname, "err", err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		data := shared.PageData{
-			Site: *cfg.GetSiteData(),
-		}
-		err = ts.Execute(w, data)
+		err = ts.Execute(w, shared.PageData{Site: s.Site})
 		if err != nil {
-			logger.Error(err.Error())
+			s.Logger.Error("could not execute template", "fname", fname, "err", err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	}

@@ -490,6 +490,9 @@ func NewSSHServer(ctx context.Context, logger *slog.Logger, config *SSHServerCon
 			}
 
 			ctx, cancelFunc := context.WithCancel(sc.Ctx)
+			// The client closing the session ends its command, even while
+			// the connection stays open for other sessions.
+			defer cancelFunc()
 
 			sesh := &SSHServerConnSession{
 				Channel:       channel,

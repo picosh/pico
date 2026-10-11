@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"sync"
 	"testing"
@@ -220,4 +221,58 @@ func TestDispatcherSingleSubscriber(t *testing.T) {
 			t.Errorf("Multicast with single subscriber: expected %q, got %q", message, buf.String())
 		}
 	})
+}
+
+// slowSession is a subscriber whose writes take a while and fail once it is
+// closed, like an ssh session.
+type slowSession struct {
+	Buffer
+	mu     sync.Mutex
+	closed bool
+}
+
+func (s *slowSession) Write(p []byte) (int, error) {
+	time.Sleep(20 * time.Millisecond)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return 0, io.ErrClosedPipe
+	}
+	return s.Buffer.Write(p)
+}
+
+func (s *slowSession) Close() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.closed = true
+	return nil
+}
+
+func TestSubReceivesLastMessageWhenPublisherLeaves(t *testing.T) {
+	cast := NewMulticast(slog.Default())
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sub := &slowSession{}
+	subDone := make(chan struct{})
+	go func() {
+		_ = cast.Sub(ctx, "sub", sub, []*Channel{NewChannel("topic")}, false)
+		close(subDone)
+	}()
+	for joined := 0; joined == 0; time.Sleep(time.Millisecond) {
+		for range cast.GetSubs() {
+			joined++
+		}
+	}
+
+	_ = cast.Pub(ctx, "pub", &Buffer{b: *bytes.NewBufferString("last")}, []*Channel{NewChannel("topic")}, false)
+
+	select {
+	case <-subDone:
+	case <-time.After(5 * time.Second):
+		t.Fatal("subscriber is still connected after the publisher left")
+	}
+	if got := sub.String(); got != "last" {
+		t.Errorf("subscriber got %q, want %q", got, "last")
+	}
 }

@@ -57,7 +57,7 @@ func newRsyncEnv(t *testing.T, st storage.StorageServe) *rsyncEnv {
 	bucket := storagetest.Bucket(t, st, shared.GetAssetBucketName(dbpool.Users[0].ID))
 
 	t.Setenv("PGS_SSH_PORT", "0")
-	cfg := NewPgsConfig(logger, dbpool, st, discardPubsub{})
+	cfg := NewConfig(logger, dbpool, st, discardPubsub{})
 	cfg.Domain = "pgs.sh"
 	cfg.WebProtocol = "https"
 	done := make(chan error)

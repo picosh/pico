@@ -24,17 +24,17 @@ func StartSshServer() {
 	host := shared.GetEnv("PASTES_HOST", "0.0.0.0")
 	port := shared.GetEnv("PASTES_SSH_PORT", "2222")
 	promPort := shared.GetEnv("PASTES_PROM_PORT", "9222")
-	cfg := NewConfigSite(appName)
+	cfg := NewConfig(appName)
 	logger := cfg.Logger
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	dbh := postgres.NewDB(cfg.DbURL, cfg.Logger)
+	dbh := NewDB(postgres.NewDB(cfg.DbURL, cfg.Logger))
 	defer func() {
 		_ = dbh.Close()
 	}()
-	handler := NewFileHandler(cfg, dbh)
+	handler := NewUploadHandler(cfg, dbh)
 	sshAuth := shared.NewSshAuthHandler(dbh, logger, "pastes")
 
 	// Create a new SSH server

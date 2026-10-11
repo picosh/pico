@@ -1,7 +1,6 @@
 package pastes
 
 import (
-	"context"
 	"html/template"
 	"log/slog"
 	"net/http"
@@ -19,20 +18,24 @@ import (
 type pasteDB struct {
 	*stub.StubDB
 	post *db.Post
+	// user and slug are the last ones asked for.
+	user, slug string
 }
 
-func (m *pasteDB) FindUserByName(string) (*db.User, error) {
-	return &db.User{ID: "user-1", Name: "tester"}, nil
+func (m *pasteDB) FindUserByName(name string) (*db.User, error) {
+	m.user = name
+	return &db.User{ID: "user-1", Name: name}, nil
 }
 
-func (m *pasteDB) FindPostWithSlug(string, string, string) (*db.Post, error) {
+func (m *pasteDB) FindPostWithSlug(slug string, _ string, _ string) (*db.Post, error) {
+	m.slug = slug
 	return m.post, nil
 }
 
 func TestLargePasteEscapesHTML(t *testing.T) {
 	t.Chdir("../../..")
 	logger := slog.New(slog.DiscardHandler)
-	cfg := &shared.ConfigSite{
+	cfg := &Config{
 		Domain: "pastes.test", Protocol: "https", Space: "pastes", Logger: logger,
 	}
 	now := time.Now()
@@ -44,11 +47,11 @@ func TestLargePasteEscapesHTML(t *testing.T) {
 			Text: text, FileSize: len(text), PublishAt: &now, UpdatedAt: &now,
 		},
 	}
-	api := &router.ApiConfig{Cfg: cfg, Dbpool: dbpool}
-	handler := router.CreateServeBasic(createSubdomainRoutes(nil), api.CreateCtx(context.Background(), "tester"))
+	web := &webRouter{cfg: cfg, db: dbpool}
+	handler := router.NewHostRouter(cfg.Domain, cfg.Space, web.mainMux(), web.sitesMux())
 
 	page := httptest.NewRecorder()
-	handler(page, httptest.NewRequest(http.MethodGet, "https://tester.pastes.test/test.html", nil))
+	handler.ServeHTTP(page, httptest.NewRequest(http.MethodGet, "https://tester.pastes.test/test.html", nil))
 	if page.Code != http.StatusOK {
 		t.Fatalf("page status = %d", page.Code)
 	}
@@ -61,8 +64,54 @@ func TestLargePasteEscapesHTML(t *testing.T) {
 	}
 
 	raw := httptest.NewRecorder()
-	handler(raw, httptest.NewRequest(http.MethodGet, "https://tester.pastes.test/test.html/raw", nil))
+	handler.ServeHTTP(raw, httptest.NewRequest(http.MethodGet, "https://tester.pastes.test/test.html/raw", nil))
 	if raw.Code != http.StatusOK || raw.Body.String() != text {
 		t.Fatal("raw response does not preserve the uploaded text")
+	}
+}
+
+func TestRoutes(t *testing.T) {
+	t.Chdir("../../..")
+	logger := slog.New(slog.DiscardHandler)
+	cfg := &Config{
+		Domain: "pastes.test", Protocol: "https", Space: "pastes", Logger: logger,
+	}
+	now := time.Now()
+	dbpool := &pasteDB{
+		StubDB: stub.NewStubDB(logger),
+		post: &db.Post{
+			Filename: "a.txt", Slug: "a.txt", Username: "tester",
+			Text: "paste", FileSize: 5, PublishAt: &now, UpdatedAt: &now,
+		},
+	}
+	web := &webRouter{cfg: cfg, db: dbpool}
+	handler := router.NewHostRouter(cfg.Domain, cfg.Space, web.mainMux(), web.sitesMux())
+
+	for _, tt := range []struct {
+		url    string
+		status int
+		raw    bool
+		user   string
+		slug   string
+	}{
+		{url: "https://pastes.test/tester/a.txt", status: http.StatusOK, user: "tester", slug: "a.txt"},
+		{url: "https://pastes.test/tester/a.txt/raw", status: http.StatusOK, raw: true, user: "tester", slug: "a.txt"},
+		{url: "https://pastes.test/raw/tester/a.txt", status: http.StatusOK, raw: true, user: "tester", slug: "a.txt"},
+		// Both raw forms fit, and the trailing one wins.
+		{url: "https://pastes.test/raw/tester/raw", status: http.StatusOK, raw: true, user: "raw", slug: "tester"},
+		{url: "https://pastes.test/tester/a.txt/other", status: http.StatusNotFound},
+		{url: "https://tester.pastes.test/a.txt", status: http.StatusOK, user: "tester", slug: "a.txt"},
+		{url: "https://tester.pastes.test/a.txt/raw", status: http.StatusOK, raw: true, user: "tester", slug: "a.txt"},
+		{url: "https://tester.pastes.test/raw/a.txt", status: http.StatusOK, raw: true, user: "tester", slug: "a.txt"},
+		{url: "https://tester.pastes.test/a.txt/other", status: http.StatusNotFound},
+	} {
+		dbpool.user, dbpool.slug = "", ""
+		res := httptest.NewRecorder()
+		handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, tt.url, nil))
+		raw := res.Body.String() == "paste"
+		if res.Code != tt.status || dbpool.user != tt.user || dbpool.slug != tt.slug || (res.Code == http.StatusOK && raw != tt.raw) {
+			t.Errorf("%s = %d raw %v for %q/%q, want %d raw %v for %q/%q",
+				tt.url, res.Code, raw, dbpool.user, dbpool.slug, tt.status, tt.raw, tt.user, tt.slug)
+		}
 	}
 }

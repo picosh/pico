@@ -13,19 +13,12 @@ import (
 const adminPrefix = "admin__"
 
 type SshAuthHandler struct {
-	DB        AuthFindUser
+	DB        db.AuthDB
 	Logger    *slog.Logger
 	Principal string
 }
 
-type AuthFindUser interface {
-	FindUserByPubkey(key string) (*db.User, error)
-	FindUserByName(name string) (*db.User, error)
-	FindFeature(userID, name string) (*db.FeatureFlag, error)
-	InsertAccessLog(log *db.AccessLog) error
-}
-
-func NewSshAuthHandler(dbh AuthFindUser, logger *slog.Logger, principal string) *SshAuthHandler {
+func NewSshAuthHandler(dbh db.AuthDB, logger *slog.Logger, principal string) *SshAuthHandler {
 	return &SshAuthHandler{
 		DB:        dbh,
 		Logger:    logger,
@@ -149,24 +142,4 @@ func (r *SshAuthHandler) PubkeyAuthHandler(conn ssh.ConnMetadata, key ssh.Public
 	}
 
 	return perms, nil
-}
-
-func FindPlusFF(dbpool db.DB, cfg *ConfigSite, userID string) *db.FeatureFlag {
-	ff, _ := dbpool.FindFeature(userID, "plus")
-	// we have free tiers so users might not have a feature flag
-	// in which case we set sane defaults
-	if ff == nil {
-		ff = db.NewFeatureFlag(
-			userID,
-			"plus",
-			cfg.MaxSize,
-			cfg.MaxAssetSize,
-			cfg.MaxSpecialFileSize,
-		)
-	}
-	// this is jank
-	ff.Data.StorageMax = ff.FindStorageMax(cfg.MaxSize)
-	ff.Data.FileMax = ff.FindFileMax(cfg.MaxAssetSize)
-	ff.Data.SpecialFileMax = ff.FindSpecialFileMax(cfg.MaxSpecialFileSize)
-	return ff
 }

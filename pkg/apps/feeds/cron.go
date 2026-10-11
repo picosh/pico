@@ -128,14 +128,14 @@ func isValidItem(logger *slog.Logger, item *gofeed.Item, feedItems []*db.FeedIte
 }
 
 type Fetcher struct {
-	cfg  *shared.ConfigSite
-	db   db.DB
+	cfg  *Config
+	db   DB
 	auth sasl.Client
 	gron *gronx.Gronx
 	host string
 }
 
-func NewFetcher(dbpool db.DB, cfg *shared.ConfigSite) *Fetcher {
+func NewFetcher(dbpool DB, cfg *Config) *Fetcher {
 	host := os.Getenv("PICO_SMTP_HOST")
 	smtPass := os.Getenv("PICO_SMTP_PASS")
 	emailLogin := os.Getenv("PICO_SMTP_USER")

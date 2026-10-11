@@ -11,7 +11,7 @@ import (
 
 const binRetentionDays = 14
 
-func BinCron(cfg *PgsConfig) {
+func BinCron(cfg *Config) {
 	logger := cfg.Logger
 	storage := cfg.Storage
 	db := cfg.DB

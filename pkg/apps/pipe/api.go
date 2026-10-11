@@ -9,66 +9,28 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
-	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/db/postgres"
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/pico/pkg/shared/router"
 	"github.com/picosh/utils/pipe"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"golang.org/x/crypto/ssh"
 )
 
 var (
 	cleanRegex = regexp.MustCompile(`[^0-9a-zA-Z,/]`)
-	sshClient  *pipe.Client
 	upgrader   = websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
 			return true
 		},
 	}
 )
-
-func serveFile(file string, contentType string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := router.GetLogger(r)
-		cfg := router.GetCfg(r)
-
-		contents, err := os.ReadFile(cfg.StaticPath(fmt.Sprintf("public/%s", file)))
-		if err != nil {
-			logger.Error("could not read statis file", "err", err.Error())
-			http.Error(w, "file not found", 404)
-		}
-		w.Header().Add("Content-Type", contentType)
-
-		_, err = w.Write(contents)
-		if err != nil {
-			logger.Error("could not write static file", "err", err.Error())
-			http.Error(w, "server error", http.StatusInternalServerError)
-		}
-	}
-}
-
-func createStaticRoutes() []router.Route {
-	return []router.Route{
-		router.NewRoute("GET", "/main.css", serveFile("main.css", "text/css")),
-		router.NewRoute("GET", "/smol.css", serveFile("smol.css", "text/css")),
-		router.NewRoute("GET", "/syntax.css", serveFile("syntax.css", "text/css")),
-		router.NewRoute("GET", "/card.png", serveFile("card.png", "image/png")),
-		router.NewRoute("GET", "/favicon-16x16.png", serveFile("favicon-16x16.png", "image/png")),
-		router.NewRoute("GET", "/favicon-32x32.png", serveFile("favicon-32x32.png", "image/png")),
-		router.NewRoute("GET", "/apple-touch-icon.png", serveFile("apple-touch-icon.png", "image/png")),
-		router.NewRoute("GET", "/favicon.ico", serveFile("favicon.ico", "image/x-icon")),
-		router.NewRoute("GET", "/robots.txt", serveFile("robots.txt", "text/plain")),
-		router.NewRoute("GET", "/anim.js", serveFile("anim.js", "text/javascript")),
-	}
-}
 
 type writeFlusher struct {
 	responseWriter http.ResponseWriter
@@ -85,12 +47,19 @@ func (w writeFlusher) Write(p []byte) (n int, err error) {
 
 var _ io.Writer = writeFlusher{}
 
-func handleSub(pubsub bool) http.HandlerFunc {
+const (
+	// pongWait is how long a websocket client has to answer a ping.
+	pongWait   = 60 * time.Second
+	pingPeriod = pongWait / 2
+	writeWait  = 10 * time.Second
+)
+
+func (web *webRouter) handleSub(pubsub bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		logger := router.GetLogger(r)
+		logger := web.cfg.Logger
 
 		clientInfo := shared.NewPicoPipeClient()
-		topic, _ := url.PathUnescape(router.GetField(r, 0))
+		topic, _ := url.PathUnescape(r.PathValue("topic"))
 
 		topic = cleanRegex.ReplaceAllString(topic, "")
 
@@ -107,22 +76,15 @@ func handleSub(pubsub bool) http.HandlerFunc {
 			params += fmt.Sprintf(" -a=%s", cleanList)
 		}
 
-		id := uuid.NewString()
-
-		p, err := sshClient.AddSession(id, fmt.Sprintf("sub %s %s", params, topic), 0, -1, -1)
+		p, err := web.conn.run(r.Context(), fmt.Sprintf("sub %s %s", params, topic))
 		if err != nil {
 			logger.Error("sub error", "topic", topic, "info", clientInfo, "err", err.Error())
 			http.Error(w, "server error", http.StatusInternalServerError)
 			return
 		}
-
-		go func() {
-			<-r.Context().Done()
-			err := sshClient.RemoveSession(id)
-			if err != nil {
-				logger.Error("sub remove error", "topic", topic, "info", clientInfo, "err", err.Error())
-			}
-		}()
+		defer func() { _ = p.Close() }()
+		// A client that leaves while nothing is published ends the sub.
+		defer context.AfterFunc(r.Context(), func() { _ = p.Close() })()
 
 		if mime := r.URL.Query().Get("mime"); mime != "" {
 			w.Header().Add("Content-Type", r.URL.Query().Get("mime"))
@@ -138,12 +100,12 @@ func handleSub(pubsub bool) http.HandlerFunc {
 	}
 }
 
-func handlePub(pubsub bool) http.HandlerFunc {
+func (web *webRouter) handlePub(pubsub bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		logger := router.GetLogger(r)
+		logger := web.cfg.Logger
 
 		clientInfo := shared.NewPicoPipeClient()
-		topic, _ := url.PathUnescape(router.GetField(r, 0))
+		topic, _ := url.PathUnescape(r.PathValue("topic"))
 
 		topic = cleanRegex.ReplaceAllString(topic, "")
 
@@ -179,22 +141,14 @@ func handlePub(pubsub bool) http.HandlerFunc {
 			params += " -e"
 		}
 
-		id := uuid.NewString()
-
-		p, err := sshClient.AddSession(id, fmt.Sprintf("pub %s %s", params, topic), 0, -1, -1)
+		p, err := web.conn.run(r.Context(), fmt.Sprintf("pub %s %s", params, topic))
 		if err != nil {
 			logger.Error("pub error", "topic", topic, "info", clientInfo, "err", err.Error())
 			http.Error(w, "server error", http.StatusInternalServerError)
 			return
 		}
-
-		go func() {
-			<-r.Context().Done()
-			err := sshClient.RemoveSession(id)
-			if err != nil {
-				logger.Error("pub remove error", "topic", topic, "info", clientInfo, "err", err.Error())
-			}
-		}()
+		defer func() { _ = p.Close() }()
+		defer context.AfterFunc(r.Context(), func() { _ = p.Close() })()
 
 		var scanErr error
 		scanStatus := http.StatusInternalServerError
@@ -243,30 +197,16 @@ func handlePub(pubsub bool) http.HandlerFunc {
 			return
 		}
 
-	outer:
-		for {
-			select {
-			case <-r.Context().Done():
-				break outer
-			default:
-				messageToWrite := first
-				if prefix != "" {
-					messageToWrite = append([]byte(prefix), messageToWrite...)
-				}
+		messageToWrite := first
+		if prefix != "" {
+			messageToWrite = append([]byte(prefix), messageToWrite...)
+		}
 
-				n, err := p.Write(messageToWrite)
-				if err != nil {
-					logger.Error("pub write error", "topic", topic, "info", clientInfo, "err", err.Error())
-					http.Error(w, "server error", http.StatusInternalServerError)
-					return
-				}
-
-				if n > 0 {
-					break outer
-				}
-
-				time.Sleep(10 * time.Millisecond)
-			}
+		_, err = p.Write(messageToWrite)
+		if err != nil {
+			logger.Error("pub write error", "topic", topic, "info", clientInfo, "err", err.Error())
+			http.Error(w, "server error", http.StatusInternalServerError)
+			return
 		}
 
 		_, err = io.Copy(p, reader)
@@ -276,15 +216,23 @@ func handlePub(pubsub bool) http.HandlerFunc {
 			return
 		}
 
-		w.WriteHeader(http.StatusOK)
+		// pub sends the message once its stdin ends, and exits when it has.
+		// Older pipe servers close the session without an exit status.
+		_ = p.CloseWrite()
+		var missing *ssh.ExitMissingError
+		if err := p.Wait(); err != nil && !errors.As(err, &missing) {
+			logger.Error("pub exit error", "topic", topic, "info", clientInfo, "err", err.Error())
+			http.Error(w, "server error", http.StatusInternalServerError)
+			return
+		}
 
-		time.Sleep(10 * time.Millisecond)
+		w.WriteHeader(http.StatusOK)
 	}
 }
 
-func handlePipe() http.HandlerFunc {
+func (web *webRouter) handlePipe() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		logger := router.GetLogger(r)
+		logger := web.cfg.Logger
 
 		c, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
@@ -297,7 +245,7 @@ func handlePipe() http.HandlerFunc {
 		}()
 
 		clientInfo := shared.NewPicoPipeClient()
-		topic, _ := url.PathUnescape(router.GetField(r, 0))
+		topic, _ := url.PathUnescape(r.PathValue("topic"))
 
 		topic = cleanRegex.ReplaceAllString(topic, "")
 
@@ -325,22 +273,36 @@ func handlePipe() http.HandlerFunc {
 
 		prefix := r.URL.Query().Get("prefix")
 
-		id := uuid.NewString()
-
-		p, err := sshClient.AddSession(id, fmt.Sprintf("pipe %s %s", params, topic), 0, -1, -1)
+		p, err := web.conn.run(r.Context(), fmt.Sprintf("pipe %s %s", params, topic))
 		if err != nil {
 			logger.Error("pipe error", "topic", topic, "info", clientInfo, "err", err.Error())
-			http.Error(w, "server error", http.StatusInternalServerError)
+			_ = c.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseInternalServerErr, "server error"), time.Now().Add(time.Second))
 			return
 		}
+		defer func() { _ = p.Close() }()
 
+		// A client that stops answering pings is gone, even if its
+		// connection never closed.
+		_ = c.SetReadDeadline(time.Now().Add(pongWait))
+		c.SetPongHandler(func(string) error {
+			return c.SetReadDeadline(time.Now().Add(pongWait))
+		})
+		done := make(chan struct{})
+		defer close(done)
 		go func() {
-			<-r.Context().Done()
-			err := sshClient.RemoveSession(id)
-			if err != nil {
-				logger.Error("pipe remove error", "topic", topic, "info", clientInfo, "err", err.Error())
+			ticker := time.NewTicker(pingPeriod)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-done:
+					return
+				case <-ticker.C:
+					if err := c.WriteControl(websocket.PingMessage, nil, time.Now().Add(writeWait)); err != nil {
+						_ = c.Close()
+						return
+					}
+				}
 			}
-			_ = c.Close()
 		}()
 
 		var wg sync.WaitGroup
@@ -376,10 +338,9 @@ func handlePipe() http.HandlerFunc {
 			}()
 
 			var messageBuffer []byte
+			buf := make([]byte, 32*1024)
 
 			for {
-				buf := make([]byte, 32*1024)
-
 				n, err := p.Read(buf)
 				if err != nil {
 					logger.Error("pipe read error", "topic", topic, "info", clientInfo, "err", err.Error())
@@ -434,9 +395,9 @@ func handlePipe() http.HandlerFunc {
 	}
 }
 
-func rssHandler(cfg *shared.ConfigSite, dbpool db.DB) http.HandlerFunc {
+func rssHandler(cfg *Config, dbpool DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		apiToken, _ := url.PathUnescape(router.GetField(r, 0))
+		apiToken, _ := url.PathUnescape(r.PathValue("token"))
 		user, err := dbpool.FindUserByToken(apiToken)
 		if err != nil {
 			cfg.Logger.Error(
@@ -471,62 +432,68 @@ func rssHandler(cfg *shared.ConfigSite, dbpool db.DB) http.HandlerFunc {
 	}
 }
 
-func createMainRoutes(staticRoutes []router.Route, cfg *shared.ConfigSite, dbpool db.DB) []router.Route {
-	routes := []router.Route{
-		router.NewRoute("GET", "/", router.CreatePageHandler("html/marketing.page.tmpl")),
-		router.NewRoute("GET", "/check", router.CheckHandler),
-		router.NewRoute("GET", "/rss/(.+)", rssHandler(cfg, dbpool)),
-		router.NewRoute("GET", "/_metrics", promhttp.Handler().ServeHTTP),
+type webRouter struct {
+	cfg  *Config
+	db   DB
+	conn *pipeConn
+}
+
+func (web *webRouter) static(mux *http.ServeMux) {
+	cfg := web.cfg
+	files := cfg.Static()
+	mux.HandleFunc("GET /favicon-16x16.png", files.File("favicon-16x16.png", "image/png"))
+	mux.HandleFunc("GET /apple-touch-icon.png", files.File("apple-touch-icon.png", "image/png"))
+	mux.HandleFunc("GET /favicon.ico", files.File("favicon.ico", "image/x-icon"))
+	mux.HandleFunc("GET /robots.txt", files.File("robots.txt", "text/plain"))
+	mux.HandleFunc("GET /anim.js", files.File("anim.js", "text/javascript"))
+	if cfg.Debug {
+		router.CreatePProfRoutesMux(mux)
 	}
+}
 
-	pipeRoutes := []router.Route{
-		router.NewRoute("GET", "/topic/(.+)", handleSub(false)),
-		router.NewRoute("POST", "/topic/(.+)", handlePub(false)),
-		router.NewRoute("GET", "/pubsub/(.+)", handleSub(true)),
-		router.NewRoute("POST", "/pubsub/(.+)", handlePub(true)),
-		router.NewRoute("GET", "/pipe/(.+)", handlePipe()),
-	}
+func (web *webRouter) mainMux() *http.ServeMux {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /{$}", web.cfg.Static().Page("html/marketing.page.tmpl"))
+	mux.HandleFunc("GET /check", router.CheckHandler(web.cfg.Domain, web.cfg.Space, web.db))
+	mux.HandleFunc("GET /rss/{token...}", rssHandler(web.cfg, web.db))
+	mux.Handle("GET /_metrics", promhttp.Handler())
 
-	for _, route := range pipeRoutes {
-		route.CorsEnabled = true
-		routes = append(routes, route)
-	}
+	mux.HandleFunc("GET /topic/{topic...}", router.Cors(web.handleSub(false)))
+	mux.HandleFunc("POST /topic/{topic...}", router.Cors(web.handlePub(false)))
+	mux.HandleFunc("OPTIONS /topic/{topic...}", router.CorsPreflight)
+	mux.HandleFunc("GET /pubsub/{topic...}", router.Cors(web.handleSub(true)))
+	mux.HandleFunc("POST /pubsub/{topic...}", router.Cors(web.handlePub(true)))
+	mux.HandleFunc("OPTIONS /pubsub/{topic...}", router.CorsPreflight)
+	mux.HandleFunc("GET /pipe/{topic...}", router.Cors(web.handlePipe()))
+	mux.HandleFunc("OPTIONS /pipe/{topic...}", router.CorsPreflight)
 
-	routes = append(
-		routes,
-		staticRoutes...,
-	)
+	web.static(mux)
+	return mux
+}
 
-	return routes
+// sitesMux serves only static files on subdomains.
+func (web *webRouter) sitesMux() *http.ServeMux {
+	mux := http.NewServeMux()
+	web.static(mux)
+	return mux
 }
 
 func StartApiServer() {
-	cfg := NewConfigSite("pipe-web")
-	db := postgres.NewDB(cfg.DbURL, cfg.Logger)
+	cfg := NewConfig("pipe-web")
+	db := NewDB(postgres.NewDB(cfg.DbURL, cfg.Logger))
 	defer func() {
 		_ = db.Close()
 	}()
 	logger := cfg.Logger
 
-	staticRoutes := createStaticRoutes()
-
-	if cfg.Debug {
-		staticRoutes = router.CreatePProfRoutes(staticRoutes)
-	}
-
-	mainRoutes := createMainRoutes(staticRoutes, cfg, db)
-	subdomainRoutes := staticRoutes
-
 	info := shared.NewPicoPipeClient()
 
-	client, err := pipe.NewClient(context.Background(), logger.With("info", info), info)
+	pingClient, err := pipe.NewClient(context.Background(), logger.With("info", info), info)
 	if err != nil {
 		panic(err)
 	}
 
-	sshClient = client
-
-	pingSession, err := sshClient.AddSession("ping", "pub -b=false -c ping", 0, -1, -1)
+	pingSession, err := pingClient.AddSession("ping", "pub -b=false -c ping", 0, -1, -1)
 	if err != nil {
 		panic(err)
 	}
@@ -542,12 +509,8 @@ func StartApiServer() {
 		}
 	}()
 
-	apiConfig := &router.ApiConfig{
-		Cfg:    cfg,
-		Dbpool: db,
-	}
-	handler := router.CreateServe(mainRoutes, subdomainRoutes, apiConfig)
-	router := http.HandlerFunc(handler)
+	web := &webRouter{cfg: cfg, db: db, conn: newPipeConn(info)}
+	handler := router.NewHostRouter(cfg.Domain, cfg.Space, web.mainMux(), web.sitesMux())
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)
 	logger.Info(
@@ -556,5 +519,5 @@ func StartApiServer() {
 		"domain", cfg.Domain,
 	)
 
-	logger.Error("listen", "err", http.ListenAndServe(portStr, router).Error())
+	logger.Error("listen", "err", http.ListenAndServe(portStr, handler).Error())
 }

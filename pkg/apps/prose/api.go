@@ -6,8 +6,8 @@ import (
 	"html/template"
 	"net/http"
 	"net/url"
-	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -118,11 +118,11 @@ func GetBlogName(username string) string {
 	return fmt.Sprintf("%s's blog", username)
 }
 
-func blogStyleHandler(w http.ResponseWriter, r *http.Request) {
+func (web *webRouter) blogStyleHandler(w http.ResponseWriter, r *http.Request) {
 	username := router.GetUsernameFromRequest(r)
-	dbpool := router.GetDB(r)
-	logger := router.GetLogger(r)
-	cfg := router.GetCfg(r)
+	dbpool := web.db
+	logger := web.cfg.Logger
+	cfg := web.cfg
 
 	user, err := dbpool.FindUserByName(username)
 	if err != nil {
@@ -148,11 +148,11 @@ func blogStyleHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func blogHandler(w http.ResponseWriter, r *http.Request) {
+func (web *webRouter) blogHandler(w http.ResponseWriter, r *http.Request) {
 	username := router.GetUsernameFromRequest(r)
-	dbpool := router.GetDB(r)
-	logger := router.GetLogger(r)
-	cfg := router.GetCfg(r)
+	dbpool := web.db
+	logger := web.cfg.Logger
+	cfg := web.cfg
 
 	user, err := dbpool.FindUserByName(username)
 	if err != nil {
@@ -179,12 +179,12 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ts, err := router.RenderTemplate(cfg, []string{
+	ts, err := router.RenderTemplate(staticDir, []string{
 		cfg.StaticPath("html/blog-default.partial.tmpl"),
 		cfg.StaticPath("html/blog.page.tmpl"),
 	})
 
-	curl := shared.CreateURLFromRequest(cfg, r)
+	curl := shared.CreateURLFromRequest(cfg.Protocol, cfg.Domain, r)
 
 	if err != nil {
 		logger.Error("render template", "err", err.Error())
@@ -218,9 +218,7 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 			u, _ := url.Parse(nav.URL)
 			finURL := nav.URL
 			if !u.IsAbs() {
-				finURL = cfg.FullPostURL(
-					curl,
-					readme.Username,
+				finURL = curl.FullPostURL(readme.Username,
 					nav.URL,
 				)
 			}
@@ -245,8 +243,8 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	postCollection := make([]PostItemData, 0, len(posts))
 	for _, post := range posts {
 		p := PostItemData{
-			URL:            template.URL(cfg.FullPostURL(curl, post.Username, post.Slug)),
-			BlogURL:        template.URL(cfg.FullBlogURL(curl, post.Username)),
+			URL:            template.URL(curl.FullPostURL(post.Username, post.Slug)),
+			BlogURL:        template.URL(curl.FullBlogURL(post.Username)),
 			Title:          shared.FilenameToTitle(post.Filename, post.Title),
 			PublishAt:      post.PublishAt.Format(time.DateOnly),
 			PublishAtISO:   post.PublishAt.Format(time.RFC3339),
@@ -257,16 +255,16 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := BlogPageData{
-		Site:      *cfg.GetSiteData(),
+		Site:      cfg.SiteData(),
 		PageTitle: headerTxt.Title,
-		URL:       template.URL(cfg.FullBlogURL(curl, username)),
-		RSSURL:    template.URL(cfg.RssBlogURL(curl, username, tag)),
+		URL:       template.URL(curl.FullBlogURL(username)),
+		RSSURL:    template.URL(curl.RssBlogURL(username, tag)),
 		Readme:    readmeTxt,
 		Header:    headerTxt,
 		Username:  username,
 		Posts:     postCollection,
 		HasCSS:    hasCSS,
-		CssURL:    template.URL(cfg.CssURL(username)),
+		CssURL:    template.URL(cfg.CssURL()),
 		HasFilter: tag != "",
 	}
 
@@ -277,21 +275,14 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func postRawHandler(w http.ResponseWriter, r *http.Request) {
+func (web *webRouter) postRawHandler(w http.ResponseWriter, r *http.Request) {
 	username := router.GetUsernameFromRequest(r)
-	subdomain := router.GetSubdomain(r)
-	cfg := router.GetCfg(r)
-
-	var slug string
-	if !cfg.IsSubdomains() || subdomain == "" {
-		slug, _ = url.PathUnescape(router.GetField(r, 1))
-	} else {
-		slug, _ = url.PathUnescape(router.GetField(r, 0))
-	}
+	cfg := web.cfg
+	slug, _ := url.PathUnescape(r.PathValue("slug"))
 	slug = strings.TrimSuffix(slug, "/")
 
-	dbpool := router.GetDB(r)
-	logger := router.GetLogger(r)
+	dbpool := web.db
+	logger := web.cfg.Logger
 	logger = logger.With("slug", slug)
 
 	user, err := dbpool.FindUserByName(username)
@@ -318,11 +309,11 @@ func postRawHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func robotsHandler(w http.ResponseWriter, r *http.Request) {
+func (web *webRouter) robotsHandler(w http.ResponseWriter, r *http.Request) {
 	username := router.GetUsernameFromRequest(r)
-	cfg := router.GetCfg(r)
-	dbpool := router.GetDB(r)
-	logger := router.GetLogger(r)
+	cfg := web.cfg
+	dbpool := web.db
+	logger := web.cfg.Logger
 	user, err := dbpool.FindUserByName(username)
 	if err != nil {
 		logger.Info("blog not found", "user", username)
@@ -344,21 +335,14 @@ func robotsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func postHandler(w http.ResponseWriter, r *http.Request) {
+func (web *webRouter) postHandler(w http.ResponseWriter, r *http.Request) {
 	username := router.GetUsernameFromRequest(r)
-	subdomain := router.GetSubdomain(r)
-	cfg := router.GetCfg(r)
-
-	var slug string
-	if !cfg.IsSubdomains() || subdomain == "" {
-		slug, _ = url.PathUnescape(router.GetField(r, 1))
-	} else {
-		slug, _ = url.PathUnescape(router.GetField(r, 0))
-	}
+	cfg := web.cfg
+	slug, _ := url.PathUnescape(r.PathValue("slug"))
 	slug = strings.TrimSuffix(slug, "/")
 
-	dbpool := router.GetDB(r)
-	logger := router.GetLogger(r)
+	dbpool := web.db
+	logger := web.cfg.Logger
 
 	user, err := dbpool.FindUserByName(username)
 	if err != nil {
@@ -371,7 +355,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	logger = logger.With("slug", slug)
 
 	blogName := GetBlogName(username)
-	curl := shared.CreateURLFromRequest(cfg, r)
+	curl := shared.CreateURLFromRequest(cfg.Protocol, cfg.Domain, r)
 
 	favicon := ""
 	ogImage := ""
@@ -455,10 +439,10 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		data = PostPageData{
-			Site:         *cfg.GetSiteData(),
+			Site:         cfg.SiteData(),
 			PageTitle:    GetPostTitle(post),
-			URL:          template.URL(cfg.FullPostURL(curl, post.Username, post.Slug)),
-			BlogURL:      template.URL(cfg.FullBlogURL(curl, username)),
+			URL:          template.URL(curl.FullPostURL(post.Username, post.Slug)),
+			BlogURL:      template.URL(curl.FullBlogURL(username)),
 			Description:  post.Description,
 			Title:        shared.FilenameToTitle(post.Filename, post.Title),
 			Slug:         post.Slug,
@@ -470,7 +454,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			BlogName:     blogName,
 			Contents:     contents,
 			HasCSS:       hasCSS,
-			CssURL:       template.URL(cfg.CssURL(username)),
+			CssURL:       template.URL(cfg.CssURL()),
 			Tags:         tags,
 			Image:        template.URL(ogImage),
 			ImageCard:    ogImageCard,
@@ -506,8 +490,8 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 		now := time.Now()
 
 		data = PostPageData{
-			Site:         *cfg.GetSiteData(),
-			BlogURL:      template.URL(cfg.FullBlogURL(curl, username)),
+			Site:         cfg.SiteData(),
+			BlogURL:      template.URL(curl.FullBlogURL(username)),
 			PageTitle:    title,
 			Description:  desc,
 			Title:        title,
@@ -518,7 +502,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			Username:     username,
 			BlogName:     blogName,
 			HasCSS:       hasCSS,
-			CssURL:       template.URL(cfg.CssURL(username)),
+			CssURL:       template.URL(cfg.CssURL()),
 			Image:        template.URL(ogImage),
 			ImageCard:    ogImageCard,
 			Favicon:      template.URL(favicon),
@@ -529,7 +513,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 	}
 
-	ts, err := router.RenderTemplate(cfg, []string{
+	ts, err := router.RenderTemplate(staticDir, []string{
 		cfg.StaticPath("html/list.partial.tmpl"),
 		cfg.StaticPath("html/post.page.tmpl"),
 	})
@@ -547,10 +531,10 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func readHandler(w http.ResponseWriter, r *http.Request) {
-	dbpool := router.GetDB(r)
-	logger := router.GetLogger(r)
-	cfg := router.GetCfg(r)
+func (web *webRouter) readHandler(w http.ResponseWriter, r *http.Request) {
+	dbpool := web.db
+	logger := web.cfg.Logger
+	cfg := web.cfg
 
 	posts, err := dbpool.FindPopularPosts()
 	if err != nil {
@@ -559,7 +543,7 @@ func readHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ts, err := router.RenderTemplate(cfg, []string{
+	ts, err := router.RenderTemplate(staticDir, []string{
 		cfg.StaticPath("html/read.page.tmpl"),
 	})
 
@@ -568,14 +552,14 @@ func readHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := ReadPageData{
-		Site: *cfg.GetSiteData(),
+		Site: cfg.SiteData(),
 	}
 
-	curl := shared.NewCreateURL(cfg)
+	curl := shared.NewCreateURL(cfg.Protocol, cfg.Domain)
 	for _, post := range posts {
 		item := PostItemData{
-			URL:            template.URL(cfg.FullPostURL(curl, post.Username, post.Slug)),
-			BlogURL:        template.URL(cfg.FullBlogURL(curl, post.Username)),
+			URL:            template.URL(curl.FullPostURL(post.Username, post.Slug)),
+			BlogURL:        template.URL(curl.FullBlogURL(post.Username)),
 			Title:          shared.FilenameToTitle(post.Filename, post.Title),
 			Description:    post.Description,
 			Username:       post.Username,
@@ -595,11 +579,11 @@ func readHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
+func (web *webRouter) rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 	username := router.GetUsernameFromRequest(r)
-	dbpool := router.GetDB(r)
-	logger := router.GetLogger(r)
-	cfg := router.GetCfg(r)
+	dbpool := web.db
+	logger := web.cfg.Logger
+	cfg := web.cfg
 
 	user, err := dbpool.FindUserByName(username)
 	if err != nil {
@@ -656,8 +640,8 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	curl := shared.CreateURLFromRequest(cfg, r)
-	blogUrl := cfg.FullBlogURL(curl, username)
+	curl := shared.CreateURLFromRequest(cfg.Protocol, cfg.Domain, r)
+	blogUrl := curl.FullBlogURL(username)
 
 	updatedAt := &time.Time{}
 	if len(posts) > 0 {
@@ -722,7 +706,7 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 
 		}
 
-		realUrl := cfg.FullPostURL(curl, post.Username, post.Slug)
+		realUrl := curl.FullPostURL(post.Username, post.Slug)
 		feedId := realUrl
 
 		item := &feeds.Item{
@@ -756,10 +740,10 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func rssHandler(w http.ResponseWriter, r *http.Request) {
-	dbpool := router.GetDB(r)
-	logger := router.GetLogger(r)
-	cfg := router.GetCfg(r)
+func (web *webRouter) rssHandler(w http.ResponseWriter, r *http.Request) {
+	dbpool := web.db
+	logger := web.cfg.Logger
+	cfg := web.cfg
 
 	posts, err := dbpool.FindPopularPosts()
 	if err != nil {
@@ -786,7 +770,7 @@ func rssHandler(w http.ResponseWriter, r *http.Request) {
 		Created:     time.Now(),
 	}
 
-	curl := shared.CreateURLFromRequest(cfg, r)
+	curl := shared.CreateURLFromRequest(cfg.Protocol, cfg.Domain, r)
 
 	var feedItems []*feeds.Item
 	for _, post := range posts {
@@ -820,7 +804,7 @@ func rssHandler(w http.ResponseWriter, r *http.Request) {
 
 		}
 
-		realUrl := cfg.FullPostURL(curl, post.Username, post.Slug)
+		realUrl := curl.FullPostURL(post.Username, post.Slug)
 		if !curl.Subdomain && !curl.UsernameInRoute {
 			realUrl = fmt.Sprintf("%s://%s%s", cfg.Protocol, r.Host, realUrl)
 		}
@@ -857,62 +841,10 @@ func rssHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func serveFile(file string, contentType string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := router.GetLogger(r)
-		cfg := router.GetCfg(r)
-
-		contents, err := os.ReadFile(cfg.StaticPath(fmt.Sprintf("public/%s", file)))
-		if err != nil {
-			logger.Error("read file", "err", err.Error())
-			http.Error(w, "file not found", 404)
-		}
-		w.Header().Add("Content-Type", contentType)
-
-		_, err = w.Write(contents)
-		if err != nil {
-			logger.Error("write to response writer", "err", err.Error())
-			http.Error(w, "server error", 500)
-		}
-	}
-}
-
-func createStaticRoutes() []router.Route {
-	return []router.Route{
-		router.NewRoute("GET", "/read.css", serveFile("read.css", "text/css")),
-		router.NewRoute("GET", "/reset.css", serveFile("reset.css", "text/css")),
-		router.NewRoute("GET", "/syntax.css", serveFile("syntax.css", "text/css")),
-		router.NewRoute("GET", "/card.png", serveFile("card.png", "image/png")),
-		router.NewRoute("GET", "/favicon-16x16.png", serveFile("favicon-16x16.png", "image/png")),
-		router.NewRoute("GET", "/favicon-32x32.png", serveFile("favicon-32x32.png", "image/png")),
-		router.NewRoute("GET", "/apple-touch-icon.png", serveFile("apple-touch-icon.png", "image/png")),
-		router.NewRoute("GET", "/favicon.ico", serveFile("favicon.ico", "image/x-icon")),
-		router.NewRoute("GET", "/robots.txt", serveFile("robots.txt", "text/plain")),
-	}
-}
-
-func createMainRoutes(staticRoutes []router.Route) []router.Route {
-	routes := []router.Route{
-		router.NewRoute("GET", "/", readHandler),
-		router.NewRoute("GET", "/read", readHandler),
-		router.NewRoute("GET", "/check", router.CheckHandler),
-		router.NewRoute("GET", "/rss", rssHandler),
-		router.NewRoute("GET", "/rss.atom", rssHandler),
-		router.NewRoute("GET", "/_metrics", promhttp.Handler().ServeHTTP),
-	}
-
-	routes = append(
-		routes,
-		staticRoutes...,
-	)
-
-	return routes
-}
-
-func imgRequest(w http.ResponseWriter, r *http.Request) {
-	logger := router.GetLogger(r)
-	st := router.GetStorage(r)
-	dbpool := router.GetDB(r)
+func (web *webRouter) imgRequest(w http.ResponseWriter, r *http.Request) {
+	logger := web.cfg.Logger
+	st := web.storage
+	dbpool := web.db
 	username := router.GetUsernameFromRequest(r)
 	user, err := dbpool.FindUserByName(username)
 	if err != nil {
@@ -922,8 +854,8 @@ func imgRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	logger = shared.LoggerWithUser(logger, user)
 
-	rawname := router.GetField(r, 0)
-	imgOpts := router.GetField(r, 1)
+	rawname := r.PathValue("file")
+	imgOpts := r.PathValue("opts")
 	// we place all prose images inside a "prose" folder
 	fname := filepath.Join("/prose", rawname)
 
@@ -946,41 +878,97 @@ func imgRequest(w http.ResponseWriter, r *http.Request) {
 	imgproxy.ServeHTTP(w, r)
 }
 
-func createSubdomainRoutes(staticRoutes []router.Route) []router.Route {
-	routes := []router.Route{
-		router.NewRoute("GET", "/", blogHandler),
-		router.NewRoute("GET", "/_styles.css", blogStyleHandler),
-		router.NewRoute("GET", "/robots.txt", robotsHandler),
-		router.NewRoute("GET", "/rss", rssBlogHandler),
-		router.NewRoute("GET", "/rss.xml", rssBlogHandler),
-		router.NewRoute("GET", "/atom.xml", rssBlogHandler),
-		router.NewRoute("GET", "/feed.xml", rssBlogHandler),
-		router.NewRoute("GET", "/atom", rssBlogHandler),
-		router.NewRoute("GET", "/blog/index.xml", rssBlogHandler),
+type webRouter struct {
+	cfg     *Config
+	db      DB
+	storage storage.StorageServe
+}
+
+func (web *webRouter) static(mux *http.ServeMux) {
+	cfg := web.cfg
+	files := cfg.Static()
+	mux.HandleFunc("GET /read.css", files.File("read.css", "text/css"))
+	mux.HandleFunc("GET /reset.css", files.File("reset.css", "text/css"))
+	mux.HandleFunc("GET /syntax.css", files.File("syntax.css", "text/css"))
+	mux.HandleFunc("GET /card.png", files.File("card.png", "image/png"))
+	mux.HandleFunc("GET /favicon-16x16.png", files.File("favicon-16x16.png", "image/png"))
+	mux.HandleFunc("GET /favicon.ico", files.File("favicon.ico", "image/x-icon"))
+	if cfg.Debug {
+		router.CreatePProfRoutesMux(mux)
 	}
+}
 
-	routes = append(
-		routes,
-		staticRoutes...,
-	)
+// mainMux serves the discover feed and site pages.
+func (web *webRouter) mainMux() *http.ServeMux {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /{$}", web.readHandler)
+	mux.HandleFunc("GET /read", web.readHandler)
+	mux.HandleFunc("GET /check", router.CheckHandler(web.cfg.Domain, web.cfg.Space, web.db))
+	mux.HandleFunc("GET /rss", web.rssHandler)
+	mux.HandleFunc("GET /rss.atom", web.rssHandler)
+	mux.Handle("GET /_metrics", promhttp.Handler())
+	mux.HandleFunc("GET /robots.txt", web.cfg.Static().File("robots.txt", "text/plain"))
+	web.static(mux)
+	return mux
+}
 
-	routes = append(
-		routes,
-		router.NewRoute("GET", "/raw/(.+)", postRawHandler),
-		router.NewRoute("GET", "/(.+).md", postRawHandler),
-		router.NewRoute("GET", "/(.+).lxt", postRawHandler),
-		router.NewRoute("GET", `/(.+\.(?:jpg|jpeg|png|gif|webp|svg|ico))/(.+)`, imgRequest),
-		router.NewRoute("GET", `/(.+\.(?:jpg|jpeg|png|gif|webp|svg|ico))$`, imgRequest),
-		router.NewRoute("GET", "/(.+).html", postHandler),
-		router.NewRoute("GET", "/(.+)", postHandler),
-	)
+// sitesMux serves a user's blog on their subdomain or custom domain.
+func (web *webRouter) sitesMux() *http.ServeMux {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /{$}", web.blogHandler)
+	mux.HandleFunc("GET /_styles.css", web.blogStyleHandler)
+	mux.HandleFunc("GET /robots.txt", web.robotsHandler)
+	for _, feed := range []string{"/rss", "/rss.xml", "/atom.xml", "/feed.xml", "/atom", "/blog/index.xml"} {
+		mux.HandleFunc("GET "+feed, web.rssBlogHandler)
+	}
+	web.static(mux)
+	mux.HandleFunc("GET /{path...}", web.pathRoute)
+	return mux
+}
 
-	return routes
+var (
+	imgWithOpts = regexp.MustCompile(`^(.+\.(?:jpg|jpeg|png|gif|webp|svg|ico))/(.+)$`)
+	imgPath     = regexp.MustCompile(`^.+\.(?:jpg|jpeg|png|gif|webp|svg|ico)$`)
+)
+
+// pathRoute serves the site paths ServeMux patterns can't tell apart: a
+// post's markdown, an image with or without processing options, and a post.
+// A "/raw/{slug...}" pattern would redirect "/raw" away from a post named raw.
+func (web *webRouter) pathRoute(w http.ResponseWriter, r *http.Request) {
+	path := r.PathValue("path")
+	if slug, ok := strings.CutPrefix(path, "raw/"); ok && slug != "" {
+		r.SetPathValue("slug", slug)
+		web.postRawHandler(w, r)
+		return
+	}
+	for _, ext := range []string{".md", ".lxt"} {
+		if slug, ok := strings.CutSuffix(path, ext); ok && slug != "" {
+			r.SetPathValue("slug", slug)
+			web.postRawHandler(w, r)
+			return
+		}
+	}
+	if m := imgWithOpts.FindStringSubmatch(path); m != nil {
+		r.SetPathValue("file", m[1])
+		r.SetPathValue("opts", m[2])
+		web.imgRequest(w, r)
+		return
+	}
+	if imgPath.MatchString(path) {
+		r.SetPathValue("file", path)
+		web.imgRequest(w, r)
+		return
+	}
+	if slug, ok := strings.CutSuffix(path, ".html"); ok && slug != "" {
+		path = slug
+	}
+	r.SetPathValue("slug", path)
+	web.postHandler(w, r)
 }
 
 func StartApiServer() {
-	cfg := NewConfigSite("prose-web")
-	dbpool := postgres.NewDB(cfg.DbURL, cfg.Logger)
+	cfg := NewConfig("prose-web")
+	dbpool := NewDB(postgres.NewDB(cfg.DbURL, cfg.Logger))
 	defer func() {
 		_ = dbpool.Close()
 	}()
@@ -993,22 +981,8 @@ func StartApiServer() {
 		return
 	}
 
-	staticRoutes := createStaticRoutes()
-
-	if cfg.Debug {
-		staticRoutes = router.CreatePProfRoutes(staticRoutes)
-	}
-
-	mainRoutes := createMainRoutes(staticRoutes)
-	subdomainRoutes := createSubdomainRoutes(staticRoutes)
-
-	apiConfig := &router.ApiConfig{
-		Cfg:     cfg,
-		Dbpool:  dbpool,
-		Storage: st,
-	}
-	handler := router.CreateServe(mainRoutes, subdomainRoutes, apiConfig)
-	router := http.HandlerFunc(handler)
+	web := &webRouter{cfg: cfg, db: dbpool, storage: st}
+	handler := router.NewHostRouter(cfg.Domain, cfg.Space, web.mainMux(), web.sitesMux())
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)
 	logger.Info(
@@ -1017,5 +991,5 @@ func StartApiServer() {
 		"domain", cfg.Domain,
 	)
 
-	logger.Error(http.ListenAndServe(portStr, router).Error())
+	logger.Error(http.ListenAndServe(portStr, handler).Error())
 }

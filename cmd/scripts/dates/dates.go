@@ -59,10 +59,7 @@ func updateDates(tx *sql.Tx, postID string, date *time.Time) error {
 func main() {
 	logger := slog.Default()
 
-	picoCfg := shared.NewConfigSite()
-	picoCfg.Logger = logger
-	picoCfg.DbURL = os.Getenv("DATABASE_URL")
-	picoDb := postgres.NewDB(picoCfg.DbURL, picoCfg.Logger)
+	picoDb := postgres.NewDB(os.Getenv("DATABASE_URL"), logger)
 
 	logger.Info("fetching all posts")
 	posts, err := findPosts(picoDb.Db)

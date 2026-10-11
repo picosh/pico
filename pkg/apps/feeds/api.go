@@ -12,10 +12,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-func keepAliveHandler(w http.ResponseWriter, r *http.Request) {
-	dbpool := router.GetDB(r)
-	logger := router.GetLogger(r)
-	postID, _ := url.PathUnescape(router.GetField(r, 0))
+func (web *webRouter) keepAliveHandler(w http.ResponseWriter, r *http.Request) {
+	dbpool := web.db
+	logger := web.cfg.Logger
+	postID, _ := url.PathUnescape(r.PathValue("id"))
 
 	post, err := dbpool.FindPost(postID)
 	if err != nil {
@@ -60,10 +60,10 @@ func keepAliveHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func unsubHandler(w http.ResponseWriter, r *http.Request) {
-	dbpool := router.GetDB(r)
-	logger := router.GetLogger(r)
-	postID, _ := url.PathUnescape(router.GetField(r, 0))
+func (web *webRouter) unsubHandler(w http.ResponseWriter, r *http.Request) {
+	dbpool := web.db
+	logger := web.cfg.Logger
+	postID, _ := url.PathUnescape(r.PathValue("id"))
 
 	post, err := dbpool.FindPost(postID)
 	if err != nil {
@@ -97,37 +97,34 @@ func unsubHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func createMainRoutes(staticRoutes []router.Route) []router.Route {
-	routes := []router.Route{
-		router.NewRoute("GET", "/", router.CreatePageHandler("html/marketing.page.tmpl")),
-		router.NewRoute("GET", "/keep-alive/(.+)", keepAliveHandler),
-		router.NewRoute("GET", "/unsub/(.+)", unsubHandler),
-		router.NewRoute("GET", "/_metrics", promhttp.Handler().ServeHTTP),
-	}
-
-	routes = append(
-		routes,
-		staticRoutes...,
-	)
-
-	return routes
+type webRouter struct {
+	cfg *Config
+	db  DB
 }
 
-func createStaticRoutes() []router.Route {
-	return []router.Route{
-		router.NewRoute("GET", "/main.css", router.ServeFile("main.css", "text/css")),
-		router.NewRoute("GET", "/card.png", router.ServeFile("card.png", "image/png")),
-		router.NewRoute("GET", "/favicon-16x16.png", router.ServeFile("favicon-16x16.png", "image/png")),
-		router.NewRoute("GET", "/favicon-32x32.png", router.ServeFile("favicon-32x32.png", "image/png")),
-		router.NewRoute("GET", "/apple-touch-icon.png", router.ServeFile("apple-touch-icon.png", "image/png")),
-		router.NewRoute("GET", "/favicon.ico", router.ServeFile("favicon.ico", "image/x-icon")),
-		router.NewRoute("GET", "/robots.txt", router.ServeFile("robots.txt", "text/plain")),
+func (web *webRouter) mux() *http.ServeMux {
+	cfg := web.cfg
+	files := cfg.Static()
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /{$}", files.Page("html/marketing.page.tmpl"))
+	mux.HandleFunc("GET /keep-alive/{id...}", web.keepAliveHandler)
+	mux.HandleFunc("GET /unsub/{id...}", web.unsubHandler)
+	mux.Handle("GET /_metrics", promhttp.Handler())
+	mux.HandleFunc("GET /main.css", files.File("main.css", "text/css"))
+	mux.HandleFunc("GET /card.png", files.File("card.png", "image/png"))
+	mux.HandleFunc("GET /favicon-16x16.png", files.File("favicon-16x16.png", "image/png"))
+	mux.HandleFunc("GET /apple-touch-icon.png", files.File("apple-touch-icon.png", "image/png"))
+	mux.HandleFunc("GET /favicon.ico", files.File("favicon.ico", "image/x-icon"))
+	mux.HandleFunc("GET /robots.txt", files.File("robots.txt", "text/plain"))
+	if cfg.Debug {
+		router.CreatePProfRoutesMux(mux)
 	}
+	return mux
 }
 
 func StartApiServer() {
-	cfg := NewConfigSite("feeds-web")
-	db := postgres.NewDB(cfg.DbURL, cfg.Logger)
+	cfg := NewConfig("feeds-web")
+	db := NewDB(postgres.NewDB(cfg.DbURL, cfg.Logger))
 	defer func() {
 		_ = db.Close()
 	}()
@@ -137,20 +134,7 @@ func StartApiServer() {
 	fetcher := NewFetcher(db, cfg)
 	go fetcher.Loop()
 
-	staticRoutes := createStaticRoutes()
-
-	if cfg.Debug {
-		staticRoutes = router.CreatePProfRoutes(staticRoutes)
-	}
-
-	mainRoutes := createMainRoutes(staticRoutes)
-
-	apiConfig := &router.ApiConfig{
-		Cfg:    cfg,
-		Dbpool: db,
-	}
-	handler := router.CreateServe(mainRoutes, []router.Route{}, apiConfig)
-	router := http.HandlerFunc(handler)
+	web := &webRouter{cfg: cfg, db: db}
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)
 	logger.Info(
@@ -159,5 +143,5 @@ func StartApiServer() {
 		"domain", cfg.Domain,
 	)
 
-	logger.Error(http.ListenAndServe(portStr, router).Error())
+	logger.Error(http.ListenAndServe(portStr, web.mux()).Error())
 }

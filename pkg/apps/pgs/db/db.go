@@ -7,13 +7,8 @@ import (
 )
 
 type PgsDB interface {
-	FindUser(userID string) (*db.User, error)
-	FindUserByName(name string) (*db.User, error)
-	FindUserByPubkey(pubkey string) (*db.User, error)
+	db.AuthDB
 	FindUsers() ([]*db.User, error)
-
-	FindFeature(userID string, name string) (*db.FeatureFlag, error)
-	InsertAccessLog(*db.AccessLog) error
 
 	InsertProject(userID, name, projectDir string) (string, error)
 	UpdateProject(userID, name string) error

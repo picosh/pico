@@ -2,12 +2,9 @@ package pastes
 
 import (
 	"time"
-
-	"github.com/picosh/pico/pkg/db"
-	"github.com/picosh/pico/pkg/shared"
 )
 
-func deleteExpiredPosts(cfg *shared.ConfigSite, dbpool db.DB) error {
+func deleteExpiredPosts(cfg *Config, dbpool DB) error {
 	cfg.Logger.Info("checking for expired posts")
 	posts, err := dbpool.FindExpiredPosts(cfg.Space)
 	if err != nil {
@@ -28,7 +25,7 @@ func deleteExpiredPosts(cfg *shared.ConfigSite, dbpool db.DB) error {
 	return nil
 }
 
-func CronDeleteExpiredPosts(cfg *shared.ConfigSite, dbpool db.DB) {
+func CronDeleteExpiredPosts(cfg *Config, dbpool DB) {
 	for {
 		err := deleteExpiredPosts(cfg, dbpool)
 		if err != nil {

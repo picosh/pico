@@ -36,7 +36,7 @@ func TestPrivateProjectDeniesWebAccess(t *testing.T) {
 	defer func() {
 		_ = pubsub.Close()
 	}()
-	cfg := NewPgsConfig(logger, dbpool, st, pubsub)
+	cfg := NewConfig(logger, dbpool, st, pubsub)
 	cfg.Domain = "pgs.test"
 	router := NewWebRouter(cfg)
 	router.ServeHTTP(responseRecorder, request)

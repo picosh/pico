@@ -7,7 +7,6 @@ import (
 	"syscall"
 
 	"github.com/picosh/pico/pkg/db/postgres"
-	"github.com/picosh/pico/pkg/filehandlers"
 	"github.com/picosh/pico/pkg/pssh"
 	"github.com/picosh/pico/pkg/send/auth"
 	"github.com/picosh/pico/pkg/send/list"
@@ -24,26 +23,18 @@ func StartSshServer() {
 	host := shared.GetEnv("FEEDS_HOST", "0.0.0.0")
 	port := shared.GetEnv("FEEDS_SSH_PORT", "2222")
 	promPort := shared.GetEnv("FEEDS_PROM_PORT", "9222")
-	cfg := NewConfigSite(appName)
+	cfg := NewConfig(appName)
 	logger := cfg.Logger
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	dbh := postgres.NewDB(cfg.DbURL, cfg.Logger)
+	dbh := NewDB(postgres.NewDB(cfg.DbURL, cfg.Logger))
 	defer func() {
 		_ = dbh.Close()
 	}()
 
-	hooks := &FeedHooks{
-		Cfg: cfg,
-		Db:  dbh,
-	}
-
-	fileMap := map[string]filehandlers.ReadWriteHandler{
-		"fallback": filehandlers.NewScpPostHandler(dbh, cfg, hooks),
-	}
-	handler := filehandlers.NewFileHandlerRouter(cfg, dbh, fileMap)
+	handler := NewUploadHandler(cfg, dbh)
 
 	sshAuth := shared.NewSshAuthHandler(dbh, logger, "feeds")
 

@@ -21,7 +21,6 @@ import (
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/pssh"
 	psub "github.com/picosh/pico/pkg/pubsub"
-	"github.com/picosh/pico/pkg/shared"
 	gossh "golang.org/x/crypto/ssh"
 )
 
@@ -43,7 +42,7 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 			uuidStr := uuid.NewString()
 			isAdmin := false
 			if user != nil {
-				isAdmin = handler.DBPool.HasFeatureByUser(user.ID, "admin")
+				isAdmin = db.HasFeature(handler.DBPool, user.ID, "admin")
 				if isAdmin && strings.HasPrefix(sesh.User(), "admin__") {
 					uuidStr = fmt.Sprintf("admin-%s", uuidStr)
 				}
@@ -185,10 +184,10 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 }
 
 type CliHandler struct {
-	DBPool  db.DB
+	DBPool  DB
 	Logger  *slog.Logger
 	PubSub  psub.PubSub
-	Cfg     *shared.ConfigSite
+	Cfg     *Config
 	Waiters *syncmap.Map[string, []string]
 	Access  *syncmap.Map[string, []string]
 }
@@ -207,7 +206,7 @@ type CliCmd struct {
 	user     *db.User
 }
 
-func help(cfg *shared.ConfigSite, sesh *pssh.SSHServerConnSession) {
+func help(cfg *Config, sesh *pssh.SSHServerConnSession) {
 	data := fmt.Sprintf(`Command: ssh %s <command> [args...]
 
 The simplest authenticated pubsub system.  Send messages through
@@ -548,7 +547,7 @@ func parseDuration(s string) (time.Duration, error) {
 	return time.ParseDuration(s)
 }
 
-func MonitorRss(dbpool db.DB, user *db.User, domain string) (string, error) {
+func MonitorRss(dbpool DB, user *db.User, domain string) (string, error) {
 	if user == nil {
 		return "", fmt.Errorf("access denied")
 	}
@@ -1153,7 +1152,7 @@ func (handler *CliHandler) pipe(cmd *CliCmd, topic string, clientID string) erro
 	return nil
 }
 
-func toSshCmd(cfg *shared.ConfigSite) string {
+func toSshCmd(cfg *Config) string {
 	port := ""
 	if cfg.PortOverride != "22" {
 		port = fmt.Sprintf("-p %s ", cfg.PortOverride)

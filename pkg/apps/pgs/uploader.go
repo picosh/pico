@@ -65,11 +65,11 @@ type FileData struct {
 }
 
 type UploadAssetHandler struct {
-	Cfg                *PgsConfig
+	Cfg                *Config
 	CacheClearingQueue chan string
 }
 
-func NewUploadAssetHandler(cfg *PgsConfig, ch chan string, ctx context.Context) *UploadAssetHandler {
+func NewUploadAssetHandler(cfg *Config, ch chan string, ctx context.Context) *UploadAssetHandler {
 	go runCacheQueue(cfg, ctx)
 	return &UploadAssetHandler{
 		Cfg:                cfg,
@@ -513,7 +513,7 @@ func (h *UploadAssetHandler) writeAsset(s *pssh.SSHServerConnSession, reader io.
 // One message arrives per file that is written/deleted during uploads.
 // Repeated messages for the same site are grouped so that we only flush once
 // per site per 5 seconds.
-func runCacheQueue(cfg *PgsConfig, ctx context.Context) {
+func runCacheQueue(cfg *Config, ctx context.Context) {
 	var pendingFlushes sync.Map
 	tick := time.NewTicker(5 * time.Second)
 	defer tick.Stop()

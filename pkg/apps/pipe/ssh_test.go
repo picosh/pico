@@ -5,9 +5,11 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"os"
 	"strings"
 	"sync"
@@ -88,14 +90,6 @@ func (t *TestDB) FindFeature(userID, name string) (*db.FeatureFlag, error) {
 		}
 	}
 	return nil, fmt.Errorf("feature not found")
-}
-
-func (t *TestDB) HasFeatureByUser(userID string, feature string) bool {
-	ff, err := t.FindFeature(userID, feature)
-	if err != nil {
-		return false
-	}
-	return ff.IsValid()
 }
 
 func (t *TestDB) InsertAccessLog(_ *db.AccessLog) error {
@@ -237,7 +231,7 @@ func (t *TestDB) FindPipeMonitorHistory(monitorID string, from, to time.Time) ([
 }
 
 type TestSSHServer struct {
-	Cfg         *shared.ConfigSite
+	Cfg         *Config
 	DBPool      *TestDB
 	PipeHandler *CliHandler
 	Cancel      context.CancelFunc
@@ -254,7 +248,7 @@ func NewTestSSHServer(t *testing.T) *TestSSHServer {
 
 	dbpool := NewTestDB(logger)
 
-	cfg := &shared.ConfigSite{
+	cfg := &Config{
 		Domain:       "pipe.test",
 		Port:         "2225",
 		PortOverride: "2225",
@@ -316,7 +310,7 @@ func NewTestSSHServer(t *testing.T) *TestSSHServer {
 		}
 	}()
 
-	time.Sleep(100 * time.Millisecond)
+	waitForPort(t, cfg.Port, true)
 
 	return &TestSSHServer{
 		Cfg:         cfg,
@@ -328,7 +322,50 @@ func NewTestSSHServer(t *testing.T) *TestSSHServer {
 
 func (s *TestSSHServer) Shutdown() {
 	s.Cancel()
-	time.Sleep(10 * time.Millisecond)
+	waitForPort(nil, s.Cfg.Port, false)
+}
+
+// waitForPort waits until the test server's port accepts connections, or
+// until it stops accepting them so the next test can listen on it.
+func waitForPort(t *testing.T, port string, open bool) {
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		conn, err := net.DialTimeout("tcp", "localhost:"+port, 100*time.Millisecond)
+		if err == nil {
+			_ = conn.Close()
+		}
+		if (err == nil) == open {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	if t != nil {
+		t.Fatalf("port %s open = %v, want %v", port, !open, open)
+	}
+}
+
+// waitForClients waits until n subscribers and pipes are on their topics,
+// so a message published next reaches them.
+func (s *TestSSHServer) waitForClients(t *testing.T, n int) {
+	t.Helper()
+	ps := s.PipeHandler.PubSub.(*psub.Multicast)
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		joined := 0
+		for range ps.GetSubs() {
+			joined++
+		}
+		for range ps.GetPipes() {
+			joined++
+		}
+		if joined == n {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("%d subscribers and pipes, want %d", joined, n)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
 }
 
 type UserSSH struct {
@@ -539,7 +576,7 @@ func TestPubSub_BasicFlow(t *testing.T) {
 		t.Fatalf("failed to start sub: %v", err)
 	}
 
-	time.Sleep(100 * time.Millisecond)
+	server.waitForClients(t, 1)
 
 	testMessage := "hello from pub"
 	_, err = user.RunCommandWithStdin(pubClient, "pub testtopic -c", testMessage)
@@ -595,7 +632,7 @@ func TestPubSub_PublicTopic(t *testing.T) {
 		t.Fatalf("failed to start sub: %v", err)
 	}
 
-	time.Sleep(100 * time.Millisecond)
+	server.waitForClients(t, 1)
 
 	testMessage := "public message"
 	_, err = alice.RunCommandWithStdin(pubClient, "pub publictopic -p -c", testMessage)
@@ -656,7 +693,7 @@ func TestPipe_Bidirectional(t *testing.T) {
 		t.Fatalf("failed to start alice pipe: %v", err)
 	}
 
-	time.Sleep(100 * time.Millisecond)
+	server.waitForClients(t, 1)
 
 	bobSession, err := bobClient.NewSession()
 	if err != nil {
@@ -678,7 +715,7 @@ func TestPipe_Bidirectional(t *testing.T) {
 		t.Fatalf("failed to start bob pipe: %v", err)
 	}
 
-	time.Sleep(100 * time.Millisecond)
+	server.waitForClients(t, 2)
 
 	aliceMsg := "hello from alice\n"
 	_, err = aliceStdin.Write([]byte(aliceMsg))
@@ -798,7 +835,7 @@ func TestAccessControl_AllowedUserViaFullPath(t *testing.T) {
 		t.Fatalf("failed to start alice sub: %v", err)
 	}
 
-	time.Sleep(100 * time.Millisecond)
+	server.waitForClients(t, 1)
 
 	bobClient, err := bob.NewClient()
 	if err != nil {
@@ -908,7 +945,7 @@ func TestPubSub_BlockingWaitsForSubscriber(t *testing.T) {
 		t.Fatalf("failed to start sub: %v", err)
 	}
 
-	time.Sleep(100 * time.Millisecond)
+	server.waitForClients(t, 1)
 
 	// Now send the message
 	testMessage := "blocking message"
@@ -1036,7 +1073,7 @@ func TestSub_WaitsForPublisher(t *testing.T) {
 	}
 
 	// Subscriber is now waiting - give it a moment
-	time.Sleep(100 * time.Millisecond)
+	server.waitForClients(t, 1)
 
 	// Now publish - subscriber should receive it
 	testMessage := "delayed publish"
@@ -1097,7 +1134,7 @@ func TestSub_KeepAliveReceivesMultipleMessages(t *testing.T) {
 		t.Fatalf("failed to start sub: %v", err)
 	}
 
-	time.Sleep(100 * time.Millisecond)
+	server.waitForClients(t, 1)
 
 	// Send first message
 	msg1 := "first message\n"
@@ -1160,7 +1197,7 @@ func TestSub_WithoutKeepAliveExitsAfterPublisher(t *testing.T) {
 		t.Fatalf("failed to start sub: %v", err)
 	}
 
-	time.Sleep(100 * time.Millisecond)
+	server.waitForClients(t, 1)
 
 	// Publish a message
 	testMessage := "single message"
@@ -1227,7 +1264,7 @@ func TestPub_EmptyMessage(t *testing.T) {
 		t.Fatalf("failed to start sub: %v", err)
 	}
 
-	time.Sleep(100 * time.Millisecond)
+	server.waitForClients(t, 1)
 
 	// Publish with -e flag (empty message) - should not require stdin
 	output, err := user.RunCommand(pubClient, "pub emptytopic -e -c")
@@ -1291,7 +1328,7 @@ func TestPipe_AccessControl(t *testing.T) {
 		t.Fatalf("failed to start alice pipe: %v", err)
 	}
 
-	time.Sleep(100 * time.Millisecond)
+	server.waitForClients(t, 1)
 
 	// Bob joins the pipe using alice's namespace
 	bobSession, err := bobClient.NewSession()
@@ -1314,7 +1351,7 @@ func TestPipe_AccessControl(t *testing.T) {
 		t.Fatalf("failed to start bob pipe: %v", err)
 	}
 
-	time.Sleep(100 * time.Millisecond)
+	server.waitForClients(t, 2)
 
 	// Alice sends message to bob
 	aliceMsg := "hello bob\n"
@@ -1377,7 +1414,7 @@ func TestPipe_Replay(t *testing.T) {
 		t.Fatalf("failed to start pipe: %v", err)
 	}
 
-	time.Sleep(100 * time.Millisecond)
+	server.waitForClients(t, 1)
 
 	// Send a message - with -r flag, should receive it back
 	testMsg := "echo back\n"
@@ -1431,7 +1468,7 @@ func TestAccessControl_UnauthorizedUserDenied(t *testing.T) {
 		t.Fatalf("failed to start alice sub: %v", err)
 	}
 
-	time.Sleep(100 * time.Millisecond)
+	server.waitForClients(t, 1)
 
 	// Charlie tries to publish to alice's restricted topic - should be denied
 	output, err := charlie.RunCommandWithStdin(charlieClient, "pub alice/restrictedtopic -c", "unauthorized message")
@@ -1524,7 +1561,7 @@ func TestPubSub_MultipleSubscribers(t *testing.T) {
 		t.Fatalf("failed to start sub3: %v", err)
 	}
 
-	time.Sleep(100 * time.Millisecond)
+	server.waitForClients(t, 3)
 
 	// Publish a single message
 	testMessage := "broadcast message"
@@ -1995,7 +2032,7 @@ func TestPub_UpdatesMonitorLastPing(t *testing.T) {
 		t.Fatalf("failed to start sub: %v", err)
 	}
 
-	time.Sleep(100 * time.Millisecond)
+	server.waitForClients(t, 1)
 
 	// Publish to the monitored topic
 	_, err = user.RunCommandWithStdin(pubClient, "pub ping-test -c", "health check")
@@ -2093,7 +2130,7 @@ func TestStatus_PingResetsWindow(t *testing.T) {
 		t.Fatalf("failed to start sub: %v", err)
 	}
 
-	time.Sleep(100 * time.Millisecond)
+	server.waitForClients(t, 1)
 
 	// Pub to trigger monitor update
 	_, err = user.RunCommandWithStdin(client, "pub reset-test -c", "ping")
@@ -2154,7 +2191,7 @@ func TestStatus_HealthyImmediatelyAfterPing(t *testing.T) {
 		t.Fatalf("failed to start sub: %v", err)
 	}
 
-	time.Sleep(100 * time.Millisecond)
+	server.waitForClients(t, 1)
 
 	// Pub to trigger ping
 	pubClient, err := user.NewClient()
@@ -2413,5 +2450,88 @@ func TestSSH_WildcardSub(t *testing.T) {
 	}
 	if !strings.Contains(output, "prose-event") {
 		t.Errorf("expected SSH wildcard subscriber output to contain 'prose-event', got: %q", output)
+	}
+}
+
+// runStatus runs cmd with stdin and returns its exit status, or -1 when the
+// session ended without one.
+func runStatus(t *testing.T, client *ssh.Client, cmd, stdin string) int {
+	t.Helper()
+	session, err := client.NewSession()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = session.Close() }()
+	session.Stdin = strings.NewReader(stdin)
+	return exitStatus(t, session.Run(cmd))
+}
+
+func exitStatus(t *testing.T, err error) int {
+	t.Helper()
+	var exitErr *ssh.ExitError
+	var missing *ssh.ExitMissingError
+	switch {
+	case err == nil:
+		return 0
+	case errors.As(err, &exitErr):
+		return exitErr.ExitStatus()
+	case errors.As(err, &missing):
+		return -1
+	}
+	t.Fatalf("command failed: %v", err)
+	return 0
+}
+
+func TestCommandsExitWithStatus(t *testing.T) {
+	server := NewTestSSHServer(t)
+	defer server.Shutdown()
+
+	alice := GenerateUser("alice")
+	charlie := GenerateUser("charlie")
+	RegisterUserWithServer(server, alice)
+	RegisterUserWithServer(server, charlie)
+	aliceClient, err := alice.NewClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = aliceClient.Close() }()
+	charlieClient, err := charlie.NewClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = charlieClient.Close() }()
+
+	if got := runStatus(t, aliceClient, "pub nobody -b=false", "hello"); got != 0 {
+		t.Errorf("pub exited %d, want 0", got)
+	}
+
+	sub, err := aliceClient.NewSession()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = sub.Close() }()
+	if err := sub.Start("sub news -a alice"); err != nil {
+		t.Fatal(err)
+	}
+	server.waitForClients(t, 1)
+	if got := runStatus(t, aliceClient, "pub news", "hello"); got != 0 {
+		t.Errorf("pub to a sub exited %d, want 0", got)
+	}
+	if got := exitStatus(t, sub.Wait()); got != 0 {
+		t.Errorf("sub exited %d after its publisher left, want 0", got)
+	}
+
+	if err := (func() error {
+		s, err := aliceClient.NewSession()
+		if err != nil {
+			return err
+		}
+		return s.Start("sub restricted -p -a alice -k")
+	})(); err != nil {
+		t.Fatal(err)
+	}
+	server.waitForClients(t, 1)
+	if got := runStatus(t, charlieClient, "sub restricted -p", ""); got != 1 {
+		t.Errorf("denied sub exited %d, want 1", got)
 	}
 }

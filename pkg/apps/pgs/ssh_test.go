@@ -24,7 +24,7 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-func StartSshServerForTesting(cfg *PgsConfig, killCh chan error, readyCh chan *pssh.SSHServer) {
+func StartSshServerForTesting(cfg *Config, killCh chan error, readyCh chan *pssh.SSHServer) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
 		// Cancel is deferred to avoid being called in error path
@@ -87,7 +87,7 @@ func TestSshServerSftp(t *testing.T) {
 	// Use dynamic port for tests to avoid port conflicts
 	_ = os.Setenv("PGS_SSH_PORT", "0")
 
-	cfg := NewPgsConfig(logger, dbpool, st, pubsub)
+	cfg := NewConfig(logger, dbpool, st, pubsub)
 	done := make(chan error)
 	readyCh := make(chan *pssh.SSHServer)
 	prometheus.DefaultRegisterer = prometheus.NewRegistry()
@@ -190,7 +190,7 @@ func TestSshServerRsync(t *testing.T) {
 	// Use dynamic port for tests to avoid port conflicts
 	_ = os.Setenv("PGS_SSH_PORT", "0")
 
-	cfg := NewPgsConfig(logger, dbpool, st, pubsub)
+	cfg := NewConfig(logger, dbpool, st, pubsub)
 	done := make(chan error)
 	readyCh := make(chan *pssh.SSHServer)
 	prometheus.DefaultRegisterer = prometheus.NewRegistry()
@@ -442,7 +442,7 @@ func GenerateUser() UserSSH {
 	}
 }
 
-func WriteFileWithSftp(cfg *PgsConfig, conn *ssh.Client) (*os.FileInfo, error) {
+func WriteFileWithSftp(cfg *Config, conn *ssh.Client) (*os.FileInfo, error) {
 	// open an SFTP session over an existing ssh connection.
 	client, err := sftp.NewClient(conn)
 	if err != nil {
@@ -475,7 +475,7 @@ func WriteFileWithSftp(cfg *PgsConfig, conn *ssh.Client) (*os.FileInfo, error) {
 	return &fi, nil
 }
 
-func WriteFilesMultProjectsWithSftp(cfg *PgsConfig, conn *ssh.Client) (*os.FileInfo, error) {
+func WriteFilesMultProjectsWithSftp(cfg *Config, conn *ssh.Client) (*os.FileInfo, error) {
 	// open an SFTP session over an existing ssh connection.
 	client, err := sftp.NewClient(conn)
 	if err != nil {
