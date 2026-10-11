@@ -14,18 +14,17 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/picosh/pico/pkg/db/postgres"
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/pico/pkg/shared/router"
 	"github.com/picosh/utils/pipe"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"golang.org/x/crypto/ssh"
 )
 
 var (
 	cleanRegex = regexp.MustCompile(`[^0-9a-zA-Z,/]`)
-	sshClient  *pipe.Client
 	upgrader   = websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
 			return true
@@ -47,6 +46,13 @@ func (w writeFlusher) Write(p []byte) (n int, err error) {
 }
 
 var _ io.Writer = writeFlusher{}
+
+const (
+	// pongWait is how long a websocket client has to answer a ping.
+	pongWait   = 60 * time.Second
+	pingPeriod = pongWait / 2
+	writeWait  = 10 * time.Second
+)
 
 func (web *webRouter) handleSub(pubsub bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -70,22 +76,15 @@ func (web *webRouter) handleSub(pubsub bool) http.HandlerFunc {
 			params += fmt.Sprintf(" -a=%s", cleanList)
 		}
 
-		id := uuid.NewString()
-
-		p, err := sshClient.AddSession(id, fmt.Sprintf("sub %s %s", params, topic), 0, -1, -1)
+		p, err := web.conn.run(fmt.Sprintf("sub %s %s", params, topic))
 		if err != nil {
 			logger.Error("sub error", "topic", topic, "info", clientInfo, "err", err.Error())
 			http.Error(w, "server error", http.StatusInternalServerError)
 			return
 		}
-
-		go func() {
-			<-r.Context().Done()
-			err := sshClient.RemoveSession(id)
-			if err != nil {
-				logger.Error("sub remove error", "topic", topic, "info", clientInfo, "err", err.Error())
-			}
-		}()
+		defer func() { _ = p.Close() }()
+		// A client that leaves while nothing is published ends the sub.
+		defer context.AfterFunc(r.Context(), func() { _ = p.Close() })()
 
 		if mime := r.URL.Query().Get("mime"); mime != "" {
 			w.Header().Add("Content-Type", r.URL.Query().Get("mime"))
@@ -142,22 +141,14 @@ func (web *webRouter) handlePub(pubsub bool) http.HandlerFunc {
 			params += " -e"
 		}
 
-		id := uuid.NewString()
-
-		p, err := sshClient.AddSession(id, fmt.Sprintf("pub %s %s", params, topic), 0, -1, -1)
+		p, err := web.conn.run(fmt.Sprintf("pub %s %s", params, topic))
 		if err != nil {
 			logger.Error("pub error", "topic", topic, "info", clientInfo, "err", err.Error())
 			http.Error(w, "server error", http.StatusInternalServerError)
 			return
 		}
-
-		go func() {
-			<-r.Context().Done()
-			err := sshClient.RemoveSession(id)
-			if err != nil {
-				logger.Error("pub remove error", "topic", topic, "info", clientInfo, "err", err.Error())
-			}
-		}()
+		defer func() { _ = p.Close() }()
+		defer context.AfterFunc(r.Context(), func() { _ = p.Close() })()
 
 		var scanErr error
 		scanStatus := http.StatusInternalServerError
@@ -206,30 +197,16 @@ func (web *webRouter) handlePub(pubsub bool) http.HandlerFunc {
 			return
 		}
 
-	outer:
-		for {
-			select {
-			case <-r.Context().Done():
-				break outer
-			default:
-				messageToWrite := first
-				if prefix != "" {
-					messageToWrite = append([]byte(prefix), messageToWrite...)
-				}
+		messageToWrite := first
+		if prefix != "" {
+			messageToWrite = append([]byte(prefix), messageToWrite...)
+		}
 
-				n, err := p.Write(messageToWrite)
-				if err != nil {
-					logger.Error("pub write error", "topic", topic, "info", clientInfo, "err", err.Error())
-					http.Error(w, "server error", http.StatusInternalServerError)
-					return
-				}
-
-				if n > 0 {
-					break outer
-				}
-
-				time.Sleep(10 * time.Millisecond)
-			}
+		_, err = p.Write(messageToWrite)
+		if err != nil {
+			logger.Error("pub write error", "topic", topic, "info", clientInfo, "err", err.Error())
+			http.Error(w, "server error", http.StatusInternalServerError)
+			return
 		}
 
 		_, err = io.Copy(p, reader)
@@ -239,9 +216,17 @@ func (web *webRouter) handlePub(pubsub bool) http.HandlerFunc {
 			return
 		}
 
-		w.WriteHeader(http.StatusOK)
+		// pub sends the message once its stdin ends, and exits when it has.
+		// pipe closes its sessions without an exit status.
+		_ = p.CloseWrite()
+		var missing *ssh.ExitMissingError
+		if err := p.Wait(); err != nil && !errors.As(err, &missing) {
+			logger.Error("pub exit error", "topic", topic, "info", clientInfo, "err", err.Error())
+			http.Error(w, "server error", http.StatusInternalServerError)
+			return
+		}
 
-		time.Sleep(10 * time.Millisecond)
+		w.WriteHeader(http.StatusOK)
 	}
 }
 
@@ -288,22 +273,36 @@ func (web *webRouter) handlePipe() http.HandlerFunc {
 
 		prefix := r.URL.Query().Get("prefix")
 
-		id := uuid.NewString()
-
-		p, err := sshClient.AddSession(id, fmt.Sprintf("pipe %s %s", params, topic), 0, -1, -1)
+		p, err := web.conn.run(fmt.Sprintf("pipe %s %s", params, topic))
 		if err != nil {
 			logger.Error("pipe error", "topic", topic, "info", clientInfo, "err", err.Error())
-			http.Error(w, "server error", http.StatusInternalServerError)
+			_ = c.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseInternalServerErr, "server error"), time.Now().Add(time.Second))
 			return
 		}
+		defer func() { _ = p.Close() }()
 
+		// A client that stops answering pings is gone, even if its
+		// connection never closed.
+		_ = c.SetReadDeadline(time.Now().Add(pongWait))
+		c.SetPongHandler(func(string) error {
+			return c.SetReadDeadline(time.Now().Add(pongWait))
+		})
+		done := make(chan struct{})
+		defer close(done)
 		go func() {
-			<-r.Context().Done()
-			err := sshClient.RemoveSession(id)
-			if err != nil {
-				logger.Error("pipe remove error", "topic", topic, "info", clientInfo, "err", err.Error())
+			ticker := time.NewTicker(pingPeriod)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-done:
+					return
+				case <-ticker.C:
+					if err := c.WriteControl(websocket.PingMessage, nil, time.Now().Add(writeWait)); err != nil {
+						_ = c.Close()
+						return
+					}
+				}
 			}
-			_ = c.Close()
 		}()
 
 		var wg sync.WaitGroup
@@ -339,10 +338,9 @@ func (web *webRouter) handlePipe() http.HandlerFunc {
 			}()
 
 			var messageBuffer []byte
+			buf := make([]byte, 32*1024)
 
 			for {
-				buf := make([]byte, 32*1024)
-
 				n, err := p.Read(buf)
 				if err != nil {
 					logger.Error("pipe read error", "topic", topic, "info", clientInfo, "err", err.Error())
@@ -435,8 +433,9 @@ func rssHandler(cfg *Config, dbpool DB) http.HandlerFunc {
 }
 
 type webRouter struct {
-	cfg *Config
-	db  DB
+	cfg  *Config
+	db   DB
+	conn *pipeConn
 }
 
 func (web *webRouter) static(mux *http.ServeMux) {
@@ -489,14 +488,12 @@ func StartApiServer() {
 
 	info := shared.NewPicoPipeClient()
 
-	client, err := pipe.NewClient(context.Background(), logger.With("info", info), info)
+	pingClient, err := pipe.NewClient(context.Background(), logger.With("info", info), info)
 	if err != nil {
 		panic(err)
 	}
 
-	sshClient = client
-
-	pingSession, err := sshClient.AddSession("ping", "pub -b=false -c ping", 0, -1, -1)
+	pingSession, err := pingClient.AddSession("ping", "pub -b=false -c ping", 0, -1, -1)
 	if err != nil {
 		panic(err)
 	}
@@ -512,7 +509,7 @@ func StartApiServer() {
 		}
 	}()
 
-	web := &webRouter{cfg: cfg, db: db}
+	web := &webRouter{cfg: cfg, db: db, conn: newPipeConn(info)}
 	handler := router.NewHostRouter(cfg.Domain, cfg.Space, web.mainMux(), web.sitesMux())
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)

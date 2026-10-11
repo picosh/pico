@@ -351,8 +351,8 @@ func waitForPort(t *testing.T, port string, open bool) {
 	}
 }
 
-// waitForClients waits until n subscribers and pipes have joined their
-// topics, so a message published next reaches them.
+// waitForClients waits until n subscribers and pipes are on their topics,
+// so a message published next reaches them.
 func (s *TestSSHServer) waitForClients(t *testing.T, n int) {
 	t.Helper()
 	ps := s.PipeHandler.PubSub.(*psub.Multicast)
@@ -365,11 +365,11 @@ func (s *TestSSHServer) waitForClients(t *testing.T, n int) {
 		for range ps.GetPipes() {
 			joined++
 		}
-		if joined >= n {
+		if joined == n {
 			return
 		}
 		if time.Now().After(deadline) {
-			t.Fatalf("%d of %d subscribers and pipes joined", joined, n)
+			t.Fatalf("%d subscribers and pipes, want %d", joined, n)
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
