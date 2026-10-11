@@ -20,10 +20,10 @@ import (
 
 type UploadHandler struct {
 	DBPool db.DB
-	Cfg    *shared.ConfigSite
+	Cfg    *Config
 }
 
-func NewUploadHandler(dbpool db.DB, cfg *shared.ConfigSite) *UploadHandler {
+func NewUploadHandler(dbpool db.DB, cfg *Config) *UploadHandler {
 	return &UploadHandler{
 		DBPool: dbpool,
 		Cfg:    cfg,

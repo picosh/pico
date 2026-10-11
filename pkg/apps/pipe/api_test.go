@@ -12,10 +12,10 @@ import (
 func TestRoutes(t *testing.T) {
 	t.Chdir("../../..")
 	t.Setenv("PICO_PIPE_ENABLED", "false")
-	cfg := NewConfigSite("pipe-test")
+	cfg := NewConfig("pipe-test")
 	cfg.Logger = slog.New(slog.DiscardHandler)
 	web := &webRouter{cfg: cfg, db: NewTestDB(cfg.Logger)}
-	handler := router.NewHostRouter(cfg, web.mainMux(), web.sitesMux())
+	handler := router.NewHostRouter(cfg.Domain, cfg.Space, web.mainMux(), web.sitesMux())
 
 	site := "https://tester." + cfg.Domain
 	main := "https://" + cfg.Domain

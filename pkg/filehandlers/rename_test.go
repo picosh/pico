@@ -15,7 +15,6 @@ import (
 	"github.com/picosh/pico/pkg/db/stub"
 	"github.com/picosh/pico/pkg/pssh"
 	sendutils "github.com/picosh/pico/pkg/send/utils"
-	"github.com/picosh/pico/pkg/shared"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -140,7 +139,7 @@ func (otherHandler) List(*pssh.SSHServerConnSession, string, bool, bool) ([]os.F
 func TestRouterSharedHandler(t *testing.T) {
 	session, posts := newPostsSession(t)
 	postHandler := &postsHandler{db: posts}
-	router := NewFileHandlerRouter(&shared.ConfigSite{Space: "prose"}, map[string]ReadWriteHandler{
+	router := NewFileHandlerRouter("prose", map[string]ReadWriteHandler{
 		".md":      postHandler,
 		".lxt":     postHandler,
 		".txt":     &postsHandler{db: posts},

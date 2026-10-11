@@ -12,7 +12,7 @@ import (
 
 func TestRoutes(t *testing.T) {
 	t.Chdir("../../..")
-	cfg := NewConfigSite("feeds-test")
+	cfg := NewConfig("feeds-test")
 	cfg.Logger = slog.New(slog.DiscardHandler)
 	web := &webRouter{cfg: cfg, db: stub.NewPostsDB(cfg.Logger, &db.User{ID: "user-1"})}
 	mux := web.mux()

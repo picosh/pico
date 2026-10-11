@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path"
 	"strings"
 	"time"
 
@@ -28,169 +27,72 @@ type PageData struct {
 	Site SitePageData
 }
 
-type ConfigSite struct {
-	Debug              bool
-	SendgridKey        string
-	Domain             string
-	Port               string
-	PortOverride       string
-	Protocol           string
-	DbURL              string
-	Space              string
-	Issuer             string
-	Secret             string
-	SecretWebhook      string
-	AllowedExt         []string
-	HiddenPosts        []string
-	MaxSize            uint64
-	MaxAssetSize       int64
-	MaxSpecialFileSize int64
-	Logger             *slog.Logger
-	TunsSecret         string
-}
-
-func NewConfigSite() *ConfigSite {
-	return &ConfigSite{}
-}
-
+// CreateURL builds links to users' sites on Domain, as seen from the host a
+// request came in on.
 type CreateURL struct {
+	Protocol        string
+	Domain          string
 	Subdomain       bool
 	UsernameInRoute bool
 	HostDomain      string
-	AppDomain       string
-	Username        string
-	Cfg             *ConfigSite
 }
 
-func NewCreateURL(cfg *ConfigSite) *CreateURL {
+// NewCreateURL builds links that point at users' subdomains.
+func NewCreateURL(protocol, domain string) *CreateURL {
 	return &CreateURL{
-		Cfg:       cfg,
-		Subdomain: cfg.IsSubdomains(),
+		Protocol:  protocol,
+		Domain:    domain,
+		Subdomain: true,
 	}
 }
 
-func CreateURLFromRequest(cfg *ConfigSite, r *http.Request) *CreateURL {
+func CreateURLFromRequest(protocol, domain string, r *http.Request) *CreateURL {
 	hostDomain := strings.Split(r.Host, ":")[0]
-	appDomain := strings.Split(cfg.Domain, ":")[0]
+	appDomain := strings.Split(domain, ":")[0]
 
-	onSubdomain := cfg.IsSubdomains() && strings.Contains(hostDomain, appDomain)
-	withUserName := !cfg.IsCustomdomains() || (!onSubdomain && hostDomain == appDomain)
+	onSubdomain := strings.Contains(hostDomain, appDomain)
+	withUserName := !onSubdomain && hostDomain == appDomain
 
 	return &CreateURL{
-		Cfg:             cfg,
-		AppDomain:       appDomain,
+		Protocol:        protocol,
+		Domain:          domain,
 		HostDomain:      hostDomain,
 		Subdomain:       onSubdomain,
 		UsernameInRoute: withUserName,
 	}
 }
 
-func (c *ConfigSite) GetSiteData() *SitePageData {
-	return &SitePageData{
-		Domain:  template.URL(c.Domain),
-		HomeURL: template.URL(c.HomeURL()),
-	}
-}
-
-func (c *ConfigSite) IsSubdomains() bool {
-	return true
-}
-
-func (c *ConfigSite) IsCustomdomains() bool {
-	return true
-}
-
-func (c *ConfigSite) HomeURL() string {
-	if c.IsSubdomains() || c.IsCustomdomains() {
-		return fmt.Sprintf("//%s", c.Domain)
-	}
-
-	return "/"
-}
-
-func (c *ConfigSite) ReadURL() string {
-	if c.IsSubdomains() || c.IsCustomdomains() {
-		return fmt.Sprintf("%s://%s", c.Protocol, c.Domain)
-	}
-
-	return "/"
-}
-
-func (c *ConfigSite) StaticPath(fname string) string {
-	return path.Join("pkg", "apps", c.Space, fname)
-}
-
-func (c *ConfigSite) BlogURL(username string) string {
-	if c.IsSubdomains() {
+func (c *CreateURL) FullBlogURL(username string) string {
+	if c.Subdomain {
 		return fmt.Sprintf("%s://%s.%s", c.Protocol, username, c.Domain)
 	}
 
-	return fmt.Sprintf("/%s", username)
-}
-
-func (c *ConfigSite) CssURL(username string) string {
-	if c.IsSubdomains() || c.IsCustomdomains() {
-		return "/_styles.css"
-	}
-
-	return fmt.Sprintf("/%s/styles.css", username)
-}
-
-func (c *ConfigSite) PostURL(username, slug string) string {
-	fname := url.PathEscape(slug)
-	if c.IsSubdomains() {
-		return fmt.Sprintf("%s://%s.%s/%s", c.Protocol, username, c.Domain, fname)
-	}
-
-	return fmt.Sprintf("/%s/%s", username, fname)
-
-}
-
-func (c *ConfigSite) RawPostURL(username, slug string) string {
-	fname := url.PathEscape(slug)
-	if c.IsSubdomains() {
-		return fmt.Sprintf("%s://%s.%s/raw/%s", c.Protocol, username, c.Domain, fname)
-	}
-
-	return fmt.Sprintf("/raw/%s/%s", username, fname)
-}
-
-func (c *ConfigSite) ImgFullURL(username, slug string) string {
-	fname := url.PathEscape(strings.TrimLeft(slug, "/"))
-	return fmt.Sprintf("%s://%s.%s/%s", c.Protocol, username, c.Domain, fname)
-}
-
-func (c *ConfigSite) FullBlogURL(curl *CreateURL, username string) string {
-	if c.IsSubdomains() && curl.Subdomain {
-		return fmt.Sprintf("%s://%s.%s", c.Protocol, username, c.Domain)
-	}
-
-	if curl.UsernameInRoute {
+	if c.UsernameInRoute {
 		return fmt.Sprintf("/%s", username)
 	}
 
-	return fmt.Sprintf("%s://%s", c.Protocol, curl.HostDomain)
+	return fmt.Sprintf("%s://%s", c.Protocol, c.HostDomain)
 }
 
-func (c *ConfigSite) FullPostURL(curl *CreateURL, username, slug string) string {
+func (c *CreateURL) FullPostURL(username, slug string) string {
 	fname := url.PathEscape(strings.TrimLeft(slug, "/"))
 
-	if curl.Subdomain && c.IsSubdomains() {
+	if c.Subdomain {
 		return fmt.Sprintf("%s://%s.%s/%s", c.Protocol, username, c.Domain, fname)
 	}
 
-	if curl.UsernameInRoute {
+	if c.UsernameInRoute {
 		return fmt.Sprintf("%s://%s/%s/%s", c.Protocol, c.Domain, username, fname)
 	}
 
-	return fmt.Sprintf("%s://%s/%s", c.Protocol, curl.HostDomain, fname)
+	return fmt.Sprintf("%s://%s/%s", c.Protocol, c.HostDomain, fname)
 }
 
-func (c *ConfigSite) RssBlogURL(curl *CreateURL, username, tag string) string {
+func (c *CreateURL) RssBlogURL(username, tag string) string {
 	url := ""
-	if c.IsSubdomains() && curl.Subdomain {
+	if c.Subdomain {
 		url = fmt.Sprintf("%s://%s.%s/rss", c.Protocol, username, c.Domain)
-	} else if curl.UsernameInRoute {
+	} else if c.UsernameInRoute {
 		url = fmt.Sprintf("/%s/rss", username)
 	} else {
 		url = "/rss"
@@ -201,71 +103,6 @@ func (c *ConfigSite) RssBlogURL(curl *CreateURL, username, tag string) string {
 	}
 
 	return url
-}
-
-func (c *ConfigSite) ImgURL(curl *CreateURL, username string, slug string) string {
-	fname := url.PathEscape(strings.TrimLeft(slug, "/"))
-	if c.IsSubdomains() && curl.Subdomain {
-		return fmt.Sprintf("%s://%s.%s/%s", c.Protocol, username, c.Domain, fname)
-	}
-
-	if curl.UsernameInRoute {
-		return fmt.Sprintf("/%s/%s", username, fname)
-	}
-
-	return fmt.Sprintf("/%s", fname)
-}
-
-func (c *ConfigSite) ImgPostURL(curl *CreateURL, username string, slug string) string {
-	fname := url.PathEscape(strings.TrimLeft(slug, "/"))
-	if c.IsSubdomains() && curl.Subdomain {
-		return fmt.Sprintf("%s://%s.%s/p/%s", c.Protocol, username, c.Domain, fname)
-	}
-
-	if curl.UsernameInRoute {
-		return fmt.Sprintf("/%s/p/%s", username, fname)
-	}
-
-	return fmt.Sprintf("/p/%s", fname)
-}
-
-func (c *ConfigSite) ImgOrigURL(curl *CreateURL, username string, slug string) string {
-	fname := url.PathEscape(strings.TrimLeft(slug, "/"))
-	if c.IsSubdomains() && curl.Subdomain {
-		return fmt.Sprintf("%s://%s.%s/o/%s", c.Protocol, username, c.Domain, fname)
-	}
-
-	if curl.UsernameInRoute {
-		return fmt.Sprintf("/%s/o/%s", username, fname)
-	}
-
-	return fmt.Sprintf("/o/%s", fname)
-}
-
-func (c *ConfigSite) TagURL(curl *CreateURL, username, tag string) string {
-	tg := url.PathEscape(tag)
-	return fmt.Sprintf("%s?tag=%s", c.FullBlogURL(curl, username), tg)
-}
-
-func (c *ConfigSite) AssetURL(username, projectName, fpath string) string {
-	if username == projectName {
-		return fmt.Sprintf(
-			"%s://%s.%s/%s",
-			c.Protocol,
-			username,
-			c.Domain,
-			fpath,
-		)
-	}
-
-	return fmt.Sprintf(
-		"%s://%s-%s.%s/%s",
-		c.Protocol,
-		username,
-		projectName,
-		c.Domain,
-		fpath,
-	)
 }
 
 func CreateLogger(space string, withPipe bool) *slog.Logger {

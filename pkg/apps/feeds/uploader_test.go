@@ -26,7 +26,7 @@ func TestWriteKeepsDigestState(t *testing.T) {
 	user := &db.User{ID: "user-1", Name: "tester"}
 	pssh.SetUser(session, user)
 	posts := stub.NewPostsDB(logger, user)
-	cfg := NewConfigSite("feeds-test")
+	cfg := NewConfig("feeds-test")
 	h := NewUploadHandler(cfg, posts)
 	write := func(text string, mtime int64) {
 		t.Helper()

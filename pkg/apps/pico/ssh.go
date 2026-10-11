@@ -43,7 +43,7 @@ func StartSshServer() {
 	host := shared.GetEnv("PICO_HOST", "0.0.0.0")
 	port := shared.GetEnv("PICO_SSH_PORT", "2222")
 	promPort := shared.GetEnv("PICO_PROM_PORT", "9222")
-	cfg := NewConfigSite(appName)
+	cfg := NewConfig(appName)
 	logger := cfg.Logger
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -99,11 +99,11 @@ func StartSshServer() {
 			func(next pssh.SSHServerHandler) pssh.SSHServerHandler {
 				return func(sesh *pssh.SSHServerConnSession) error {
 					shrd := &tui.SharedModel{
-						Session: sesh,
-						Cfg:     cfg,
-						Dbpool:  handler.DBPool,
-						PgsDB:   pgsDB,
-						Logger:  pssh.GetLogger(sesh),
+						Session:    sesh,
+						TunsSecret: cfg.TunsSecret,
+						Dbpool:     handler.DBPool,
+						PgsDB:      pgsDB,
+						Logger:     pssh.GetLogger(sesh),
 					}
 					return pssh.PtyMdw(createTui(shrd), 200*time.Millisecond)(next)(sesh)
 				}

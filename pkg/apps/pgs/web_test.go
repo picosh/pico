@@ -461,7 +461,7 @@ func TestApiBasic(t *testing.T) {
 			defer func() {
 				_ = pubsub.Close()
 			}()
-			cfg := NewPgsConfig(logger, dbpool, st, pubsub)
+			cfg := NewConfig(logger, dbpool, st, pubsub)
 			cfg.Domain = "pgs.test"
 			router := NewWebRouter(cfg)
 			router.ServeHTTP(responseRecorder, request)
@@ -543,7 +543,7 @@ func TestApiHttpPassNotCached(t *testing.T) {
 	defer func() {
 		_ = pubsub.Close()
 	}()
-	cfg := NewPgsConfig(logger, dbpool, st, pubsub)
+	cfg := NewConfig(logger, dbpool, st, pubsub)
 	cfg.Domain = "pgs.test"
 	router := NewWebRouter(cfg)
 
@@ -662,7 +662,7 @@ func TestDirectoryListing(t *testing.T) {
 			defer func() {
 				_ = pubsub.Close()
 			}()
-			cfg := NewPgsConfig(logger, dbpool, st, pubsub)
+			cfg := NewConfig(logger, dbpool, st, pubsub)
 			cfg.Domain = "pgs.test"
 			router := NewWebRouter(cfg)
 			router.ServeHTTP(responseRecorder, request)
@@ -754,7 +754,7 @@ func TestDirectoryListing(t *testing.T) {
 // 			defer func() {
 // 				_ = pubsub.Close()
 // 			}()
-// 			cfg := NewPgsConfig(logger, dbpool, st, pubsub)
+// 			cfg := NewConfig(logger, dbpool, st, pubsub)
 // 			cfg.Domain = "pgs.test"
 // 			router := NewWebRouter(cfg)
 // 			router.ServeHTTP(responseRecorder, request)
@@ -795,7 +795,7 @@ func TestRulesCacheClearedByUploadPurge(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg := NewPgsConfig(logger, dbpool, st, discardPubsub{})
+	cfg := NewConfig(logger, dbpool, st, discardPubsub{})
 	cfg.Domain = "pgs.test"
 	router := newWebRouter(cfg)
 
@@ -853,7 +853,7 @@ func TestSiteCache(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg := NewPgsConfig(logger, dbpool, st, discardPubsub{})
+	cfg := NewConfig(logger, dbpool, st, discardPubsub{})
 	cfg.Domain = "pgs.test"
 	router := newWebRouter(cfg)
 

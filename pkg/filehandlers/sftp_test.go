@@ -50,24 +50,27 @@ func newPostsEnv(t *testing.T, app string) *postsEnv {
 	posts := stub.NewPostsDB(logger, &db.User{ID: "user-1", Name: "tester"})
 	posts.Pubkey = shared.KeyForKeyText(signer.PublicKey())
 
-	var cfg *shared.ConfigSite
+	var space string
 	var handler interface {
 		utils.CopyFromClientHandler
 		pssh.GetLoggerInterface
 	}
 	switch app {
 	case "prose":
-		cfg = prose.NewConfigSite("prose-test")
+		cfg := prose.NewConfig("prose-test")
+		cfg.Logger = logger
 		st, err := storage.NewStorageMemory(map[string]map[string]string{})
 		if err != nil {
 			t.Fatal(err)
 		}
 		handler = prose.NewFileHandler(cfg, posts, st)
+		space = cfg.Space
 	case "pastes":
-		cfg = pastes.NewConfigSite("pastes-test")
+		cfg := pastes.NewConfig("pastes-test")
+		cfg.Logger = logger
 		handler = pastes.NewUploadHandler(cfg, posts)
+		space = cfg.Space
 	}
-	cfg.Logger = logger
 
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
@@ -107,7 +110,7 @@ func newPostsEnv(t *testing.T, app string) *postsEnv {
 	if err := os.WriteFile(key, pem.EncodeToMemory(b), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	return &postsEnv{t: t, db: posts, space: cfg.Space, port: port, key: key}
+	return &postsEnv{t: t, db: posts, space: space, port: port, key: key}
 }
 
 func (e *postsEnv) sshOpts() []string {

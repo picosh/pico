@@ -1,4 +1,4 @@
-package uploadimgs
+package prose
 
 import (
 	"bytes"
@@ -19,8 +19,6 @@ import (
 	"github.com/picosh/pico/pkg/storage"
 )
 
-var Space = "imgs"
-
 type PostMetaData struct {
 	Text          []byte
 	FileSize      int
@@ -32,12 +30,12 @@ type PostMetaData struct {
 }
 
 type UploadImgHandler struct {
-	DBPool  shared.FeatureFinder
-	Cfg     *shared.ConfigSite
+	DBPool  DB
+	Cfg     *Config
 	Storage storage.StorageServe
 }
 
-func NewUploadImgHandler(dbpool shared.FeatureFinder, cfg *shared.ConfigSite, storage storage.StorageServe) *UploadImgHandler {
+func NewUploadImgHandler(dbpool DB, cfg *Config, storage storage.StorageServe) *UploadImgHandler {
 	return &UploadImgHandler{
 		DBPool:  dbpool,
 		Cfg:     cfg,
@@ -171,7 +169,13 @@ func (h *UploadImgHandler) Write(s *pssh.SSHServerConnSession, entry *sendutils.
 	}
 
 	fileSize := binary.Size(text)
-	featureFlag := shared.FindPlusFF(h.DBPool, h.Cfg, user.ID)
+	featureFlag, _ := h.DBPool.FindFeature(user.ID, "plus")
+	// we have free tiers so users might not have a feature flag
+	// in which case we set sane defaults
+	if featureFlag == nil {
+		featureFlag = db.NewFeatureFlag(user.ID, "plus", h.Cfg.MaxSize, h.Cfg.MaxAssetSize, h.Cfg.MaxSpecialFileSize)
+	}
+	featureFlag.SetLimits(h.Cfg.MaxSize, h.Cfg.MaxAssetSize, h.Cfg.MaxSpecialFileSize)
 
 	bucket, err := h.Storage.UpsertBucket(shared.GetAssetBucketName(user.ID))
 	if err != nil {
@@ -200,12 +204,8 @@ func (h *UploadImgHandler) Write(s *pssh.SSHServerConnSession, entry *sendutils.
 		return "", err
 	}
 
-	curl := shared.NewCreateURL(h.Cfg)
-	url := h.Cfg.FullPostURL(
-		curl,
-		user.Name,
-		metadata.Filename,
-	)
+	curl := shared.NewCreateURL(h.Cfg.Protocol, h.Cfg.Domain)
+	url := curl.FullPostURL(user.Name, metadata.Filename)
 	return url + shared.StorageUsage(metadata.TotalFileSize+fileSize, int(featureFlag.Data.StorageMax)), nil
 }
 

@@ -16,7 +16,7 @@ import (
 
 // postUploader stores prose's text files as posts.
 type postUploader struct {
-	Cfg *shared.ConfigSite
+	Cfg *Config
 	DB  DB
 }
 
@@ -98,7 +98,7 @@ func (h *postUploader) Write(s *pssh.SSHServerConnSession, entry *sendutils.File
 		}
 	}
 
-	return h.Cfg.FullPostURL(shared.NewCreateURL(h.Cfg), user.Name, post.Slug), nil
+	return shared.NewCreateURL(h.Cfg.Protocol, h.Cfg.Domain).FullPostURL(user.Name, post.Slug), nil
 }
 
 // Rename moves a post to a new filename in place, so it keeps its ID,

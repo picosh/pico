@@ -56,30 +56,35 @@ func GetSubdomainFromRequest(r *http.Request, domain, space string) string {
 	return ""
 }
 
-// NewHostRouter serves requests for users' sites, on subdomains and custom
-// domains, with sites, and the rest with main. GetSubdomain returns the
-// site's name. A nil sites serves everything with main.
-func NewHostRouter(cfg *shared.ConfigSite, main, sites http.Handler) http.Handler {
+// NewHostRouter serves requests for users' sites with sites, and the rest
+// with main. A site is a subdomain of domain, or a custom domain whose TXT
+// record for txtPrefix names one. GetSubdomain returns the site's name. A
+// nil sites serves everything with main.
+func NewHostRouter(domain, txtPrefix string, main, sites http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if sites == nil {
 			main.ServeHTTP(w, r)
 			return
 		}
-		subdomain := GetSubdomainFromRequest(r, cfg.Domain, cfg.Space)
+		subdomain := GetSubdomainFromRequest(r, domain, txtPrefix)
 		if subdomain == "" {
 			main.ServeHTTP(w, r)
 			return
 		}
-		ctx := context.WithValue(r.Context(), CtxSubdomainKey{}, subdomain)
-		sites.ServeHTTP(w, r.WithContext(ctx))
+		sites.ServeHTTP(w, r.WithContext(WithSubdomain(r.Context(), subdomain)))
 	})
 }
 
-type CtxSubdomainKey struct{}
+type ctxSubdomainKey struct{}
+
+// WithSubdomain marks ctx as a request for the site subdomain.
+func WithSubdomain(ctx context.Context, subdomain string) context.Context {
+	return context.WithValue(ctx, ctxSubdomainKey{}, subdomain)
+}
 
 // GetSubdomain is the site a request is for, or "" for the main domain.
 func GetSubdomain(r *http.Request) string {
-	subdomain, _ := r.Context().Value(CtxSubdomainKey{}).(string)
+	subdomain, _ := r.Context().Value(ctxSubdomainKey{}).(string)
 	return subdomain
 }
 

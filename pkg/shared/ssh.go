@@ -150,27 +150,3 @@ func (r *SshAuthHandler) PubkeyAuthHandler(conn ssh.ConnMetadata, key ssh.Public
 
 	return perms, nil
 }
-
-type FeatureFinder interface {
-	FindFeature(userID string, feature string) (*db.FeatureFlag, error)
-}
-
-func FindPlusFF(dbpool FeatureFinder, cfg *ConfigSite, userID string) *db.FeatureFlag {
-	ff, _ := dbpool.FindFeature(userID, "plus")
-	// we have free tiers so users might not have a feature flag
-	// in which case we set sane defaults
-	if ff == nil {
-		ff = db.NewFeatureFlag(
-			userID,
-			"plus",
-			cfg.MaxSize,
-			cfg.MaxAssetSize,
-			cfg.MaxSpecialFileSize,
-		)
-	}
-	// this is jank
-	ff.Data.StorageMax = ff.FindStorageMax(cfg.MaxSize)
-	ff.Data.FileMax = ff.FindFileMax(cfg.MaxAssetSize)
-	ff.Data.SpecialFileMax = ff.FindSpecialFileMax(cfg.MaxSpecialFileSize)
-	return ff
-}

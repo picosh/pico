@@ -27,7 +27,7 @@ func main() {
 	defer func() {
 		_ = pubsub.Close()
 	}()
-	cfg := pgs.NewPgsConfig(logger, dbpool, st, pubsub)
+	cfg := pgs.NewConfig(logger, dbpool, st, pubsub)
 	killCh := make(chan error)
 
 	// first time user experience flow

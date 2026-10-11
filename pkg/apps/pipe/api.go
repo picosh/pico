@@ -397,7 +397,7 @@ func (web *webRouter) handlePipe() http.HandlerFunc {
 	}
 }
 
-func rssHandler(cfg *shared.ConfigSite, dbpool DB) http.HandlerFunc {
+func rssHandler(cfg *Config, dbpool DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		apiToken, _ := url.PathUnescape(r.PathValue("token"))
 		user, err := dbpool.FindUserByToken(apiToken)
@@ -435,17 +435,18 @@ func rssHandler(cfg *shared.ConfigSite, dbpool DB) http.HandlerFunc {
 }
 
 type webRouter struct {
-	cfg *shared.ConfigSite
+	cfg *Config
 	db  DB
 }
 
 func (web *webRouter) static(mux *http.ServeMux) {
 	cfg := web.cfg
-	mux.HandleFunc("GET /favicon-16x16.png", router.ServeFile(cfg, "favicon-16x16.png", "image/png"))
-	mux.HandleFunc("GET /apple-touch-icon.png", router.ServeFile(cfg, "apple-touch-icon.png", "image/png"))
-	mux.HandleFunc("GET /favicon.ico", router.ServeFile(cfg, "favicon.ico", "image/x-icon"))
-	mux.HandleFunc("GET /robots.txt", router.ServeFile(cfg, "robots.txt", "text/plain"))
-	mux.HandleFunc("GET /anim.js", router.ServeFile(cfg, "anim.js", "text/javascript"))
+	files := cfg.Static()
+	mux.HandleFunc("GET /favicon-16x16.png", files.File("favicon-16x16.png", "image/png"))
+	mux.HandleFunc("GET /apple-touch-icon.png", files.File("apple-touch-icon.png", "image/png"))
+	mux.HandleFunc("GET /favicon.ico", files.File("favicon.ico", "image/x-icon"))
+	mux.HandleFunc("GET /robots.txt", files.File("robots.txt", "text/plain"))
+	mux.HandleFunc("GET /anim.js", files.File("anim.js", "text/javascript"))
 	if cfg.Debug {
 		router.CreatePProfRoutesMux(mux)
 	}
@@ -453,8 +454,8 @@ func (web *webRouter) static(mux *http.ServeMux) {
 
 func (web *webRouter) mainMux() *http.ServeMux {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /{$}", router.CreatePageHandler(web.cfg, "html/marketing.page.tmpl"))
-	mux.HandleFunc("GET /check", router.CheckHandler(web.cfg, web.db))
+	mux.HandleFunc("GET /{$}", web.cfg.Static().Page("html/marketing.page.tmpl"))
+	mux.HandleFunc("GET /check", router.CheckHandler(web.cfg.Domain, web.cfg.Space, web.db))
 	mux.HandleFunc("GET /rss/{token...}", rssHandler(web.cfg, web.db))
 	mux.Handle("GET /_metrics", promhttp.Handler())
 
@@ -479,7 +480,7 @@ func (web *webRouter) sitesMux() *http.ServeMux {
 }
 
 func StartApiServer() {
-	cfg := NewConfigSite("pipe-web")
+	cfg := NewConfig("pipe-web")
 	db := NewDB(postgres.NewDB(cfg.DbURL, cfg.Logger))
 	defer func() {
 		_ = db.Close()
@@ -512,7 +513,7 @@ func StartApiServer() {
 	}()
 
 	web := &webRouter{cfg: cfg, db: db}
-	handler := router.NewHostRouter(cfg, web.mainMux(), web.sitesMux())
+	handler := router.NewHostRouter(cfg.Domain, cfg.Space, web.mainMux(), web.sitesMux())
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)
 	logger.Info(

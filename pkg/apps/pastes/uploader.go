@@ -19,29 +19,9 @@ import (
 
 var DEFAULT_EXPIRES_AT = 90
 
-func checkAccess(dbpool DB, userID string) error {
-	ffPlus, plusErr := dbpool.FindFeature(userID, "plus")
-	if plusErr == nil && ffPlus.IsValid() {
-		return nil
-	}
-
-	ffPastes, pastesErr := dbpool.FindFeature(userID, "pastes")
-	if pastesErr == nil {
-		if ffPastes.IsValid() {
-			return nil
-		}
-		return fmt.Errorf("ERROR: your pastes access has expired: https://blog.pico.sh/ann-038-pico-invite-system")
-	}
-
-	if plusErr == nil {
-		return fmt.Errorf("ERROR: your pico+ has expired: https://blog.pico.sh/ann-038-pico-invite-system")
-	}
-	return fmt.Errorf("ERROR: uploading to pastes requires an invitation or pico+: https://blog.pico.sh/ann-038-pico-invite-system")
-}
-
 // UploadHandler stores every file as a paste.
 type UploadHandler struct {
-	Cfg *shared.ConfigSite
+	Cfg *Config
 	DB  DB
 }
 
@@ -51,7 +31,7 @@ var (
 	_ sendutils.FileRenamer           = (*UploadHandler)(nil)
 )
 
-func NewUploadHandler(cfg *shared.ConfigSite, dbpool DB) *UploadHandler {
+func NewUploadHandler(cfg *Config, dbpool DB) *UploadHandler {
 	return &UploadHandler{Cfg: cfg, DB: dbpool}
 }
 
@@ -71,7 +51,7 @@ func (h *UploadHandler) Validate(s *pssh.SSHServerConnSession) error {
 	if err != nil {
 		return err
 	}
-	if err := checkAccess(h.DB, user.ID); err != nil {
+	if _, err := db.FindAccess(h.DB, user.ID, "pastes"); err != nil {
 		return err
 	}
 	h.GetLogger(s).Info("attempting to upload files", "user", user.Name, "space", h.Cfg.Space)
@@ -132,7 +112,7 @@ func (h *UploadHandler) Write(s *pssh.SSHServerConnSession, entry *sendutils.Fil
 		return "", err
 	}
 	logger.Info("saved paste", "new", cur == nil, "changed", changed)
-	return h.Cfg.FullPostURL(shared.NewCreateURL(h.Cfg), user.Name, post.Slug), nil
+	return shared.NewCreateURL(h.Cfg.Protocol, h.Cfg.Domain).FullPostURL(user.Name, post.Slug), nil
 }
 
 // Rename moves a paste to a new filename in place, keeping its settings.

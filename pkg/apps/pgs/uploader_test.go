@@ -59,7 +59,7 @@ func TestRsyncDeleteDirectory(t *testing.T) {
 	_ = os.Setenv("PGS_SSH_PORT", "0")
 	_ = os.Setenv("PGS_PROM_PORT", "0")
 
-	cfg := NewPgsConfig(logger, dbpool, st, pubsub)
+	cfg := NewConfig(logger, dbpool, st, pubsub)
 	done := make(chan error)
 	readyCh := make(chan *pssh.SSHServer)
 	prometheus.DefaultRegisterer = prometheus.NewRegistry()
@@ -250,7 +250,7 @@ func TestRsyncDeleteNestedEmptyDirectories(t *testing.T) {
 	_ = os.Setenv("PGS_SSH_PORT", "0")
 	_ = os.Setenv("PGS_PROM_PORT", "0")
 
-	cfg := NewPgsConfig(logger, dbpool, st, pubsub)
+	cfg := NewConfig(logger, dbpool, st, pubsub)
 	done := make(chan error)
 	readyCh := make(chan *pssh.SSHServer)
 	prometheus.DefaultRegisterer = prometheus.NewRegistry()
@@ -389,7 +389,7 @@ func setupPgsTestServer(t *testing.T, dbpool *pgsdb.MemoryDB) (string, func()) {
 	_ = os.Setenv("PGS_SSH_PORT", "0")
 	_ = os.Setenv("PGS_PROM_PORT", "0")
 
-	cfg := NewPgsConfig(logger, dbpool, st, pubsub)
+	cfg := NewConfig(logger, dbpool, st, pubsub)
 	done := make(chan error)
 	readyCh := make(chan *pssh.SSHServer)
 	prometheus.DefaultRegisterer = prometheus.NewRegistry()
@@ -550,7 +550,7 @@ func TestNoPlusFlagBlocksUpload(t *testing.T) {
 
 func TestFindFeatureFlag(t *testing.T) {
 	logger := slog.Default()
-	cfg := &PgsConfig{
+	cfg := &Config{
 		MaxSize:            uint64(100 * shared.MB),
 		MaxAssetSize:       int64(10 * shared.MB),
 		MaxSpecialFileSize: int64(5 * shared.KB),
@@ -723,7 +723,7 @@ func TestSftpDirectories(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = os.Setenv("PGS_SSH_PORT", "0")
-	cfg := NewPgsConfig(logger, dbpool, st, discardPubsub{})
+	cfg := NewConfig(logger, dbpool, st, discardPubsub{})
 	done := make(chan error)
 	defer close(done)
 	readyCh := make(chan *pssh.SSHServer)

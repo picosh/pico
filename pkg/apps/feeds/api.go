@@ -98,23 +98,24 @@ func (web *webRouter) unsubHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 type webRouter struct {
-	cfg *shared.ConfigSite
+	cfg *Config
 	db  DB
 }
 
 func (web *webRouter) mux() *http.ServeMux {
 	cfg := web.cfg
+	files := cfg.Static()
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /{$}", router.CreatePageHandler(cfg, "html/marketing.page.tmpl"))
+	mux.HandleFunc("GET /{$}", files.Page("html/marketing.page.tmpl"))
 	mux.HandleFunc("GET /keep-alive/{id...}", web.keepAliveHandler)
 	mux.HandleFunc("GET /unsub/{id...}", web.unsubHandler)
 	mux.Handle("GET /_metrics", promhttp.Handler())
-	mux.HandleFunc("GET /main.css", router.ServeFile(cfg, "main.css", "text/css"))
-	mux.HandleFunc("GET /card.png", router.ServeFile(cfg, "card.png", "image/png"))
-	mux.HandleFunc("GET /favicon-16x16.png", router.ServeFile(cfg, "favicon-16x16.png", "image/png"))
-	mux.HandleFunc("GET /apple-touch-icon.png", router.ServeFile(cfg, "apple-touch-icon.png", "image/png"))
-	mux.HandleFunc("GET /favicon.ico", router.ServeFile(cfg, "favicon.ico", "image/x-icon"))
-	mux.HandleFunc("GET /robots.txt", router.ServeFile(cfg, "robots.txt", "text/plain"))
+	mux.HandleFunc("GET /main.css", files.File("main.css", "text/css"))
+	mux.HandleFunc("GET /card.png", files.File("card.png", "image/png"))
+	mux.HandleFunc("GET /favicon-16x16.png", files.File("favicon-16x16.png", "image/png"))
+	mux.HandleFunc("GET /apple-touch-icon.png", files.File("apple-touch-icon.png", "image/png"))
+	mux.HandleFunc("GET /favicon.ico", files.File("favicon.ico", "image/x-icon"))
+	mux.HandleFunc("GET /robots.txt", files.File("robots.txt", "text/plain"))
 	if cfg.Debug {
 		router.CreatePProfRoutesMux(mux)
 	}
@@ -122,7 +123,7 @@ func (web *webRouter) mux() *http.ServeMux {
 }
 
 func StartApiServer() {
-	cfg := NewConfigSite("feeds-web")
+	cfg := NewConfig("feeds-web")
 	db := NewDB(postgres.NewDB(cfg.DbURL, cfg.Logger))
 	defer func() {
 		_ = db.Close()

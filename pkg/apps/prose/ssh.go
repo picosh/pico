@@ -25,7 +25,7 @@ func StartSshServer() {
 	host := shared.GetEnv("PROSE_HOST", "0.0.0.0")
 	port := shared.GetEnv("PROSE_SSH_PORT", "2222")
 	promPort := shared.GetEnv("PROSE_PROM_PORT", "9222")
-	cfg := NewConfigSite(appName)
+	cfg := NewConfig(appName)
 	logger := cfg.Logger
 
 	ctx, cancel := context.WithCancel(context.Background())

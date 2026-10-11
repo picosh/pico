@@ -35,7 +35,7 @@ func (m *pasteDB) FindPostWithSlug(slug string, _ string, _ string) (*db.Post, e
 func TestLargePasteEscapesHTML(t *testing.T) {
 	t.Chdir("../../..")
 	logger := slog.New(slog.DiscardHandler)
-	cfg := &shared.ConfigSite{
+	cfg := &Config{
 		Domain: "pastes.test", Protocol: "https", Space: "pastes", Logger: logger,
 	}
 	now := time.Now()
@@ -48,7 +48,7 @@ func TestLargePasteEscapesHTML(t *testing.T) {
 		},
 	}
 	web := &webRouter{cfg: cfg, db: dbpool}
-	handler := router.NewHostRouter(cfg, web.mainMux(), web.sitesMux())
+	handler := router.NewHostRouter(cfg.Domain, cfg.Space, web.mainMux(), web.sitesMux())
 
 	page := httptest.NewRecorder()
 	handler.ServeHTTP(page, httptest.NewRequest(http.MethodGet, "https://tester.pastes.test/test.html", nil))
@@ -73,7 +73,7 @@ func TestLargePasteEscapesHTML(t *testing.T) {
 func TestRoutes(t *testing.T) {
 	t.Chdir("../../..")
 	logger := slog.New(slog.DiscardHandler)
-	cfg := &shared.ConfigSite{
+	cfg := &Config{
 		Domain: "pastes.test", Protocol: "https", Space: "pastes", Logger: logger,
 	}
 	now := time.Now()
@@ -85,7 +85,7 @@ func TestRoutes(t *testing.T) {
 		},
 	}
 	web := &webRouter{cfg: cfg, db: dbpool}
-	handler := router.NewHostRouter(cfg, web.mainMux(), web.sitesMux())
+	handler := router.NewHostRouter(cfg.Domain, cfg.Space, web.mainMux(), web.sitesMux())
 
 	for _, tt := range []struct {
 		url    string

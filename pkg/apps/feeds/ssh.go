@@ -23,7 +23,7 @@ func StartSshServer() {
 	host := shared.GetEnv("FEEDS_HOST", "0.0.0.0")
 	port := shared.GetEnv("FEEDS_SSH_PORT", "2222")
 	promPort := shared.GetEnv("FEEDS_PROM_PORT", "9222")
-	cfg := NewConfigSite(appName)
+	cfg := NewConfig(appName)
 	logger := cfg.Logger
 
 	ctx, cancel := context.WithCancel(context.Background())

@@ -1,14 +1,37 @@
 package prose
 
 import (
+	"fmt"
+	"html/template"
+	"log/slog"
+	"path/filepath"
 	"strings"
 
 	"github.com/picosh/pico/pkg/shared"
+	"github.com/picosh/pico/pkg/shared/router"
 )
 
 var MAX_FILE_SIZE = 3 * shared.MB
 
-func NewConfigSite(service string) *shared.ConfigSite {
+// staticDir holds prose's templates and public files.
+const staticDir = "pkg/apps/prose"
+
+type Config struct {
+	Debug              bool
+	Domain             string
+	Port               string
+	Protocol           string
+	DbURL              string
+	Space              string
+	AllowedExt         []string
+	HiddenPosts        []string
+	MaxSize            uint64
+	MaxAssetSize       int64
+	MaxSpecialFileSize int64
+	Logger             *slog.Logger
+}
+
+func NewConfig(service string) *Config {
 	debug := shared.GetEnv("PROSE_DEBUG", "0")
 	domain := shared.GetEnv("PROSE_DOMAIN", "prose.sh")
 	port := shared.GetEnv("PROSE_WEB_PORT", "3000")
@@ -18,7 +41,7 @@ func NewConfigSite(service string) *shared.ConfigSite {
 	maxImgSize := int64(10 * shared.MB)
 	withPipe := strings.ToLower(shared.GetEnv("PICO_PIPE_ENABLED", "true")) == "true"
 
-	return &shared.ConfigSite{
+	return &Config{
 		Debug:    debug == "1",
 		Domain:   domain,
 		Port:     port,
@@ -41,4 +64,27 @@ func NewConfigSite(service string) *shared.ConfigSite {
 		MaxSize:      maxSize,
 		MaxAssetSize: maxImgSize,
 	}
+}
+
+func (c *Config) StaticPath(fname string) string {
+	return filepath.Join(staticDir, fname)
+}
+
+func (c *Config) SiteData() shared.SitePageData {
+	return shared.SitePageData{
+		Domain:  template.URL(c.Domain),
+		HomeURL: template.URL("//" + c.Domain),
+	}
+}
+
+func (c *Config) Static() router.Static {
+	return router.Static{Dir: staticDir, Logger: c.Logger, Site: c.SiteData()}
+}
+
+func (c *Config) ReadURL() string {
+	return fmt.Sprintf("%s://%s", c.Protocol, c.Domain)
+}
+
+func (c *Config) CssURL() string {
+	return "/_styles.css"
 }

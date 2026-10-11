@@ -472,12 +472,12 @@ func (m *TunsPage) fetchEventLogs() {
 }
 
 func (m *TunsPage) fetchTuns() {
-	tMap, err := fetch("tuns.sh", m.shared.Cfg.TunsSecret)
+	tMap, err := fetch("tuns.sh", m.shared.TunsSecret)
 	if err != nil {
 		m.err = err
 		return
 	}
-	nMap, err := fetch("nue.tuns.sh", m.shared.Cfg.TunsSecret)
+	nMap, err := fetch("nue.tuns.sh", m.shared.TunsSecret)
 	if err != nil {
 		m.err = err
 		return

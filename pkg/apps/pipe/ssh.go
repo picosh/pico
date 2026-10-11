@@ -21,7 +21,7 @@ func StartSshServer() {
 	port := shared.GetEnv("PIPE_SSH_PORT", "2222")
 	portOverride := shared.GetEnv("PIPE_SSH_PORT_OVERRIDE", port)
 	promPort := shared.GetEnv("PIPE_PROM_PORT", "9222")
-	cfg := NewConfigSite(appName)
+	cfg := NewConfig(appName)
 	logger := cfg.Logger
 
 	ctx, cancel := context.WithCancel(context.Background())

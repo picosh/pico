@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-
-	"github.com/picosh/pico/pkg/shared"
 )
 
 func TestGetCustomDomainCachesMisses(t *testing.T) {
@@ -56,7 +54,6 @@ func TestGetCustomDomainCachesMisses(t *testing.T) {
 }
 
 func TestNewHostRouter(t *testing.T) {
-	cfg := &shared.ConfigSite{Domain: "pico.test", Space: "prose"}
 	serve := func(name string) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte(name + ":" + GetSubdomain(r)))
@@ -68,14 +65,14 @@ func TestNewHostRouter(t *testing.T) {
 		return res.Body.String()
 	}
 
-	h := NewHostRouter(cfg, serve("main"), serve("sites"))
+	h := NewHostRouter("pico.test", "prose", serve("main"), serve("sites"))
 	if got := get(h, "https://pico.test/"); got != "main:" {
 		t.Errorf("main domain = %q", got)
 	}
 	if got := get(h, "https://tester.pico.test/"); got != "sites:tester" {
 		t.Errorf("subdomain = %q", got)
 	}
-	if got := get(NewHostRouter(cfg, serve("main"), nil), "https://tester.pico.test/"); got != "main:" {
+	if got := get(NewHostRouter("pico.test", "prose", serve("main"), nil), "https://tester.pico.test/"); got != "main:" {
 		t.Errorf("subdomain without sites = %q", got)
 	}
 }

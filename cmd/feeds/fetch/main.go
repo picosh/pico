@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	cfg := feeds.NewConfigSite("feeds-fetch")
+	cfg := feeds.NewConfig("feeds-fetch")
 	dbh := feeds.NewDB(postgres.NewDB(cfg.DbURL, cfg.Logger))
 	defer func() {
 		_ = dbh.Close()

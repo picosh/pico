@@ -15,7 +15,6 @@ import (
 	"github.com/picosh/pico/pkg/db/stub"
 	"github.com/picosh/pico/pkg/pssh"
 	sendutils "github.com/picosh/pico/pkg/send/utils"
-	"github.com/picosh/pico/pkg/shared"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -43,7 +42,7 @@ func (m *mockFeatureDB) setFeature(userID, name string, expiresAt time.Time) {
 }
 
 func TestUploadHandlerValidate(t *testing.T) {
-	cfg := NewConfigSite("pastes-test")
+	cfg := NewConfig("pastes-test")
 	userID := "user-1"
 	future := time.Now().Add(24 * time.Hour)
 	past := time.Now().Add(-24 * time.Hour)
@@ -198,7 +197,7 @@ func TestWriteReadError(t *testing.T) {
 			user := &db.User{ID: "user-1", Name: "tester"}
 			pssh.SetUser(session, user)
 			posts := stub.NewPostsDB(logger, user)
-			handler := NewUploadHandler(&shared.ConfigSite{Space: "pastes", MaxAssetSize: 1024}, posts)
+			handler := NewUploadHandler(&Config{Space: "pastes", MaxAssetSize: 1024}, posts)
 			reader := io.MultiReader(strings.NewReader(tt.text), iotest.ErrReader(tt.err))
 
 			message, err := handler.Write(session, &sendutils.FileEntry{Filepath: "/test.txt", Reader: reader})

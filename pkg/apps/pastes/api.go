@@ -72,7 +72,7 @@ type HeaderTxt struct {
 }
 
 func (web *webRouter) blogHandler(w http.ResponseWriter, r *http.Request) {
-	username := router.GetUsernameFromRequest(r, web.cfg)
+	username := router.GetUsernameFromRequest(r)
 	dbpool := web.db
 	blogger := web.cfg.Logger
 	logger := blogger.With("user", username)
@@ -95,7 +95,7 @@ func (web *webRouter) blogHandler(w http.ResponseWriter, r *http.Request) {
 
 	posts := pager.Data
 
-	ts, err := router.RenderTemplate(cfg, []string{
+	ts, err := router.RenderTemplate(staticDir, []string{
 		cfg.StaticPath("html/blog.page.tmpl"),
 	})
 
@@ -110,12 +110,12 @@ func (web *webRouter) blogHandler(w http.ResponseWriter, r *http.Request) {
 		Bio:   "",
 	}
 
-	curl := shared.CreateURLFromRequest(cfg, r)
+	curl := shared.CreateURLFromRequest(cfg.Protocol, cfg.Domain, r)
 	postCollection := make([]PostItemData, 0, len(posts))
 	for _, post := range posts {
 		p := PostItemData{
-			URL:            template.URL(cfg.FullPostURL(curl, post.Username, post.Slug)),
-			BlogURL:        template.URL(cfg.FullBlogURL(curl, post.Username)),
+			URL:            template.URL(curl.FullPostURL(post.Username, post.Slug)),
+			BlogURL:        template.URL(curl.FullBlogURL(post.Username)),
 			Title:          post.Filename,
 			PublishAt:      post.PublishAt.Format(time.DateOnly),
 			PublishAtISO:   post.PublishAt.Format(time.RFC3339),
@@ -126,10 +126,10 @@ func (web *webRouter) blogHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := BlogPageData{
-		Site:      *cfg.GetSiteData(),
+		Site:      cfg.SiteData(),
 		PageTitle: headerTxt.Title,
-		URL:       template.URL(cfg.FullBlogURL(curl, username)),
-		RSSURL:    template.URL(cfg.RssBlogURL(curl, username, "")),
+		URL:       template.URL(curl.FullBlogURL(username)),
+		RSSURL:    template.URL(curl.RssBlogURL(username, "")),
 		Header:    headerTxt,
 		Username:  username,
 		Posts:     postCollection,
@@ -155,7 +155,7 @@ func GetBlogName(username string) string {
 }
 
 func (web *webRouter) postHandler(w http.ResponseWriter, r *http.Request) {
-	username := router.GetUsernameFromRequest(r, web.cfg)
+	username := router.GetUsernameFromRequest(r)
 	cfg := web.cfg
 	slug, _ := url.PathUnescape(r.PathValue("slug"))
 
@@ -201,7 +201,7 @@ func (web *webRouter) postHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		data = PostPageData{
-			Site:         *cfg.GetSiteData(),
+			Site:         cfg.SiteData(),
 			PageTitle:    post.Filename,
 			URL:          template.URL(cfg.PostURL(post.Username, post.Slug)),
 			RawURL:       template.URL(cfg.RawPostURL(post.Username, post.Slug)),
@@ -220,7 +220,7 @@ func (web *webRouter) postHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		logger.Info("paste not found")
 		data = PostPageData{
-			Site:         *cfg.GetSiteData(),
+			Site:         cfg.SiteData(),
 			PageTitle:    "Paste not found",
 			Description:  "Paste not found",
 			Title:        "Paste not found",
@@ -235,7 +235,7 @@ func (web *webRouter) postHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	ts, err := router.RenderTemplate(cfg, []string{
+	ts, err := router.RenderTemplate(staticDir, []string{
 		cfg.StaticPath("html/post.page.tmpl"),
 	})
 
@@ -252,7 +252,7 @@ func (web *webRouter) postHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (web *webRouter) postHandlerRaw(w http.ResponseWriter, r *http.Request) {
-	username := router.GetUsernameFromRequest(r, web.cfg)
+	username := router.GetUsernameFromRequest(r)
 	cfg := web.cfg
 	slug, _ := url.PathUnescape(r.PathValue("slug"))
 
@@ -285,20 +285,21 @@ func (web *webRouter) postHandlerRaw(w http.ResponseWriter, r *http.Request) {
 }
 
 type webRouter struct {
-	cfg *shared.ConfigSite
+	cfg *Config
 	db  DB
 }
 
 func (web *webRouter) static(mux *http.ServeMux) {
 	cfg := web.cfg
-	mux.HandleFunc("GET /main.css", router.ServeFile(cfg, "main.css", "text/css"))
-	mux.HandleFunc("GET /smol.css", router.ServeFile(cfg, "smol.css", "text/css"))
-	mux.HandleFunc("GET /syntax.css", router.ServeFile(cfg, "syntax.css", "text/css"))
-	mux.HandleFunc("GET /card.png", router.ServeFile(cfg, "card.png", "image/png"))
-	mux.HandleFunc("GET /favicon-16x16.png", router.ServeFile(cfg, "favicon-16x16.png", "image/png"))
-	mux.HandleFunc("GET /apple-touch-icon.png", router.ServeFile(cfg, "apple-touch-icon.png", "image/png"))
-	mux.HandleFunc("GET /favicon.ico", router.ServeFile(cfg, "favicon.ico", "image/x-icon"))
-	mux.HandleFunc("GET /robots.txt", router.ServeFile(cfg, "robots.txt", "text/plain"))
+	files := cfg.Static()
+	mux.HandleFunc("GET /main.css", files.File("main.css", "text/css"))
+	mux.HandleFunc("GET /smol.css", files.File("smol.css", "text/css"))
+	mux.HandleFunc("GET /syntax.css", files.File("syntax.css", "text/css"))
+	mux.HandleFunc("GET /card.png", files.File("card.png", "image/png"))
+	mux.HandleFunc("GET /favicon-16x16.png", files.File("favicon-16x16.png", "image/png"))
+	mux.HandleFunc("GET /apple-touch-icon.png", files.File("apple-touch-icon.png", "image/png"))
+	mux.HandleFunc("GET /favicon.ico", files.File("favicon.ico", "image/x-icon"))
+	mux.HandleFunc("GET /robots.txt", files.File("robots.txt", "text/plain"))
 	if cfg.Debug {
 		router.CreatePProfRoutesMux(mux)
 	}
@@ -307,8 +308,8 @@ func (web *webRouter) static(mux *http.ServeMux) {
 // mainMux serves the marketing site and users' pastes below /{user}.
 func (web *webRouter) mainMux() *http.ServeMux {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /{$}", router.CreatePageHandler(web.cfg, "html/marketing.page.tmpl"))
-	mux.HandleFunc("GET /check", router.CheckHandler(web.cfg, web.db))
+	mux.HandleFunc("GET /{$}", web.cfg.Static().Page("html/marketing.page.tmpl"))
+	mux.HandleFunc("GET /check", router.CheckHandler(web.cfg.Domain, web.cfg.Space, web.db))
 	mux.Handle("GET /_metrics", promhttp.Handler())
 	web.static(mux)
 	mux.HandleFunc("GET /{user}", web.blogHandler)
@@ -352,7 +353,7 @@ func (web *webRouter) rawRoute(w http.ResponseWriter, r *http.Request) {
 }
 
 func StartApiServer() {
-	cfg := NewConfigSite("pastes-web")
+	cfg := NewConfig("pastes-web")
 	db := NewDB(postgres.NewDB(cfg.DbURL, cfg.Logger))
 	defer func() {
 		_ = db.Close()
@@ -362,7 +363,7 @@ func StartApiServer() {
 	go CronDeleteExpiredPosts(cfg, db)
 
 	web := &webRouter{cfg: cfg, db: db}
-	handler := router.NewHostRouter(cfg, web.mainMux(), web.sitesMux())
+	handler := router.NewHostRouter(cfg.Domain, cfg.Space, web.mainMux(), web.sitesMux())
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)
 	logger.Info(

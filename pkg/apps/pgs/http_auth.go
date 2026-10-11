@@ -26,7 +26,7 @@ type loginFormData struct {
 }
 
 // serveLoginFormWithConfig renders and serves the login form using templates.
-func serveLoginFormWithConfig(w http.ResponseWriter, r *http.Request, project *db.Project, cfg *PgsConfig, logger *slog.Logger) {
+func serveLoginFormWithConfig(w http.ResponseWriter, r *http.Request, project *db.Project, cfg *Config, logger *slog.Logger) {
 	// Determine error message from query params
 	errorMsg := ""
 	if r.URL.Query().Get("error") == "invalid" {
@@ -40,7 +40,7 @@ func serveLoginFormWithConfig(w http.ResponseWriter, r *http.Request, project *d
 
 	w.WriteHeader(http.StatusForbidden)
 
-	ts, err := renderTemplate(cfg, []string{cfg.StaticPath("html/login.page.tmpl")})
+	ts, err := router.RenderTemplate(staticDir, []string{cfg.StaticPath("html/login.page.tmpl")})
 	if err != nil {
 		logger.Error("could not render login template", "err", err.Error())
 		http.Error(w, "Server error", http.StatusInternalServerError)
@@ -55,7 +55,7 @@ func serveLoginFormWithConfig(w http.ResponseWriter, r *http.Request, project *d
 }
 
 // handleLogin processes the login form submission.
-func handleLogin(w http.ResponseWriter, r *http.Request, cfg *PgsConfig) {
+func handleLogin(w http.ResponseWriter, r *http.Request, cfg *Config) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return

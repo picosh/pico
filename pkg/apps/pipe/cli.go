@@ -21,7 +21,6 @@ import (
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/pssh"
 	psub "github.com/picosh/pico/pkg/pubsub"
-	"github.com/picosh/pico/pkg/shared"
 	gossh "golang.org/x/crypto/ssh"
 )
 
@@ -188,7 +187,7 @@ type CliHandler struct {
 	DBPool  DB
 	Logger  *slog.Logger
 	PubSub  psub.PubSub
-	Cfg     *shared.ConfigSite
+	Cfg     *Config
 	Waiters *syncmap.Map[string, []string]
 	Access  *syncmap.Map[string, []string]
 }
@@ -207,7 +206,7 @@ type CliCmd struct {
 	user     *db.User
 }
 
-func help(cfg *shared.ConfigSite, sesh *pssh.SSHServerConnSession) {
+func help(cfg *Config, sesh *pssh.SSHServerConnSession) {
 	data := fmt.Sprintf(`Command: ssh %s <command> [args...]
 
 The simplest authenticated pubsub system.  Send messages through
@@ -1153,7 +1152,7 @@ func (handler *CliHandler) pipe(cmd *CliCmd, topic string, clientID string) erro
 	return nil
 }
 
-func toSshCmd(cfg *shared.ConfigSite) string {
+func toSshCmd(cfg *Config) string {
 	port := ""
 	if cfg.PortOverride != "22" {
 		port = fmt.Sprintf("-p %s ", cfg.PortOverride)

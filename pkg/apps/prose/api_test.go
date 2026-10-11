@@ -20,7 +20,7 @@ func TestRoutes(t *testing.T) {
 	logger := slog.New(slog.DiscardHandler)
 	user := &db.User{ID: "user-1", Name: "tester"}
 	posts := stub.NewPostsDB(logger, user)
-	cfg := NewConfigSite("prose-test")
+	cfg := NewConfig("prose-test")
 	cfg.Logger = logger
 	post := filehandlers.NewPost("hello.md", []byte("# hello"))
 	post.UserID, post.Space, post.Title = user.ID, cfg.Space, "Hello"
@@ -32,7 +32,7 @@ func TestRoutes(t *testing.T) {
 		t.Fatal(err)
 	}
 	web := &webRouter{cfg: cfg, db: posts, storage: st}
-	handler := router.NewHostRouter(cfg, web.mainMux(), web.sitesMux())
+	handler := router.NewHostRouter(cfg.Domain, cfg.Space, web.mainMux(), web.sitesMux())
 
 	site := "https://tester." + cfg.Domain
 	for _, tt := range []struct {

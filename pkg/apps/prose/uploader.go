@@ -3,14 +3,11 @@ package prose
 import (
 	"fmt"
 	"log/slog"
-	"strings"
 
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/filehandlers"
-	uploadimgs "github.com/picosh/pico/pkg/filehandlers/imgs"
 	"github.com/picosh/pico/pkg/pssh"
 	sendutils "github.com/picosh/pico/pkg/send/utils"
-	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/pico/pkg/storage"
 )
 
@@ -29,51 +26,17 @@ func setFeatureFlag(s *pssh.SSHServerConnSession, ff *db.FeatureFlag) {
 	s.SetValue(ctxFeatureFlagKey{}, ff)
 }
 
-func setFeatureLimits(ff *db.FeatureFlag, cfg *shared.ConfigSite) {
-	ff.Data.StorageMax = ff.FindStorageMax(cfg.MaxSize)
-	ff.Data.FileMax = ff.FindFileMax(cfg.MaxAssetSize)
-	ff.Data.SpecialFileMax = ff.FindSpecialFileMax(cfg.MaxSpecialFileSize)
-}
-
-func findFeatureFlag(dbpool DB, cfg *shared.ConfigSite, userID string) (*db.FeatureFlag, error) {
-	ff, err := dbpool.FindFeature(userID, "plus")
-	if err == nil {
-		if ff.IsValid() {
-			setFeatureLimits(ff, cfg)
-			return ff, nil
-		}
-		err = fmt.Errorf("ERROR: your pico+ has expired: https://blog.pico.sh/ann-038-pico-invite-system")
-	}
-
-	ffProse, proseErr := dbpool.FindFeature(userID, "prose")
-	if proseErr == nil {
-		if ffProse.IsValid() {
-			setFeatureLimits(ffProse, cfg)
-			return ffProse, nil
-		}
-		proseErr = fmt.Errorf("ERROR: your prose access has expired: https://blog.pico.sh/ann-038-pico-invite-system")
-	}
-
-	if err != nil && strings.Contains(err.Error(), "expired") {
-		return nil, err
-	}
-	if proseErr != nil && strings.Contains(proseErr.Error(), "expired") {
-		return nil, proseErr
-	}
-	return nil, fmt.Errorf("ERROR: uploading to prose requires an invitation or pico+: https://blog.pico.sh/ann-038-pico-invite-system")
-}
-
 type UploadHandler struct {
 	*filehandlers.FileHandlerRouter
-	Cfg *shared.ConfigSite
+	Cfg *Config
 	DB  DB
 }
 
 var _ sendutils.CopyFromClientHandler = &UploadHandler{}
 var _ sendutils.CopyFromClientHandler = (*UploadHandler)(nil)
 
-func NewUploadHandler(cfg *shared.ConfigSite, dbpool DB, fileMap map[string]filehandlers.ReadWriteHandler) *UploadHandler {
-	router := filehandlers.NewFileHandlerRouter(cfg, fileMap)
+func NewUploadHandler(cfg *Config, dbpool DB, fileMap map[string]filehandlers.ReadWriteHandler) *UploadHandler {
+	router := filehandlers.NewFileHandlerRouter(cfg.Space, fileMap)
 	return &UploadHandler{
 		FileHandlerRouter: router,
 		Cfg:               cfg,
@@ -82,7 +45,7 @@ func NewUploadHandler(cfg *shared.ConfigSite, dbpool DB, fileMap map[string]file
 }
 
 // NewFileHandler routes prose's text files to posts and the rest to images.
-func NewFileHandler(cfg *shared.ConfigSite, dbpool DB, st storage.StorageServe) *UploadHandler {
+func NewFileHandler(cfg *Config, dbpool DB, st storage.StorageServe) *UploadHandler {
 	// One post handler serves every text extension, so a post can be
 	// renamed in place from one to another.
 	posts := &postUploader{Cfg: cfg, DB: dbpool}
@@ -91,7 +54,7 @@ func NewFileHandler(cfg *shared.ConfigSite, dbpool DB, st storage.StorageServe) 
 		".txt":     posts,
 		".css":     posts,
 		".lxt":     posts,
-		"fallback": uploadimgs.NewUploadImgHandler(dbpool, cfg, st),
+		"fallback": NewUploadImgHandler(dbpool, cfg, st),
 	})
 }
 
@@ -116,10 +79,11 @@ func (h *UploadHandler) Validate(s *pssh.SSHServerConnSession) error {
 		return err
 	}
 
-	ff, err := findFeatureFlag(h.DB, h.Cfg, user.ID)
+	ff, err := db.FindAccess(h.DB, user.ID, "prose")
 	if err != nil {
 		return err
 	}
+	ff.SetLimits(h.Cfg.MaxSize, h.Cfg.MaxAssetSize, h.Cfg.MaxSpecialFileSize)
 	setFeatureFlag(s, ff)
 
 	return h.FileHandlerRouter.Validate(s)

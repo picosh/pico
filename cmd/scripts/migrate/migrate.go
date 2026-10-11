@@ -10,7 +10,6 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/db/postgres"
-	"github.com/picosh/pico/pkg/shared"
 )
 
 func findPosts(dbpool *sqlx.DB) ([]*db.Post, error) {
@@ -102,20 +101,11 @@ type ConflictData struct {
 func main() {
 	logger := slog.Default()
 
-	listsCfg := shared.NewConfigSite()
-	listsCfg.Logger = logger
-	listsCfg.DbURL = os.Getenv("LISTS_DB_URL")
-	listsDb := postgres.NewDB(listsCfg.DbURL, listsCfg.Logger)
+	listsDb := postgres.NewDB(os.Getenv("LISTS_DB_URL"), logger)
 
-	proseCfg := shared.NewConfigSite()
-	proseCfg.DbURL = os.Getenv("PROSE_DB_URL")
-	proseCfg.Logger = logger
-	proseDb := postgres.NewDB(proseCfg.DbURL, proseCfg.Logger)
+	proseDb := postgres.NewDB(os.Getenv("PROSE_DB_URL"), logger)
 
-	picoCfg := shared.NewConfigSite()
-	picoCfg.Logger = logger
-	picoCfg.DbURL = os.Getenv("PICO_DB_URL")
-	picoDb := postgres.NewDB(picoCfg.DbURL, picoCfg.Logger)
+	picoDb := postgres.NewDB(os.Getenv("PICO_DB_URL"), logger)
 
 	ctx := context.Background()
 	tx, err := picoDb.Db.BeginTx(ctx, nil)

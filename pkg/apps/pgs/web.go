@@ -5,10 +5,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"html/template"
 	"log/slog"
 	"net/http"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -109,7 +107,7 @@ func (p *PromCacheMetrics) AddUpstreamRequest() {
 	p.UpstreamReq.Add(1)
 }
 
-func NewPgsHttpCache(cfg *PgsConfig, upstream http.Handler) (*httpcache.HttpCache, *SiteCache) {
+func NewPgsHttpCache(cfg *Config, upstream http.Handler) (*httpcache.HttpCache, *SiteCache) {
 	ttl := cfg.CacheTTL
 	metrics := NewPromCacheMetrics(cfg.Logger, prometheus.DefaultRegisterer)
 	cache := NewSiteCache(cfg.CacheMaxItems, ttl, metrics.EvictCacheItem)
@@ -135,7 +133,7 @@ func NewPgsHttpCache(cfg *PgsConfig, upstream http.Handler) (*httpcache.HttpCach
 	return httpCache, cache
 }
 
-func StartApiServer(cfg *PgsConfig) {
+func StartApiServer(cfg *Config) {
 	ctx := context.Background()
 
 	router := NewWebRouter(cfg)
@@ -158,7 +156,7 @@ func StartApiServer(cfg *PgsConfig) {
 type HasPerm = func(proj *db.Project) bool
 
 type WebRouter struct {
-	Cfg            *PgsConfig
+	Cfg            *Config
 	RootRouter     *http.ServeMux
 	UserRouter     *http.ServeMux
 	RedirectsCache *expirable.LRU[string, []*RedirectRule]
@@ -178,11 +176,11 @@ func (s *siteInfo) hasPicoPlus() bool {
 	return s.plus != nil && s.plus.ExpiresAt.After(time.Now())
 }
 
-func NewWebRouter(cfg *PgsConfig) *WebRouter {
+func NewWebRouter(cfg *Config) *WebRouter {
 	return newWebRouter(cfg)
 }
 
-func newWebRouter(cfg *PgsConfig) *WebRouter {
+func newWebRouter(cfg *Config) *WebRouter {
 	router := &WebRouter{
 		Cfg:            cfg,
 		RedirectsCache: expirable.NewLRU[string, []*RedirectRule](2048, nil, shared.CacheTimeout),
@@ -194,23 +192,12 @@ func newWebRouter(cfg *PgsConfig) *WebRouter {
 }
 
 func (web *WebRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	subdomain := router.GetSubdomainFromRequest(r, web.Cfg.Domain, web.Cfg.TxtPrefix)
 	if web.RootRouter == nil || web.UserRouter == nil {
 		web.Cfg.Logger.Error("routers not initialized")
 		http.Error(w, "routers not initialized", http.StatusInternalServerError)
 		return
 	}
-
-	var mux *http.ServeMux
-	if subdomain == "" {
-		mux = web.RootRouter
-	} else {
-		mux = web.UserRouter
-	}
-
-	ctx := r.Context()
-	ctx = context.WithValue(ctx, router.CtxSubdomainKey{}, subdomain)
-	mux.ServeHTTP(w, r.WithContext(ctx))
+	router.NewHostRouter(web.Cfg.Domain, web.Cfg.TxtPrefix, web.RootRouter, web.UserRouter).ServeHTTP(w, r)
 }
 
 // clearSiteCache drops what is cached about a site: its database records and
@@ -272,14 +259,15 @@ func (web *WebRouter) initRouters() {
 		w.Header().Set("cache-control", "no-store")
 		promhttp.Handler().ServeHTTP(w, r)
 	})
-	rootRouter.Handle("GET /main.css", web.serveFile("main.css", "text/css"))
-	rootRouter.Handle("GET /favicon-16x16.png", web.serveFile("favicon-16x16.png", "image/png"))
-	rootRouter.Handle("GET /favicon.ico", web.serveFile("favicon.ico", "image/x-icon"))
-	rootRouter.Handle("GET /robots.txt", web.serveFile("robots.txt", "text/plain"))
+	files := web.Cfg.Static()
+	rootRouter.Handle("GET /main.css", files.File("main.css", "text/css"))
+	rootRouter.Handle("GET /favicon-16x16.png", files.File("favicon-16x16.png", "image/png"))
+	rootRouter.Handle("GET /favicon.ico", files.File("favicon.ico", "image/x-icon"))
+	rootRouter.Handle("GET /robots.txt", files.File("robots.txt", "text/plain"))
 
 	rootRouter.Handle("GET /rss/updated", web.createRssHandler("updated_at"))
 	rootRouter.Handle("GET /rss", web.createRssHandler("created_at"))
-	rootRouter.Handle("GET /{$}", web.createPageHandler("html/marketing.page.tmpl"))
+	rootRouter.Handle("GET /{$}", files.Page("html/marketing.page.tmpl"))
 	web.RootRouter = rootRouter
 
 	// subdomain or custom domains
@@ -289,82 +277,6 @@ func (web *WebRouter) initRouters() {
 	userRouter.HandleFunc("GET /{fname...}", web.AssetRequest(WebPerm))
 	userRouter.HandleFunc("GET /{$}", web.AssetRequest(WebPerm))
 	web.UserRouter = userRouter
-}
-
-func (web *WebRouter) serveFile(file string, contentType string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := web.Cfg.Logger
-		cfg := web.Cfg
-
-		contents, err := os.ReadFile(cfg.StaticPath(fmt.Sprintf("public/%s", file)))
-		if err != nil {
-			logger.Error(
-				"could not read file",
-				"fname", file,
-				"err", err.Error(),
-			)
-			http.Error(w, "file not found", 404)
-		}
-
-		w.Header().Add("Content-Type", contentType)
-
-		_, err = w.Write(contents)
-		if err != nil {
-			logger.Error(
-				"could not write http response",
-				"file", file,
-				"err", err.Error(),
-			)
-		}
-	}
-}
-
-func renderTemplate(cfg *PgsConfig, templates []string) (*template.Template, error) {
-	files := make([]string, len(templates))
-	copy(files, templates)
-	files = append(
-		files,
-		cfg.StaticPath("html/footer.partial.tmpl"),
-		cfg.StaticPath("html/marketing-footer.partial.tmpl"),
-		cfg.StaticPath("html/base.layout.tmpl"),
-	)
-
-	ts, err := template.New("base").ParseFiles(files...)
-	if err != nil {
-		return nil, err
-	}
-	return ts, nil
-}
-
-func (web *WebRouter) createPageHandler(fname string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := web.Cfg.Logger
-		cfg := web.Cfg
-		ts, err := renderTemplate(cfg, []string{cfg.StaticPath(fname)})
-
-		if err != nil {
-			logger.Error(
-				"could not render template",
-				"fname", fname,
-				"err", err.Error(),
-			)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		data := shared.PageData{
-			Site: shared.SitePageData{Domain: template.URL(cfg.Domain), HomeURL: "/"},
-		}
-		err = ts.Execute(w, data)
-		if err != nil {
-			logger.Error(
-				"could not execute template",
-				"fname", fname,
-				"err", err.Error(),
-			)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-	}
 }
 
 func (web *WebRouter) checkHandler(w http.ResponseWriter, r *http.Request) {
@@ -430,7 +342,7 @@ func (web *WebRouter) checkHandler(w http.ResponseWriter, r *http.Request) {
 // CacheMgmt applies the purges published on the cache-drain pipe. onPurge,
 // when set, clears whatever else is cached about the site; it runs first so
 // the http cache isn't refilled from stale records.
-func CacheMgmt(ctx context.Context, cfg *PgsConfig, cache *SiteCache, onPurge func(site string)) {
+func CacheMgmt(ctx context.Context, cfg *Config, cache *SiteCache, onPurge func(site string)) {
 	cfg.Logger.Info("cache mgmt initiated")
 	for {
 		scanner := bufio.NewScanner(cfg.Pubsub)

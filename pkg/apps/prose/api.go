@@ -119,7 +119,7 @@ func GetBlogName(username string) string {
 }
 
 func (web *webRouter) blogStyleHandler(w http.ResponseWriter, r *http.Request) {
-	username := router.GetUsernameFromRequest(r, web.cfg)
+	username := router.GetUsernameFromRequest(r)
 	dbpool := web.db
 	logger := web.cfg.Logger
 	cfg := web.cfg
@@ -149,7 +149,7 @@ func (web *webRouter) blogStyleHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (web *webRouter) blogHandler(w http.ResponseWriter, r *http.Request) {
-	username := router.GetUsernameFromRequest(r, web.cfg)
+	username := router.GetUsernameFromRequest(r)
 	dbpool := web.db
 	logger := web.cfg.Logger
 	cfg := web.cfg
@@ -179,12 +179,12 @@ func (web *webRouter) blogHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ts, err := router.RenderTemplate(cfg, []string{
+	ts, err := router.RenderTemplate(staticDir, []string{
 		cfg.StaticPath("html/blog-default.partial.tmpl"),
 		cfg.StaticPath("html/blog.page.tmpl"),
 	})
 
-	curl := shared.CreateURLFromRequest(cfg, r)
+	curl := shared.CreateURLFromRequest(cfg.Protocol, cfg.Domain, r)
 
 	if err != nil {
 		logger.Error("render template", "err", err.Error())
@@ -218,9 +218,7 @@ func (web *webRouter) blogHandler(w http.ResponseWriter, r *http.Request) {
 			u, _ := url.Parse(nav.URL)
 			finURL := nav.URL
 			if !u.IsAbs() {
-				finURL = cfg.FullPostURL(
-					curl,
-					readme.Username,
+				finURL = curl.FullPostURL(readme.Username,
 					nav.URL,
 				)
 			}
@@ -245,8 +243,8 @@ func (web *webRouter) blogHandler(w http.ResponseWriter, r *http.Request) {
 	postCollection := make([]PostItemData, 0, len(posts))
 	for _, post := range posts {
 		p := PostItemData{
-			URL:            template.URL(cfg.FullPostURL(curl, post.Username, post.Slug)),
-			BlogURL:        template.URL(cfg.FullBlogURL(curl, post.Username)),
+			URL:            template.URL(curl.FullPostURL(post.Username, post.Slug)),
+			BlogURL:        template.URL(curl.FullBlogURL(post.Username)),
 			Title:          shared.FilenameToTitle(post.Filename, post.Title),
 			PublishAt:      post.PublishAt.Format(time.DateOnly),
 			PublishAtISO:   post.PublishAt.Format(time.RFC3339),
@@ -257,16 +255,16 @@ func (web *webRouter) blogHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := BlogPageData{
-		Site:      *cfg.GetSiteData(),
+		Site:      cfg.SiteData(),
 		PageTitle: headerTxt.Title,
-		URL:       template.URL(cfg.FullBlogURL(curl, username)),
-		RSSURL:    template.URL(cfg.RssBlogURL(curl, username, tag)),
+		URL:       template.URL(curl.FullBlogURL(username)),
+		RSSURL:    template.URL(curl.RssBlogURL(username, tag)),
 		Readme:    readmeTxt,
 		Header:    headerTxt,
 		Username:  username,
 		Posts:     postCollection,
 		HasCSS:    hasCSS,
-		CssURL:    template.URL(cfg.CssURL(username)),
+		CssURL:    template.URL(cfg.CssURL()),
 		HasFilter: tag != "",
 	}
 
@@ -278,7 +276,7 @@ func (web *webRouter) blogHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (web *webRouter) postRawHandler(w http.ResponseWriter, r *http.Request) {
-	username := router.GetUsernameFromRequest(r, web.cfg)
+	username := router.GetUsernameFromRequest(r)
 	cfg := web.cfg
 	slug, _ := url.PathUnescape(r.PathValue("slug"))
 	slug = strings.TrimSuffix(slug, "/")
@@ -312,7 +310,7 @@ func (web *webRouter) postRawHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (web *webRouter) robotsHandler(w http.ResponseWriter, r *http.Request) {
-	username := router.GetUsernameFromRequest(r, web.cfg)
+	username := router.GetUsernameFromRequest(r)
 	cfg := web.cfg
 	dbpool := web.db
 	logger := web.cfg.Logger
@@ -338,7 +336,7 @@ func (web *webRouter) robotsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (web *webRouter) postHandler(w http.ResponseWriter, r *http.Request) {
-	username := router.GetUsernameFromRequest(r, web.cfg)
+	username := router.GetUsernameFromRequest(r)
 	cfg := web.cfg
 	slug, _ := url.PathUnescape(r.PathValue("slug"))
 	slug = strings.TrimSuffix(slug, "/")
@@ -357,7 +355,7 @@ func (web *webRouter) postHandler(w http.ResponseWriter, r *http.Request) {
 	logger = logger.With("slug", slug)
 
 	blogName := GetBlogName(username)
-	curl := shared.CreateURLFromRequest(cfg, r)
+	curl := shared.CreateURLFromRequest(cfg.Protocol, cfg.Domain, r)
 
 	favicon := ""
 	ogImage := ""
@@ -441,10 +439,10 @@ func (web *webRouter) postHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		data = PostPageData{
-			Site:         *cfg.GetSiteData(),
+			Site:         cfg.SiteData(),
 			PageTitle:    GetPostTitle(post),
-			URL:          template.URL(cfg.FullPostURL(curl, post.Username, post.Slug)),
-			BlogURL:      template.URL(cfg.FullBlogURL(curl, username)),
+			URL:          template.URL(curl.FullPostURL(post.Username, post.Slug)),
+			BlogURL:      template.URL(curl.FullBlogURL(username)),
 			Description:  post.Description,
 			Title:        shared.FilenameToTitle(post.Filename, post.Title),
 			Slug:         post.Slug,
@@ -456,7 +454,7 @@ func (web *webRouter) postHandler(w http.ResponseWriter, r *http.Request) {
 			BlogName:     blogName,
 			Contents:     contents,
 			HasCSS:       hasCSS,
-			CssURL:       template.URL(cfg.CssURL(username)),
+			CssURL:       template.URL(cfg.CssURL()),
 			Tags:         tags,
 			Image:        template.URL(ogImage),
 			ImageCard:    ogImageCard,
@@ -492,8 +490,8 @@ func (web *webRouter) postHandler(w http.ResponseWriter, r *http.Request) {
 		now := time.Now()
 
 		data = PostPageData{
-			Site:         *cfg.GetSiteData(),
-			BlogURL:      template.URL(cfg.FullBlogURL(curl, username)),
+			Site:         cfg.SiteData(),
+			BlogURL:      template.URL(curl.FullBlogURL(username)),
 			PageTitle:    title,
 			Description:  desc,
 			Title:        title,
@@ -504,7 +502,7 @@ func (web *webRouter) postHandler(w http.ResponseWriter, r *http.Request) {
 			Username:     username,
 			BlogName:     blogName,
 			HasCSS:       hasCSS,
-			CssURL:       template.URL(cfg.CssURL(username)),
+			CssURL:       template.URL(cfg.CssURL()),
 			Image:        template.URL(ogImage),
 			ImageCard:    ogImageCard,
 			Favicon:      template.URL(favicon),
@@ -515,7 +513,7 @@ func (web *webRouter) postHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 	}
 
-	ts, err := router.RenderTemplate(cfg, []string{
+	ts, err := router.RenderTemplate(staticDir, []string{
 		cfg.StaticPath("html/list.partial.tmpl"),
 		cfg.StaticPath("html/post.page.tmpl"),
 	})
@@ -545,7 +543,7 @@ func (web *webRouter) readHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ts, err := router.RenderTemplate(cfg, []string{
+	ts, err := router.RenderTemplate(staticDir, []string{
 		cfg.StaticPath("html/read.page.tmpl"),
 	})
 
@@ -554,14 +552,14 @@ func (web *webRouter) readHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := ReadPageData{
-		Site: *cfg.GetSiteData(),
+		Site: cfg.SiteData(),
 	}
 
-	curl := shared.NewCreateURL(cfg)
+	curl := shared.NewCreateURL(cfg.Protocol, cfg.Domain)
 	for _, post := range posts {
 		item := PostItemData{
-			URL:            template.URL(cfg.FullPostURL(curl, post.Username, post.Slug)),
-			BlogURL:        template.URL(cfg.FullBlogURL(curl, post.Username)),
+			URL:            template.URL(curl.FullPostURL(post.Username, post.Slug)),
+			BlogURL:        template.URL(curl.FullBlogURL(post.Username)),
 			Title:          shared.FilenameToTitle(post.Filename, post.Title),
 			Description:    post.Description,
 			Username:       post.Username,
@@ -582,7 +580,7 @@ func (web *webRouter) readHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (web *webRouter) rssBlogHandler(w http.ResponseWriter, r *http.Request) {
-	username := router.GetUsernameFromRequest(r, web.cfg)
+	username := router.GetUsernameFromRequest(r)
 	dbpool := web.db
 	logger := web.cfg.Logger
 	cfg := web.cfg
@@ -642,8 +640,8 @@ func (web *webRouter) rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	curl := shared.CreateURLFromRequest(cfg, r)
-	blogUrl := cfg.FullBlogURL(curl, username)
+	curl := shared.CreateURLFromRequest(cfg.Protocol, cfg.Domain, r)
+	blogUrl := curl.FullBlogURL(username)
 
 	updatedAt := &time.Time{}
 	if len(posts) > 0 {
@@ -708,7 +706,7 @@ func (web *webRouter) rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 
 		}
 
-		realUrl := cfg.FullPostURL(curl, post.Username, post.Slug)
+		realUrl := curl.FullPostURL(post.Username, post.Slug)
 		feedId := realUrl
 
 		item := &feeds.Item{
@@ -772,7 +770,7 @@ func (web *webRouter) rssHandler(w http.ResponseWriter, r *http.Request) {
 		Created:     time.Now(),
 	}
 
-	curl := shared.CreateURLFromRequest(cfg, r)
+	curl := shared.CreateURLFromRequest(cfg.Protocol, cfg.Domain, r)
 
 	var feedItems []*feeds.Item
 	for _, post := range posts {
@@ -806,7 +804,7 @@ func (web *webRouter) rssHandler(w http.ResponseWriter, r *http.Request) {
 
 		}
 
-		realUrl := cfg.FullPostURL(curl, post.Username, post.Slug)
+		realUrl := curl.FullPostURL(post.Username, post.Slug)
 		if !curl.Subdomain && !curl.UsernameInRoute {
 			realUrl = fmt.Sprintf("%s://%s%s", cfg.Protocol, r.Host, realUrl)
 		}
@@ -847,7 +845,7 @@ func (web *webRouter) imgRequest(w http.ResponseWriter, r *http.Request) {
 	logger := web.cfg.Logger
 	st := web.storage
 	dbpool := web.db
-	username := router.GetUsernameFromRequest(r, web.cfg)
+	username := router.GetUsernameFromRequest(r)
 	user, err := dbpool.FindUserByName(username)
 	if err != nil {
 		logger.Error("could not find user", "username", username)
@@ -881,19 +879,20 @@ func (web *webRouter) imgRequest(w http.ResponseWriter, r *http.Request) {
 }
 
 type webRouter struct {
-	cfg     *shared.ConfigSite
+	cfg     *Config
 	db      DB
 	storage storage.StorageServe
 }
 
 func (web *webRouter) static(mux *http.ServeMux) {
 	cfg := web.cfg
-	mux.HandleFunc("GET /read.css", router.ServeFile(cfg, "read.css", "text/css"))
-	mux.HandleFunc("GET /reset.css", router.ServeFile(cfg, "reset.css", "text/css"))
-	mux.HandleFunc("GET /syntax.css", router.ServeFile(cfg, "syntax.css", "text/css"))
-	mux.HandleFunc("GET /card.png", router.ServeFile(cfg, "card.png", "image/png"))
-	mux.HandleFunc("GET /favicon-16x16.png", router.ServeFile(cfg, "favicon-16x16.png", "image/png"))
-	mux.HandleFunc("GET /favicon.ico", router.ServeFile(cfg, "favicon.ico", "image/x-icon"))
+	files := cfg.Static()
+	mux.HandleFunc("GET /read.css", files.File("read.css", "text/css"))
+	mux.HandleFunc("GET /reset.css", files.File("reset.css", "text/css"))
+	mux.HandleFunc("GET /syntax.css", files.File("syntax.css", "text/css"))
+	mux.HandleFunc("GET /card.png", files.File("card.png", "image/png"))
+	mux.HandleFunc("GET /favicon-16x16.png", files.File("favicon-16x16.png", "image/png"))
+	mux.HandleFunc("GET /favicon.ico", files.File("favicon.ico", "image/x-icon"))
 	if cfg.Debug {
 		router.CreatePProfRoutesMux(mux)
 	}
@@ -904,11 +903,11 @@ func (web *webRouter) mainMux() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", web.readHandler)
 	mux.HandleFunc("GET /read", web.readHandler)
-	mux.HandleFunc("GET /check", router.CheckHandler(web.cfg, web.db))
+	mux.HandleFunc("GET /check", router.CheckHandler(web.cfg.Domain, web.cfg.Space, web.db))
 	mux.HandleFunc("GET /rss", web.rssHandler)
 	mux.HandleFunc("GET /rss.atom", web.rssHandler)
 	mux.Handle("GET /_metrics", promhttp.Handler())
-	mux.HandleFunc("GET /robots.txt", router.ServeFile(web.cfg, "robots.txt", "text/plain"))
+	mux.HandleFunc("GET /robots.txt", web.cfg.Static().File("robots.txt", "text/plain"))
 	web.static(mux)
 	return mux
 }
@@ -963,7 +962,7 @@ func (web *webRouter) pathRoute(w http.ResponseWriter, r *http.Request) {
 }
 
 func StartApiServer() {
-	cfg := NewConfigSite("prose-web")
+	cfg := NewConfig("prose-web")
 	dbpool := NewDB(postgres.NewDB(cfg.DbURL, cfg.Logger))
 	defer func() {
 		_ = dbpool.Close()
@@ -978,7 +977,7 @@ func StartApiServer() {
 	}
 
 	web := &webRouter{cfg: cfg, db: dbpool, storage: st}
-	handler := router.NewHostRouter(cfg, web.mainMux(), web.sitesMux())
+	handler := router.NewHostRouter(cfg.Domain, cfg.Space, web.mainMux(), web.sitesMux())
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)
 	logger.Info(

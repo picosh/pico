@@ -19,7 +19,7 @@ import (
 
 // UploadHandler stores every file as a feed.
 type UploadHandler struct {
-	Cfg *shared.ConfigSite
+	Cfg *Config
 	DB  DB
 }
 
@@ -29,7 +29,7 @@ var (
 	_ sendutils.FileRenamer           = (*UploadHandler)(nil)
 )
 
-func NewUploadHandler(cfg *shared.ConfigSite, dbpool DB) *UploadHandler {
+func NewUploadHandler(cfg *Config, dbpool DB) *UploadHandler {
 	return &UploadHandler{Cfg: cfg, DB: dbpool}
 }
 
@@ -100,7 +100,7 @@ func (h *UploadHandler) Write(s *pssh.SSHServerConnSession, entry *sendutils.Fil
 		return "", err
 	}
 	logger.Info("saved feed", "new", cur == nil, "changed", changed)
-	return h.Cfg.FullPostURL(shared.NewCreateURL(h.Cfg), user.Name, post.Slug), nil
+	return shared.NewCreateURL(h.Cfg.Protocol, h.Cfg.Domain).FullPostURL(user.Name, post.Slug), nil
 }
 
 // Rename moves a feed to a new filename in place, keeping its digest state.

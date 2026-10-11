@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strings"
 	"time"
 )
 
@@ -684,6 +685,44 @@ type DB interface {
 	FindPost(postID string) (*Post, error)
 
 	Close() error
+}
+
+// SetLimits fills in the flag's storage, file and special file limits, using
+// the defaults where the flag sets none.
+func (ff *FeatureFlag) SetLimits(storageMax uint64, fileMax, specialFileMax int64) {
+	ff.Data.StorageMax = ff.FindStorageMax(storageMax)
+	ff.Data.FileMax = ff.FindFileMax(fileMax)
+	ff.Data.SpecialFileMax = ff.FindSpecialFileMax(specialFileMax)
+}
+
+// FindAccess returns the flag that lets a user use a service: pico+, or the
+// service's own feature. The error says why a user has neither.
+func FindAccess(dbpool interface {
+	FindFeature(userID string, feature string) (*FeatureFlag, error)
+}, userID, service string) (*FeatureFlag, error) {
+	ff, err := dbpool.FindFeature(userID, "plus")
+	if err == nil {
+		if ff.IsValid() {
+			return ff, nil
+		}
+		err = fmt.Errorf("ERROR: your pico+ has expired: https://blog.pico.sh/ann-038-pico-invite-system")
+	}
+
+	ffService, serviceErr := dbpool.FindFeature(userID, service)
+	if serviceErr == nil {
+		if ffService.IsValid() {
+			return ffService, nil
+		}
+		serviceErr = fmt.Errorf("ERROR: your %s access has expired: https://blog.pico.sh/ann-038-pico-invite-system", service)
+	}
+
+	if err != nil && strings.Contains(err.Error(), "expired") {
+		return nil, err
+	}
+	if serviceErr != nil && strings.Contains(serviceErr.Error(), "expired") {
+		return nil, serviceErr
+	}
+	return nil, fmt.Errorf("ERROR: uploading to %s requires an invitation or pico+: https://blog.pico.sh/ann-038-pico-invite-system", service)
 }
 
 func HasPlusOrSpace(dbpool interface {

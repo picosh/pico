@@ -39,7 +39,7 @@ type oauth2Server struct {
 	ResponseTypesSupported                    []string `json:"response_types_supported"`
 }
 
-func generateURL(cfg *shared.ConfigSite, path string, space string) string {
+func generateURL(cfg *Config, path string, space string) string {
 	query := ""
 
 	if space != "" {
@@ -50,7 +50,7 @@ func generateURL(cfg *shared.ConfigSite, path string, space string) string {
 }
 
 type ApiConfig struct {
-	Cfg    *shared.ConfigSite
+	Cfg    *Config
 	Dbpool db.DB
 }
 
@@ -919,18 +919,7 @@ func authMux(apiConfig *ApiConfig) *http.ServeMux {
 }
 
 func StartApiServer() {
-	debug := shared.GetEnv("AUTH_DEBUG", "0")
-	withPipe := strings.ToLower(shared.GetEnv("PICO_PIPE_ENABLED", "true")) == "true"
-
-	cfg := &shared.ConfigSite{
-		DbURL:         shared.GetEnv("DATABASE_URL", ""),
-		Debug:         debug == "1",
-		Issuer:        shared.GetEnv("AUTH_ISSUER", "pico.sh"),
-		Domain:        shared.GetEnv("AUTH_DOMAIN", "http://0.0.0.0:3000"),
-		Port:          shared.GetEnv("AUTH_WEB_PORT", "3000"),
-		Secret:        shared.GetEnv("PICO_SECRET", ""),
-		SecretWebhook: shared.GetEnv("PICO_SECRET_WEBHOOK", ""),
-	}
+	cfg := NewConfig()
 
 	if cfg.SecretWebhook == "" {
 		panic("must provide PICO_SECRET_WEBHOOK environment variable")
@@ -940,9 +929,7 @@ func StartApiServer() {
 		panic("must provide PICO_SECRET environment variable")
 	}
 
-	logger := shared.CreateLogger("auth-web", withPipe)
-
-	cfg.Logger = logger
+	logger := cfg.Logger
 
 	db := postgres.NewDB(cfg.DbURL, logger)
 	defer func() {

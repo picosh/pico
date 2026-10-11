@@ -6,7 +6,7 @@ import (
 	"github.com/picosh/pico/pkg/shared/router"
 )
 
-func handleAutoForm(w http.ResponseWriter, r *http.Request, cfg *PgsConfig) {
+func handleAutoForm(w http.ResponseWriter, r *http.Request, cfg *Config) {
 	formName := r.PathValue("fname")
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -65,7 +65,7 @@ type FormData struct {
 	Error string
 }
 
-func serveAutoFormSubmitted(w http.ResponseWriter, r *http.Request, cfg *PgsConfig) {
+func serveAutoFormSubmitted(w http.ResponseWriter, r *http.Request, cfg *Config) {
 	errorMsg := r.URL.Query().Get("error")
 	data := loginFormData{
 		Error: errorMsg,
@@ -73,7 +73,7 @@ func serveAutoFormSubmitted(w http.ResponseWriter, r *http.Request, cfg *PgsConf
 
 	w.WriteHeader(http.StatusUnprocessableEntity)
 
-	ts, err := renderTemplate(cfg, []string{cfg.StaticPath("html/auto_form.page.tmpl")})
+	ts, err := router.RenderTemplate(staticDir, []string{cfg.StaticPath("html/auto_form.page.tmpl")})
 	if err != nil {
 		cfg.Logger.Error("could not render auto form template", "err", err.Error())
 		http.Error(w, "Server error", http.StatusInternalServerError)

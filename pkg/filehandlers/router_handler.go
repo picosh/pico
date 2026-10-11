@@ -11,7 +11,6 @@ import (
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/pssh"
 	"github.com/picosh/pico/pkg/send/utils"
-	"github.com/picosh/pico/pkg/shared"
 )
 
 type ReadWriteHandler interface {
@@ -23,15 +22,15 @@ type ReadWriteHandler interface {
 
 type FileHandlerRouter struct {
 	FileMap map[string]ReadWriteHandler
-	Cfg     *shared.ConfigSite
+	Space   string
 }
 
 var _ utils.CopyFromClientHandler = &FileHandlerRouter{}      // Verify implementation
 var _ utils.CopyFromClientHandler = (*FileHandlerRouter)(nil) // Verify implementation
 
-func NewFileHandlerRouter(cfg *shared.ConfigSite, mapper map[string]ReadWriteHandler) *FileHandlerRouter {
+func NewFileHandlerRouter(space string, mapper map[string]ReadWriteHandler) *FileHandlerRouter {
 	return &FileHandlerRouter{
-		Cfg:     cfg,
+		Space:   space,
 		FileMap: mapper,
 	}
 }
@@ -150,7 +149,7 @@ func (r *FileHandlerRouter) Validate(s *pssh.SSHServerConnSession) error {
 	logger.Info(
 		"attempting to upload files",
 		"user", user.Name,
-		"space", r.Cfg.Space,
+		"space", r.Space,
 	)
 	return nil
 }

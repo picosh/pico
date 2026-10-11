@@ -44,7 +44,7 @@ func (m *mockFeatureDB) setFeature(userID string, ff *db.FeatureFlag) {
 }
 
 func TestUploadHandlerValidate(t *testing.T) {
-	cfg := NewConfigSite("prose-test")
+	cfg := NewConfig("prose-test")
 	validExpires := time.Now().Add(24 * time.Hour)
 	userID := "user-1"
 
@@ -124,7 +124,7 @@ func TestPostWriteTagsAndAliases(t *testing.T) {
 	user := &db.User{ID: "user-1", Name: "tester"}
 	pssh.SetUser(session, user)
 	posts := stub.NewPostsDB(logger, user)
-	cfg := NewConfigSite("prose-test")
+	cfg := NewConfig("prose-test")
 	h := &postUploader{Cfg: cfg, DB: posts}
 	write := func(text string, mtime int64) *db.Post {
 		t.Helper()
