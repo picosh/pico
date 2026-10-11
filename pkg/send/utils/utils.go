@@ -84,6 +84,13 @@ type FileRenamer interface {
 	Rename(s *pssh.SSHServerConnSession, from, to *FileEntry) error
 }
 
+// ImplicitDirs is implemented by handlers with directories that exist
+// before anything is stored in them. A stat of one reports a directory, so
+// a client copying a single file there puts the file inside it.
+type ImplicitDirs interface {
+	IsImplicitDir(s *pssh.SSHServerConnSession, path string) bool
+}
+
 func KeyText(session *pssh.SSHServerConnSession) (string, error) {
 	if session.PublicKey() == nil {
 		return "", fmt.Errorf("session doesn't have public key")

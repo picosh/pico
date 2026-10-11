@@ -163,6 +163,12 @@ func (h *UploadAssetHandler) List(s *pssh.SSHServerConnSession, fpath string, is
 	return fileList, nil
 }
 
+// IsImplicitDir reports top-level project names. A project holds its files
+// whether or not it exists yet.
+func (h *UploadAssetHandler) IsImplicitDir(_ *pssh.SSHServerConnSession, fpath string) bool {
+	return shared.IsValidSubdomain(strings.Trim(fpath, "/"))
+}
+
 func (h *UploadAssetHandler) Validate(s *pssh.SSHServerConnSession) error {
 	logger := pssh.GetLogger(s)
 	user := pssh.GetUser(s)
@@ -305,6 +311,9 @@ func (h *UploadAssetHandler) write(s *pssh.SSHServerConnSession, entry *sendutil
 
 	projectName := shared.GetProjectName(entry)
 	logger = logger.With("project", projectName)
+	if projectName == "" || projectName == "/" || projectName == "." {
+		return "", fmt.Errorf("ERROR: invalid project name, you must copy files to a non-root folder (e.g. pgs.sh:/project-name)")
+	}
 
 	project, denylist, err := h.sessionProject(state, user, projectName, logger)
 	if err != nil {
@@ -465,11 +474,7 @@ func (h *UploadAssetHandler) Delete(s *pssh.SSHServerConnSession, entry *senduti
 
 func (h *UploadAssetHandler) validateAsset(data *FileData) (bool, error) {
 	fname := filepath.Base(data.Filepath)
-
 	projectName := shared.GetProjectName(data.FileEntry)
-	if projectName == "" || projectName == "/" || projectName == "." {
-		return false, fmt.Errorf("ERROR: invalid project name, you must copy files to a non-root folder (e.g. pgs.sh:/project-name)")
-	}
 
 	// special files we use for custom routing
 	if isSpecialFile(fname) {

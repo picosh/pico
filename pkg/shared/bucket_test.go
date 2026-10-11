@@ -27,29 +27,17 @@ func TestGetProjectName(t *testing.T) {
 			isDir:    false,
 			want:     "myproject",
 		},
-		// Root-level file (the bug case): /bin -> bin
+		// A file at the root is outside every project
 		{
-			name:     "root-level file (scp file pgs.sh:/bin)",
+			name:     "root-level file",
 			filepath: "/bin",
 			isDir:    false,
-			want:     "bin",
-		},
-		{
-			name:     "root-level file with different name",
-			filepath: "/myproject",
-			isDir:    false,
-			want:     "myproject",
+			want:     "",
 		},
 		// Directory cases
 		{
 			name:     "directory with no slash",
 			filepath: "myproject",
-			isDir:    true,
-			want:     "myproject",
-		},
-		{
-			name:     "directory at root level",
-			filepath: "/myproject",
 			isDir:    true,
 			want:     "myproject",
 		},
@@ -64,7 +52,7 @@ func TestGetProjectName(t *testing.T) {
 			name:     "root path",
 			filepath: "/",
 			isDir:    false,
-			want:     "/",
+			want:     "",
 		},
 	}
 

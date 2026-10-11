@@ -630,3 +630,50 @@ func testSshfs(t *testing.T, env *rsyncEnv) {
 		}
 	}
 }
+
+func TestSingleFileIntoProject(t *testing.T) {
+	newStorage := rsyncStorageBackends()["memory"]
+	clients := map[string]func(e *rsyncEnv, src, dest string) *exec.Cmd{
+		"scp-legacy": func(e *rsyncEnv, src, dest string) *exec.Cmd {
+			return exec.Command("scp", append(append([]string{"-O"}, e.sshArgs...), src, "localhost:"+dest)...)
+		},
+		"scp-sftp": func(e *rsyncEnv, src, dest string) *exec.Cmd {
+			return exec.Command("scp", append(e.sshArgs, src, "localhost:"+dest)...)
+		},
+		"sftp": func(e *rsyncEnv, src, dest string) *exec.Cmd {
+			return e.sftp("put " + src + " " + dest)
+		},
+		"rsync": func(e *rsyncEnv, src, dest string) *exec.Cmd {
+			return exec.Command("rsync", "-e", e.rsh, src, "localhost:"+dest)
+		},
+	}
+	for name, client := range clients {
+		for _, dest := range []string{"/site", "/site/"} {
+			t.Run(name+" "+dest, func(t *testing.T) {
+				env := newRsyncEnv(t, newStorage(t))
+				src := tree{t, t.TempDir()}
+				src.write("post.md", []byte("hello"), time.Now())
+				out, code := runCmd(t, client(env, filepath.Join(src.dir, "post.md"), dest))
+				if code != 0 {
+					t.Fatalf("exit %d\n%s", code, out)
+				}
+				env.assertStored(map[string]string{"post.md": "hello"})
+				if !strings.Contains(out, "https://testusr-site.pgs.sh/post.md ") {
+					t.Errorf("wrong url\n%s", out)
+				}
+			})
+		}
+		t.Run(name+" /", func(t *testing.T) {
+			env := newRsyncEnv(t, newStorage(t))
+			src := tree{t, t.TempDir()}
+			src.write("post.md", []byte("hello"), time.Now())
+			out, code := runCmd(t, client(env, filepath.Join(src.dir, "post.md"), "/"))
+			if code == 0 {
+				t.Errorf("file at the root exited 0\n%s", out)
+			}
+			if !strings.Contains(out, "you must copy files to a non-root folder") {
+				t.Errorf("no root error\n%s", out)
+			}
+		})
+	}
+}

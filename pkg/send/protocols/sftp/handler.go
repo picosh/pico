@@ -134,8 +134,18 @@ func (f *handler) Filecmd(r *sftp.Request) error {
 }
 
 func (f *handler) Filelist(r *sftp.Request) (sftp.ListerAt, error) {
+	return f.filelist(r, true)
+}
+
+// Lstat is a stat that leaves out implicit directories. sshfs looks paths
+// up with it, and a mkdir there would fail if they showed as existing.
+func (f *handler) Lstat(r *sftp.Request) (sftp.ListerAt, error) {
+	return f.filelist(r, false)
+}
+
+func (f *handler) filelist(r *sftp.Request, implicit bool) (sftp.ListerAt, error) {
 	switch r.Method {
-	case "List", "Stat":
+	case "List", "Stat", "Lstat":
 		list := r.Method == "List"
 
 		if !list {
@@ -167,6 +177,9 @@ func (f *handler) Filelist(r *sftp.Request) (sftp.ListerAt, error) {
 			listData = slices.DeleteFunc(listData, func(f os.FileInfo) bool {
 				return f.Name() != "" && f.Name() != filepath.Base(r.Filepath)
 			})
+			if d, ok := f.writeHandler.(utils.ImplicitDirs); ok && implicit && len(listData) == 0 && d.IsImplicitDir(f.session, r.Filepath) {
+				listData = []os.FileInfo{&utils.VirtualFile{FName: filepath.Base(r.Filepath), FIsDir: true}}
+			}
 		}
 
 		if r.Filepath == "/" {
@@ -581,6 +594,13 @@ func (f *handlererr) PosixRename(r *sftp.Request) error {
 }
 func (f *handlererr) Filelist(r *sftp.Request) (sftp.ListerAt, error) {
 	result, err := f.Handler.Filelist(r)
+	if err != nil {
+		_, _ = fmt.Fprintln(f.Handler.session.Stderr(), err)
+	}
+	return result, err
+}
+func (f *handlererr) Lstat(r *sftp.Request) (sftp.ListerAt, error) {
+	result, err := f.Handler.Lstat(r)
 	if err != nil {
 		_, _ = fmt.Fprintln(f.Handler.session.Stderr(), err)
 	}

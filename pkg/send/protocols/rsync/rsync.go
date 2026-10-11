@@ -47,7 +47,10 @@ func (s *storageFS) Stat(name string) (rsync.FileInfo, error) {
 			return rsync.FileInfo{Name: name, ModTime: e.ModTime(), IsDir: true}, nil
 		}
 	}
+	d, implicit := s.handler.(utils.ImplicitDirs)
 	switch {
+	case len(entries) == 0 && implicit && d.IsImplicitDir(s.session, abs(name)):
+		return rsync.FileInfo{Name: name, IsDir: true}, nil
 	case len(entries) == 0:
 		return rsync.FileInfo{}, fmt.Errorf("%s: %w", name, fs.ErrNotExist)
 	case len(entries) == 1 && !entries[0].IsDir() && path.Base(entries[0].Name()) == path.Base(name):
