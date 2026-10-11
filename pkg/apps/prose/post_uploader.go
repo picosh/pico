@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/picosh/pico/pkg/db"
-	"github.com/picosh/pico/pkg/filehandlers"
+	"github.com/picosh/pico/pkg/postfs"
 	"github.com/picosh/pico/pkg/pssh"
 	sendutils "github.com/picosh/pico/pkg/send/utils"
 	"github.com/picosh/pico/pkg/shared"
@@ -21,42 +21,42 @@ type postUploader struct {
 }
 
 var (
-	_ filehandlers.ReadWriteHandler = (*postUploader)(nil)
-	_ sendutils.WriteValidator      = (*postUploader)(nil)
-	_ sendutils.FileRenamer         = (*postUploader)(nil)
+	_ ReadWriteHandler         = (*postUploader)(nil)
+	_ sendutils.WriteValidator = (*postUploader)(nil)
+	_ sendutils.FileRenamer    = (*postUploader)(nil)
 )
 
 func (h *postUploader) List(s *pssh.SSHServerConnSession, fpath string, isDir bool, recursive bool) ([]os.FileInfo, error) {
-	return filehandlers.BaseList(s, fpath, isDir, recursive, []string{h.Cfg.Space}, h.DB)
+	return postfs.ListPosts(s, fpath, isDir, recursive, []string{h.Cfg.Space}, h.DB)
 }
 
 func (h *postUploader) Read(s *pssh.SSHServerConnSession, entry *sendutils.FileEntry) (os.FileInfo, sendutils.ReadAndReaderAtCloser, error) {
-	return filehandlers.ReadPost(s, h.DB, h.Cfg.Space, entry)
+	return postfs.ReadPost(s, h.DB, h.Cfg.Space, entry)
 }
 
 func (h *postUploader) Delete(s *pssh.SSHServerConnSession, entry *sendutils.FileEntry) error {
-	return filehandlers.DeletePost(s, h.DB, h.Cfg.Space, entry)
+	return postfs.DeletePost(s, h.DB, h.Cfg.Space, entry)
 }
 
 // ValidateWrite checks a post's name before its contents arrive.
 func (h *postUploader) ValidateWrite(s *pssh.SSHServerConnSession, entry *sendutils.FileEntry) error {
-	if _, err := filehandlers.SessionUser(s); err != nil {
+	if _, err := postfs.SessionUser(s); err != nil {
 		return err
 	}
 	if entry.Mode.IsDir() {
 		return fmt.Errorf("file entry is directory, but only files are supported: %s", entry.Filepath)
 	}
-	return h.validate(filehandlers.NewPost(filepath.Base(entry.Filepath), nil))
+	return h.validate(postfs.NewPost(filepath.Base(entry.Filepath), nil))
 }
 
 func (h *postUploader) Write(s *pssh.SSHServerConnSession, entry *sendutils.FileEntry) (string, error) {
-	user, err := filehandlers.SessionUser(s)
+	user, err := postfs.SessionUser(s)
 	if err != nil {
 		return "", err
 	}
 	logger := pssh.GetLogger(s).With("filename", filepath.Base(entry.Filepath))
 
-	post, err := filehandlers.PostFromEntry(entry, user, h.Cfg.Space)
+	post, err := postfs.PostFromEntry(entry, user, h.Cfg.Space)
 	if err != nil {
 		return "", err
 	}
@@ -65,7 +65,7 @@ func (h *postUploader) Write(s *pssh.SSHServerConnSession, entry *sendutils.File
 		return "", err
 	}
 
-	cur, err := filehandlers.LookupPost(h.DB, user.ID, h.Cfg.Space, post.Filename)
+	cur, err := postfs.LookupPost(h.DB, user.ID, h.Cfg.Space, post.Filename)
 	if err != nil {
 		return "", err
 	}
@@ -78,7 +78,7 @@ func (h *postUploader) Write(s *pssh.SSHServerConnSession, entry *sendutils.File
 		return "", err
 	}
 
-	saved, changed, err := filehandlers.SavePost(h.DB, cur, post)
+	saved, changed, err := postfs.SavePost(h.DB, cur, post)
 	if err != nil {
 		logger.Error("post could not be saved", "err", err.Error())
 		return "", err
@@ -104,7 +104,7 @@ func (h *postUploader) Write(s *pssh.SSHServerConnSession, entry *sendutils.File
 // Rename moves a post to a new filename in place, so it keeps its ID,
 // publish date and settings. A post at the new filename is replaced.
 func (h *postUploader) Rename(s *pssh.SSHServerConnSession, from, to *sendutils.FileEntry) error {
-	return filehandlers.RenamePost(s, h.DB, h.Cfg.Space, from, to, func(cur, next *db.Post) ([]string, error) {
+	return postfs.RenamePost(s, h.DB, h.Cfg.Space, from, to, func(cur, next *db.Post) ([]string, error) {
 		if err := h.validate(next); err != nil {
 			return nil, err
 		}

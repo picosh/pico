@@ -5,7 +5,6 @@ import (
 	"log/slog"
 
 	"github.com/picosh/pico/pkg/db"
-	"github.com/picosh/pico/pkg/filehandlers"
 	"github.com/picosh/pico/pkg/pssh"
 	sendutils "github.com/picosh/pico/pkg/send/utils"
 	"github.com/picosh/pico/pkg/storage"
@@ -27,7 +26,7 @@ func setFeatureFlag(s *pssh.SSHServerConnSession, ff *db.FeatureFlag) {
 }
 
 type UploadHandler struct {
-	*filehandlers.FileHandlerRouter
+	*fileRouter
 	Cfg *Config
 	DB  DB
 }
@@ -35,12 +34,12 @@ type UploadHandler struct {
 var _ sendutils.CopyFromClientHandler = &UploadHandler{}
 var _ sendutils.CopyFromClientHandler = (*UploadHandler)(nil)
 
-func NewUploadHandler(cfg *Config, dbpool DB, fileMap map[string]filehandlers.ReadWriteHandler) *UploadHandler {
-	router := filehandlers.NewFileHandlerRouter(cfg.Space, fileMap)
+func NewUploadHandler(cfg *Config, dbpool DB, fileMap map[string]ReadWriteHandler) *UploadHandler {
+	router := newFileRouter(cfg.Space, fileMap)
 	return &UploadHandler{
-		FileHandlerRouter: router,
-		Cfg:               cfg,
-		DB:                dbpool,
+		fileRouter: router,
+		Cfg:        cfg,
+		DB:         dbpool,
 	}
 }
 
@@ -49,7 +48,7 @@ func NewFileHandler(cfg *Config, dbpool DB, st storage.StorageServe) *UploadHand
 	// One post handler serves every text extension, so a post can be
 	// renamed in place from one to another.
 	posts := &postUploader{Cfg: cfg, DB: dbpool}
-	return NewUploadHandler(cfg, dbpool, map[string]filehandlers.ReadWriteHandler{
+	return NewUploadHandler(cfg, dbpool, map[string]ReadWriteHandler{
 		".md":      posts,
 		".txt":     posts,
 		".css":     posts,
@@ -86,5 +85,5 @@ func (h *UploadHandler) Validate(s *pssh.SSHServerConnSession) error {
 	ff.SetLimits(h.Cfg.MaxSize, h.Cfg.MaxAssetSize, h.Cfg.MaxSpecialFileSize)
 	setFeatureFlag(s, ff)
 
-	return h.FileHandlerRouter.Validate(s)
+	return h.fileRouter.Validate(s)
 }

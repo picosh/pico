@@ -9,7 +9,7 @@ import (
 
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/db/stub"
-	"github.com/picosh/pico/pkg/filehandlers"
+	"github.com/picosh/pico/pkg/postfs"
 	"github.com/picosh/pico/pkg/shared/router"
 	"github.com/picosh/pico/pkg/storage"
 )
@@ -23,7 +23,7 @@ func TestRoutes(t *testing.T) {
 	cfg := NewConfig("prose-test")
 	cfg.Logger = logger
 	for _, name := range []string{"hello", "raw"} {
-		post := filehandlers.NewPost(name+".md", []byte("# "+name))
+		post := postfs.NewPost(name+".md", []byte("# "+name))
 		post.UserID, post.Space, post.Title = user.ID, cfg.Space, name
 		if _, err := posts.InsertPost(post); err != nil {
 			t.Fatal(err)

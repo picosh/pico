@@ -1,4 +1,4 @@
-package filehandlers_test
+package postfs_test
 
 import (
 	"context"

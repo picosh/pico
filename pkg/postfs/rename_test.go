@@ -1,4 +1,4 @@
-package filehandlers
+package postfs
 
 import (
 	"context"
@@ -39,20 +39,6 @@ func extRename(meta func()) RenameFunc {
 
 func entry(name string) *sendutils.FileEntry {
 	return &sendutils.FileEntry{Filepath: "/" + name}
-}
-
-// postsHandler stores posts with the shared post functions.
-type postsHandler struct {
-	ReadWriteHandler
-	db *stub.PostsDB
-}
-
-func (h *postsHandler) List(s *pssh.SSHServerConnSession, fpath string, isDir bool, recursive bool) ([]os.FileInfo, error) {
-	return BaseList(s, fpath, isDir, recursive, []string{"prose"}, h.db)
-}
-
-func (h *postsHandler) Rename(s *pssh.SSHServerConnSession, from, to *sendutils.FileEntry) error {
-	return RenamePost(s, h.db, "prose", from, to, extRename(nil))
 }
 
 func newPostsSession(t *testing.T) (*pssh.SSHServerConnSession, *stub.PostsDB) {
@@ -126,46 +112,6 @@ func TestPostRename(t *testing.T) {
 	all, _ := posts.FindAllPostsByUser("user-1", "prose")
 	if len(all) != 2 {
 		t.Errorf("posts = %d, want 2", len(all))
-	}
-}
-
-// otherHandler is a handler of a different kind, like prose's images.
-type otherHandler struct{ ReadWriteHandler }
-
-func (otherHandler) List(*pssh.SSHServerConnSession, string, bool, bool) ([]os.FileInfo, error) {
-	return []os.FileInfo{&sendutils.VirtualFile{FName: "/", FIsDir: true}, &sendutils.VirtualFile{FName: "x.png"}}, nil
-}
-
-func TestRouterSharedHandler(t *testing.T) {
-	session, posts := newPostsSession(t)
-	postHandler := &postsHandler{db: posts}
-	router := NewFileHandlerRouter("prose", map[string]ReadWriteHandler{
-		".md":      postHandler,
-		".lxt":     postHandler,
-		".txt":     &postsHandler{db: posts},
-		"fallback": otherHandler{},
-	})
-	insertPost(t, posts, "a.md", "# a", false)
-
-	list, err := router.List(session, "/", true, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var names []string
-	for _, f := range list {
-		names = append(names, f.Name())
-	}
-	if len(names) != 3 {
-		t.Errorf("listed %q, want /, a.md and x.png once each", names)
-	}
-
-	if err := router.Rename(session, entry("a.md"), entry("a.lxt")); err != nil {
-		t.Fatal(err)
-	}
-	for _, to := range []string{"a.txt", "a.png"} {
-		if err := router.Rename(session, entry("a.lxt"), entry(to)); !errors.Is(err, errors.ErrUnsupported) {
-			t.Errorf("rename to %s across handlers: %v", to, err)
-		}
 	}
 }
 

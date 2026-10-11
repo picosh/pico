@@ -11,7 +11,6 @@ import (
 
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/db/stub"
-	"github.com/picosh/pico/pkg/filehandlers"
 	"github.com/picosh/pico/pkg/pssh"
 	sendutils "github.com/picosh/pico/pkg/send/utils"
 	"github.com/picosh/pico/pkg/shared"
@@ -69,7 +68,7 @@ func TestUploadHandlerValidate(t *testing.T) {
 
 	t.Run("nil user in session fails validation", func(t *testing.T) {
 		mockDB := newMockFeatureDB()
-		handler := NewUploadHandler(cfg, mockDB, map[string]filehandlers.ReadWriteHandler{})
+		handler := NewUploadHandler(cfg, mockDB, map[string]ReadWriteHandler{})
 
 		sesh := createSession(nil)
 		err := handler.Validate(sesh)
@@ -80,7 +79,7 @@ func TestUploadHandlerValidate(t *testing.T) {
 
 	t.Run("user without feature flag fails validation", func(t *testing.T) {
 		mockDB := newMockFeatureDB()
-		handler := NewUploadHandler(cfg, mockDB, map[string]filehandlers.ReadWriteHandler{})
+		handler := NewUploadHandler(cfg, mockDB, map[string]ReadWriteHandler{})
 
 		user := &db.User{ID: userID, Name: "tester"}
 		sesh := createSession(user)
@@ -96,7 +95,7 @@ func TestUploadHandlerValidate(t *testing.T) {
 		proseFF.ExpiresAt = &validExpires
 		mockDB.setFeature(userID, proseFF)
 
-		handler := NewUploadHandler(cfg, mockDB, map[string]filehandlers.ReadWriteHandler{})
+		handler := NewUploadHandler(cfg, mockDB, map[string]ReadWriteHandler{})
 
 		user := &db.User{ID: userID, Name: "tester"}
 		sesh := createSession(user)

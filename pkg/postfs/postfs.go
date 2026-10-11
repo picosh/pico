@@ -1,4 +1,5 @@
-package filehandlers
+// Package postfs serves an app's posts as files over scp, sftp and sshfs.
+package postfs
 
 import (
 	"database/sql"
@@ -241,4 +242,75 @@ func renamePost(dbpool db.PostDB, user *db.User, space, fromName, toName string,
 		return fmt.Errorf("error for %s: %w", toName, err)
 	}
 	return err
+}
+
+// ListPosts lists a user's posts in spaces, or the one at fpath.
+func ListPosts(s *pssh.SSHServerConnSession, fpath string, isDir bool, recursive bool, spaces []string, dbpool db.PostDB) ([]os.FileInfo, error) {
+	var fileList []os.FileInfo
+	logger := pssh.GetLogger(s)
+	user := pssh.GetUser(s)
+
+	var err error
+
+	if user == nil {
+		err = fmt.Errorf("could not get user from ctx")
+		logger.Error("error getting user from ctx", "err", err)
+		return fileList, err
+	}
+
+	cleanFilename := filepath.Base(fpath)
+
+	var post *db.Post
+	var posts []*db.Post
+
+	if cleanFilename == "" || cleanFilename == "." || cleanFilename == "/" {
+		name := cleanFilename
+		if name == "" {
+			name = "/"
+		}
+
+		fileList = append(fileList, &sendutils.VirtualFile{
+			FName:  name,
+			FIsDir: true,
+		})
+
+		for _, space := range spaces {
+			curPosts, e := dbpool.FindAllPostsByUser(user.ID, space)
+			if e != nil {
+				err = e
+				break
+			}
+			posts = append(posts, curPosts...)
+		}
+	} else {
+		for _, space := range spaces {
+			p, e := dbpool.FindPostWithFilename(cleanFilename, user.ID, space)
+			if e != nil {
+				err = e
+				continue
+			}
+			post = p
+		}
+
+		posts = append(posts, post)
+	}
+
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, err
+	}
+
+	for _, post := range posts {
+		if post == nil {
+			continue
+		}
+
+		fileList = append(fileList, &sendutils.VirtualFile{
+			FName:    post.Filename,
+			FIsDir:   false,
+			FSize:    int64(post.FileSize),
+			FModTime: *post.UpdatedAt,
+		})
+	}
+
+	return fileList, nil
 }
