@@ -22,7 +22,6 @@ import (
 	"github.com/picosh/pico/pkg/pssh"
 	psub "github.com/picosh/pico/pkg/pubsub"
 	"github.com/picosh/pico/pkg/shared"
-	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -271,15 +270,13 @@ func NewTestSSHServer(t *testing.T) *TestSSHServer {
 
 	sshAuth := shared.NewSshAuthHandler(dbpool, logger, "pipe")
 
-	prometheus.DefaultRegisterer = prometheus.NewRegistry()
-
 	server, err := pssh.NewSSHServerWithConfig(
 		ctx,
 		logger,
 		"pipe-ssh-test",
 		"localhost",
 		cfg.Port,
-		"9223",
+		"",
 		"../../ssh_data/term_info_ed25519",
 		func(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
 			perms, _ := sshAuth.PubkeyAuthHandler(conn, key)
