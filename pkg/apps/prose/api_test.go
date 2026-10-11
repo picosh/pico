@@ -22,10 +22,12 @@ func TestRoutes(t *testing.T) {
 	posts := stub.NewPostsDB(logger, user)
 	cfg := NewConfig("prose-test")
 	cfg.Logger = logger
-	post := filehandlers.NewPost("hello.md", []byte("# hello"))
-	post.UserID, post.Space, post.Title = user.ID, cfg.Space, "Hello"
-	if _, err := posts.InsertPost(post); err != nil {
-		t.Fatal(err)
+	for _, name := range []string{"hello", "raw"} {
+		post := filehandlers.NewPost(name+".md", []byte("# "+name))
+		post.UserID, post.Space, post.Title = user.ID, cfg.Space, name
+		if _, err := posts.InsertPost(post); err != nil {
+			t.Fatal(err)
+		}
 	}
 	st, err := storage.NewStorageMemory(map[string]map[string]string{})
 	if err != nil {
@@ -48,6 +50,9 @@ func TestRoutes(t *testing.T) {
 		{url: site + "/hello.md", status: http.StatusOK, body: "# hello"},
 		{url: site + "/hello.lxt", status: http.StatusOK, body: "# hello"},
 		{url: site + "/raw/hello", status: http.StatusOK, body: "# hello"},
+		{url: site + "/raw", status: http.StatusOK, body: "<html"},
+		{url: site + "/raw.md", status: http.StatusOK, body: "# raw"},
+		{url: site + "/raw/raw", status: http.StatusOK, body: "# raw"},
 		{url: site + "/missing", status: http.StatusNotFound},
 		// Images are served from the user's bucket, which they don't have.
 		{url: site + "/cat.png", status: http.StatusUnprocessableEntity, body: "bucket does not exist"},

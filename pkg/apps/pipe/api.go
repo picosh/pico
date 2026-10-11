@@ -76,7 +76,7 @@ func (web *webRouter) handleSub(pubsub bool) http.HandlerFunc {
 			params += fmt.Sprintf(" -a=%s", cleanList)
 		}
 
-		p, err := web.conn.run(fmt.Sprintf("sub %s %s", params, topic))
+		p, err := web.conn.run(r.Context(), fmt.Sprintf("sub %s %s", params, topic))
 		if err != nil {
 			logger.Error("sub error", "topic", topic, "info", clientInfo, "err", err.Error())
 			http.Error(w, "server error", http.StatusInternalServerError)
@@ -141,7 +141,7 @@ func (web *webRouter) handlePub(pubsub bool) http.HandlerFunc {
 			params += " -e"
 		}
 
-		p, err := web.conn.run(fmt.Sprintf("pub %s %s", params, topic))
+		p, err := web.conn.run(r.Context(), fmt.Sprintf("pub %s %s", params, topic))
 		if err != nil {
 			logger.Error("pub error", "topic", topic, "info", clientInfo, "err", err.Error())
 			http.Error(w, "server error", http.StatusInternalServerError)
@@ -273,7 +273,7 @@ func (web *webRouter) handlePipe() http.HandlerFunc {
 
 		prefix := r.URL.Query().Get("prefix")
 
-		p, err := web.conn.run(fmt.Sprintf("pipe %s %s", params, topic))
+		p, err := web.conn.run(r.Context(), fmt.Sprintf("pipe %s %s", params, topic))
 		if err != nil {
 			logger.Error("pipe error", "topic", topic, "info", clientInfo, "err", err.Error())
 			_ = c.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseInternalServerErr, "server error"), time.Now().Add(time.Second))

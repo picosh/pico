@@ -922,7 +922,6 @@ func (web *webRouter) sitesMux() *http.ServeMux {
 		mux.HandleFunc("GET "+feed, web.rssBlogHandler)
 	}
 	web.static(mux)
-	mux.HandleFunc("GET /raw/{slug...}", web.postRawHandler)
 	mux.HandleFunc("GET /{path...}", web.pathRoute)
 	return mux
 }
@@ -934,8 +933,14 @@ var (
 
 // pathRoute serves the site paths ServeMux patterns can't tell apart: a
 // post's markdown, an image with or without processing options, and a post.
+// A "/raw/{slug...}" pattern would redirect "/raw" away from a post named raw.
 func (web *webRouter) pathRoute(w http.ResponseWriter, r *http.Request) {
 	path := r.PathValue("path")
+	if slug, ok := strings.CutPrefix(path, "raw/"); ok && slug != "" {
+		r.SetPathValue("slug", slug)
+		web.postRawHandler(w, r)
+		return
+	}
 	for _, ext := range []string{".md", ".lxt"} {
 		if slug, ok := strings.CutSuffix(path, ext); ok && slug != "" {
 			r.SetPathValue("slug", slug)
