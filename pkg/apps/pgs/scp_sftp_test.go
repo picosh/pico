@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -658,7 +659,8 @@ func TestSingleFileIntoProject(t *testing.T) {
 					t.Fatalf("exit %d\n%s", code, out)
 				}
 				env.assertStored(map[string]string{"post.md": "hello"})
-				if !strings.Contains(out, "https://testusr-site.pgs.sh/post.md ") {
+				lines := strings.Split(out, "\n")
+				if !slices.ContainsFunc(lines, func(l string) bool { return strings.TrimSpace(l) == "https://testusr-site.pgs.sh/post.md" }) {
 					t.Errorf("wrong url\n%s", out)
 				}
 			})

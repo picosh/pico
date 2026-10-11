@@ -206,15 +206,7 @@ func (h *UploadImgHandler) Write(s *pssh.SSHServerConnSession, entry *sendutils.
 		user.Name,
 		metadata.Filename,
 	)
-	maxSize := int(featureFlag.Data.StorageMax)
-	str := fmt.Sprintf(
-		"%s (space: %.2f/%.2fGB, %.2f%%)",
-		url,
-		shared.BytesToGB(metadata.TotalFileSize+fileSize),
-		shared.BytesToGB(maxSize),
-		(float32(totalFileSize)/float32(maxSize))*100,
-	)
-	return str, nil
+	return url + shared.StorageUsage(metadata.TotalFileSize+fileSize, int(featureFlag.Data.StorageMax)), nil
 }
 
 func (h *UploadImgHandler) Delete(s *pssh.SSHServerConnSession, entry *sendutils.FileEntry) error {

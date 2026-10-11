@@ -404,14 +404,7 @@ func (h *UploadAssetHandler) write(s *pssh.SSHServerConnSession, entry *sendutil
 		strings.Replace(data.Filepath, "/"+projectName+"/", "", 1),
 	)
 
-	maxSize := int(featureFlag.Data.StorageMax)
-	str := fmt.Sprintf(
-		"%s (space: %.2f/%.2fGB, %.2f%%)",
-		url,
-		shared.BytesToGB(int(nextStorageSize)),
-		shared.BytesToGB(maxSize),
-		(float32(nextStorageSize)/float32(maxSize))*100,
-	)
+	str := url + shared.StorageUsage(int(nextStorageSize), int(featureFlag.Data.StorageMax))
 
 	surrogate := getSurrogateKey(user.Name, projectName)
 	h.Cfg.CacheClearingQueue <- surrogate

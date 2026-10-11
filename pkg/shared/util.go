@@ -144,6 +144,16 @@ func BytesToGB(size int) float32 {
 	return BytesToMB(size) / 1000
 }
 
+// StorageUsage is the note an upload prints about storage. It is empty
+// until a user reaches their quota.
+func StorageUsage(used, max int) string {
+	if max <= 0 || used < max {
+		return ""
+	}
+	pct := float32(used) / float32(max) * 100
+	return fmt.Sprintf(" (space: %.2f/%.2fGB, %.2f%%)", BytesToGB(used), BytesToGB(max), pct)
+}
+
 // https://stackoverflow.com/a/46964105
 func StartOfMonth() time.Time {
 	now := time.Now()
