@@ -6,11 +6,12 @@ runs:
   using: composite
   steps:
     - name: Set up Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v7
       with:
         go-version-file: go.mod
+        cache-dependency-path: go.sum
     - name: Lint the codebase
-      uses: golangci/golangci-lint-action@v8
+      uses: golangci/golangci-lint-action@v9
       with:
         version: latest
     - name: Run tests

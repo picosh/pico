@@ -10,6 +10,6 @@ jobs:
     runs-on: ubuntu-26.04
     steps:
     - name: Checkout repo
-      uses: actions/checkout@v3
+      uses: actions/checkout@v7
     - name: Run tests and lint
       uses: ./.github/actions/test

@@ -7,6 +7,7 @@ DOCKER_TAG?=$(shell git log --format="%H" -n 1)
 DOCKER_PLATFORM?=linux/amd64,linux/arm64
 DOCKER_CMD?=docker
 DOCKER_BUILDX_BUILD?=$(DOCKER_CMD) buildx build --push --platform $(DOCKER_PLATFORM) -t
+DOCKER_BAKE?=TAGS=$(DOCKER_TAG) $(DOCKER_CMD) buildx bake -f docker-bake.hcl --push --set "*.platform=$(DOCKER_PLATFORM)"
 WRITE?=0
 
 smol:
@@ -49,6 +50,44 @@ else
 endif
 .PHONY: bp-setup
 
+# Podman has no bake, so it builds each image on its own.
+ifeq ($(DOCKER_CMD),docker)
+bp-caddy: bp-setup
+	$(DOCKER_BAKE) caddy
+.PHONY: bp-caddy
+
+bp-auth: bp-setup
+	$(DOCKER_BAKE) auth-web
+.PHONY: bp-auth
+
+bp-pgs-cdn: bp-setup
+	$(DOCKER_BAKE) pgs-cdn
+.PHONY: bp-pgs-cdn
+
+bp-pgs-standalone: bp-setup
+	$(DOCKER_BAKE) pgs-standalone
+.PHONY: bp-pgs-standalone
+
+bp-pico: bp-setup
+	$(DOCKER_BAKE) pico-ssh
+.PHONY: bp-pico
+
+bp-bouncer: bp-setup
+	$(DOCKER_BAKE) bouncer
+.PHONY: bp-bouncer
+
+bp-ssh-%: bp-setup
+	$(DOCKER_BAKE) "$*-ssh"
+.PHONY: bp-ssh-%
+
+bp-%: bp-setup
+	$(DOCKER_BAKE) "$*-web" "$*-ssh"
+.PHONY: bp-%
+
+bp-all: bp-setup
+	$(DOCKER_BAKE) default bouncer
+.PHONY: bp-all
+else
 bp-caddy: bp-setup
 	$(DOCKER_BUILDX_BUILD) ghcr.io/picosh/pico/caddy:$(DOCKER_TAG) ./caddy
 .PHONY: bp-caddy
@@ -82,8 +121,9 @@ bp-%: bp-setup
 	$(DOCKER_BUILDX_BUILD) "ghcr.io/picosh/pico/$*-web:$(DOCKER_TAG)" --build-arg "APP=$*" --target release-web .
 .PHONY: bp-%
 
-bp-all: bp-prose bp-pastes bp-feeds bp-pgs bp-auth bp-bouncer bp-pipe bp-pgs-cdn
+bp-all: bp-prose bp-pastes bp-feeds bp-pgs bp-auth bp-bouncer bp-pipe bp-pgs-cdn bp-pico bp-pgs-standalone
 .PHONY: bp-all
+endif
 
 LDFLAGS?=-s -w
 
