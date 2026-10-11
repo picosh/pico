@@ -640,3 +640,72 @@ func GenerateKey() UserSSH {
 		signer:   userSigner,
 	}
 }
+
+// A client that closes a session but keeps its connection, like pipe-web,
+// ends the command running in it.
+func TestSessionContextEndsWhenClientCloses(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	user := GenerateKey()
+	started := make(chan struct{})
+	ended := make(chan struct{})
+	server := pssh.NewSSHServer(ctx, slog.New(slog.DiscardHandler), &pssh.SSHServerConfig{
+		ListenAddr: "127.0.0.1:0",
+		Middleware: []pssh.SSHServerMiddleware{
+			func(next pssh.SSHServerHandler) pssh.SSHServerHandler {
+				return func(sesh *pssh.SSHServerConnSession) error {
+					close(started)
+					<-sesh.Context().Done()
+					close(ended)
+					return next(sesh)
+				}
+			},
+		},
+		ServerConfig: &ssh.ServerConfig{
+			NoClientAuth: true,
+			NoClientAuthCallback: func(ssh.ConnMetadata) (*ssh.Permissions, error) {
+				return &ssh.Permissions{Extensions: map[string]string{}}, nil
+			},
+		},
+	})
+	server.Config.AddHostKey(user.signer)
+	go func() { _ = server.ListenAndServe() }()
+
+	var addr string
+	for range 50 {
+		server.Mu.Lock()
+		if server.Listener != nil {
+			addr = server.Listener.Addr().String()
+		}
+		server.Mu.Unlock()
+		if addr != "" {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if addr == "" {
+		t.Fatal("server listener not ready")
+	}
+
+	client, err := ssh.Dial("tcp", addr, &ssh.ClientConfig{User: "user", HostKeyCallback: ssh.InsecureIgnoreHostKey()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = client.Close() }()
+	session, err := client.NewSession()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := session.Start("wait"); err != nil {
+		t.Fatal(err)
+	}
+	<-started
+	_ = session.Close()
+
+	select {
+	case <-ended:
+	case <-time.After(2 * time.Second):
+		t.Fatal("command still running after the client closed its session")
+	}
+}
