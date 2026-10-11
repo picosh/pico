@@ -48,12 +48,11 @@ func (c *Client) GetChannels() iter.Seq2[string, *Channel] {
 	return c.Channels.Range
 }
 
+// Cleanup ends the client. Its ReadWriter stays open for whoever opened it
+// to close, so an ssh session can still send its exit status.
 func (c *Client) Cleanup() {
 	c.once.Do(func() {
 		close(c.Done)
-		if closer, ok := c.ReadWriter.(io.Closer); ok {
-			_ = closer.Close()
-		}
 	})
 }
 

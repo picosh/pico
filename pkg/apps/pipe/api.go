@@ -217,7 +217,7 @@ func (web *webRouter) handlePub(pubsub bool) http.HandlerFunc {
 		}
 
 		// pub sends the message once its stdin ends, and exits when it has.
-		// pipe closes its sessions without an exit status.
+		// Older pipe servers close the session without an exit status.
 		_ = p.CloseWrite()
 		var missing *ssh.ExitMissingError
 		if err := p.Wait(); err != nil && !errors.As(err, &missing) {

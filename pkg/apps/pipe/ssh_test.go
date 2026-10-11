@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -2457,5 +2458,88 @@ func TestSSH_WildcardSub(t *testing.T) {
 	}
 	if !strings.Contains(output, "prose-event") {
 		t.Errorf("expected SSH wildcard subscriber output to contain 'prose-event', got: %q", output)
+	}
+}
+
+// runStatus runs cmd with stdin and returns its exit status, or -1 when the
+// session ended without one.
+func runStatus(t *testing.T, client *ssh.Client, cmd, stdin string) int {
+	t.Helper()
+	session, err := client.NewSession()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = session.Close() }()
+	session.Stdin = strings.NewReader(stdin)
+	return exitStatus(t, session.Run(cmd))
+}
+
+func exitStatus(t *testing.T, err error) int {
+	t.Helper()
+	var exitErr *ssh.ExitError
+	var missing *ssh.ExitMissingError
+	switch {
+	case err == nil:
+		return 0
+	case errors.As(err, &exitErr):
+		return exitErr.ExitStatus()
+	case errors.As(err, &missing):
+		return -1
+	}
+	t.Fatalf("command failed: %v", err)
+	return 0
+}
+
+func TestCommandsExitWithStatus(t *testing.T) {
+	server := NewTestSSHServer(t)
+	defer server.Shutdown()
+
+	alice := GenerateUser("alice")
+	charlie := GenerateUser("charlie")
+	RegisterUserWithServer(server, alice)
+	RegisterUserWithServer(server, charlie)
+	aliceClient, err := alice.NewClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = aliceClient.Close() }()
+	charlieClient, err := charlie.NewClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = charlieClient.Close() }()
+
+	if got := runStatus(t, aliceClient, "pub nobody -b=false", "hello"); got != 0 {
+		t.Errorf("pub exited %d, want 0", got)
+	}
+
+	sub, err := aliceClient.NewSession()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = sub.Close() }()
+	if err := sub.Start("sub news -a alice"); err != nil {
+		t.Fatal(err)
+	}
+	server.waitForClients(t, 1)
+	if got := runStatus(t, aliceClient, "pub news", "hello"); got != 0 {
+		t.Errorf("pub to a sub exited %d, want 0", got)
+	}
+	if got := exitStatus(t, sub.Wait()); got != 0 {
+		t.Errorf("sub exited %d after its publisher left, want 0", got)
+	}
+
+	if err := (func() error {
+		s, err := aliceClient.NewSession()
+		if err != nil {
+			return err
+		}
+		return s.Start("sub restricted -p -a alice -k")
+	})(); err != nil {
+		t.Fatal(err)
+	}
+	server.waitForClients(t, 1)
+	if got := runStatus(t, charlieClient, "sub restricted -p", ""); got != 1 {
+		t.Errorf("denied sub exited %d, want 1", got)
 	}
 }
