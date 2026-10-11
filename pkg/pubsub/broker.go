@@ -129,7 +129,7 @@ func (b *BaseBroker) Connect(client *Client, channels []*Channel) (error, error)
 							}
 						}
 						if otherChannels == 0 {
-							cl.Cleanup()
+							cl.Finish()
 						}
 					}
 				}
@@ -235,6 +235,9 @@ func (b *BaseBroker) Connect(client *Client, channels []*Channel) (error, error)
 						break mainLoop
 					}
 				case <-client.Done:
+					break mainLoop
+				case <-client.finish:
+					client.Cleanup()
 					break mainLoop
 				}
 			}

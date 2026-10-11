@@ -15,6 +15,7 @@ func NewClient(ID string, rw io.ReadWriter, direction ChannelDirection, blockWri
 		Direction:  direction,
 		Channels:   syncmap.New[string, *Channel](),
 		Done:       make(chan struct{}),
+		finish:     make(chan struct{}),
 		Data:       make(chan ChannelMessage),
 		Replay:     replay,
 		BlockWrite: blockWrite,
@@ -39,6 +40,8 @@ type Client struct {
 	KeepAlive  bool
 	once       sync.Once
 	onceData   sync.Once
+	finish     chan struct{}
+	finishOnce sync.Once
 }
 
 func (c *Client) GetChannels() iter.Seq2[string, *Channel] {
@@ -51,5 +54,13 @@ func (c *Client) Cleanup() {
 		if closer, ok := c.ReadWriter.(io.Closer); ok {
 			_ = closer.Close()
 		}
+	})
+}
+
+// Finish ends a subscriber after it writes the message it was last sent, so
+// a publisher that leaves doesn't cut off its own last message.
+func (c *Client) Finish() {
+	c.finishOnce.Do(func() {
+		close(c.finish)
 	})
 }
