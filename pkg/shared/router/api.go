@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/shared"
 )
 
@@ -40,43 +41,44 @@ func UnauthorizedHandler(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "You do not have access to this site", http.StatusUnauthorized)
 }
 
-func CheckHandler(w http.ResponseWriter, r *http.Request) {
-	dbpool := GetDB(r)
-	cfg := GetCfg(r)
+// CheckHandler reports whether a custom domain points at a user's site.
+func CheckHandler(cfg *shared.ConfigSite, users interface {
+	FindUserByName(name string) (*db.User, error)
+}) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if cfg.IsCustomdomains() {
+			hostDomain := r.URL.Query().Get("domain")
+			appDomain := strings.Split(cfg.Domain, ":")[0]
 
-	if cfg.IsCustomdomains() {
-		hostDomain := r.URL.Query().Get("domain")
-		appDomain := strings.Split(cfg.Domain, ":")[0]
-
-		if !strings.Contains(hostDomain, appDomain) {
-			subdomain := GetCustomDomain(hostDomain, cfg.Space)
-			if subdomain != "" {
-				u, err := dbpool.FindUserByName(subdomain)
-				if u != nil && err == nil {
-					w.WriteHeader(http.StatusOK)
-					return
+			if !strings.Contains(hostDomain, appDomain) {
+				subdomain := GetCustomDomain(hostDomain, cfg.Space)
+				if subdomain != "" {
+					u, err := users.FindUserByName(subdomain)
+					if u != nil && err == nil {
+						w.WriteHeader(http.StatusOK)
+						return
+					}
 				}
 			}
 		}
-	}
 
-	w.WriteHeader(http.StatusNotFound)
+		w.WriteHeader(http.StatusNotFound)
+	}
 }
 
-func GetUsernameFromRequest(r *http.Request) string {
+// GetUsernameFromRequest is the user whose site a request is for: the
+// subdomain, or the path's {user} on the main domain.
+func GetUsernameFromRequest(r *http.Request, cfg *shared.ConfigSite) string {
 	subdomain := GetSubdomain(r)
-	cfg := GetCfg(r)
-
 	if !cfg.IsSubdomains() || subdomain == "" {
-		return GetField(r, 0)
+		return r.PathValue("user")
 	}
 	return subdomain
 }
 
-func ServeFile(file string, contentType string) http.HandlerFunc {
+func ServeFile(cfg *shared.ConfigSite, file string, contentType string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		logger := GetLogger(r)
-		cfg := GetCfg(r)
+		logger := cfg.Logger
 
 		contents, err := os.ReadFile(cfg.StaticPath(fmt.Sprintf("public/%s", file)))
 		if err != nil {
@@ -128,10 +130,9 @@ func RenderTemplate(cfg *shared.ConfigSite, templates []string) (*template.Templ
 	return ts, nil
 }
 
-func CreatePageHandler(fname string) http.HandlerFunc {
+func CreatePageHandler(cfg *shared.ConfigSite, fname string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		logger := GetLogger(r)
-		cfg := GetCfg(r)
+		logger := cfg.Logger
 		ts, err := RenderTemplate(cfg, []string{cfg.StaticPath(fname)})
 
 		if err != nil {

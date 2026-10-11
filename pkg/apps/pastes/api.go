@@ -5,7 +5,6 @@ import (
 	"html/template"
 	"net/http"
 	"net/url"
-	"os"
 	"time"
 
 	"github.com/picosh/pico/pkg/db"
@@ -72,12 +71,12 @@ type HeaderTxt struct {
 	HasLinks bool
 }
 
-func blogHandler(w http.ResponseWriter, r *http.Request) {
-	username := router.GetUsernameFromRequest(r)
-	dbpool := getDB(r)
-	blogger := router.GetLogger(r)
+func (web *webRouter) blogHandler(w http.ResponseWriter, r *http.Request) {
+	username := router.GetUsernameFromRequest(r, web.cfg)
+	dbpool := web.db
+	blogger := web.cfg.Logger
 	logger := blogger.With("user", username)
-	cfg := router.GetCfg(r)
+	cfg := web.cfg
 
 	user, err := dbpool.FindUserByName(username)
 	if err != nil {
@@ -155,20 +154,13 @@ func GetBlogName(username string) string {
 	return fmt.Sprintf("%s's pastes", username)
 }
 
-func postHandler(w http.ResponseWriter, r *http.Request) {
-	username := router.GetUsernameFromRequest(r)
-	subdomain := router.GetSubdomain(r)
-	cfg := router.GetCfg(r)
+func (web *webRouter) postHandler(w http.ResponseWriter, r *http.Request) {
+	username := router.GetUsernameFromRequest(r, web.cfg)
+	cfg := web.cfg
+	slug, _ := url.PathUnescape(r.PathValue("slug"))
 
-	var slug string
-	if !cfg.IsSubdomains() || subdomain == "" {
-		slug, _ = url.PathUnescape(router.GetField(r, 1))
-	} else {
-		slug, _ = url.PathUnescape(router.GetField(r, 0))
-	}
-
-	dbpool := getDB(r)
-	blogger := router.GetLogger(r)
+	dbpool := web.db
+	blogger := web.cfg.Logger
 	logger := blogger.With("slug", slug, "user", username)
 
 	user, err := dbpool.FindUserByName(username)
@@ -259,20 +251,13 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func postHandlerRaw(w http.ResponseWriter, r *http.Request) {
-	username := router.GetUsernameFromRequest(r)
-	subdomain := router.GetSubdomain(r)
-	cfg := router.GetCfg(r)
+func (web *webRouter) postHandlerRaw(w http.ResponseWriter, r *http.Request) {
+	username := router.GetUsernameFromRequest(r, web.cfg)
+	cfg := web.cfg
+	slug, _ := url.PathUnescape(r.PathValue("slug"))
 
-	var slug string
-	if !cfg.IsSubdomains() || subdomain == "" {
-		slug, _ = url.PathUnescape(router.GetField(r, 1))
-	} else {
-		slug, _ = url.PathUnescape(router.GetField(r, 0))
-	}
-
-	dbpool := getDB(r)
-	blogger := router.GetLogger(r)
+	dbpool := web.db
+	blogger := web.cfg.Logger
 	logger := blogger.With("user", username, "slug", slug)
 
 	user, err := dbpool.FindUserByName(username)
@@ -299,81 +284,71 @@ func postHandlerRaw(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func serveFile(file string, contentType string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := router.GetLogger(r)
-		cfg := router.GetCfg(r)
+type webRouter struct {
+	cfg *shared.ConfigSite
+	db  DB
+}
 
-		contents, err := os.ReadFile(cfg.StaticPath(fmt.Sprintf("public/%s", file)))
-		if err != nil {
-			logger.Error("could not read file", "err", err)
-			http.Error(w, "file not found", 404)
-		}
-		w.Header().Add("Content-Type", contentType)
-
-		_, err = w.Write(contents)
-		if err != nil {
-			logger.Error("could not write contents", "err", err)
-			http.Error(w, "server error", 500)
-		}
+func (web *webRouter) static(mux *http.ServeMux) {
+	cfg := web.cfg
+	mux.HandleFunc("GET /main.css", router.ServeFile(cfg, "main.css", "text/css"))
+	mux.HandleFunc("GET /smol.css", router.ServeFile(cfg, "smol.css", "text/css"))
+	mux.HandleFunc("GET /syntax.css", router.ServeFile(cfg, "syntax.css", "text/css"))
+	mux.HandleFunc("GET /card.png", router.ServeFile(cfg, "card.png", "image/png"))
+	mux.HandleFunc("GET /favicon-16x16.png", router.ServeFile(cfg, "favicon-16x16.png", "image/png"))
+	mux.HandleFunc("GET /apple-touch-icon.png", router.ServeFile(cfg, "apple-touch-icon.png", "image/png"))
+	mux.HandleFunc("GET /favicon.ico", router.ServeFile(cfg, "favicon.ico", "image/x-icon"))
+	mux.HandleFunc("GET /robots.txt", router.ServeFile(cfg, "robots.txt", "text/plain"))
+	if cfg.Debug {
+		router.CreatePProfRoutesMux(mux)
 	}
 }
 
-func createStaticRoutes() []router.Route {
-	return []router.Route{
-		router.NewRoute("GET", "/main.css", serveFile("main.css", "text/css")),
-		router.NewRoute("GET", "/smol.css", serveFile("smol.css", "text/css")),
-		router.NewRoute("GET", "/syntax.css", serveFile("syntax.css", "text/css")),
-		router.NewRoute("GET", "/card.png", serveFile("card.png", "image/png")),
-		router.NewRoute("GET", "/favicon-16x16.png", serveFile("favicon-16x16.png", "image/png")),
-		router.NewRoute("GET", "/favicon-32x32.png", serveFile("favicon-32x32.png", "image/png")),
-		router.NewRoute("GET", "/apple-touch-icon.png", serveFile("apple-touch-icon.png", "image/png")),
-		router.NewRoute("GET", "/favicon.ico", serveFile("favicon.ico", "image/x-icon")),
-		router.NewRoute("GET", "/robots.txt", serveFile("robots.txt", "text/plain")),
-	}
+// mainMux serves the marketing site and users' pastes below /{user}.
+func (web *webRouter) mainMux() *http.ServeMux {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /{$}", router.CreatePageHandler(web.cfg, "html/marketing.page.tmpl"))
+	mux.HandleFunc("GET /check", router.CheckHandler(web.cfg, web.db))
+	mux.Handle("GET /_metrics", promhttp.Handler())
+	web.static(mux)
+	mux.HandleFunc("GET /{user}", web.blogHandler)
+	mux.HandleFunc("GET /{user}/{slug}", web.postHandler)
+	mux.HandleFunc("GET /{first}/{second}/{third}", web.rawRoute)
+	return mux
 }
 
-func createMainRoutes(staticRoutes []router.Route) []router.Route {
-	routes := []router.Route{
-		router.NewRoute("GET", "/", router.CreatePageHandler("html/marketing.page.tmpl")),
-		router.NewRoute("GET", "/check", router.CheckHandler),
-		router.NewRoute("GET", "/_metrics", promhttp.Handler().ServeHTTP),
-	}
-
-	routes = append(
-		routes,
-		staticRoutes...,
-	)
-
-	routes = append(
-		routes,
-		router.NewRoute("GET", "/([^/]+)", blogHandler),
-		router.NewRoute("GET", "/([^/]+)/([^/]+)", postHandler),
-		router.NewRoute("GET", "/([^/]+)/([^/]+)/raw", postHandlerRaw),
-		router.NewRoute("GET", "/raw/([^/]+)/([^/]+)", postHandlerRaw),
-	)
-
-	return routes
+// sitesMux serves a user's pastes on their subdomain.
+func (web *webRouter) sitesMux() *http.ServeMux {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /{$}", web.blogHandler)
+	web.static(mux)
+	mux.HandleFunc("GET /{slug}", web.postHandler)
+	mux.HandleFunc("GET /{first}/{second}", web.rawRoute)
+	return mux
 }
 
-func createSubdomainRoutes(staticRoutes []router.Route) []router.Route {
-	routes := []router.Route{
-		router.NewRoute("GET", "/", blogHandler),
+// rawRoute serves a raw paste at .../{slug}/raw or raw/.../{slug}, with the
+// user first on the main domain. The two overlap as patterns, so a path
+// that fits both, like /raw/raw, is the first kind.
+func (web *webRouter) rawRoute(w http.ResponseWriter, r *http.Request) {
+	segs := []string{r.PathValue("first"), r.PathValue("second")}
+	if third := r.PathValue("third"); third != "" {
+		segs = append(segs, third)
 	}
-
-	routes = append(
-		routes,
-		staticRoutes...,
-	)
-
-	routes = append(
-		routes,
-		router.NewRoute("GET", "/([^/]+)", postHandler),
-		router.NewRoute("GET", "/([^/]+)/raw", postHandlerRaw),
-		router.NewRoute("GET", "/raw/([^/]+)", postHandlerRaw),
-	)
-
-	return routes
+	switch {
+	case segs[len(segs)-1] == "raw":
+		segs = segs[:len(segs)-1]
+	case segs[0] == "raw":
+		segs = segs[1:]
+	default:
+		http.NotFound(w, r)
+		return
+	}
+	if len(segs) == 2 {
+		r.SetPathValue("user", segs[0])
+	}
+	r.SetPathValue("slug", segs[len(segs)-1])
+	web.postHandlerRaw(w, r)
 }
 
 func StartApiServer() {
@@ -386,21 +361,8 @@ func StartApiServer() {
 
 	go CronDeleteExpiredPosts(cfg, db)
 
-	staticRoutes := createStaticRoutes()
-
-	if cfg.Debug {
-		staticRoutes = router.CreatePProfRoutes(staticRoutes)
-	}
-
-	mainRoutes := createMainRoutes(staticRoutes)
-	subdomainRoutes := createSubdomainRoutes(staticRoutes)
-
-	apiConfig := &router.ApiConfig{
-		Cfg:    cfg,
-		Dbpool: db,
-	}
-	handler := router.CreateServe(mainRoutes, subdomainRoutes, apiConfig)
-	router := http.HandlerFunc(handler)
+	web := &webRouter{cfg: cfg, db: db}
+	handler := router.NewHostRouter(cfg, web.mainMux(), web.sitesMux())
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)
 	logger.Info(
@@ -409,5 +371,5 @@ func StartApiServer() {
 		"domain", cfg.Domain,
 	)
 
-	logger.Error(http.ListenAndServe(portStr, router).Error())
+	logger.Error(http.ListenAndServe(portStr, handler).Error())
 }

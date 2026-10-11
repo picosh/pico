@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"regexp"
 	"strings"
 	"sync"
@@ -34,41 +33,6 @@ var (
 	}
 )
 
-func serveFile(file string, contentType string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := router.GetLogger(r)
-		cfg := router.GetCfg(r)
-
-		contents, err := os.ReadFile(cfg.StaticPath(fmt.Sprintf("public/%s", file)))
-		if err != nil {
-			logger.Error("could not read statis file", "err", err.Error())
-			http.Error(w, "file not found", 404)
-		}
-		w.Header().Add("Content-Type", contentType)
-
-		_, err = w.Write(contents)
-		if err != nil {
-			logger.Error("could not write static file", "err", err.Error())
-			http.Error(w, "server error", http.StatusInternalServerError)
-		}
-	}
-}
-
-func createStaticRoutes() []router.Route {
-	return []router.Route{
-		router.NewRoute("GET", "/main.css", serveFile("main.css", "text/css")),
-		router.NewRoute("GET", "/smol.css", serveFile("smol.css", "text/css")),
-		router.NewRoute("GET", "/syntax.css", serveFile("syntax.css", "text/css")),
-		router.NewRoute("GET", "/card.png", serveFile("card.png", "image/png")),
-		router.NewRoute("GET", "/favicon-16x16.png", serveFile("favicon-16x16.png", "image/png")),
-		router.NewRoute("GET", "/favicon-32x32.png", serveFile("favicon-32x32.png", "image/png")),
-		router.NewRoute("GET", "/apple-touch-icon.png", serveFile("apple-touch-icon.png", "image/png")),
-		router.NewRoute("GET", "/favicon.ico", serveFile("favicon.ico", "image/x-icon")),
-		router.NewRoute("GET", "/robots.txt", serveFile("robots.txt", "text/plain")),
-		router.NewRoute("GET", "/anim.js", serveFile("anim.js", "text/javascript")),
-	}
-}
-
 type writeFlusher struct {
 	responseWriter http.ResponseWriter
 	controller     *http.ResponseController
@@ -84,12 +48,12 @@ func (w writeFlusher) Write(p []byte) (n int, err error) {
 
 var _ io.Writer = writeFlusher{}
 
-func handleSub(pubsub bool) http.HandlerFunc {
+func (web *webRouter) handleSub(pubsub bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		logger := router.GetLogger(r)
+		logger := web.cfg.Logger
 
 		clientInfo := shared.NewPicoPipeClient()
-		topic, _ := url.PathUnescape(router.GetField(r, 0))
+		topic, _ := url.PathUnescape(r.PathValue("topic"))
 
 		topic = cleanRegex.ReplaceAllString(topic, "")
 
@@ -137,12 +101,12 @@ func handleSub(pubsub bool) http.HandlerFunc {
 	}
 }
 
-func handlePub(pubsub bool) http.HandlerFunc {
+func (web *webRouter) handlePub(pubsub bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		logger := router.GetLogger(r)
+		logger := web.cfg.Logger
 
 		clientInfo := shared.NewPicoPipeClient()
-		topic, _ := url.PathUnescape(router.GetField(r, 0))
+		topic, _ := url.PathUnescape(r.PathValue("topic"))
 
 		topic = cleanRegex.ReplaceAllString(topic, "")
 
@@ -281,9 +245,9 @@ func handlePub(pubsub bool) http.HandlerFunc {
 	}
 }
 
-func handlePipe() http.HandlerFunc {
+func (web *webRouter) handlePipe() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		logger := router.GetLogger(r)
+		logger := web.cfg.Logger
 
 		c, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
@@ -296,7 +260,7 @@ func handlePipe() http.HandlerFunc {
 		}()
 
 		clientInfo := shared.NewPicoPipeClient()
-		topic, _ := url.PathUnescape(router.GetField(r, 0))
+		topic, _ := url.PathUnescape(r.PathValue("topic"))
 
 		topic = cleanRegex.ReplaceAllString(topic, "")
 
@@ -435,7 +399,7 @@ func handlePipe() http.HandlerFunc {
 
 func rssHandler(cfg *shared.ConfigSite, dbpool DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		apiToken, _ := url.PathUnescape(router.GetField(r, 0))
+		apiToken, _ := url.PathUnescape(r.PathValue("token"))
 		user, err := dbpool.FindUserByToken(apiToken)
 		if err != nil {
 			cfg.Logger.Error(
@@ -470,33 +434,48 @@ func rssHandler(cfg *shared.ConfigSite, dbpool DB) http.HandlerFunc {
 	}
 }
 
-func createMainRoutes(staticRoutes []router.Route, cfg *shared.ConfigSite, dbpool DB) []router.Route {
-	routes := []router.Route{
-		router.NewRoute("GET", "/", router.CreatePageHandler("html/marketing.page.tmpl")),
-		router.NewRoute("GET", "/check", router.CheckHandler),
-		router.NewRoute("GET", "/rss/(.+)", rssHandler(cfg, dbpool)),
-		router.NewRoute("GET", "/_metrics", promhttp.Handler().ServeHTTP),
+type webRouter struct {
+	cfg *shared.ConfigSite
+	db  DB
+}
+
+func (web *webRouter) static(mux *http.ServeMux) {
+	cfg := web.cfg
+	mux.HandleFunc("GET /favicon-16x16.png", router.ServeFile(cfg, "favicon-16x16.png", "image/png"))
+	mux.HandleFunc("GET /apple-touch-icon.png", router.ServeFile(cfg, "apple-touch-icon.png", "image/png"))
+	mux.HandleFunc("GET /favicon.ico", router.ServeFile(cfg, "favicon.ico", "image/x-icon"))
+	mux.HandleFunc("GET /robots.txt", router.ServeFile(cfg, "robots.txt", "text/plain"))
+	mux.HandleFunc("GET /anim.js", router.ServeFile(cfg, "anim.js", "text/javascript"))
+	if cfg.Debug {
+		router.CreatePProfRoutesMux(mux)
 	}
+}
 
-	pipeRoutes := []router.Route{
-		router.NewRoute("GET", "/topic/(.+)", handleSub(false)),
-		router.NewRoute("POST", "/topic/(.+)", handlePub(false)),
-		router.NewRoute("GET", "/pubsub/(.+)", handleSub(true)),
-		router.NewRoute("POST", "/pubsub/(.+)", handlePub(true)),
-		router.NewRoute("GET", "/pipe/(.+)", handlePipe()),
-	}
+func (web *webRouter) mainMux() *http.ServeMux {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /{$}", router.CreatePageHandler(web.cfg, "html/marketing.page.tmpl"))
+	mux.HandleFunc("GET /check", router.CheckHandler(web.cfg, web.db))
+	mux.HandleFunc("GET /rss/{token...}", rssHandler(web.cfg, web.db))
+	mux.Handle("GET /_metrics", promhttp.Handler())
 
-	for _, route := range pipeRoutes {
-		route.CorsEnabled = true
-		routes = append(routes, route)
-	}
+	mux.HandleFunc("GET /topic/{topic...}", router.Cors(web.handleSub(false)))
+	mux.HandleFunc("POST /topic/{topic...}", router.Cors(web.handlePub(false)))
+	mux.HandleFunc("OPTIONS /topic/{topic...}", router.CorsPreflight)
+	mux.HandleFunc("GET /pubsub/{topic...}", router.Cors(web.handleSub(true)))
+	mux.HandleFunc("POST /pubsub/{topic...}", router.Cors(web.handlePub(true)))
+	mux.HandleFunc("OPTIONS /pubsub/{topic...}", router.CorsPreflight)
+	mux.HandleFunc("GET /pipe/{topic...}", router.Cors(web.handlePipe()))
+	mux.HandleFunc("OPTIONS /pipe/{topic...}", router.CorsPreflight)
 
-	routes = append(
-		routes,
-		staticRoutes...,
-	)
+	web.static(mux)
+	return mux
+}
 
-	return routes
+// sitesMux serves only static files on subdomains.
+func (web *webRouter) sitesMux() *http.ServeMux {
+	mux := http.NewServeMux()
+	web.static(mux)
+	return mux
 }
 
 func StartApiServer() {
@@ -506,15 +485,6 @@ func StartApiServer() {
 		_ = db.Close()
 	}()
 	logger := cfg.Logger
-
-	staticRoutes := createStaticRoutes()
-
-	if cfg.Debug {
-		staticRoutes = router.CreatePProfRoutes(staticRoutes)
-	}
-
-	mainRoutes := createMainRoutes(staticRoutes, cfg, db)
-	subdomainRoutes := staticRoutes
 
 	info := shared.NewPicoPipeClient()
 
@@ -541,12 +511,8 @@ func StartApiServer() {
 		}
 	}()
 
-	apiConfig := &router.ApiConfig{
-		Cfg:    cfg,
-		Dbpool: db,
-	}
-	handler := router.CreateServe(mainRoutes, subdomainRoutes, apiConfig)
-	router := http.HandlerFunc(handler)
+	web := &webRouter{cfg: cfg, db: db}
+	handler := router.NewHostRouter(cfg, web.mainMux(), web.sitesMux())
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)
 	logger.Info(
@@ -555,5 +521,5 @@ func StartApiServer() {
 		"domain", cfg.Domain,
 	)
 
-	logger.Error("listen", "err", http.ListenAndServe(portStr, router).Error())
+	logger.Error("listen", "err", http.ListenAndServe(portStr, handler).Error())
 }

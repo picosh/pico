@@ -3,11 +3,9 @@ package feeds
 import (
 	"database/sql"
 	"fmt"
-	"net/http"
 
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/db/postgres"
-	"github.com/picosh/pico/pkg/shared/router"
 )
 
 // DB is the storage feeds uses.
@@ -103,9 +101,4 @@ func (me *PsqlDB) FindFeedItemsByPostID(postID string) ([]*db.FeedItem, error) {
 		return nil, err
 	}
 	return items, nil
-}
-
-// getDB is the storage StartApiServer gave the router, which is a PsqlDB.
-func getDB(r *http.Request) DB {
-	return router.GetDB(r).(DB)
 }

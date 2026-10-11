@@ -3,7 +3,6 @@ package prose
 import (
 	"fmt"
 	"math"
-	"net/http"
 	"sync"
 	"time"
 
@@ -11,7 +10,6 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/db/postgres"
-	"github.com/picosh/pico/pkg/shared/router"
 )
 
 // DB is the storage prose uses.
@@ -334,9 +332,4 @@ func (me *PsqlDB) FindPopularTags(space string) ([]string, error) {
 		return tags, rs.Err()
 	}
 	return tags, nil
-}
-
-// getDB is the storage StartApiServer gave the router, which is a PsqlDB.
-func getDB(r *http.Request) DB {
-	return router.GetDB(r).(DB)
 }

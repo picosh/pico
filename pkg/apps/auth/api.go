@@ -49,7 +49,24 @@ func generateURL(cfg *shared.ConfigSite, path string, space string) string {
 	return fmt.Sprintf("%s/%s%s", cfg.Domain, path, query)
 }
 
-func wellKnownHandler(apiConfig *router.ApiConfig) http.HandlerFunc {
+type ApiConfig struct {
+	Cfg    *shared.ConfigSite
+	Dbpool db.DB
+}
+
+func (hc *ApiConfig) HasPrivilegedAccess(apiToken string) bool {
+	user, err := hc.Dbpool.FindUserByToken(apiToken)
+	if err != nil {
+		return false
+	}
+	return hc.Dbpool.HasFeatureByUser(user.ID, "auth")
+}
+
+func (hc *ApiConfig) HasPlusOrSpace(user *db.User, space string) bool {
+	return db.HasPlusOrSpace(hc.Dbpool, user.ID, space)
+}
+
+func wellKnownHandler(apiConfig *ApiConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		space := r.PathValue("space")
 		if space == "" {
@@ -81,7 +98,7 @@ type oauth2Introspection struct {
 	Username string `json:"username"`
 }
 
-func introspectHandler(apiConfig *router.ApiConfig) http.HandlerFunc {
+func introspectHandler(apiConfig *ApiConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		token := r.FormValue("token")
 		apiConfig.Cfg.Logger.Info("introspect token", "token", token)
@@ -115,7 +132,7 @@ func introspectHandler(apiConfig *router.ApiConfig) http.HandlerFunc {
 	}
 }
 
-func authorizeHandler(apiConfig *router.ApiConfig) http.HandlerFunc {
+func authorizeHandler(apiConfig *ApiConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		responseType := r.URL.Query().Get("response_type")
 		clientID := r.URL.Query().Get("client_id")
@@ -159,7 +176,7 @@ func authorizeHandler(apiConfig *router.ApiConfig) http.HandlerFunc {
 	}
 }
 
-func redirectHandler(apiConfig *router.ApiConfig) http.HandlerFunc {
+func redirectHandler(apiConfig *ApiConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		token := r.FormValue("token")
 		redirectURI := r.FormValue("redirect_uri")
@@ -195,7 +212,7 @@ type oauth2Token struct {
 	AccessToken string `json:"access_token"`
 }
 
-func tokenHandler(apiConfig *router.ApiConfig) http.HandlerFunc {
+func tokenHandler(apiConfig *ApiConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		token := r.FormValue("code")
 		redirectURI := r.FormValue("redirect_uri")
@@ -234,7 +251,7 @@ type sishData struct {
 	RemoteAddress string `json:"remote_addr"`
 }
 
-func keyHandler(apiConfig *router.ApiConfig) http.HandlerFunc {
+func keyHandler(apiConfig *ApiConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var data sishData
 
@@ -308,7 +325,7 @@ func keyHandler(apiConfig *router.ApiConfig) http.HandlerFunc {
 	}
 }
 
-func userHandler(apiConfig *router.ApiConfig) http.HandlerFunc {
+func userHandler(apiConfig *ApiConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !apiConfig.HasPrivilegedAccess(router.GetApiToken(r)) {
 			w.WriteHeader(http.StatusForbidden)
@@ -355,7 +372,7 @@ func userHandler(apiConfig *router.ApiConfig) http.HandlerFunc {
 	}
 }
 
-func rssHandler(apiConfig *router.ApiConfig) http.HandlerFunc {
+func rssHandler(apiConfig *ApiConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		apiToken := r.PathValue("token")
 		user, err := apiConfig.Dbpool.FindUserByToken(apiToken)
@@ -388,7 +405,7 @@ func rssHandler(apiConfig *router.ApiConfig) http.HandlerFunc {
 	}
 }
 
-func pubkeysHandler(apiConfig *router.ApiConfig) http.HandlerFunc {
+func pubkeysHandler(apiConfig *ApiConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userName := r.PathValue("user")
 		user, err := apiConfig.Dbpool.FindUserByName(userName)
@@ -457,7 +474,7 @@ type OrderEvent struct {
 
 // Status code must be 200 or else lemonsqueezy will keep retrying
 // https://docs.lemonsqueezy.com/help/webhooks
-func paymentWebhookHandler(apiConfig *router.ApiConfig) http.HandlerFunc {
+func paymentWebhookHandler(apiConfig *ApiConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		dbpool := apiConfig.Dbpool
 		logger := apiConfig.Cfg.Logger
@@ -863,7 +880,7 @@ func tunsEventLogDrainSub(ctx context.Context, dbpool db.DB, logger *slog.Logger
 	}
 }
 
-func authMux(apiConfig *router.ApiConfig) *http.ServeMux {
+func authMux(apiConfig *ApiConfig) *http.ServeMux {
 	serverRoot, err := fs.Sub(embedFS, "public")
 	if err != nil {
 		panic(err)
@@ -942,7 +959,7 @@ func StartApiServer() {
 	// monthly analytics aggregation (checks daily, runs if previous month is missing)
 	go analyticsAggregationCron(ctx, db, logger)
 
-	apiConfig := &router.ApiConfig{
+	apiConfig := &ApiConfig{
 		Cfg:    cfg,
 		Dbpool: db,
 	}

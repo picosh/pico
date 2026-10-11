@@ -2,11 +2,9 @@ package pastes
 
 import (
 	"fmt"
-	"net/http"
 
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/db/postgres"
-	"github.com/picosh/pico/pkg/shared/router"
 )
 
 // DB is the storage pastes uses.
@@ -44,9 +42,4 @@ func (me *PsqlDB) FindExpiredPosts(space string) ([]*db.Post, error) {
 		return nil, err
 	}
 	return posts, nil
-}
-
-// getDB is the storage StartApiServer gave the router, which is a PsqlDB.
-func getDB(r *http.Request) DB {
-	return router.GetDB(r).(DB)
 }

@@ -277,7 +277,7 @@ func mkpath(path string) string {
 	return fmt.Sprintf("https://auth.pico.test%s", path)
 }
 
-func setupTest() *router.ApiConfig {
+func setupTest() *ApiConfig {
 	logger := shared.CreateLogger("auth-test", false)
 	cfg := &shared.ConfigSite{
 		Issuer:        "auth.pico.test",
@@ -288,7 +288,7 @@ func setupTest() *router.ApiConfig {
 	}
 	cfg.Logger = logger
 	db := NewAuthDb(cfg.Logger)
-	apiConfig := &router.ApiConfig{
+	apiConfig := &ApiConfig{
 		Cfg:    cfg,
 		Dbpool: db,
 	}
