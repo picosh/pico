@@ -92,14 +92,6 @@ func (t *TestDB) FindFeature(userID, name string) (*db.FeatureFlag, error) {
 	return nil, fmt.Errorf("feature not found")
 }
 
-func (t *TestDB) HasFeatureByUser(userID string, feature string) bool {
-	ff, err := t.FindFeature(userID, feature)
-	if err != nil {
-		return false
-	}
-	return ff.IsValid()
-}
-
 func (t *TestDB) InsertAccessLog(_ *db.AccessLog) error {
 	return nil
 }

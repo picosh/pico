@@ -881,21 +881,21 @@ func TestFindFeaturesByUser(t *testing.T) {
 	}
 }
 
-func TestHasFeatureByUser(t *testing.T) {
+func TestHasFeature(t *testing.T) {
 	cleanupTestData(t)
 
 	user, _ := testDB.RegisterUser("hasfeatureowner", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI hasfeatureowner", "comment", "")
 	expiresAt := time.Now().Add(365 * 24 * time.Hour)
 	_, _ = testDB.InsertFeature(user.ID, "plus", expiresAt)
 
-	has := testDB.HasFeatureByUser(user.ID, "plus")
+	has := db.HasFeature(testDB, user.ID, "plus")
 	if !has {
-		t.Error("expected HasFeatureByUser to return true")
+		t.Error("expected HasFeature to return true")
 	}
 
-	hasNot := testDB.HasFeatureByUser(user.ID, "nonexistent")
+	hasNot := db.HasFeature(testDB, user.ID, "nonexistent")
 	if hasNot {
-		t.Error("expected HasFeatureByUser to return false for nonexistent feature")
+		t.Error("expected HasFeature to return false for nonexistent feature")
 	}
 }
 
@@ -1286,7 +1286,7 @@ func TestInviteUser_PlusMember(t *testing.T) {
 	}
 
 	for _, name := range []string{"prose", "pgs", "pastes"} {
-		if !testDB.HasFeatureByUser(to.ID, name) {
+		if !db.HasFeature(testDB, to.ID, name) {
 			t.Errorf("expected invitee to have %s", name)
 		}
 	}
@@ -1314,7 +1314,7 @@ func TestInviteUser_InvitedUserCanInvite(t *testing.T) {
 	if err := testDB.InviteUser(mid.ID, last.ID); err != nil {
 		t.Fatalf("InviteUser from invited user failed: %v", err)
 	}
-	if !testDB.HasFeatureByUser(last.ID, "pastes") {
+	if !db.HasFeature(testDB, last.ID, "pastes") {
 		t.Error("expected second invitee to have pastes")
 	}
 }
@@ -1328,7 +1328,7 @@ func TestInviteUser_Unauthorized(t *testing.T) {
 	if err := testDB.InviteUser(from.ID, to.ID); err == nil {
 		t.Fatal("expected error for user without pico+ or invite")
 	}
-	if testDB.HasFeatureByUser(to.ID, "prose") {
+	if db.HasFeature(testDB, to.ID, "prose") {
 		t.Error("expected invitee not to have prose")
 	}
 }

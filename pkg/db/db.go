@@ -587,6 +587,15 @@ type UserDB interface {
 	FindUserStats(userID string) (*UserStats, error)
 }
 
+// AuthDB is what an SSH server needs to authenticate and log its users.
+type AuthDB interface {
+	FindUser(userID string) (*User, error)
+	FindUserByPubkey(pubkey string) (*User, error)
+	FindUserByName(name string) (*User, error)
+	FindFeature(userID string, feature string) (*FeatureFlag, error)
+	InsertAccessLog(log *AccessLog) error
+}
+
 type KeyDB interface {
 	UpdatePublicKey(pubkeyID, name string) (*PublicKey, error)
 	InsertPublicKey(userID, pubkey, name string) error
@@ -609,6 +618,7 @@ type PostDB interface {
 	FindAllPostsByUser(userID string, space string) ([]*Post, error)
 	FindPostWithFilename(filename string, userID string, space string) (*Post, error)
 	FindPostWithSlug(slug string, userID string, space string) (*Post, error)
+	FindPost(postID string) (*Post, error)
 	InsertPost(post *Post) (*Post, error)
 	UpdatePost(post *Post) (*Post, error)
 	// RenamePost moves cur to next's filename, with the slug, title,
@@ -637,7 +647,6 @@ type FeatureDB interface {
 	AddFeatureUser(username, name string) error
 	FindFeature(userID string, feature string) (*FeatureFlag, error)
 	FindFeaturesByUser(userID string) ([]*FeatureFlag, error)
-	HasFeatureByUser(userID string, feature string) bool
 	InsertFeature(userID, name string, expiresAt time.Time) (*FeatureFlag, error)
 	RemoveFeature(userID, names string) error
 }
@@ -682,7 +691,6 @@ type DB interface {
 	InviteDB
 
 	FindPosts() ([]*Post, error)
-	FindPost(postID string) (*Post, error)
 
 	Close() error
 }
@@ -725,8 +733,16 @@ func FindAccess(dbpool interface {
 	return nil, fmt.Errorf("ERROR: uploading to %s requires an invitation or pico+: https://blog.pico.sh/ann-038-pico-invite-system", service)
 }
 
+// HasFeature reports whether a user has a feature that has not expired.
+func HasFeature(dbpool interface {
+	FindFeature(userID string, feature string) (*FeatureFlag, error)
+}, userID, feature string) bool {
+	ff, err := dbpool.FindFeature(userID, feature)
+	return err == nil && ff.IsValid()
+}
+
 func HasPlusOrSpace(dbpool interface {
-	HasFeatureByUser(userID string, feature string) bool
+	FindFeature(userID string, feature string) (*FeatureFlag, error)
 }, userID, space string) bool {
-	return dbpool.HasFeatureByUser(userID, "plus") || dbpool.HasFeatureByUser(userID, space)
+	return HasFeature(dbpool, userID, "plus") || HasFeature(dbpool, userID, space)
 }

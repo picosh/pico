@@ -9,10 +9,9 @@ import (
 
 // DB is the storage pastes uses.
 type DB interface {
+	db.AuthDB
 	db.PostDB
-	FindUserByName(name string) (*db.User, error)
 	FindExpiredPosts(space string) ([]*db.Post, error)
-	FindFeature(userID string, feature string) (*db.FeatureFlag, error)
 }
 
 // PsqlDB is pastes's postgres storage: the queries apps share, and the ones

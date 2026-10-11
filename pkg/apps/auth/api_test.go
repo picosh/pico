@@ -2,6 +2,7 @@ package auth
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -237,18 +238,19 @@ func (a *AuthDb) FindUserByToken(token string) (*db.User, error) {
 	return &db.User{ID: testUserID, Name: testUsername}, nil
 }
 
-func (a *AuthDb) HasFeatureByUser(userID string, feature string) bool {
-	return true
-}
-
 func (a *AuthDb) FindKeysByUser(user *db.User) ([]*db.PublicKey, error) {
 	return []*db.PublicKey{{ID: "1", UserID: user.ID, Name: "my-key", Key: "nice-pubkey", CreatedAt: &time.Time{}}}, nil
 }
 
+// FindFeature gives pico+ a fixed expiry for the feed snapshots, and every
+// other feature an active flag.
 func (a *AuthDb) FindFeature(userID string, feature string) (*db.FeatureFlag, error) {
 	now := time.Date(2021, 8, 15, 14, 30, 45, 100, time.UTC)
-	oneDayWarning := now.AddDate(0, 0, 1)
-	return &db.FeatureFlag{ID: "2", UserID: userID, Name: "plus", ExpiresAt: &oneDayWarning, CreatedAt: &now}, nil
+	expiresAt := now.AddDate(0, 0, 1)
+	if feature != "plus" {
+		expiresAt = time.Now().AddDate(0, 0, 1)
+	}
+	return &db.FeatureFlag{ID: "2", UserID: userID, Name: feature, ExpiresAt: &expiresAt, CreatedAt: &now}, nil
 }
 
 func (a *AuthDb) InsertPost(post *db.Post) (*db.Post, error) {
@@ -323,8 +325,12 @@ type stubDBWithFeatures struct {
 	features map[string]bool
 }
 
-func (s *stubDBWithFeatures) HasFeatureByUser(userID string, feature string) bool {
-	return s.features[feature]
+func (s *stubDBWithFeatures) FindFeature(userID string, feature string) (*db.FeatureFlag, error) {
+	if !s.features[feature] {
+		return nil, sql.ErrNoRows
+	}
+	expiresAt := time.Now().AddDate(0, 0, 1)
+	return &db.FeatureFlag{UserID: userID, Name: feature, ExpiresAt: &expiresAt}, nil
 }
 
 func newStubDBWithFeatures(features ...string) *stubDBWithFeatures {

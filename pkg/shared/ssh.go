@@ -13,19 +13,12 @@ import (
 const adminPrefix = "admin__"
 
 type SshAuthHandler struct {
-	DB        AuthFindUser
+	DB        db.AuthDB
 	Logger    *slog.Logger
 	Principal string
 }
 
-type AuthFindUser interface {
-	FindUserByPubkey(key string) (*db.User, error)
-	FindUserByName(name string) (*db.User, error)
-	FindFeature(userID, name string) (*db.FeatureFlag, error)
-	InsertAccessLog(log *db.AccessLog) error
-}
-
-func NewSshAuthHandler(dbh AuthFindUser, logger *slog.Logger, principal string) *SshAuthHandler {
+func NewSshAuthHandler(dbh db.AuthDB, logger *slog.Logger, principal string) *SshAuthHandler {
 	return &SshAuthHandler{
 		DB:        dbh,
 		Logger:    logger,

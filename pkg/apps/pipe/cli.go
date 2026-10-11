@@ -42,7 +42,7 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 			uuidStr := uuid.NewString()
 			isAdmin := false
 			if user != nil {
-				isAdmin = handler.DBPool.HasFeatureByUser(user.ID, "admin")
+				isAdmin = db.HasFeature(handler.DBPool, user.ID, "admin")
 				if isAdmin && strings.HasPrefix(sesh.User(), "admin__") {
 					uuidStr = fmt.Sprintf("admin-%s", uuidStr)
 				}

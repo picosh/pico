@@ -307,7 +307,7 @@ func FindUser(shrd *SharedModel) (*db.User, error) {
 
 	// impersonation
 	if strings.HasPrefix(usr, adminPrefix) {
-		hasFeature := shrd.Dbpool.HasFeatureByUser(user.ID, "admin")
+		hasFeature := db.HasFeature(shrd.Dbpool, user.ID, "admin")
 		if hasFeature {
 			impersonate := strings.TrimPrefix(usr, adminPrefix)
 			user, err = shrd.Dbpool.FindUserByName(impersonate)

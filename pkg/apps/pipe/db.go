@@ -10,9 +10,8 @@ import (
 
 // DB is the storage pipe uses.
 type DB interface {
-	FindUserByName(name string) (*db.User, error)
+	db.AuthDB
 	FindUserByToken(token string) (*db.User, error)
-	HasFeatureByUser(userID string, feature string) bool
 	UpsertPipeMonitor(userID, topic string, dur time.Duration, winEnd *time.Time) error
 	UpdatePipeMonitorLastPing(userID, topic string, lastPing *time.Time) error
 	RemovePipeMonitor(userID, topic string) error

@@ -59,7 +59,7 @@ func (hc *ApiConfig) HasPrivilegedAccess(apiToken string) bool {
 	if err != nil {
 		return false
 	}
-	return hc.Dbpool.HasFeatureByUser(user.ID, "auth")
+	return db.HasFeature(hc.Dbpool, user.ID, "auth")
 }
 
 func (hc *ApiConfig) HasPlusOrSpace(user *db.User, space string) bool {

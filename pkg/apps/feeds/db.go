@@ -10,11 +10,9 @@ import (
 
 // DB is the storage feeds uses.
 type DB interface {
+	db.AuthDB
 	db.PostDB
-	FindUser(userID string) (*db.User, error)
-	FindPost(postID string) (*db.Post, error)
 	FindUsersWithPost(space string) ([]*db.User, error)
-	HasFeatureByUser(userID string, feature string) bool
 	InsertFeedItems(postID string, items []*db.FeedItem) error
 	FindFeedItemsByPostID(postID string) ([]*db.FeedItem, error)
 }

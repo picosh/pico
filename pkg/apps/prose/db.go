@@ -14,13 +14,11 @@ import (
 
 // DB is the storage prose uses.
 type DB interface {
+	db.AuthDB
 	db.PostDB
-	ReplaceTagsByPost(tags []string, postID string) error
-	ReplaceAliasesByPost(aliases []string, postID string) error
+	db.TagDB
 	FindUserPostsByTag(pager *db.Pager, tag, userID, space string) (*db.Paginate[*db.Post], error)
 	FindPopularPosts() ([]*db.Post, error)
-	FindUserByName(name string) (*db.User, error)
-	FindFeature(userID string, feature string) (*db.FeatureFlag, error)
 }
 
 // PsqlDB is prose's postgres storage: the queries apps share, and the ones

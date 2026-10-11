@@ -48,7 +48,7 @@ func (me *PsqlDB) hasActiveInvite(userID string) (bool, error) {
 		return false, err
 	}
 	for _, name := range inviteFeatures {
-		if me.HasFeatureByUser(userID, name) {
+		if db.HasFeature(me, userID, name) {
 			return true, nil
 		}
 	}
@@ -56,7 +56,7 @@ func (me *PsqlDB) hasActiveInvite(userID string) (bool, error) {
 }
 
 func (me *PsqlDB) InviteUser(fromUserID string, toUserID string) error {
-	canInvite := me.HasFeatureByUser(fromUserID, "plus")
+	canInvite := db.HasFeature(me, fromUserID, "plus")
 	if !canInvite {
 		invited, err := me.hasActiveInvite(fromUserID)
 		if err != nil {

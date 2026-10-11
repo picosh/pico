@@ -31,14 +31,6 @@ func (me *PsqlDB) FindFeaturesByUser(userID string) ([]*db.FeatureFlag, error) {
 	return features, nil
 }
 
-func (me *PsqlDB) HasFeatureByUser(userID string, feature string) bool {
-	ff, err := me.FindFeature(userID, feature)
-	if err != nil {
-		return false
-	}
-	return ff.IsValid()
-}
-
 func (me *PsqlDB) InsertFeature(userID, name string, expiresAt time.Time) (*db.FeatureFlag, error) {
 	var featureID string
 	err := me.Db.QueryRow(
