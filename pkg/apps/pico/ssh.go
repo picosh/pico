@@ -62,8 +62,9 @@ func StartSshServer() {
 	)
 
 	cliHandler := &CliHandler{
-		Logger: logger,
-		DBPool: dbpool,
+		Logger:        logger,
+		DBPool:        dbpool,
+		DomainTargets: cfg.CustomDomainTargets,
 	}
 
 	sshAuth := shared.NewSshAuthHandler(dbpool, logger, "pico")

@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net"
+	"slices"
 	"strings"
 
 	"github.com/picosh/pico/pkg/db"
@@ -107,8 +109,59 @@ func checkTunsRecords(c *Cmd, records []string) string {
 	return fmt.Sprintf("%s is invalid: no record is your username or the SHA256 fingerprint of one of your keys", strings.Join(quoted, ", "))
 }
 
-// dnsCheck reports, for each service, whether domain has a TXT record and
-// whether the service would accept it.
+// lookupHost resolves host and returns its canonical name, or "" when it has
+// no CNAME.
+func lookupHost(host string) (string, []string, error) {
+	addrs, err := net.LookupHost(host)
+	if err != nil {
+		return "", nil, err
+	}
+	cname, err := net.LookupCNAME(host)
+	if err != nil {
+		return "", addrs, nil
+	}
+	cname = strings.TrimSuffix(cname, ".")
+	if strings.EqualFold(cname, host) {
+		cname = ""
+	}
+	return cname, addrs, nil
+}
+
+// checkPointer reports what host resolves to and which of the service
+// domains it points at. Addresses are compared so a CNAME to a regional
+// name or an apex A record both count.
+func (c *Cmd) checkPointer(host string, lookup func(string) (string, []string, error)) string {
+	cname, addrs, err := lookup(host)
+	var dnsErr *net.DNSError
+	if errors.As(err, &dnsErr) && dnsErr.IsNotFound {
+		return fmt.Sprintf("%s: no CNAME or A record", host)
+	}
+	if err != nil {
+		return fmt.Sprintf("%s: lookup failed: %v", host, err)
+	}
+
+	line := fmt.Sprintf("%s: resolves to %s", host, strings.Join(addrs, ", "))
+	if cname != "" {
+		line = fmt.Sprintf("%s: CNAME %s, resolves to %s", host, cname, strings.Join(addrs, ", "))
+	}
+	matches := []string{}
+	for _, target := range c.DomainTargets {
+		_, targetAddrs, err := lookup(target)
+		if err != nil {
+			continue
+		}
+		if slices.ContainsFunc(addrs, func(a string) bool { return slices.Contains(targetAddrs, a) }) {
+			matches = append(matches, target)
+		}
+	}
+	if len(matches) == 0 {
+		return fmt.Sprintf("%s, which is not %s", line, strings.Join(c.DomainTargets, ", "))
+	}
+	return fmt.Sprintf("%s, which is %s", line, strings.Join(matches, ", "))
+}
+
+// dnsCheck reports what domain points at and, for each service, whether it
+// has a TXT record the service would accept.
 func (c *Cmd) dnsCheck(domain string) error {
 	domain = strings.TrimSuffix(strings.ToLower(strings.TrimSpace(domain)), ".")
 	base, wildcard := strings.CutPrefix(domain, "*.")
@@ -127,6 +180,12 @@ func (c *Cmd) dnsCheck(domain string) error {
 		_, _ = rand.Read(label)
 		host = hex.EncodeToString(label) + "." + base
 	}
+
+	resolve := c.lookupHost
+	if resolve == nil {
+		resolve = lookupHost
+	}
+	c.output(c.checkPointer(host, resolve))
 
 	for _, svc := range customDomainServices {
 		name := router.TXTRecordName(host, svc.space)

@@ -43,7 +43,11 @@ type Cmd struct {
 	Dbpool     db.DB
 	Write      bool
 
-	lookupTXT func(host, space string) ([]string, error)
+	// DomainTargets are the hosts dns-check expects a custom domain to point at.
+	DomainTargets []string
+
+	lookupTXT  func(host, space string) ([]string, error)
+	lookupHost func(host string) (cname string, addrs []string, err error)
 }
 
 func (c *Cmd) output(out string) {
@@ -58,7 +62,7 @@ func (c *Cmd) help() {
 	helpStr += "access-logs - fetch access logs from the last 30 days\n"
 	helpStr += "chat - IRC chat (must enable pty with `-t` to the SSH command)\n"
 	helpStr += "not-found - return all status 404 requests for a host (hostname.com [year|month])\n"
-	helpStr += "dns-check - check a domain's TXT records for pgs, prose and tuns custom domains (hostname.com or *.hostname.com)\n"
+	helpStr += "dns-check - check a domain's CNAME/A and TXT records for pgs, prose and tuns custom domains (hostname.com or *.hostname.com)\n"
 	c.output(helpStr)
 }
 
@@ -177,8 +181,9 @@ func (c *Cmd) logs(ctx context.Context) error {
 }
 
 type CliHandler struct {
-	DBPool db.DB
-	Logger *slog.Logger
+	DBPool        db.DB
+	Logger        *slog.Logger
+	DomainTargets []string
 }
 
 func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
@@ -250,6 +255,8 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 				Log:        log,
 				Dbpool:     dbpool,
 				Write:      false,
+
+				DomainTargets: handler.DomainTargets,
 			}
 
 			cmd := strings.TrimSpace(args[0])

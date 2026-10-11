@@ -352,6 +352,7 @@ services:
       - all
     logging: *default-logging
   pico-ssh:
+    dns: 1.1.1.1
     networks:
       pico:
         aliases:

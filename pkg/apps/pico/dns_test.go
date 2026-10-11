@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"strings"
 	"testing"
 
@@ -124,6 +125,9 @@ func TestDNSCheck(t *testing.T) {
 				Session: session,
 				Log:     slog.New(slog.DiscardHandler),
 				Dbpool:  dbpool,
+				lookupHost: func(host string) (string, []string, error) {
+					return "", nil, &net.DNSError{IsNotFound: true}
+				},
 				lookupTXT: func(host, space string) ([]string, error) {
 					if tt.domain == "" && host != "example.com" {
 						t.Fatalf("looked up %q", host)
@@ -149,6 +153,60 @@ func TestDNSCheck(t *testing.T) {
 				if !strings.Contains(out, line) {
 					t.Errorf("missing %q in output:\n%s", line, out)
 				}
+			}
+		})
+	}
+
+	pointers := []struct {
+		name  string
+		hosts map[string][]string
+		cname string
+		want  string
+	}{
+		{"none", map[string][]string{}, "", "example.com: no CNAME or A record"},
+		{"cname to a region", map[string][]string{
+			"example.com": {"10.0.0.3"},
+			"pgs.sh":      {"10.0.0.1"},
+			"prose.sh":    {"10.0.0.2"},
+			"tuns.sh":     {"10.0.0.3"},
+			"nue.tuns.sh": {"10.0.0.4"},
+		}, "tuns.pico.sh", "example.com: CNAME tuns.pico.sh, resolves to 10.0.0.3, which is tuns.sh"},
+		{"apex A", map[string][]string{
+			"example.com": {"10.0.0.9", "10.0.0.1"},
+			"pgs.sh":      {"10.0.0.1"},
+		}, "", "example.com: resolves to 10.0.0.9, 10.0.0.1, which is pgs.sh"},
+		{"elsewhere", map[string][]string{
+			"example.com": {"10.0.0.9"},
+			"pgs.sh":      {"10.0.0.1"},
+		}, "", "example.com: resolves to 10.0.0.9, which is not pgs.sh, prose.sh, tuns.sh, nue.tuns.sh"},
+	}
+	for _, tt := range pointers {
+		t.Run("pointer "+tt.name, func(t *testing.T) {
+			session := &fakeSession{}
+			cmd := &Cmd{
+				User:          me,
+				Session:       session,
+				Dbpool:        dbpool,
+				DomainTargets: []string{"pgs.sh", "prose.sh", "tuns.sh", "nue.tuns.sh"},
+				lookupHost: func(host string) (string, []string, error) {
+					addrs, ok := tt.hosts[host]
+					if !ok {
+						return "", nil, &net.DNSError{IsNotFound: true}
+					}
+					if host == "example.com" {
+						return tt.cname, addrs, nil
+					}
+					return "", addrs, nil
+				},
+				lookupTXT: func(host, space string) ([]string, error) {
+					return nil, router.ErrNoTXTRecord
+				},
+			}
+			if err := cmd.dnsCheck("example.com"); err != nil {
+				t.Fatal(err)
+			}
+			if out := session.String(); !strings.Contains(out, tt.want+"\r\n") {
+				t.Errorf("missing %q in output:\n%s", tt.want, out)
 			}
 		})
 	}
