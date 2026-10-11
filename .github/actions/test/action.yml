@@ -16,5 +16,5 @@ runs:
     - name: Run tests
       shell: bash
       run: |
-        PICO_SECRET="danger" go test -v ./... -cover -race -coverprofile=coverage.out
+        PICO_SECRET="danger" go test -v ./... -cover -race -coverprofile=coverage.out -timeout 5m
         go tool cover -func=coverage.out -o=coverage.out

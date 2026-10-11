@@ -21,7 +21,7 @@ var uploadModes = map[string]func(e *rsyncEnv, dir string) *exec.Cmd{
 		return exec.Command("scp", append(append([]string{"-O", "-r"}, e.sshArgs...), dir+"/.", "localhost:/site")...)
 	},
 	"scp-sftp": func(e *rsyncEnv, dir string) *exec.Cmd {
-		return exec.Command("scp", append(append([]string{"-r"}, e.sshArgs...), dir+"/.", "localhost:/site")...)
+		return exec.Command("scp", append(append([]string{"-s", "-r"}, e.sshArgs...), dir+"/.", "localhost:/site")...)
 	},
 	"sftp": func(e *rsyncEnv, dir string) *exec.Cmd {
 		return e.sftp("-mkdir /site", "put -r "+dir+"/. /site")
@@ -172,7 +172,7 @@ func TestScpSftpDownloadAndCommands(t *testing.T) {
 
 	t.Run("scp download over sftp", func(t *testing.T) {
 		dst := t.TempDir()
-		cmd := exec.Command("scp", append(append([]string{"-r"}, env.sshArgs...), "localhost:/site/css", dst)...)
+		cmd := exec.Command("scp", append(append([]string{"-s", "-r"}, env.sshArgs...), "localhost:/site/css", dst)...)
 		if out, code := runCmd(t, cmd); code != 0 {
 			t.Fatalf("exit %d\n%s", code, out)
 		}
@@ -639,7 +639,7 @@ func TestSingleFileIntoProject(t *testing.T) {
 			return exec.Command("scp", append(append([]string{"-O"}, e.sshArgs...), src, "localhost:"+dest)...)
 		},
 		"scp-sftp": func(e *rsyncEnv, src, dest string) *exec.Cmd {
-			return exec.Command("scp", append(e.sshArgs, src, "localhost:"+dest)...)
+			return exec.Command("scp", append(append([]string{"-s"}, e.sshArgs...), src, "localhost:"+dest)...)
 		},
 		"sftp": func(e *rsyncEnv, src, dest string) *exec.Cmd {
 			return e.sftp("put " + src + " " + dest)

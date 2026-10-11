@@ -160,7 +160,9 @@ func (e *rsyncEnv) run(args ...string) (string, error) {
 	e.t.Helper()
 	rsh := fmt.Sprintf("%s -test.run=^TestHelperProcess$ --", os.Args[0])
 	cmd := exec.Command("rsync", append([]string{"-e", rsh}, args...)...)
-	cmd.Env = append(os.Environ(), "RSYNC_TEST_ROOT="+e.remote)
+	// A race build sleeps a second before exiting, once per helper.
+	gorace := strings.TrimSpace(os.Getenv("GORACE") + " atexit_sleep_ms=0")
+	cmd.Env = append(os.Environ(), "RSYNC_TEST_ROOT="+e.remote, "GORACE="+gorace)
 	out, err := cmd.CombinedOutput()
 	return string(out), err
 }

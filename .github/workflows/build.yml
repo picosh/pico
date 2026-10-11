@@ -16,14 +16,14 @@ env:
 
 jobs:
   test:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-26.04
     steps:
     - name: Checkout repo
       uses: actions/checkout@v3
     - name: Run tests and lint
       uses: ./.github/actions/test
   build-main:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-26.04
     needs: test
     strategy:
       matrix:
@@ -44,7 +44,7 @@ jobs:
         platforms: ${{ env.PLATFORMS }}
         registry: ${{ env.REGISTRY }}
   build-auth:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-26.04
     needs: test
     steps:
     - name: Checkout repo
@@ -63,7 +63,7 @@ jobs:
         registry: ${{ env.REGISTRY }}
         ssh: false
   build-pico:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-26.04
     needs: test
     steps:
     - name: Checkout repo
@@ -82,7 +82,7 @@ jobs:
         registry: ${{ env.REGISTRY }}
         web: false
   build-pgs-cdn:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-26.04
     needs: test
     steps:
     - name: Checkout repo
@@ -111,7 +111,7 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
   build-pgs-standalone:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-26.04
     needs: test
     steps:
     - name: Checkout repo
@@ -140,7 +140,7 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
   build-bouncer:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-26.04
     needs: test
     steps:
     - name: Checkout repo
@@ -175,7 +175,7 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
   build-caddy:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-26.04
     needs: test
     steps:
     - name: Checkout repo
