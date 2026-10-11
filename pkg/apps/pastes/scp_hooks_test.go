@@ -13,7 +13,9 @@ import (
 func TestFileMetaKeepsSettings(t *testing.T) {
 	soon := time.Now().Add(time.Hour)
 	past := time.Now().Add(-time.Hour)
-	day := 24 * time.Hour
+	// Pastes expire after calendar days, which a daylight saving change
+	// makes an hour longer or shorter.
+	defaultExpiry := time.Until(time.Now().AddDate(0, 0, DEFAULT_EXPIRES_AT)).Round(time.Minute)
 	tests := []struct {
 		name   string
 		cmd    []string
@@ -22,12 +24,12 @@ func TestFileMetaKeepsSettings(t *testing.T) {
 		// expires is how long until the paste expires, or 0 for never.
 		expires time.Duration
 	}{
-		{name: "new", expires: 90 * day},
+		{name: "new", expires: defaultExpiry},
 		{name: "new with arguments", cmd: []string{"hidden=true", "expires=2h"}, hidden: true, expires: 2 * time.Hour},
 		{name: "existing", cur: &db.Post{Hidden: true, ExpiresAt: &soon}, hidden: true, expires: time.Hour},
 		{name: "existing without expiry", cur: &db.Post{Hidden: true}, hidden: true},
-		{name: "existing past its expiry", cur: &db.Post{Hidden: true, ExpiresAt: &past}, hidden: true, expires: 90 * day},
-		{name: "existing with arguments", cmd: []string{"hidden=false", "expires=true"}, cur: &db.Post{Hidden: true}, expires: 90 * day},
+		{name: "existing past its expiry", cur: &db.Post{Hidden: true, ExpiresAt: &past}, hidden: true, expires: defaultExpiry},
+		{name: "existing with arguments", cmd: []string{"hidden=false", "expires=true"}, cur: &db.Post{Hidden: true}, expires: defaultExpiry},
 		{name: "existing made permanent", cmd: []string{"expires=false"}, cur: &db.Post{ExpiresAt: &soon}},
 	}
 	for _, tt := range tests {

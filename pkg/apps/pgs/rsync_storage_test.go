@@ -58,6 +58,8 @@ func newRsyncEnv(t *testing.T, st storage.StorageServe) *rsyncEnv {
 
 	t.Setenv("PGS_SSH_PORT", "0")
 	cfg := NewPgsConfig(logger, dbpool, st, discardPubsub{})
+	cfg.Domain = "pgs.sh"
+	cfg.WebProtocol = "https"
 	done := make(chan error)
 	readyCh := make(chan *pssh.SSHServer)
 	prometheus.DefaultRegisterer = prometheus.NewRegistry()
