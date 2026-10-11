@@ -27,7 +27,7 @@ func StartSshServer() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	dbh := postgres.NewDB(cfg.DbURL, cfg.Logger)
+	dbh := NewDB(postgres.NewDB(cfg.DbURL, cfg.Logger))
 	defer func() {
 		_ = dbh.Close()
 	}()

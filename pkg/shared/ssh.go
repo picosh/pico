@@ -151,7 +151,11 @@ func (r *SshAuthHandler) PubkeyAuthHandler(conn ssh.ConnMetadata, key ssh.Public
 	return perms, nil
 }
 
-func FindPlusFF(dbpool db.DB, cfg *ConfigSite, userID string) *db.FeatureFlag {
+type FeatureFinder interface {
+	FindFeature(userID string, feature string) (*db.FeatureFlag, error)
+}
+
+func FindPlusFF(dbpool FeatureFinder, cfg *ConfigSite, userID string) *db.FeatureFlag {
 	ff, _ := dbpool.FindFeature(userID, "plus")
 	// we have free tiers so users might not have a feature flag
 	// in which case we set sane defaults

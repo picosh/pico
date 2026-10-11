@@ -1,194 +1,35 @@
 package postgres
 
 import (
-	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"os"
-	"os/exec"
-	"path/filepath"
-	"runtime"
 	"slices"
-	"sort"
 	"testing"
 	"time"
 
-	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq"
 	"github.com/picosh/pico/pkg/db"
-	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/modules/postgres"
-	"github.com/testcontainers/testcontainers-go/wait"
+	"github.com/picosh/pico/pkg/db/postgres/pgtest"
 )
 
 var testDB *PsqlDB
-var testLogger *slog.Logger
-var skipTests bool
-
-func setupContainerRuntime() bool {
-	// Check if DATABASE_URL is set for external postgres (CI/CD or manual testing)
-	if os.Getenv("TEST_DATABASE_URL") != "" {
-		return true
-	}
-
-	// Try docker
-	if cmd := exec.Command("docker", "info"); cmd.Run() == nil {
-		return true
-	}
-
-	return false
-}
 
 func TestMain(m *testing.M) {
-	ctx := context.Background()
-	testLogger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
-
-	// REQUIRE_TESTCONTAINERS=1 makes the build fail if containers can't start
-	requireContainers := os.Getenv("REQUIRE_TESTCONTAINERS") == "1"
-
-	// Check for external database URL first (for CI/CD or manual testing)
-	if dbURL := os.Getenv("TEST_DATABASE_URL"); dbURL != "" {
-		testDB = NewDB(dbURL, testLogger)
-		if err := setupTestSchema(testDB.Db); err != nil {
-			panic(fmt.Sprintf("failed to setup schema: %s", err))
-		}
-		code := m.Run()
-		_ = testDB.Close()
-		os.Exit(code)
-	}
-
-	if !setupContainerRuntime() {
-		fmt.Println("Container runtime not available, skipping integration tests")
-		fmt.Println("To run tests, either:")
-		fmt.Println("  - Set TEST_DATABASE_URL to a postgres connection string")
-		fmt.Println("  - Start docker daemon")
-		skipTests = true
-		exitCode := 0
-		if requireContainers {
-			exitCode = 1
-		}
-		os.Exit(exitCode)
-	}
-
-	pgContainer, err := postgres.Run(ctx,
-		"postgres:14",
-		postgres.WithDatabase("pico_test"),
-		postgres.WithUsername("postgres"),
-		postgres.WithPassword("postgres"),
-		testcontainers.WithWaitStrategy(
-			wait.ForLog("database system is ready to accept connections").
-				WithOccurrence(2).
-				WithStartupTimeout(30*time.Second)),
-	)
-	if err != nil {
-		fmt.Printf("Failed to start postgres container (Docker may not be running): %s\n", err)
-		skipTests = true
-		exitCode := 0
-		if requireContainers {
-			exitCode = 1
-		}
-		os.Exit(exitCode)
-	}
-
-	connStr, err := pgContainer.ConnectionString(ctx, "sslmode=disable")
-	if err != nil {
-		panic(fmt.Sprintf("failed to get connection string: %s", err))
-	}
-
-	testDB = NewDB(connStr, testLogger)
-
-	if err := setupTestSchema(testDB.Db); err != nil {
-		panic(fmt.Sprintf("failed to setup schema: %s", err))
-	}
-
-	code := m.Run()
-
-	_ = testDB.Close()
-	_ = pgContainer.Terminate(ctx)
-
-	os.Exit(code)
-}
-
-func getProjectRoot() string {
-	_, filename, _, ok := runtime.Caller(0)
-	if !ok {
-		panic("failed to get current file path")
-	}
-	// storage_test.go is in pkg/db/postgres/, so go up 4 levels to get project root
-	return filepath.Join(filepath.Dir(filename), "..", "..", "..")
-}
-
-func setupTestSchema(db *sqlx.DB) error {
-	projectRoot := getProjectRoot()
-	migrationsDir := filepath.Join(projectRoot, "sql", "migrations")
-
-	// Read all migration files
-	entries, err := os.ReadDir(migrationsDir)
-	if err != nil {
-		return fmt.Errorf("failed to read migrations directory: %w", err)
-	}
-
-	// Sort by filename (they're date-prefixed, so alphabetical order is correct)
-	var migrationFiles []string
-	for _, entry := range entries {
-		if !entry.IsDir() && filepath.Ext(entry.Name()) == ".sql" {
-			migrationFiles = append(migrationFiles, entry.Name())
-		}
-	}
-	sort.Strings(migrationFiles)
-
-	// Execute each migration in order
-	for _, filename := range migrationFiles {
-		migrationPath := filepath.Join(migrationsDir, filename)
-		content, err := os.ReadFile(migrationPath)
-		if err != nil {
-			return fmt.Errorf("failed to read migration %s: %w", filename, err)
-		}
-
-		_, err = db.Exec(string(content))
-		if err != nil {
-			return fmt.Errorf("failed to execute migration %s: %w", filename, err)
-		}
-	}
-
-	return nil
+	pgtest.Main(m)
 }
 
 func cleanupTestData(t *testing.T) {
 	t.Helper()
-	testDB.ClearPopularPostsCache()
-	tables := []string{
-		"access_logs", "tuns_event_logs", "analytics_visits",
-		"feed_items", "post_aliases", "post_tags", "posts",
-		"projects", "feature_flags", "payment_history", "tokens",
-		"public_keys", "pipe_monitors", "app_users",
+	if testDB == nil {
+		testDB = NewDB(pgtest.URL(t), slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError})))
 	}
-	for _, table := range tables {
-		_, err := testDB.Db.Exec(fmt.Sprintf("DELETE FROM %s", table))
-		if err != nil {
-			t.Fatalf("failed to clean up %s: %v", table, err)
-		}
-	}
+	pgtest.Clean(t, testDB.Db)
 }
 
 func mustInsertPost(t *testing.T, post *db.Post) *db.Post {
 	t.Helper()
-	now := time.Now()
-	if post.UpdatedAt == nil {
-		post.UpdatedAt = &now
-	}
-	if post.PublishAt == nil {
-		post.PublishAt = &now
-	}
-	created, err := testDB.InsertPost(post)
-	if err != nil {
-		t.Fatalf("InsertPost failed: %v", err)
-	}
-	return created
+	return pgtest.InsertPost(t, testDB, post)
 }
-
-// ============ User Management Tests ============
 
 func TestRegisterUser_Success(t *testing.T) {
 	cleanupTestData(t)
@@ -842,141 +683,6 @@ func TestFindAllPostsByUser(t *testing.T) {
 	}
 }
 
-func TestFindUsersWithPost(t *testing.T) {
-	cleanupTestData(t)
-
-	user, _ := testDB.RegisterUser("feedspostowner", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI feedspostowner", "comment", "")
-
-	_ = mustInsertPost(t, &db.Post{UserID: user.ID, Filename: "feed.txt", Slug: "feed", Title: "Feed", Space: "feeds"})
-
-	users, err := testDB.FindUsersWithPost("feeds")
-	if err != nil {
-		t.Fatalf("FindUsersWithPost failed: %v", err)
-	}
-	if len(users) != 1 {
-		t.Errorf("expected 1 user, got %d", len(users))
-	}
-}
-
-func TestFindExpiredPosts(t *testing.T) {
-	cleanupTestData(t)
-
-	user, _ := testDB.RegisterUser("expiredpostowner", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI expiredpostowner", "comment", "")
-
-	expired := time.Now().Add(-24 * time.Hour)
-	_ = mustInsertPost(t, &db.Post{
-		UserID:    user.ID,
-		Filename:  "expired.txt",
-		Slug:      "expired",
-		Title:     "Expired",
-		Space:     "pastes",
-		ExpiresAt: &expired,
-	})
-
-	posts, err := testDB.FindExpiredPosts("pastes")
-	if err != nil {
-		t.Fatalf("FindExpiredPosts failed: %v", err)
-	}
-	if len(posts) != 1 {
-		t.Errorf("expected 1 expired post, got %d", len(posts))
-	}
-}
-
-func TestFindPopularPosts(t *testing.T) {
-	cleanupTestData(t)
-
-	user, _ := testDB.RegisterUser("feedowner", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI feedowner", "comment", "")
-
-	now := time.Now()
-	post := mustInsertPost(t, &db.Post{UserID: user.ID, Filename: "feedpost.md", Slug: "feedpost", Title: "Feed Post", Space: "prose", PublishAt: &now})
-
-	// Before having feature flag, should not appear
-	posts, err := testDB.FindPopularPosts()
-	if err != nil {
-		t.Fatalf("FindPopularPosts failed: %v", err)
-	}
-	if len(posts) != 0 {
-		t.Errorf("expected 0 posts without feature flag, got %d", len(posts))
-	}
-
-	// Add prose feature flag
-	_, err = testDB.InsertFeature(user.ID, "prose", time.Now().Add(time.Hour*24))
-	if err != nil {
-		t.Fatalf("InsertFeature failed: %v", err)
-	}
-	testDB.ClearPopularPostsCache()
-
-	posts, err = testDB.FindPopularPosts()
-	if err != nil {
-		t.Fatalf("FindPopularPosts failed: %v", err)
-	}
-	if len(posts) != 1 {
-		t.Fatalf("expected 1 post in popular posts, got %d", len(posts))
-	}
-	if posts[0].Score != 0 {
-		t.Errorf("expected score 0, got %d", posts[0].Score)
-	}
-
-	// Add visits
-	_ = testDB.InsertVisit(&db.AnalyticsVisits{UserID: user.ID, PostID: post.ID, IpAddress: "192.168.1.1", Status: 200})
-	_ = testDB.InsertVisit(&db.AnalyticsVisits{UserID: user.ID, PostID: post.ID, IpAddress: "192.168.1.2", Status: 200})
-	_ = testDB.InsertVisit(&db.AnalyticsVisits{UserID: user.ID, PostID: post.ID, IpAddress: "192.168.1.1", Status: 200}) // duplicate IP
-
-	// Before clearing cache, should return cached result (score 0)
-	cachedPosts, err := testDB.FindPopularPosts()
-	if err != nil {
-		t.Fatalf("FindPopularPosts failed: %v", err)
-	}
-	if cachedPosts[0].Score != 0 {
-		t.Errorf("expected cached score 0, got %d", cachedPosts[0].Score)
-	}
-
-	// After clearing cache, should re-query and return updated score 2
-	testDB.ClearPopularPostsCache()
-	posts, err = testDB.FindPopularPosts()
-	if err != nil {
-		t.Fatalf("FindPopularPosts failed: %v", err)
-	}
-	if len(posts) != 1 {
-		t.Fatalf("expected 1 post, got %d", len(posts))
-	}
-	if posts[0].Score != 2 {
-		t.Errorf("expected score 2 (unique visitors), got %d", posts[0].Score)
-	}
-
-	// Verify max 3 posts per user
-	testDB.ClearPopularPostsCache()
-	post2Time := now.Add(-1 * time.Hour)
-	_ = mustInsertPost(t, &db.Post{UserID: user.ID, Filename: "feedpost2.md", Slug: "feedpost2", Title: "Feed Post 2", Space: "prose", PublishAt: &post2Time})
-	post3Time := now.Add(-2 * time.Hour)
-	_ = mustInsertPost(t, &db.Post{UserID: user.ID, Filename: "feedpost3.md", Slug: "feedpost3", Title: "Feed Post 3", Space: "prose", PublishAt: &post3Time})
-	post4Time := now.Add(-3 * time.Hour)
-	_ = mustInsertPost(t, &db.Post{UserID: user.ID, Filename: "feedpost4.md", Slug: "feedpost4", Title: "Feed Post 4", Space: "prose", PublishAt: &post4Time})
-
-	posts, err = testDB.FindPopularPosts()
-	if err != nil {
-		t.Fatalf("FindPopularPosts failed: %v", err)
-	}
-	if len(posts) != 3 {
-		t.Errorf("expected max 3 posts for single user, got %d", len(posts))
-	}
-
-	// Post older than 30 days should be excluded
-	testDB.ClearPopularPostsCache()
-	oldTime := now.Add(-31 * 24 * time.Hour)
-	_ = mustInsertPost(t, &db.Post{UserID: user.ID, Filename: "oldpost.md", Slug: "oldpost", Title: "Old Post", Space: "prose", PublishAt: &oldTime})
-
-	posts, err = testDB.FindPopularPosts()
-	if err != nil {
-		t.Fatalf("FindPopularPosts failed: %v", err)
-	}
-	if len(posts) != 3 {
-		t.Errorf("expected still 3 posts (old post excluded), got %d", len(posts))
-	}
-}
-
-// ============ Tags Tests ============
-
 func TestReplaceTagsByPost(t *testing.T) {
 	cleanupTestData(t)
 
@@ -993,62 +699,6 @@ func TestReplaceTagsByPost(t *testing.T) {
 		t.Errorf("expected 2 tags, got %d", len(found.Tags))
 	}
 }
-
-func TestFindUserPostsByTag(t *testing.T) {
-	cleanupTestData(t)
-
-	user, _ := testDB.RegisterUser("usertagowner", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI usertagowner", "comment", "")
-	now := time.Now()
-	post := mustInsertPost(t, &db.Post{UserID: user.ID, Filename: "usertag.md", Slug: "usertag", Title: "User Tag", Space: "prose", PublishAt: &now})
-	_ = testDB.ReplaceTagsByPost([]string{"mytag"}, post.ID)
-
-	pager := &db.Pager{Num: 10, Page: 0}
-	result, err := testDB.FindUserPostsByTag(pager, "mytag", user.ID, "prose")
-	if err != nil {
-		t.Fatalf("FindUserPostsByTag failed: %v", err)
-	}
-	if len(result.Data) != 1 {
-		t.Errorf("expected 1 post with tag, got %d", len(result.Data))
-	}
-}
-
-func TestFindPostsByTag(t *testing.T) {
-	cleanupTestData(t)
-
-	user, _ := testDB.RegisterUser("tagsearchowner", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI tagsearchowner", "comment", "")
-	now := time.Now()
-	post := mustInsertPost(t, &db.Post{UserID: user.ID, Filename: "tagsearch.md", Slug: "tagsearch", Title: "Tag Search", Space: "prose", PublishAt: &now})
-	_ = testDB.ReplaceTagsByPost([]string{"searchtag"}, post.ID)
-
-	pager := &db.Pager{Num: 10, Page: 0}
-	result, err := testDB.FindPostsByTag(pager, "searchtag", "prose")
-	if err != nil {
-		t.Fatalf("FindPostsByTag failed: %v", err)
-	}
-	if len(result.Data) != 1 {
-		t.Errorf("expected 1 post with tag, got %d", len(result.Data))
-	}
-}
-
-func TestFindPopularTags(t *testing.T) {
-	cleanupTestData(t)
-
-	user, _ := testDB.RegisterUser("populartagowner", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI populartagowner", "comment", "")
-	post1 := mustInsertPost(t, &db.Post{UserID: user.ID, Filename: "pop1.md", Slug: "pop1", Title: "Pop 1", Space: "prose"})
-	post2 := mustInsertPost(t, &db.Post{UserID: user.ID, Filename: "pop2.md", Slug: "pop2", Title: "Pop 2", Space: "prose"})
-	_ = testDB.ReplaceTagsByPost([]string{"popular"}, post1.ID)
-	_ = testDB.ReplaceTagsByPost([]string{"popular"}, post2.ID)
-
-	tags, err := testDB.FindPopularTags("prose")
-	if err != nil {
-		t.Fatalf("FindPopularTags failed: %v", err)
-	}
-	if len(tags) < 1 {
-		t.Errorf("expected at least 1 popular tag, got %d", len(tags))
-	}
-}
-
-// ============ Aliases Tests ============
 
 func TestReplaceAliasesByPost(t *testing.T) {
 	cleanupTestData(t)
@@ -1299,47 +949,6 @@ func TestAddFeatureUser(t *testing.T) {
 		t.Errorf("expected feature to be valid")
 	}
 }
-
-// ============ Feed Items Tests ============
-
-func TestInsertFeedItems(t *testing.T) {
-	cleanupTestData(t)
-
-	user, _ := testDB.RegisterUser("feeditemsowner", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI feeditemsowner", "comment", "")
-	post := mustInsertPost(t, &db.Post{UserID: user.ID, Filename: "feed.txt", Slug: "feed", Title: "Feed", Space: "feeds"})
-
-	items := []*db.FeedItem{
-		{PostID: post.ID, GUID: "guid-1", Data: db.FeedItemData{Title: "Item 1", Link: "http://example.com/1"}},
-		{PostID: post.ID, GUID: "guid-2", Data: db.FeedItemData{Title: "Item 2", Link: "http://example.com/2"}},
-	}
-
-	err := testDB.InsertFeedItems(post.ID, items)
-	if err != nil {
-		t.Fatalf("InsertFeedItems failed: %v", err)
-	}
-}
-
-func TestFindFeedItemsByPostID(t *testing.T) {
-	cleanupTestData(t)
-
-	user, _ := testDB.RegisterUser("findfeeditemsowner", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI findfeeditemsowner", "comment", "")
-	post := mustInsertPost(t, &db.Post{UserID: user.ID, Filename: "findfeed.txt", Slug: "findfeed", Title: "Find Feed", Space: "feeds"})
-
-	items := []*db.FeedItem{
-		{PostID: post.ID, GUID: "find-guid-1", Data: db.FeedItemData{Title: "Find Item 1"}},
-	}
-	_ = testDB.InsertFeedItems(post.ID, items)
-
-	found, err := testDB.FindFeedItemsByPostID(post.ID)
-	if err != nil {
-		t.Fatalf("FindFeedItemsByPostID failed: %v", err)
-	}
-	if len(found) != 1 {
-		t.Errorf("expected 1 feed item, got %d", len(found))
-	}
-}
-
-// ============ Projects Tests ============
 
 func TestUpsertProject(t *testing.T) {
 	cleanupTestData(t)
@@ -1623,40 +1232,6 @@ func TestProjectAcl_JSONBRoundtrip(t *testing.T) {
 	_ = project
 }
 
-func TestFeedItemData_JSONBRoundtrip(t *testing.T) {
-	cleanupTestData(t)
-
-	user, _ := testDB.RegisterUser("feedjsonbowner", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI feedjsonbowner", "comment", "")
-	post := mustInsertPost(t, &db.Post{UserID: user.ID, Filename: "feedjsonb.txt", Slug: "feedjsonb", Title: "Feed JSONB", Space: "feeds"})
-
-	now := time.Now().Truncate(time.Second)
-	items := []*db.FeedItem{
-		{
-			PostID: post.ID,
-			GUID:   "jsonb-guid",
-			Data: db.FeedItemData{
-				Title:       "JSONB Item",
-				Description: "Description",
-				Content:     "Content",
-				Link:        "http://example.com",
-				PublishedAt: &now,
-			},
-		},
-	}
-	_ = testDB.InsertFeedItems(post.ID, items)
-
-	found, err := testDB.FindFeedItemsByPostID(post.ID)
-	if err != nil {
-		t.Fatalf("FindFeedItemsByPostID failed: %v", err)
-	}
-	if len(found) != 1 {
-		t.Fatalf("expected 1 item, got %d", len(found))
-	}
-	if found[0].Data.Title != "JSONB Item" {
-		t.Errorf("expected title 'JSONB Item', got '%s'", found[0].Data.Title)
-	}
-}
-
 func TestFeatureFlagData_JSONBRoundtrip(t *testing.T) {
 	cleanupTestData(t)
 
@@ -1696,162 +1271,6 @@ func TestPaymentHistoryData_JSONBRoundtrip(t *testing.T) {
 	}
 	if txId != "tx789" {
 		t.Errorf("expected tx_id 'tx789', got '%s'", txId)
-	}
-}
-
-// ============ Pipe Monitor Tests ============
-
-func TestUpsertPipeMonitor(t *testing.T) {
-	cleanupTestData(t)
-
-	user, _ := testDB.RegisterUser("pipemonitorowner", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI pipemonitorowner", "comment", "")
-
-	winEnd := time.Now().Add(time.Hour)
-	err := testDB.UpsertPipeMonitor(user.ID, "test-topic", 5*time.Minute, &winEnd)
-	if err != nil {
-		t.Fatalf("UpsertPipeMonitor failed: %v", err)
-	}
-
-	monitor, err := testDB.FindPipeMonitorByTopic(user.ID, "test-topic")
-	if err != nil {
-		t.Fatalf("FindPipeMonitorByTopic failed: %v", err)
-	}
-	if monitor.Topic != "test-topic" {
-		t.Errorf("expected topic 'test-topic', got '%s'", monitor.Topic)
-	}
-	if monitor.WindowDur != 5*time.Minute {
-		t.Errorf("expected window_dur 5m, got %v", monitor.WindowDur)
-	}
-}
-
-func TestUpsertPipeMonitor_Update(t *testing.T) {
-	cleanupTestData(t)
-
-	user, _ := testDB.RegisterUser("pipeupdateowner", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI pipeupdateowner", "comment", "")
-
-	winEnd1 := time.Now().Add(time.Hour)
-	err := testDB.UpsertPipeMonitor(user.ID, "update-topic", 5*time.Minute, &winEnd1)
-	if err != nil {
-		t.Fatalf("first UpsertPipeMonitor failed: %v", err)
-	}
-
-	winEnd2 := time.Now().Add(2 * time.Hour)
-	err = testDB.UpsertPipeMonitor(user.ID, "update-topic", 10*time.Minute, &winEnd2)
-	if err != nil {
-		t.Fatalf("second UpsertPipeMonitor failed: %v", err)
-	}
-
-	monitor, err := testDB.FindPipeMonitorByTopic(user.ID, "update-topic")
-	if err != nil {
-		t.Fatalf("FindPipeMonitorByTopic failed: %v", err)
-	}
-	if monitor.WindowDur != 10*time.Minute {
-		t.Errorf("expected window_dur 10m after update, got %v", monitor.WindowDur)
-	}
-}
-
-func TestUpdatePipeMonitorLastPing(t *testing.T) {
-	cleanupTestData(t)
-
-	user, _ := testDB.RegisterUser("pipepingowner", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI pipepingowner", "comment", "")
-
-	winEnd := time.Now().Add(time.Hour)
-	err := testDB.UpsertPipeMonitor(user.ID, "ping-topic", 5*time.Minute, &winEnd)
-	if err != nil {
-		t.Fatalf("UpsertPipeMonitor failed: %v", err)
-	}
-
-	lastPing := time.Now()
-	err = testDB.UpdatePipeMonitorLastPing(user.ID, "ping-topic", &lastPing)
-	if err != nil {
-		t.Fatalf("UpdatePipeMonitorLastPing failed: %v", err)
-	}
-
-	monitor, err := testDB.FindPipeMonitorByTopic(user.ID, "ping-topic")
-	if err != nil {
-		t.Fatalf("FindPipeMonitorByTopic failed: %v", err)
-	}
-	if monitor.LastPing == nil {
-		t.Error("expected last_ping to be set, got nil")
-	}
-}
-
-func TestRemovePipeMonitor(t *testing.T) {
-	cleanupTestData(t)
-
-	user, _ := testDB.RegisterUser("piperemoveowner", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI piperemoveowner", "comment", "")
-
-	winEnd := time.Now().Add(time.Hour)
-	err := testDB.UpsertPipeMonitor(user.ID, "remove-topic", 5*time.Minute, &winEnd)
-	if err != nil {
-		t.Fatalf("UpsertPipeMonitor failed: %v", err)
-	}
-
-	err = testDB.RemovePipeMonitor(user.ID, "remove-topic")
-	if err != nil {
-		t.Fatalf("RemovePipeMonitor failed: %v", err)
-	}
-
-	_, err = testDB.FindPipeMonitorByTopic(user.ID, "remove-topic")
-	if err == nil {
-		t.Error("expected error finding removed monitor, got nil")
-	}
-}
-
-func TestFindPipeMonitorByTopic_NotFound(t *testing.T) {
-	cleanupTestData(t)
-
-	user, _ := testDB.RegisterUser("pipenotfoundowner", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI pipenotfoundowner", "comment", "")
-
-	_, err := testDB.FindPipeMonitorByTopic(user.ID, "nonexistent-topic")
-	if err == nil {
-		t.Error("expected error for nonexistent monitor, got nil")
-	}
-}
-
-func TestFindPipeMonitorsByUser(t *testing.T) {
-	cleanupTestData(t)
-
-	user, _ := testDB.RegisterUser("pipemonlistowner", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI pipemonlistowner", "comment", "")
-
-	winEnd := time.Now().Add(time.Hour)
-	_ = testDB.UpsertPipeMonitor(user.ID, "service-a", 5*time.Minute, &winEnd)
-	_ = testDB.UpsertPipeMonitor(user.ID, "service-b", 10*time.Minute, &winEnd)
-	_ = testDB.UpsertPipeMonitor(user.ID, "service-c", 1*time.Hour, &winEnd)
-
-	monitors, err := testDB.FindPipeMonitorsByUser(user.ID)
-	if err != nil {
-		t.Fatalf("FindPipeMonitorsByUser failed: %v", err)
-	}
-
-	if len(monitors) != 3 {
-		t.Errorf("expected 3 monitors, got %d", len(monitors))
-	}
-
-	// Should be ordered by topic
-	if monitors[0].Topic != "service-a" {
-		t.Errorf("expected first topic 'service-a', got %s", monitors[0].Topic)
-	}
-	if monitors[1].Topic != "service-b" {
-		t.Errorf("expected second topic 'service-b', got %s", monitors[1].Topic)
-	}
-	if monitors[2].Topic != "service-c" {
-		t.Errorf("expected third topic 'service-c', got %s", monitors[2].Topic)
-	}
-}
-
-func TestFindPipeMonitorsByUser_Empty(t *testing.T) {
-	cleanupTestData(t)
-
-	user, _ := testDB.RegisterUser("pipenomonitors", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI pipenomonitors", "comment", "")
-
-	monitors, err := testDB.FindPipeMonitorsByUser(user.ID)
-	if err != nil {
-		t.Fatalf("FindPipeMonitorsByUser failed: %v", err)
-	}
-
-	if len(monitors) != 0 {
-		t.Errorf("expected 0 monitors for user with none, got %d", len(monitors))
 	}
 }
 

@@ -17,7 +17,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
-	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/db/postgres"
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/pico/pkg/shared/router"
@@ -434,7 +433,7 @@ func handlePipe() http.HandlerFunc {
 	}
 }
 
-func rssHandler(cfg *shared.ConfigSite, dbpool db.DB) http.HandlerFunc {
+func rssHandler(cfg *shared.ConfigSite, dbpool DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		apiToken, _ := url.PathUnescape(router.GetField(r, 0))
 		user, err := dbpool.FindUserByToken(apiToken)
@@ -471,7 +470,7 @@ func rssHandler(cfg *shared.ConfigSite, dbpool db.DB) http.HandlerFunc {
 	}
 }
 
-func createMainRoutes(staticRoutes []router.Route, cfg *shared.ConfigSite, dbpool db.DB) []router.Route {
+func createMainRoutes(staticRoutes []router.Route, cfg *shared.ConfigSite, dbpool DB) []router.Route {
 	routes := []router.Route{
 		router.NewRoute("GET", "/", router.CreatePageHandler("html/marketing.page.tmpl")),
 		router.NewRoute("GET", "/check", router.CheckHandler),
@@ -502,7 +501,7 @@ func createMainRoutes(staticRoutes []router.Route, cfg *shared.ConfigSite, dbpoo
 
 func StartApiServer() {
 	cfg := NewConfigSite("pipe-web")
-	db := postgres.NewDB(cfg.DbURL, cfg.Logger)
+	db := NewDB(postgres.NewDB(cfg.DbURL, cfg.Logger))
 	defer func() {
 		_ = db.Close()
 	}()

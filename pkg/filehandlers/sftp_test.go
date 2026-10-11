@@ -65,7 +65,7 @@ func newPostsEnv(t *testing.T, app string) *postsEnv {
 		handler = prose.NewFileHandler(cfg, posts, st)
 	case "pastes":
 		cfg = pastes.NewConfigSite("pastes-test")
-		handler = pastes.NewFileHandler(cfg, posts)
+		handler = pastes.NewUploadHandler(cfg, posts)
 	}
 	cfg.Logger = logger
 

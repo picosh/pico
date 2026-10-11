@@ -185,7 +185,7 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 }
 
 type CliHandler struct {
-	DBPool  db.DB
+	DBPool  DB
 	Logger  *slog.Logger
 	PubSub  psub.PubSub
 	Cfg     *shared.ConfigSite
@@ -548,7 +548,7 @@ func parseDuration(s string) (time.Duration, error) {
 	return time.ParseDuration(s)
 }
 
-func MonitorRss(dbpool db.DB, user *db.User, domain string) (string, error) {
+func MonitorRss(dbpool DB, user *db.User, domain string) (string, error) {
 	if user == nil {
 		return "", fmt.Errorf("access denied")
 	}

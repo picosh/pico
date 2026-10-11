@@ -13,7 +13,7 @@ import (
 )
 
 func keepAliveHandler(w http.ResponseWriter, r *http.Request) {
-	dbpool := router.GetDB(r)
+	dbpool := getDB(r)
 	logger := router.GetLogger(r)
 	postID, _ := url.PathUnescape(router.GetField(r, 0))
 
@@ -61,7 +61,7 @@ func keepAliveHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func unsubHandler(w http.ResponseWriter, r *http.Request) {
-	dbpool := router.GetDB(r)
+	dbpool := getDB(r)
 	logger := router.GetLogger(r)
 	postID, _ := url.PathUnescape(router.GetField(r, 0))
 
@@ -127,7 +127,7 @@ func createStaticRoutes() []router.Route {
 
 func StartApiServer() {
 	cfg := NewConfigSite("feeds-web")
-	db := postgres.NewDB(cfg.DbURL, cfg.Logger)
+	db := NewDB(postgres.NewDB(cfg.DbURL, cfg.Logger))
 	defer func() {
 		_ = db.Close()
 	}()

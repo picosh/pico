@@ -120,7 +120,7 @@ func GetBlogName(username string) string {
 
 func blogStyleHandler(w http.ResponseWriter, r *http.Request) {
 	username := router.GetUsernameFromRequest(r)
-	dbpool := router.GetDB(r)
+	dbpool := getDB(r)
 	logger := router.GetLogger(r)
 	cfg := router.GetCfg(r)
 
@@ -150,7 +150,7 @@ func blogStyleHandler(w http.ResponseWriter, r *http.Request) {
 
 func blogHandler(w http.ResponseWriter, r *http.Request) {
 	username := router.GetUsernameFromRequest(r)
-	dbpool := router.GetDB(r)
+	dbpool := getDB(r)
 	logger := router.GetLogger(r)
 	cfg := router.GetCfg(r)
 
@@ -290,7 +290,7 @@ func postRawHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	slug = strings.TrimSuffix(slug, "/")
 
-	dbpool := router.GetDB(r)
+	dbpool := getDB(r)
 	logger := router.GetLogger(r)
 	logger = logger.With("slug", slug)
 
@@ -321,7 +321,7 @@ func postRawHandler(w http.ResponseWriter, r *http.Request) {
 func robotsHandler(w http.ResponseWriter, r *http.Request) {
 	username := router.GetUsernameFromRequest(r)
 	cfg := router.GetCfg(r)
-	dbpool := router.GetDB(r)
+	dbpool := getDB(r)
 	logger := router.GetLogger(r)
 	user, err := dbpool.FindUserByName(username)
 	if err != nil {
@@ -357,7 +357,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	slug = strings.TrimSuffix(slug, "/")
 
-	dbpool := router.GetDB(r)
+	dbpool := getDB(r)
 	logger := router.GetLogger(r)
 
 	user, err := dbpool.FindUserByName(username)
@@ -548,7 +548,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func readHandler(w http.ResponseWriter, r *http.Request) {
-	dbpool := router.GetDB(r)
+	dbpool := getDB(r)
 	logger := router.GetLogger(r)
 	cfg := router.GetCfg(r)
 
@@ -597,7 +597,7 @@ func readHandler(w http.ResponseWriter, r *http.Request) {
 
 func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 	username := router.GetUsernameFromRequest(r)
-	dbpool := router.GetDB(r)
+	dbpool := getDB(r)
 	logger := router.GetLogger(r)
 	cfg := router.GetCfg(r)
 
@@ -757,7 +757,7 @@ func rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func rssHandler(w http.ResponseWriter, r *http.Request) {
-	dbpool := router.GetDB(r)
+	dbpool := getDB(r)
 	logger := router.GetLogger(r)
 	cfg := router.GetCfg(r)
 
@@ -912,7 +912,7 @@ func createMainRoutes(staticRoutes []router.Route) []router.Route {
 func imgRequest(w http.ResponseWriter, r *http.Request) {
 	logger := router.GetLogger(r)
 	st := router.GetStorage(r)
-	dbpool := router.GetDB(r)
+	dbpool := getDB(r)
 	username := router.GetUsernameFromRequest(r)
 	user, err := dbpool.FindUserByName(username)
 	if err != nil {
@@ -980,7 +980,7 @@ func createSubdomainRoutes(staticRoutes []router.Route) []router.Route {
 
 func StartApiServer() {
 	cfg := NewConfigSite("prose-web")
-	dbpool := postgres.NewDB(cfg.DbURL, cfg.Logger)
+	dbpool := NewDB(postgres.NewDB(cfg.DbURL, cfg.Logger))
 	defer func() {
 		_ = dbpool.Close()
 	}()

@@ -24,19 +24,15 @@ type ReadWriteHandler interface {
 type FileHandlerRouter struct {
 	FileMap map[string]ReadWriteHandler
 	Cfg     *shared.ConfigSite
-	DBPool  db.DB
-	Spaces  []string
 }
 
 var _ utils.CopyFromClientHandler = &FileHandlerRouter{}      // Verify implementation
 var _ utils.CopyFromClientHandler = (*FileHandlerRouter)(nil) // Verify implementation
 
-func NewFileHandlerRouter(cfg *shared.ConfigSite, dbpool db.DB, mapper map[string]ReadWriteHandler) *FileHandlerRouter {
+func NewFileHandlerRouter(cfg *shared.ConfigSite, mapper map[string]ReadWriteHandler) *FileHandlerRouter {
 	return &FileHandlerRouter{
 		Cfg:     cfg,
-		DBPool:  dbpool,
 		FileMap: mapper,
-		Spaces:  []string{cfg.Space},
 	}
 }
 
@@ -159,7 +155,7 @@ func (r *FileHandlerRouter) Validate(s *pssh.SSHServerConnSession) error {
 	return nil
 }
 
-func BaseList(s *pssh.SSHServerConnSession, fpath string, isDir bool, recursive bool, spaces []string, dbpool db.DB) ([]os.FileInfo, error) {
+func BaseList(s *pssh.SSHServerConnSession, fpath string, isDir bool, recursive bool, spaces []string, dbpool db.PostDB) ([]os.FileInfo, error) {
 	var fileList []os.FileInfo
 	logger := pssh.GetLogger(s)
 	user := pssh.GetUser(s)

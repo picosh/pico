@@ -32,12 +32,12 @@ type PostMetaData struct {
 }
 
 type UploadImgHandler struct {
-	DBPool  db.DB
+	DBPool  shared.FeatureFinder
 	Cfg     *shared.ConfigSite
 	Storage storage.StorageServe
 }
 
-func NewUploadImgHandler(dbpool db.DB, cfg *shared.ConfigSite, storage storage.StorageServe) *UploadImgHandler {
+func NewUploadImgHandler(dbpool shared.FeatureFinder, cfg *shared.ConfigSite, storage storage.StorageServe) *UploadImgHandler {
 	return &UploadImgHandler{
 		DBPool:  dbpool,
 		Cfg:     cfg,

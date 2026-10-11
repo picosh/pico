@@ -576,31 +576,36 @@ var DenyList = []string{
 	"nue",
 }
 
-type DB interface {
+type UserDB interface {
 	RegisterUser(name, pubkey, comment, ip string) (*User, error)
-	UpdatePublicKey(pubkeyID, name string) (*PublicKey, error)
-	InsertPublicKey(userID, pubkey, name string) error
-	FindKeysByUser(user *User) ([]*PublicKey, error)
-	RemoveKeys(pubkeyIDs []string) error
-
 	FindUsers() ([]*User, error)
 	FindUserByName(name string) (*User, error)
 	FindUserByKey(name string, pubkey string) (*User, error)
 	FindUserByPubkey(pubkey string) (*User, error)
 	FindUser(userID string) (*User, error)
+	FindUserStats(userID string) (*UserStats, error)
+}
 
+type KeyDB interface {
+	UpdatePublicKey(pubkeyID, name string) (*PublicKey, error)
+	InsertPublicKey(userID, pubkey, name string) error
+	FindKeysByUser(user *User) ([]*PublicKey, error)
+	RemoveKeys(pubkeyIDs []string) error
+}
+
+type TokenDB interface {
 	FindUserByToken(token string) (*User, error)
 	FindTokensByUser(userID string) ([]*Token, error)
 	InsertToken(userID, name string) (string, error)
 	UpsertToken(userID, name string) (string, error)
 	RemoveToken(tokenID string) error
+}
 
-	FindPosts() ([]*Post, error)
-	FindPost(postID string) (*Post, error)
+// PostDB is the posts storage that prose, pastes and feeds share. Each
+// keeps its posts in its own space.
+type PostDB interface {
 	FindPostsByUser(pager *Pager, userID string, space string) (*Paginate[*Post], error)
 	FindAllPostsByUser(userID string, space string) ([]*Post, error)
-	FindUsersWithPost(space string) ([]*User, error)
-	FindExpiredPosts(space string) ([]*Post, error)
 	FindPostWithFilename(filename string, userID string, space string) (*Post, error)
 	FindPostWithSlug(slug string, userID string, space string) (*Post, error)
 	InsertPost(post *Post) (*Post, error)
@@ -612,62 +617,77 @@ type DB interface {
 	// longer matches what the caller read.
 	RenamePost(cur, next, replaced *Post, tags, aliases []string) (*Post, error)
 	RemovePosts(postIDs []string) error
+}
 
-	FindPopularPosts() ([]*Post, error)
-
+type TagDB interface {
 	ReplaceTagsByPost(tags []string, postID string) error
-	FindUserPostsByTag(pager *Pager, tag, userID, space string) (*Paginate[*Post], error)
-	FindPostsByTag(pager *Pager, tag, space string) (*Paginate[*Post], error)
-	FindPopularTags(space string) ([]string, error)
 	ReplaceAliasesByPost(aliases []string, postID string) error
+}
 
+type AnalyticsDB interface {
 	InsertVisit(view *AnalyticsVisits) error
 	VisitSummary(opts *SummaryOpts) (*SummaryVisits, error)
 	FindVisitSiteList(opts *SummaryOpts) ([]*VisitUrl, error)
 	VisitUrlNotFound(opts *SummaryOpts) ([]*VisitUrl, error)
+}
 
+type FeatureDB interface {
 	AddPicoPlusUser(username, email, paymentType, txId string) error
 	AddFeatureUser(username, name string) error
 	FindFeature(userID string, feature string) (*FeatureFlag, error)
 	FindFeaturesByUser(userID string) ([]*FeatureFlag, error)
 	HasFeatureByUser(userID string, feature string) bool
-
 	InsertFeature(userID, name string, expiresAt time.Time) (*FeatureFlag, error)
 	RemoveFeature(userID, names string) error
+}
 
-	InsertFeedItems(postID string, items []*FeedItem) error
-	FindFeedItemsByPostID(postID string) ([]*FeedItem, error)
-
+type ProjectDB interface {
 	UpsertProject(userID, name, projectDir string) (*Project, error)
 	FindProjectByName(userID, name string) (*Project, error)
+}
 
-	FindUserStats(userID string) (*UserStats, error)
-
+type TunsDB interface {
 	InsertTunsEventLog(log *TunsEventLog) error
 	FindTunsEventLogs(userID string) ([]*TunsEventLog, error)
 	FindTunsEventLogsByAddr(userID, addr string) ([]*TunsEventLog, error)
+}
 
+type AccessLogDB interface {
 	InsertAccessLog(log *AccessLog) error
 	FindAccessLogs(userID string, fromDate *time.Time) ([]*AccessLog, error)
 	FindPubkeysInAccessLogs(userID string) ([]string, error)
 	FindAccessLogsByPubkey(pubkey string, fromDate *time.Time) ([]*AccessLog, error)
+}
 
-	UpsertPipeMonitor(userID, topic string, dur time.Duration, winEnd *time.Time) error
-	UpdatePipeMonitorLastPing(userID, topic string, lastPing *time.Time) error
-	RemovePipeMonitor(userID, topic string) error
-	FindPipeMonitorByTopic(userID, topic string) (*PipeMonitor, error)
-	FindPipeMonitorsByUser(userID string) ([]*PipeMonitor, error)
-
-	InsertPipeMonitorHistory(monitorID string, windowDur time.Duration, windowEnd, lastPing *time.Time) error
-	FindPipeMonitorHistory(monitorID string, from, to time.Time) ([]*PipeMonitorHistory, error)
-
+type InviteDB interface {
 	FindWhoInvitedUser(toUserID string) (string, error)
 	FindInvitesByUser(userID string) ([]*Invite, error)
 	InviteUser(fromUserID string, toUserID string) error
+}
+
+// DB is the storage apps share. Each app declares the subset it uses, and
+// keeps the queries only it makes in its own package.
+type DB interface {
+	UserDB
+	KeyDB
+	TokenDB
+	PostDB
+	TagDB
+	AnalyticsDB
+	FeatureDB
+	ProjectDB
+	TunsDB
+	AccessLogDB
+	InviteDB
+
+	FindPosts() ([]*Post, error)
+	FindPost(postID string) (*Post, error)
 
 	Close() error
 }
 
-func HasPlusOrSpace(dbpool DB, userID, space string) bool {
+func HasPlusOrSpace(dbpool interface {
+	HasFeatureByUser(userID string, feature string) bool
+}, userID, space string) bool {
 	return dbpool.HasFeatureByUser(userID, "plus") || dbpool.HasFeatureByUser(userID, space)
 }

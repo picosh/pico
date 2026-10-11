@@ -35,7 +35,7 @@ func setFeatureLimits(ff *db.FeatureFlag, cfg *shared.ConfigSite) {
 	ff.Data.SpecialFileMax = ff.FindSpecialFileMax(cfg.MaxSpecialFileSize)
 }
 
-func findFeatureFlag(dbpool db.DB, cfg *shared.ConfigSite, userID string) (*db.FeatureFlag, error) {
+func findFeatureFlag(dbpool DB, cfg *shared.ConfigSite, userID string) (*db.FeatureFlag, error) {
 	ff, err := dbpool.FindFeature(userID, "plus")
 	if err == nil {
 		if ff.IsValid() {
@@ -66,14 +66,14 @@ func findFeatureFlag(dbpool db.DB, cfg *shared.ConfigSite, userID string) (*db.F
 type UploadHandler struct {
 	*filehandlers.FileHandlerRouter
 	Cfg *shared.ConfigSite
-	DB  db.DB
+	DB  DB
 }
 
 var _ sendutils.CopyFromClientHandler = &UploadHandler{}
 var _ sendutils.CopyFromClientHandler = (*UploadHandler)(nil)
 
-func NewUploadHandler(cfg *shared.ConfigSite, dbpool db.DB, fileMap map[string]filehandlers.ReadWriteHandler) *UploadHandler {
-	router := filehandlers.NewFileHandlerRouter(cfg, dbpool, fileMap)
+func NewUploadHandler(cfg *shared.ConfigSite, dbpool DB, fileMap map[string]filehandlers.ReadWriteHandler) *UploadHandler {
+	router := filehandlers.NewFileHandlerRouter(cfg, fileMap)
 	return &UploadHandler{
 		FileHandlerRouter: router,
 		Cfg:               cfg,
@@ -82,11 +82,10 @@ func NewUploadHandler(cfg *shared.ConfigSite, dbpool db.DB, fileMap map[string]f
 }
 
 // NewFileHandler routes prose's text files to posts and the rest to images.
-func NewFileHandler(cfg *shared.ConfigSite, dbpool db.DB, st storage.StorageServe) *UploadHandler {
-	hooks := &MarkdownHooks{Cfg: cfg, Db: dbpool}
+func NewFileHandler(cfg *shared.ConfigSite, dbpool DB, st storage.StorageServe) *UploadHandler {
 	// One post handler serves every text extension, so a post can be
 	// renamed in place from one to another.
-	posts := filehandlers.NewScpPostHandler(dbpool, cfg, hooks)
+	posts := &postUploader{Cfg: cfg, DB: dbpool}
 	return NewUploadHandler(cfg, dbpool, map[string]filehandlers.ReadWriteHandler{
 		".md":      posts,
 		".txt":     posts,

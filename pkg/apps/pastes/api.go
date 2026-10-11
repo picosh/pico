@@ -74,7 +74,7 @@ type HeaderTxt struct {
 
 func blogHandler(w http.ResponseWriter, r *http.Request) {
 	username := router.GetUsernameFromRequest(r)
-	dbpool := router.GetDB(r)
+	dbpool := getDB(r)
 	blogger := router.GetLogger(r)
 	logger := blogger.With("user", username)
 	cfg := router.GetCfg(r)
@@ -167,7 +167,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 		slug, _ = url.PathUnescape(router.GetField(r, 0))
 	}
 
-	dbpool := router.GetDB(r)
+	dbpool := getDB(r)
 	blogger := router.GetLogger(r)
 	logger := blogger.With("slug", slug, "user", username)
 
@@ -271,7 +271,7 @@ func postHandlerRaw(w http.ResponseWriter, r *http.Request) {
 		slug, _ = url.PathUnescape(router.GetField(r, 0))
 	}
 
-	dbpool := router.GetDB(r)
+	dbpool := getDB(r)
 	blogger := router.GetLogger(r)
 	logger := blogger.With("user", username, "slug", slug)
 
@@ -378,7 +378,7 @@ func createSubdomainRoutes(staticRoutes []router.Route) []router.Route {
 
 func StartApiServer() {
 	cfg := NewConfigSite("pastes-web")
-	db := postgres.NewDB(cfg.DbURL, cfg.Logger)
+	db := NewDB(postgres.NewDB(cfg.DbURL, cfg.Logger))
 	defer func() {
 		_ = db.Close()
 	}()

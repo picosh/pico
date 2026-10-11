@@ -19,32 +19,41 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-// extHooks accepts .md and .lxt files, and tags each with its extension.
-type extHooks struct {
-	// meta runs while a post's metadata is read, as a save from another
-	// session could.
-	meta func()
+// extRename accepts .md and .lxt files, and tags each with its extension.
+// meta runs while the renamed post is made, as a save from another session
+// could.
+func extRename(meta func()) RenameFunc {
+	return func(cur, next *db.Post) ([]string, error) {
+		ext := filepath.Ext(next.Filename)
+		if ext != ".md" && ext != ".lxt" {
+			return nil, fmt.Errorf("%s: invalid extension", next.Filename)
+		}
+		if meta != nil {
+			meta()
+		}
+		next.Tags = []string{ext}
+		next.Title = next.Slug
+		next.Hidden = cur.Hidden
+		return []string{next.Slug + ext}, nil
+	}
 }
 
-func (extHooks) FileValidate(_ *pssh.SSHServerConnSession, data *PostMetaData) (bool, error) {
-	if ext := filepath.Ext(data.Filename); ext != ".md" && ext != ".lxt" {
-		return false, fmt.Errorf("%s: invalid extension", data.Filename)
-	}
-	return true, nil
+func entry(name string) *sendutils.FileEntry {
+	return &sendutils.FileEntry{Filepath: "/" + name}
 }
 
-func (h extHooks) FileMeta(_ *pssh.SSHServerConnSession, data *PostMetaData) error {
-	if h.meta != nil {
-		h.meta()
-	}
-	ext := filepath.Ext(data.Filename)
-	data.Tags = []string{ext}
-	data.Aliases = []string{data.Slug + ext}
-	data.Title = data.Slug
-	if data.Cur != nil {
-		data.Hidden = data.Cur.Hidden
-	}
-	return nil
+// postsHandler stores posts with the shared post functions.
+type postsHandler struct {
+	ReadWriteHandler
+	db *stub.PostsDB
+}
+
+func (h *postsHandler) List(s *pssh.SSHServerConnSession, fpath string, isDir bool, recursive bool) ([]os.FileInfo, error) {
+	return BaseList(s, fpath, isDir, recursive, []string{"prose"}, h.db)
+}
+
+func (h *postsHandler) Rename(s *pssh.SSHServerConnSession, from, to *sendutils.FileEntry) error {
+	return RenamePost(s, h.db, "prose", from, to, extRename(nil))
 }
 
 func newPostsSession(t *testing.T) (*pssh.SSHServerConnSession, *stub.PostsDB) {
@@ -64,10 +73,10 @@ func newPostsSession(t *testing.T) (*pssh.SSHServerConnSession, *stub.PostsDB) {
 
 func insertPost(t *testing.T, posts *stub.PostsDB, filename, text string, hidden bool) *db.Post {
 	t.Helper()
-	p := newPost(filename, []byte(text))
+	p := NewPost(filename, []byte(text))
 	publish := time.Date(2020, 1, 2, 0, 0, 0, 0, time.UTC)
 	p.UserID, p.Space, p.Hidden, p.PublishAt, p.UpdatedAt = "user-1", "prose", hidden, &publish, &publish
-	created, err := posts.InsertPost(&p)
+	created, err := posts.InsertPost(p)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,12 +85,11 @@ func insertPost(t *testing.T, posts *stub.PostsDB, filename, text string, hidden
 
 func TestPostRename(t *testing.T) {
 	session, posts := newPostsSession(t)
-	h := NewScpPostHandler(posts, &shared.ConfigSite{Space: "prose"}, extHooks{})
 	a := insertPost(t, posts, "a.md", "# a", true)
 	b := insertPost(t, posts, "b.md", "# b", false)
 	insertPost(t, posts, "c.md", "# c", false)
 	rename := func(from, to string) error {
-		return h.Rename(session, &sendutils.FileEntry{Filepath: "/" + from}, &sendutils.FileEntry{Filepath: "/" + to})
+		return RenamePost(session, posts, "prose", entry(from), entry(to), extRename(nil))
 	}
 
 	if err := rename("a.md", "a.lxt"); err != nil {
@@ -131,12 +139,11 @@ func (otherHandler) List(*pssh.SSHServerConnSession, string, bool, bool) ([]os.F
 
 func TestRouterSharedHandler(t *testing.T) {
 	session, posts := newPostsSession(t)
-	cfg := &shared.ConfigSite{Space: "prose"}
-	postHandler := NewScpPostHandler(posts, cfg, extHooks{})
-	router := NewFileHandlerRouter(cfg, posts, map[string]ReadWriteHandler{
+	postHandler := &postsHandler{db: posts}
+	router := NewFileHandlerRouter(&shared.ConfigSite{Space: "prose"}, map[string]ReadWriteHandler{
 		".md":      postHandler,
 		".lxt":     postHandler,
-		".txt":     NewScpPostHandler(posts, cfg, extHooks{}),
+		".txt":     &postsHandler{db: posts},
 		"fallback": otherHandler{},
 	})
 	insertPost(t, posts, "a.md", "# a", false)
@@ -153,7 +160,6 @@ func TestRouterSharedHandler(t *testing.T) {
 		t.Errorf("listed %q, want /, a.md and x.png once each", names)
 	}
 
-	entry := func(name string) *sendutils.FileEntry { return &sendutils.FileEntry{Filepath: "/" + name} }
 	if err := router.Rename(session, entry("a.md"), entry("a.lxt")); err != nil {
 		t.Fatal(err)
 	}
@@ -166,9 +172,8 @@ func TestRouterSharedHandler(t *testing.T) {
 
 func TestPostRenameRelations(t *testing.T) {
 	session, posts := newPostsSession(t)
-	h := NewScpPostHandler(posts, &shared.ConfigSite{Space: "prose"}, extHooks{})
 	a := insertPost(t, posts, "a.md", "# a", false)
-	if err := h.Rename(session, &sendutils.FileEntry{Filepath: "/a.md"}, &sendutils.FileEntry{Filepath: "/a.lxt"}); err != nil {
+	if err := RenamePost(session, posts, "prose", entry("a.md"), entry("a.lxt"), extRename(nil)); err != nil {
 		t.Fatal(err)
 	}
 	got, err := posts.FindPost(a.ID)
@@ -215,9 +220,7 @@ func TestPostRenameConcurrentSave(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			h := NewScpPostHandler(posts, &shared.ConfigSite{Space: "prose"}, extHooks{meta: save})
-
-			err := h.Rename(session, &sendutils.FileEntry{Filepath: "/a.md"}, &sendutils.FileEntry{Filepath: "/b.md"})
+			err := RenamePost(session, posts, "prose", entry("a.md"), entry("b.md"), extRename(save))
 			if !errors.Is(err, tt.want) {
 				t.Fatalf("rename: %v, want %v", err, tt.want)
 			}
@@ -274,8 +277,7 @@ func TestPostRenameMovedDestination(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	h := NewScpPostHandler(posts, &shared.ConfigSite{Space: "prose"}, extHooks{meta: move})
-	if err := h.Rename(session, &sendutils.FileEntry{Filepath: "/a.md"}, &sendutils.FileEntry{Filepath: "/b.md"}); err != nil {
+	if err := RenamePost(session, posts, "prose", entry("a.md"), entry("b.md"), extRename(move)); err != nil {
 		t.Fatal(err)
 	}
 	for name, id := range map[string]string{"b.md": a.ID, "f.md": b.ID} {

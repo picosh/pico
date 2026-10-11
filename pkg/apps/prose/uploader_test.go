@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,6 +13,7 @@ import (
 	"github.com/picosh/pico/pkg/db/stub"
 	"github.com/picosh/pico/pkg/filehandlers"
 	"github.com/picosh/pico/pkg/pssh"
+	sendutils "github.com/picosh/pico/pkg/send/utils"
 	"github.com/picosh/pico/pkg/shared"
 	"golang.org/x/crypto/ssh"
 )
@@ -107,4 +110,42 @@ func TestUploadHandlerValidate(t *testing.T) {
 			t.Errorf("expected session feature flag 'prose', got %v", ff)
 		}
 	})
+}
+
+func TestPostWriteTagsAndAliases(t *testing.T) {
+	logger := slog.New(slog.DiscardHandler)
+	session := &pssh.SSHServerConnSession{
+		SSHServerConn: &pssh.SSHServerConn{
+			Conn:   &ssh.ServerConn{Permissions: &ssh.Permissions{Extensions: map[string]string{}}},
+			Logger: logger,
+		},
+		Ctx: context.Background(),
+	}
+	user := &db.User{ID: "user-1", Name: "tester"}
+	pssh.SetUser(session, user)
+	posts := stub.NewPostsDB(logger, user)
+	cfg := NewConfigSite("prose-test")
+	h := &postUploader{Cfg: cfg, DB: posts}
+	write := func(text string, mtime int64) *db.Post {
+		t.Helper()
+		_, err := h.Write(session, &sendutils.FileEntry{Filepath: "/hello.md", Reader: strings.NewReader(text), Mtime: mtime})
+		if err != nil {
+			t.Fatal(err)
+		}
+		post, err := posts.FindPostWithFilename("hello.md", user.ID, cfg.Space)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return post
+	}
+
+	post := write("---\ntitle: Hello\ntags: [a, b]\naliases: [hi]\n---\n# hello\n", 100)
+	if post.Title != "Hello" || !slices.Equal(post.Tags, []string{"a", "b"}) || !slices.Equal(posts.Aliases(post.ID), []string{"hi"}) {
+		t.Errorf("new post = %q tags %q aliases %q", post.Title, post.Tags, posts.Aliases(post.ID))
+	}
+
+	post = write("# hello again\n", 200)
+	if len(post.Tags) != 0 || len(posts.Aliases(post.ID)) != 0 {
+		t.Errorf("updated post kept tags %q and aliases %q", post.Tags, posts.Aliases(post.ID))
+	}
 }
