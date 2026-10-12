@@ -8,6 +8,8 @@ import (
 func GetMimeType(fpath string) string {
 	ext := strings.ToLower(filepath.Ext(fpath))
 	switch ext {
+	case ".bin":
+		return "application/octet-stream"
 	case ".svg":
 		return "image/svg+xml"
 	case ".css":
