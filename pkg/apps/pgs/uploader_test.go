@@ -20,7 +20,6 @@ import (
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/pico/pkg/storage"
 	"github.com/pkg/sftp"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 // TestRsyncDeleteDirectory verifies that rsync --delete removes a directory
@@ -57,12 +56,10 @@ func TestRsyncDeleteDirectory(t *testing.T) {
 	}()
 
 	_ = os.Setenv("PGS_SSH_PORT", "0")
-	_ = os.Setenv("PGS_PROM_PORT", "0")
 
 	cfg := NewConfig(logger, dbpool, st, pubsub)
 	done := make(chan error)
 	readyCh := make(chan *pssh.SSHServer)
-	prometheus.DefaultRegisterer = prometheus.NewRegistry()
 
 	go StartSshServerForTesting(cfg, done, readyCh)
 
@@ -248,12 +245,10 @@ func TestRsyncDeleteNestedEmptyDirectories(t *testing.T) {
 	}()
 
 	_ = os.Setenv("PGS_SSH_PORT", "0")
-	_ = os.Setenv("PGS_PROM_PORT", "0")
 
 	cfg := NewConfig(logger, dbpool, st, pubsub)
 	done := make(chan error)
 	readyCh := make(chan *pssh.SSHServer)
-	prometheus.DefaultRegisterer = prometheus.NewRegistry()
 
 	go StartSshServerForTesting(cfg, done, readyCh)
 
@@ -387,12 +382,10 @@ func setupPgsTestServer(t *testing.T, dbpool *pgsdb.MemoryDB) (string, func()) {
 	pubsub := NewPubsubChan()
 
 	_ = os.Setenv("PGS_SSH_PORT", "0")
-	_ = os.Setenv("PGS_PROM_PORT", "0")
 
 	cfg := NewConfig(logger, dbpool, st, pubsub)
 	done := make(chan error)
 	readyCh := make(chan *pssh.SSHServer)
-	prometheus.DefaultRegisterer = prometheus.NewRegistry()
 
 	go StartSshServerForTesting(cfg, done, readyCh)
 
@@ -727,7 +720,6 @@ func TestSftpDirectories(t *testing.T) {
 	done := make(chan error)
 	defer close(done)
 	readyCh := make(chan *pssh.SSHServer)
-	prometheus.DefaultRegisterer = prometheus.NewRegistry()
 	go StartSshServerForTesting(cfg, done, readyCh)
 	server := <-readyCh
 	if server == nil {

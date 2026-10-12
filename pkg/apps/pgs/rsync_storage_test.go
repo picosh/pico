@@ -24,7 +24,6 @@ import (
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/pico/pkg/storage"
 	"github.com/picosh/pico/pkg/storage/storagetest"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 // rsyncFileMax lifts pgs's per-file cap so the test can move files larger
@@ -62,7 +61,6 @@ func newRsyncEnv(t *testing.T, st storage.StorageServe) *rsyncEnv {
 	cfg.WebProtocol = "https"
 	done := make(chan error)
 	readyCh := make(chan *pssh.SSHServer)
-	prometheus.DefaultRegisterer = prometheus.NewRegistry()
 	go StartSshServerForTesting(cfg, done, readyCh)
 	t.Cleanup(func() { close(done) })
 

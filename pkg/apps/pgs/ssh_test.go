@@ -20,7 +20,6 @@ import (
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/pico/pkg/storage"
 	"github.com/pkg/sftp"
-	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -42,6 +41,8 @@ func StartSshServerForTesting(cfg *Config, killCh chan error, readyCh chan *pssh
 		readyCh <- nil
 		return
 	}
+	// No test reads metrics, and a fixed port collides between test servers.
+	server.Config.PromListenAddr = ""
 
 	logger.Info("Starting SSH server", "addr", server.Config.ListenAddr)
 
@@ -90,7 +91,6 @@ func TestSshServerSftp(t *testing.T) {
 	cfg := NewConfig(logger, dbpool, st, pubsub)
 	done := make(chan error)
 	readyCh := make(chan *pssh.SSHServer)
-	prometheus.DefaultRegisterer = prometheus.NewRegistry()
 
 	go StartSshServerForTesting(cfg, done, readyCh)
 
@@ -193,7 +193,6 @@ func TestSshServerRsync(t *testing.T) {
 	cfg := NewConfig(logger, dbpool, st, pubsub)
 	done := make(chan error)
 	readyCh := make(chan *pssh.SSHServer)
-	prometheus.DefaultRegisterer = prometheus.NewRegistry()
 
 	go StartSshServerForTesting(cfg, done, readyCh)
 
