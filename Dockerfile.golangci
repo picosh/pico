@@ -1,0 +1,8 @@
+# The stock golangci/golangci-lint:v2.14 image ships a golangci-lint binary
+# built with go1.27.0, whose runtime intermittently crashes during GC with
+# "fatal error: found bad pointer in Go heap". Rebuild the same golangci-lint
+# version with go1.27.2, which does not exhibit the crash.
+FROM golangci/golangci-lint:v2.14
+
+RUN GOTOOLCHAIN=go1.27.2 GOBIN=/usr/bin go install \
+    github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0
