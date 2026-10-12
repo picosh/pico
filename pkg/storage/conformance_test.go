@@ -106,6 +106,12 @@ func TestStorageConformance(t *testing.T) {
 				if _, _, err := st.GetObject(b, "/proj/missing.txt"); err == nil {
 					t.Fatal("missing object returned no error")
 				}
+
+				for _, dir := range []string{"/proj/css", "/proj/css/"} {
+					if _, _, err := st.GetObject(b, dir); !errors.Is(err, fs.ErrNotExist) {
+						t.Errorf("GetObject(%q) returned %v, want fs.ErrNotExist", dir, err)
+					}
+				}
 			})
 
 			t.Run("stat", func(t *testing.T) {

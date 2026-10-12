@@ -129,7 +129,7 @@ func (s *StorageMemory) GetObject(bucket Bucket, fpath string) (utils.ReadAndRea
 
 	dat, ok := s.storage[bucket.Path][fpath]
 	if !ok || strings.HasSuffix(fpath, "/") {
-		return nil, objInfo, fmt.Errorf("object does not exist: %s", fpath)
+		return nil, objInfo, fmt.Errorf("object does not exist: %s: %w", fpath, fs.ErrNotExist)
 	}
 
 	objInfo.Size = int64(len([]byte(dat)))

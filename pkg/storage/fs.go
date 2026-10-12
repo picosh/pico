@@ -122,6 +122,10 @@ func (s *StorageFS) GetObject(bucket Bucket, fpath string) (utils.ReadAndReaderA
 		_ = dat.Close()
 		return nil, objInfo, err
 	}
+	if info.IsDir() {
+		_ = dat.Close()
+		return nil, objInfo, fmt.Errorf("%s is a directory: %w", fpath, fs.ErrNotExist)
+	}
 	fillObjectInfo(objInfo, info)
 	return dat, objInfo, nil
 }
