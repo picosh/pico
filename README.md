@@ -5,18 +5,11 @@ The ultimate `ssh` powered services for developers
 > [!IMPORTANT]\
 > Read our docs at [pico.sh](https://pico.sh).
 
-Open source and managed web services leveraging `ssh`.
+Publish and prototype with the tools already in your $PATH: scp, rsync, sftp, and ssh. Stay in your shell.
 
-The secret ingredient to all our services is how we let users publish content
-without needing to install anything. We accomplish this with the `ssh` tools you
-already have installed on your system.
+Read our design principles: https://blog.pico.sh/rfc-001-radical-experimentation
 
-Want to publish a blog post? Use rsync, scp, or sftp. Want to publish a website?
-Use rsync, scp, or sftp. Want to share a code snippet with a colleague? Use
-rsync, scp, or sftp. Hopefully you see the trend.
-
-- [pages](https://pico.sh/pgs): A static site hosting platform using `ssh` for
-  site deployments. `ssh`.
+- [pages](https://pico.sh/pgs): A static site hosting platform using `ssh` for site deployments. `ssh`.
 - [tuns](https://pico.sh/tuns): https/wss/tcp tunnels to localhost using only
 - [pipe](https://pipe.pico.sh): Authenticated `*nix` pipes over `ssh`
 - [prose](https://pico.sh/prose): A blog platform using `ssh` for content
