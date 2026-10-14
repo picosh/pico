@@ -75,16 +75,16 @@ func (web *webRouter) blogHandler(w http.ResponseWriter, r *http.Request) {
 	username := router.GetUsernameFromRequest(r)
 	dbpool := web.db
 	blogger := web.cfg.Logger
-	logger := blogger.With("user", username)
+	logger := blogger.With()
 	cfg := web.cfg
 
 	user, err := dbpool.FindUserByName(username)
 	if err != nil {
-		logger.Info("user not found")
+		logger.Info("user not found", "user", username)
 		http.Error(w, "user not found", http.StatusNotFound)
 		return
 	}
-	logger = shared.LoggerWithUser(blogger, user)
+	logger = shared.LoggerWithUser(logger, user)
 
 	pager, err := dbpool.FindPostsByUser(&db.Pager{Num: 1000, Page: 0}, user.ID, cfg.Space)
 	if err != nil {
@@ -137,7 +137,7 @@ func (web *webRouter) blogHandler(w http.ResponseWriter, r *http.Request) {
 
 	err = ts.Execute(w, data)
 	if err != nil {
-		logger.Error("could not execute tempalte", "err", err)
+		logger.Error("could not execute template", "err", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -161,12 +161,12 @@ func (web *webRouter) postHandler(w http.ResponseWriter, r *http.Request) {
 
 	dbpool := web.db
 	blogger := web.cfg.Logger
-	logger := blogger.With("slug", slug, "user", username)
+	logger := blogger.With("slug", slug)
 
 	user, err := dbpool.FindUserByName(username)
 	if err != nil {
-		logger.Info("paste not found")
-		http.Error(w, "paste not found", http.StatusNotFound)
+		logger.Info("user not found", "user", username)
+		http.Error(w, "user not found", http.StatusNotFound)
 		return
 	}
 	logger = shared.LoggerWithUser(logger, user)
@@ -258,15 +258,15 @@ func (web *webRouter) postHandlerRaw(w http.ResponseWriter, r *http.Request) {
 
 	dbpool := web.db
 	blogger := web.cfg.Logger
-	logger := blogger.With("user", username, "slug", slug)
+	logger := blogger.With("slug", slug)
 
 	user, err := dbpool.FindUserByName(username)
 	if err != nil {
-		logger.Info("user not found")
+		logger.Info("user not found", "user", username)
 		http.Error(w, "user not found", http.StatusNotFound)
 		return
 	}
-	logger = shared.LoggerWithUser(blogger, user)
+	logger = shared.LoggerWithUser(logger, user)
 
 	post, err := dbpool.FindPostWithSlug(slug, user.ID, cfg.Space)
 	if err != nil {
