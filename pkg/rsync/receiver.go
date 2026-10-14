@@ -502,9 +502,6 @@ func (g *generator) deletePass() error {
 		if !ok || !f.isDir() {
 			return false
 		}
-		if g.s.c.protocol < 30 && s.opts.recurse {
-			return true
-		}
 		return f.flags&flagContentDir != 0
 	}
 

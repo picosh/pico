@@ -923,13 +923,67 @@ func TestRsyncMergeFilterErrors(t *testing.T) {
 func TestRsyncUnsupportedOptions(t *testing.T) {
 	e := newRsyncEnv(t)
 	populate(t, e.local)
-	for _, opt := range []string{"-H", "-A", "-X", "-R"} {
+	for _, opt := range []string{"-H", "-A", "-X"} {
 		out, err := e.run("-r", opt, e.local+"/", "host:site")
 		if err == nil {
 			t.Errorf("%s: want an error\n%s", opt, out)
 		}
 		if !strings.Contains(out, "not supported") {
 			t.Errorf("%s: missing explanation\n%s", opt, out)
+		}
+	}
+	out, err := e.run("-rR", "host:site/./css", t.TempDir())
+	if err == nil {
+		t.Errorf("-R download: want an error\n%s", out)
+	}
+	if !strings.Contains(out, "not supported when downloading") {
+		t.Errorf("-R download: missing explanation\n%s", out)
+	}
+}
+
+func TestRsyncUploadRelative(t *testing.T) {
+	cases := []struct {
+		name string
+		args func(local, list string) []string
+	}{
+		{"files-from", func(local, list string) []string {
+			return []string{"-t", "--files-from=" + list, local + "/"}
+		}},
+		{"files-from-delete", func(local, list string) []string {
+			return []string{"-rt", "--delete", "--files-from=" + list, local + "/"}
+		}},
+		{"dot-marker", func(local, list string) []string {
+			return []string{"-tR", local + "/./a/b/c/deep.txt"}
+		}},
+		{"dot-marker-dir-delete", func(local, list string) []string {
+			return []string{"-rtR", "--delete", local + "/./a/b"}
+		}},
+	}
+	for _, proto := range protocols {
+		for _, tc := range cases {
+			t.Run(fmt.Sprintf("proto=%s/%s", proto, tc.name), func(t *testing.T) {
+				e := newRsyncEnv(t)
+				populate(t, e.local)
+				list := filepath.Join(t.TempDir(), "files")
+				writeFile(t, list, []byte("index.html\na/b/c/deep.txt\n"))
+
+				// Seed both sides with files outside the list so a
+				// deletion that reaches too far shows up.
+				ref := t.TempDir()
+				populate(t, ref)
+				writeFile(t, filepath.Join(ref, "a/b/stale.txt"), []byte("stale"))
+				writeFile(t, filepath.Join(ref, "a/b/c/stale.txt"), []byte("stale"))
+				writeFile(t, filepath.Join(ref, "a/other.txt"), []byte("other"))
+				e.mustRun("-rt", ref+"/", "host:site")
+
+				args := append(protoArgs(proto), tc.args(e.local, list)...)
+				refCmd := exec.Command("rsync", append(slices.Clone(args), ref)...)
+				if out, err := refCmd.CombinedOutput(); err != nil {
+					t.Fatalf("reference rsync: %v\n%s", err, out)
+				}
+				e.mustRun(append(args, "host:site")...)
+				assertSameTree(t, ref, filepath.Join(e.remote, "site"))
+			})
 		}
 	}
 }

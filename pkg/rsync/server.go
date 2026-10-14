@@ -42,6 +42,7 @@ func (e *ExitError) Unwrap() error { return e.Err }
 type options struct {
 	sender         bool
 	recurse        bool
+	relative       bool
 	xferDirs       bool
 	dryRun         bool
 	preserveUID    bool
@@ -155,6 +156,7 @@ func Serve(cfg Config, rw io.ReadWriter, args []string) error {
 	s.opts = options{
 		sender:         o.Sender(),
 		recurse:        o.Recurse(),
+		relative:       o.RelativePaths(),
 		xferDirs:       o.XferDirs(),
 		dryRun:         o.DryRun(),
 		preserveUID:    o.PreserveUid(),
@@ -249,8 +251,8 @@ func checkSupported(o *rsyncopts.Options) error {
 		return errors.New("--xattrs is not supported")
 	case o.PreserveCrtimes():
 		return errors.New("--crtimes is not supported")
-	case o.RelativePaths():
-		return errors.New("--relative is not supported")
+	case o.Sender() && o.RelativePaths():
+		return errors.New("--relative is not supported when downloading")
 	case o.AppendMode() != 0:
 		return errors.New("--append is not supported")
 	case len(o.BasisDirs()) > 0:
@@ -641,6 +643,8 @@ func (s *session) newFlistCodec() *flistCodec {
 		preserveAtime: s.opts.preserveAtimes,
 		alwaysSum:     s.opts.alwaysChecksum,
 		sumLen:        s.cs.file.size(),
+		recurse:       s.opts.recurse,
+		relative:      s.opts.relative,
 	}
 }
 

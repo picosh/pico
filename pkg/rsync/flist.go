@@ -72,11 +72,18 @@ type flistCodec struct {
 	preserveAtime bool
 	alwaysSum     bool
 	sumLen        int
+	recurse       bool
+	relative      bool
 
 	last      fileEntry
 	lastName  string
 	lastAtime int64
 	rdevMaj   uint32
+
+	// Before protocol 30 the receiver works out which directories are
+	// content dirs from the order of the list (flist.c:in_del_hier).
+	inDelHier  bool
+	delHierLen int
 }
 
 func (fc *flistCodec) sendEntry(c *conn, f *fileEntry) error {
@@ -493,7 +500,24 @@ func (fc *flistCodec) recvEntry(c *conn, xflags int) (*fileEntry, error) {
 				f.flags |= flagImpliedDir
 			}
 		} else if xflags&xmitTopDir != 0 {
+			fc.inDelHier = fc.recurse
+			fc.delHierLen = 0
+			if name != "." {
+				fc.delHierLen = len(rawName)
+			}
+			if fc.relative && strings.HasSuffix(rawName[:fc.delHierLen], "/.") {
+				fc.delHierLen -= 2
+			}
 			f.flags |= flagTopDir | flagContentDir
+		} else if fc.inDelHier {
+			// Under -R only the top dir's own subtree is content; implied
+			// parents of other paths end the hierarchy.
+			if !fc.relative || fc.delHierLen == 0 ||
+				(l1 >= fc.delHierLen && len(rawName) > fc.delHierLen && rawName[fc.delHierLen] == '/') {
+				f.flags |= flagContentDir
+			} else {
+				fc.inDelHier = false
+			}
 		}
 	}
 
