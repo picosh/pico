@@ -75,16 +75,16 @@ func (web *webRouter) blogHandler(w http.ResponseWriter, r *http.Request) {
 	username := router.GetUsernameFromRequest(r)
 	dbpool := web.db
 	blogger := web.cfg.Logger
-	logger := blogger.With("user", username)
+	logger := blogger.With()
 	cfg := web.cfg
 
 	user, err := dbpool.FindUserByName(username)
 	if err != nil {
-		logger.Info("user not found")
+		logger.Info("user not found", "user", username)
 		http.Error(w, "user not found", http.StatusNotFound)
 		return
 	}
-	logger = shared.LoggerWithUser(blogger, user)
+	logger = shared.LoggerWithUser(logger, user)
 
 	pager, err := dbpool.FindPostsByUser(&db.Pager{Num: 1000, Page: 0}, user.ID, cfg.Space)
 	if err != nil {
@@ -161,11 +161,11 @@ func (web *webRouter) postHandler(w http.ResponseWriter, r *http.Request) {
 
 	dbpool := web.db
 	blogger := web.cfg.Logger
-	logger := blogger.With("slug", slug, "user", username)
+	logger := blogger.With("slug", slug)
 
 	user, err := dbpool.FindUserByName(username)
 	if err != nil {
-		logger.Info("user not found")
+		logger.Info("user not found", "user", username)
 		http.Error(w, "user not found", http.StatusNotFound)
 		return
 	}
@@ -258,11 +258,11 @@ func (web *webRouter) postHandlerRaw(w http.ResponseWriter, r *http.Request) {
 
 	dbpool := web.db
 	blogger := web.cfg.Logger
-	logger := blogger.With("slug", slug, "user", username)
+	logger := blogger.With("slug", slug)
 
 	user, err := dbpool.FindUserByName(username)
 	if err != nil {
-		logger.Info("user not found")
+		logger.Info("user not found", "user", username)
 		http.Error(w, "user not found", http.StatusNotFound)
 		return
 	}
