@@ -202,7 +202,7 @@ func (m *AccessLogsPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 		listPane := NewBorder(m.list)
 		listPane.Label = "access logs"
 		m.focusBorder(listPane)
-		listSurf, _ := listPane.Draw(createDrawCtx(ctx, ctx.Max.Height-uint16(ah)-3))
+		listSurf, _ := listPane.Draw(createDrawCtx(ctx, int(ctx.Max.Height)-ah-3))
 		root.AddChild(0, ah, listSurf)
 		ah += int(listSurf.Size.Height)
 	}

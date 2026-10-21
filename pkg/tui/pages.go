@@ -126,7 +126,7 @@ func (m *PagesPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 		listPane := NewBorder(m.list)
 		listPane.Label = "pages"
 		listPane.Style = vaxis.Style{Foreground: oj}
-		listSurf, _ := listPane.Draw(createDrawCtx(ctx, ctx.Max.Height-uint16(ah)))
+		listSurf, _ := listPane.Draw(createDrawCtx(ctx, int(ctx.Max.Height)-ah))
 		root.AddChild(0, ah, listSurf)
 	}
 

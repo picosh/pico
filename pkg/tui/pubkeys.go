@@ -150,7 +150,7 @@ func (m *PubkeysPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	ah += int(headerSurf.Size.Height)
 
 	footerHeight := 3
-	listSurf, _ := m.list.Draw(createDrawCtx(ctx, ctx.Max.Height-uint16(ah)-uint16(footerHeight)))
+	listSurf, _ := m.list.Draw(createDrawCtx(ctx, int(ctx.Max.Height)-ah-footerHeight))
 	root.AddChild(0, ah, listSurf)
 
 	segs := []vaxis.Segment{}

@@ -130,7 +130,7 @@ func (m *TokensPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	ah += int(headerSurf.Size.Height)
 
 	footerHeight := 3
-	listSurf, _ := m.list.Draw(createDrawCtx(ctx, ctx.Max.Height-uint16(ah)-uint16(footerHeight)))
+	listSurf, _ := m.list.Draw(createDrawCtx(ctx, int(ctx.Max.Height)-ah-footerHeight))
 	root.AddChild(0, ah, listSurf)
 
 	segs := []vaxis.Segment{}
@@ -149,7 +149,7 @@ func (m *TokensPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	segs = append(segs, vaxis.Segment{Text: "\n"})
 
 	footer := richtext.New(segs)
-	footerSurf, _ := footer.Draw(createDrawCtx(ctx, uint16(footerHeight)))
+	footerSurf, _ := footer.Draw(createDrawCtx(ctx, footerHeight))
 	root.AddChild(0, int(h)-footerHeight, footerSurf)
 
 	return root, nil

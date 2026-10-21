@@ -171,7 +171,7 @@ func (m *AddInvitePage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 		ah += int(errSurf.Size.Height) + 1
 	}
 
-	listSurf, _ := m.list.Draw(createDrawCtx(ctx, ctx.Max.Height-uint16(ah)))
+	listSurf, _ := m.list.Draw(createDrawCtx(ctx, int(ctx.Max.Height)-ah))
 	root.AddChild(0, ah, listSurf)
 
 	return root, nil
