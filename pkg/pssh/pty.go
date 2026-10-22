@@ -3,7 +3,6 @@ package pssh
 import (
 	"encoding/binary"
 	"fmt"
-	"time"
 )
 
 func SessionMessage(sesh *SSHServerConnSession, msg string) {
@@ -24,22 +23,9 @@ func DeprecatedNotice() SSHServerMiddleware {
 	}
 }
 
-func PtyMdw(mdw SSHServerMiddleware, waitTimeout time.Duration) SSHServerMiddleware {
+func PtyMdw(mdw SSHServerMiddleware) SSHServerMiddleware {
 	return func(next SSHServerHandler) SSHServerHandler {
 		return func(sesh *SSHServerConnSession) error {
-			if waitTimeout > 0 {
-				afterTime := time.Now().Add(waitTimeout)
-
-				for time.Now().After(afterTime) {
-					_, _, ok := sesh.Pty()
-					if ok {
-						break
-					}
-
-					time.Sleep(50 * time.Millisecond)
-				}
-			}
-
 			_, _, ok := sesh.Pty()
 			if !ok {
 				return next(sesh)

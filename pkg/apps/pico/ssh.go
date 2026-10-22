@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	pgsdb "github.com/picosh/pico/pkg/apps/pgs/db"
 	"github.com/picosh/pico/pkg/db/postgres"
@@ -106,7 +105,7 @@ func StartSshServer() {
 						PgsDB:      pgsDB,
 						Logger:     pssh.GetLogger(sesh),
 					}
-					return pssh.PtyMdw(createTui(shrd), 200*time.Millisecond)(next)(sesh)
+					return pssh.PtyMdw(createTui(shrd))(next)(sesh)
 				}
 			},
 			Middleware(cliHandler),

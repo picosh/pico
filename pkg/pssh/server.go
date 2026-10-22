@@ -186,6 +186,24 @@ func (s *SSHServerConnSession) Pty() (*Pty, <-chan Window, bool) {
 	return s.pty, s.winch, true
 }
 
+func (s *SSHServerConnSession) handlePtyReq(req *ssh.Request) {
+	ptyReq, ok := parsePtyRequest(req.Payload)
+
+	s.mu.Lock()
+	if ok && s.pty == nil {
+		s.pty = &ptyReq
+		s.winch = make(chan Window, 1)
+		s.winch <- ptyReq.Window
+	} else {
+		ok = false
+	}
+	s.mu.Unlock()
+
+	if err := req.Reply(ok, nil); err != nil {
+		s.Logger.Error("pty-req reply", "err", err)
+	}
+}
+
 // Write overrides the embedded Channel's Write to normalize line endings when PTY is allocated.
 func (s *SSHServerConnSession) Write(p []byte) (n int, err error) {
 	s.mu.Lock()
@@ -510,6 +528,14 @@ func NewSSHServer(ctx context.Context, logger *slog.Logger, config *SSHServerCon
 						return nil
 					}
 
+					// Clients send pty-req before shell or exec without waiting for the
+					// reply, so it's applied here, before the next request is read.
+					if req.Type == "pty-req" {
+						sc.Logger.Info("new session request", "type", req.Type, "wantReply", req.WantReply, "payload", req.Payload)
+						sesh.handlePtyReq(req)
+						continue
+					}
+
 					go func() {
 						sc.Logger.Info("new session request", "type", req.Type, "wantReply", req.WantReply, "payload", req.Payload)
 						switch req.Type {
@@ -625,37 +651,6 @@ func NewSSHServer(ctx context.Context, logger *slog.Logger, config *SSHServerCon
 							err = sesh.Close()
 							if err != nil {
 								sc.Logger.Error("subsystem close", "err", err)
-							}
-						case "pty-req":
-							sesh.mu.Lock()
-							found := sesh.pty != nil
-							sesh.mu.Unlock()
-							if found {
-								err := req.Reply(false, nil)
-								if err != nil {
-									sc.Logger.Error("pty-req reply", "err", err)
-								}
-								return
-							}
-
-							ptyReq, ok := parsePtyRequest(req.Payload)
-							if !ok {
-								err := req.Reply(false, nil)
-								if err != nil {
-									sc.Logger.Error("pty-req reply", "err", err)
-								}
-								return
-							}
-
-							sesh.mu.Lock()
-							sesh.pty = &ptyReq
-							sesh.winch = make(chan Window, 1)
-							sesh.mu.Unlock()
-
-							sesh.winch <- ptyReq.Window
-							err := req.Reply(ok, nil)
-							if err != nil {
-								sc.Logger.Error("pty-req reply", "err", err)
 							}
 						case "window-change":
 							sesh.mu.Lock()

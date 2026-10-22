@@ -709,3 +709,82 @@ func TestSessionContextEndsWhenClientCloses(t *testing.T) {
 		t.Fatal("command still running after the client closed its session")
 	}
 }
+
+// OpenSSH sends pty-req and then shell or exec without waiting for the first
+// reply, so the pty has to be set by the time the command's middleware runs.
+func TestPtyVisibleToCommand(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	user := GenerateKey()
+	server := pssh.NewSSHServer(ctx, slog.New(slog.DiscardHandler), &pssh.SSHServerConfig{
+		ListenAddr: "127.0.0.1:0",
+		Middleware: []pssh.SSHServerMiddleware{
+			func(next pssh.SSHServerHandler) pssh.SSHServerHandler {
+				return func(sesh *pssh.SSHServerConnSession) error {
+					if _, _, ok := sesh.Pty(); !ok {
+						_, _ = sesh.Write([]byte("no pty"))
+					}
+					return next(sesh)
+				}
+			},
+		},
+		ServerConfig: &ssh.ServerConfig{
+			NoClientAuth: true,
+			NoClientAuthCallback: func(ssh.ConnMetadata) (*ssh.Permissions, error) {
+				return &ssh.Permissions{Extensions: map[string]string{}}, nil
+			},
+		},
+	})
+	server.Config.AddHostKey(user.signer)
+	go func() { _ = server.ListenAndServe() }()
+
+	var addr string
+	for range 50 {
+		server.Mu.Lock()
+		if server.Listener != nil {
+			addr = server.Listener.Addr().String()
+		}
+		server.Mu.Unlock()
+		if addr != "" {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if addr == "" {
+		t.Fatal("server listener not ready")
+	}
+
+	client, err := ssh.Dial("tcp", addr, &ssh.ClientConfig{User: "user", HostKeyCallback: ssh.InsecureIgnoreHostKey()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = client.Close() }()
+
+	ptyReq := ssh.Marshal(struct {
+		Term          string
+		Columns, Rows uint32
+		Width, Height uint32
+		Modes         string
+	}{Term: "xterm", Columns: 80, Rows: 24})
+
+	missed := 0
+	for range 200 {
+		session, err := client.NewSession()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := session.SendRequest("pty-req", false, ptyReq); err != nil {
+			t.Fatal(err)
+		}
+		out, _ := session.Output("cmd")
+		if strings.Contains(string(out), "no pty") {
+			missed++
+		}
+		_ = session.Close()
+	}
+
+	if missed > 0 {
+		t.Fatalf("command ran before its pty request in %d of 200 sessions", missed)
+	}
+}
