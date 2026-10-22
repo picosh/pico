@@ -18,6 +18,15 @@ import (
 	"github.com/picosh/pico/pkg/storage"
 )
 
+const help = `prose.sh: a blog you publish over ssh
+
+  rsync ~/blog/* prose.sh:/                  publish posts and images; scp, sftp and sshfs work too
+  cat post.md | ssh prose.sh hello-world.md  upload one post
+  cat post.md | ssh prose.sh                 upload with a random name
+
+Run ssh pico.sh for your dashboard. Docs: https://pico.sh/prose
+`
+
 func StartSshServer() {
 	appName := "prose-ssh"
 
@@ -62,7 +71,7 @@ func StartSshServer() {
 			scp.Middleware(handler),
 			rsync.Middleware(handler),
 			auth.Middleware(handler),
-			pssh.PtyMdw(pssh.DeprecatedNotice()),
+			pssh.PtyMdw(pssh.HelpNotice(help)),
 			pssh.LogMiddleware(handler, dbh),
 		},
 		[]pssh.SSHServerMiddleware{

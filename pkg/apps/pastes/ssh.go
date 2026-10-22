@@ -17,6 +17,17 @@ import (
 	"github.com/picosh/pico/pkg/shared"
 )
 
+const help = `pastes.sh: upload plain text snippets over ssh
+
+  echo "foobar" | ssh pastes.sh                       upload with a random name
+  echo "foobar" | ssh pastes.sh FILENAME              upload as FILENAME
+  echo "foobar" | ssh pastes.sh FILENAME expires=1h   expire after a duration, on a date, or never (false); default 90 days
+  echo "foobar" | ssh pastes.sh FILENAME hidden=true  leave it off your pastes page
+  rsync FILE pastes.sh:/                              scp and sftp work too
+
+Run ssh pico.sh for your dashboard. Docs: https://pico.sh/pastes
+`
+
 func StartSshServer() {
 	appName := "pastes-ssh"
 
@@ -52,7 +63,7 @@ func StartSshServer() {
 			scp.Middleware(handler),
 			rsync.Middleware(handler),
 			auth.Middleware(handler),
-			pssh.PtyMdw(pssh.DeprecatedNotice()),
+			pssh.PtyMdw(pssh.HelpNotice(help)),
 			pssh.LogMiddleware(handler, dbh),
 		},
 		[]pssh.SSHServerMiddleware{

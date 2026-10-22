@@ -2,22 +2,18 @@ package pssh
 
 import (
 	"encoding/binary"
-	"fmt"
+	"strings"
 )
 
 func SessionMessage(sesh *SSHServerConnSession, msg string) {
 	_, _ = sesh.Write([]byte(msg + "\r\n"))
 }
 
-func DeprecatedNotice() SSHServerMiddleware {
+// HelpNotice writes help to the session, translating newlines for the client's pty.
+func HelpNotice(help string) SSHServerMiddleware {
 	return func(next SSHServerHandler) SSHServerHandler {
 		return func(sesh *SSHServerConnSession) error {
-			msg := fmt.Sprintf(
-				"%s\r\n\r\nRun %s to access pico's TUI",
-				"DEPRECATED",
-				"ssh pico.sh",
-			)
-			SessionMessage(sesh, msg)
+			SessionMessage(sesh, strings.ReplaceAll(strings.TrimRight(help, "\n"), "\n", "\r\n"))
 			return next(sesh)
 		}
 	}
