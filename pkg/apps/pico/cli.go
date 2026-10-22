@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -194,6 +195,12 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 		return func(sesh *pssh.SSHServerConnSession) error {
 			args := sesh.Command()
 			if len(args) == 0 {
+				// Without a pty there is no TUI, and the upload middleware would wait on stdin.
+				if _, _, ok := sesh.Pty(); !ok {
+					opts := Cmd{Session: sesh}
+					opts.help()
+					return nil
+				}
 				return next(sesh)
 			}
 
@@ -284,8 +291,6 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 						sesh.Fatal(err)
 					}
 					return nil
-				default:
-					return next(sesh)
 				}
 			}
 
@@ -309,7 +314,23 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 				return nil
 			}
 
-			return next(sesh)
+			if passthrough(cmd) {
+				return next(sesh)
+			}
+
+			opts.help()
+			sesh.Fatal(fmt.Errorf("unknown command: %s", cmd))
+			return nil
 		}
 	}
+}
+
+// passthrough reports whether a later middleware handles cmd. Anything else
+// would reach the upload middleware, which waits on stdin.
+func passthrough(cmd string) bool {
+	switch cmd {
+	case "scp", "rsync", "command":
+		return true
+	}
+	return filepath.Base(cmd) == "authorized_keys"
 }
