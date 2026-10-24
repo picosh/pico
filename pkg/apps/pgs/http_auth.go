@@ -3,6 +3,7 @@ package pgs
 import (
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -23,6 +24,7 @@ func getCookieName(projectName string) string {
 type loginFormData struct {
 	ProjectName string
 	Error       string
+	Redirect    string
 }
 
 // serveLoginFormWithConfig renders and serves the login form using templates.
@@ -36,8 +38,13 @@ func serveLoginFormWithConfig(w http.ResponseWriter, r *http.Request, project *d
 	data := loginFormData{
 		ProjectName: project.Name,
 		Error:       errorMsg,
+		Redirect:    r.URL.RequestURI(),
 	}
 
+	renderLoginForm(w, data, cfg, logger)
+}
+
+func renderLoginForm(w http.ResponseWriter, data loginFormData, cfg *Config, logger *slog.Logger) {
 	w.WriteHeader(http.StatusForbidden)
 
 	ts, err := router.RenderTemplate(staticDir, []string{cfg.StaticPath("html/login.page.tmpl")})
@@ -70,6 +77,22 @@ func handleLogin(w http.ResponseWriter, r *http.Request, cfg *Config) {
 
 	projectName := strings.TrimSpace(r.FormValue("project"))
 	password := r.FormValue("password")
+	redirectPath := r.PostForm.Get("redirect")
+	if redirectPath == "" {
+		redirectPath = r.Header.Get("X-PGS-Referer")
+	}
+	redirectURL, err := url.Parse(redirectPath)
+	if err != nil || !strings.HasPrefix(redirectPath, "/") || strings.HasPrefix(redirectPath, "//") || strings.Contains(redirectURL.Path, `\`) {
+		redirectPath = "/"
+	}
+
+	invalidPassword := func() {
+		renderLoginForm(w, loginFormData{
+			ProjectName: projectName,
+			Error:       "Invalid password",
+			Redirect:    redirectPath,
+		}, cfg, cfg.Logger)
+	}
 
 	if projectName == "" {
 		http.Error(w, "missing project name", http.StatusBadRequest)
@@ -77,8 +100,7 @@ func handleLogin(w http.ResponseWriter, r *http.Request, cfg *Config) {
 	}
 
 	if password == "" {
-		// Redirect back with error
-		http.Redirect(w, r, "/?error=invalid", http.StatusSeeOther)
+		invalidPassword()
 		return
 	}
 
@@ -119,7 +141,7 @@ func handleLogin(w http.ResponseWriter, r *http.Request, cfg *Config) {
 	storedPass := project.Acl.Data[0]
 	if !validatePassword(storedPass, password) {
 		cfg.Logger.Info("invalid password attempt", "projectName", projectName)
-		http.Redirect(w, r, "/?error=invalid", http.StatusSeeOther)
+		invalidPassword()
 		return
 	}
 
@@ -136,11 +158,6 @@ func handleLogin(w http.ResponseWriter, r *http.Request, cfg *Config) {
 		MaxAge:   int(expiresAt.Seconds()),
 	}
 	http.SetCookie(w, cookie)
-
-	redirectPath := r.Header.Get("X-PGS-Referer")
-	if redirectPath == "" || !strings.HasPrefix(redirectPath, "/") {
-		redirectPath = "/"
-	}
 
 	cfg.Logger.Info("successful login", "projectName", projectName, "username", props.Username)
 	http.Redirect(w, r, redirectPath, http.StatusSeeOther)

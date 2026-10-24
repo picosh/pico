@@ -18,6 +18,7 @@
 
   	<form method="POST" action="/pgs/login">
   		<input type="hidden" name="project" value="{{.ProjectName}}">
+		<input type="hidden" name="redirect" value="{{.Redirect}}">
   		<label for="password">Enter password:</label>
       <div class="flex gap">
     		<input type="password" id="password" name="password" placeholder="Password" required autofocus>
