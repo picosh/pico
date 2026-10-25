@@ -36,7 +36,7 @@ func TestGetCustomDomainCachesMisses(t *testing.T) {
 	}
 
 	// The uncached lookup sees a record as soon as it exists.
-	records["_pgs.example.com"] = []string{" antonio-blog "}
+	records["_pgs.example.com."] = []string{" antonio-blog "}
 	if got, err := LookupCustomDomain("example.com", "pgs"); got != "antonio-blog" || err != nil {
 		t.Fatalf("LookupCustomDomain = %q, %v", got, err)
 	}
@@ -47,7 +47,7 @@ func TestGetCustomDomainCachesMisses(t *testing.T) {
 		t.Fatalf("got %q", got)
 	}
 	fail = nil
-	records["_pgs.other.com"] = []string{"antonio-other"}
+	records["_pgs.other.com."] = []string{"antonio-other"}
 	if got := GetCustomDomain("other.com", "pgs"); got != "antonio-other" {
 		t.Fatalf("lookup after a transient failure got %q", got)
 	}

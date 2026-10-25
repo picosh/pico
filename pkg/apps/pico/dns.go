@@ -112,11 +112,11 @@ func checkTunsRecords(c *Cmd, records []string) string {
 // lookupHost resolves host and returns its canonical name, or "" when it has
 // no CNAME.
 func lookupHost(host string) (string, []string, error) {
-	addrs, err := net.LookupHost(host)
+	addrs, err := net.LookupHost(router.FQDN(host))
 	if err != nil {
 		return "", nil, err
 	}
-	cname, err := net.LookupCNAME(host)
+	cname, err := net.LookupCNAME(router.FQDN(host))
 	if err != nil {
 		return "", addrs, nil
 	}

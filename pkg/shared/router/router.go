@@ -105,10 +105,16 @@ func TXTRecordName(host, space string) string {
 	return fmt.Sprintf("_%s.%s", space, host)
 }
 
+// FQDN returns name with a trailing dot, so the resolver won't retry a name
+// that doesn't exist under its own search domains.
+func FQDN(name string) string {
+	return strings.TrimSuffix(name, ".") + "."
+}
+
 // LookupTXTRecords asks DNS for host's records on space, bypassing the
 // cache. No records returns ErrNoTXTRecord.
 func LookupTXTRecords(host, space string) ([]string, error) {
-	records, err := lookupTXT(TXTRecordName(host, space))
+	records, err := lookupTXT(FQDN(TXTRecordName(host, space)))
 	var dnsErr *net.DNSError
 	if errors.As(err, &dnsErr) && dnsErr.IsNotFound {
 		return nil, ErrNoTXTRecord
