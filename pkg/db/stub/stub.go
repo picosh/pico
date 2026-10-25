@@ -144,14 +144,6 @@ func (me *StubDB) FindUserPostsByTag(page *db.Pager, tag, userID, space string) 
 	return &db.Paginate[*db.Post]{}, errNotImpl
 }
 
-func (me *StubDB) FindPostsByTag(pager *db.Pager, tag, space string) (*db.Paginate[*db.Post], error) {
-	return &db.Paginate[*db.Post]{}, errNotImpl
-}
-
-func (me *StubDB) FindPopularTags(space string) ([]string, error) {
-	return []string{}, errNotImpl
-}
-
 func (me *StubDB) FindFeature(userID string, feature string) (*db.FeatureFlag, error) {
 	return nil, errNotImpl
 }

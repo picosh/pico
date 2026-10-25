@@ -164,8 +164,7 @@ type Post struct {
 }
 
 type Paginate[T any] struct {
-	Data  []T
-	Total int
+	Data []T
 }
 
 type VisitInterval struct {
@@ -216,6 +215,27 @@ type AnalyticsVisits struct {
 	Referer     string `json:"referer" db:"referer"`
 	Status      int    `json:"status" db:"status"`
 	ContentType string `json:"content_type" db:"content_type"`
+}
+
+// IsMobileUserAgent checks common mobile user-agent patterns.
+// TODO: replace with a proper UA parser library (e.g., mssola/useragent).
+func IsMobileUserAgent(userAgent string) bool {
+	ua := strings.ToLower(userAgent)
+	mobileKeywords := []string{
+		"mobile",
+		"android",
+		"iphone",
+		"ipad",
+		"ipod",
+		"blackberry",
+		"windows phone",
+	}
+	for _, kw := range mobileKeywords {
+		if strings.Contains(ua, kw) {
+			return true
+		}
+	}
+	return false
 }
 
 type AccessLogData struct{}

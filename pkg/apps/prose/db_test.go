@@ -143,40 +143,4 @@ func TestFindUserPostsByTag(t *testing.T) {
 	}
 }
 
-func TestFindPostsByTag(t *testing.T) {
-	cleanupTestData(t)
-
-	user, _ := testDB.RegisterUser("tagsearchowner", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI tagsearchowner", "comment", "")
-	now := time.Now()
-	post := mustInsertPost(t, &db.Post{UserID: user.ID, Filename: "tagsearch.md", Slug: "tagsearch", Title: "Tag Search", Space: "prose", PublishAt: &now})
-	_ = testDB.ReplaceTagsByPost([]string{"searchtag"}, post.ID)
-
-	pager := &db.Pager{Num: 10, Page: 0}
-	result, err := testDB.FindPostsByTag(pager, "searchtag", "prose")
-	if err != nil {
-		t.Fatalf("FindPostsByTag failed: %v", err)
-	}
-	if len(result.Data) != 1 {
-		t.Errorf("expected 1 post with tag, got %d", len(result.Data))
-	}
-}
-
-func TestFindPopularTags(t *testing.T) {
-	cleanupTestData(t)
-
-	user, _ := testDB.RegisterUser("populartagowner", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI populartagowner", "comment", "")
-	post1 := mustInsertPost(t, &db.Post{UserID: user.ID, Filename: "pop1.md", Slug: "pop1", Title: "Pop 1", Space: "prose"})
-	post2 := mustInsertPost(t, &db.Post{UserID: user.ID, Filename: "pop2.md", Slug: "pop2", Title: "Pop 2", Space: "prose"})
-	_ = testDB.ReplaceTagsByPost([]string{"popular"}, post1.ID)
-	_ = testDB.ReplaceTagsByPost([]string{"popular"}, post2.ID)
-
-	tags, err := testDB.FindPopularTags("prose")
-	if err != nil {
-		t.Fatalf("FindPopularTags failed: %v", err)
-	}
-	if len(tags) < 1 {
-		t.Errorf("expected at least 1 popular tag, got %d", len(tags))
-	}
-}
-
 // ============ Aliases Tests ============

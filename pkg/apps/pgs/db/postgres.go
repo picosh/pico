@@ -252,14 +252,18 @@ func (me *PgsPsqlDB) FindProjectsByUser(userID string) ([]*db.Project, error) {
 }
 
 func (me *PgsPsqlDB) FindProjects(by string) ([]*db.Project, error) {
+	// A bind parameter in ORDER BY sorts by a constant, so map to a column.
+	orderBy := "p.created_at"
+	if by == "updated_at" {
+		orderBy = "p.updated_at"
+	}
 	projects := []*db.Project{}
 	err := me.Db.Select(
 		&projects,
-		`SELECT p.id, p.user_id, u.name as username, p.name, p.project_dir, p.acl, p.blocked, p.created_at, p.updated_at
+		fmt.Sprintf(`SELECT p.id, p.user_id, u.name as username, p.name, p.project_dir, p.acl, p.blocked, p.created_at, p.updated_at
 		FROM projects AS p
 		LEFT JOIN app_users AS u ON u.id = p.user_id
-		ORDER BY $1 DESC`,
-		by,
+		ORDER BY %s DESC`, orderBy),
 	)
 	return projects, err
 }

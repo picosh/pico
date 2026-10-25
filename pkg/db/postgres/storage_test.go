@@ -824,6 +824,55 @@ func TestVisitSummaryDeviceSplit(t *testing.T) {
 	}
 }
 
+func TestVisitSummaryPreviousMonthCountedOnce(t *testing.T) {
+	cleanupTestData(t)
+
+	user, _ := testDB.RegisterUser("prevmonthowner", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI prevmonthowner", "comment", "")
+
+	now := time.Now()
+	currentMonthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+	previousMonthStart := currentMonthStart.AddDate(0, -1, 0)
+
+	// Raw rows for the previous month are kept after it has been aggregated.
+	_, err := testDB.Db.Exec(
+		`INSERT INTO analytics_visits (user_id, host, path, ip_address, referer, status, created_at) VALUES ($1, 'prev.com', '/page', '192.168.1.20', 'ref.com', 200, $2)`,
+		user.ID, previousMonthStart.Add(24*time.Hour),
+	)
+	if err != nil {
+		t.Fatalf("insert raw visit: %v", err)
+	}
+	_, err = testDB.Db.Exec(
+		`INSERT INTO analytics_monthly_top_urls (user_id, host, month, path, unique_visits, status_code, rank) VALUES ($1, 'prev.com', $2, '/page', 1, 200, 1)`,
+		user.ID, previousMonthStart,
+	)
+	if err != nil {
+		t.Fatalf("insert top url: %v", err)
+	}
+	_, err = testDB.Db.Exec(
+		`INSERT INTO analytics_monthly_top_referers (user_id, host, month, referer, unique_visits, rank) VALUES ($1, 'prev.com', $2, 'ref.com', 1, 1)`,
+		user.ID, previousMonthStart,
+	)
+	if err != nil {
+		t.Fatalf("insert top referer: %v", err)
+	}
+
+	summary, err := testDB.VisitSummary(&db.SummaryOpts{
+		Interval: "month",
+		Origin:   currentMonthStart.AddDate(0, -3, 0),
+		Host:     "prev.com",
+		UserID:   user.ID,
+	})
+	if err != nil {
+		t.Fatalf("VisitSummary failed: %v", err)
+	}
+	if len(summary.TopUrls) != 1 || summary.TopUrls[0].Count != 1 {
+		t.Errorf("got top urls %+v, want /page counted once", summary.TopUrls)
+	}
+	if len(summary.TopReferers) != 1 || summary.TopReferers[0].Count != 1 {
+		t.Errorf("got top referers %+v, want ref.com counted once", summary.TopReferers)
+	}
+}
+
 func TestFindVisitSiteList(t *testing.T) {
 	cleanupTestData(t)
 

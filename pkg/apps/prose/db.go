@@ -2,12 +2,10 @@ package prose
 
 import (
 	"fmt"
-	"math"
 	"sync"
 	"time"
 
 	"github.com/hashicorp/golang-lru/v2/expirable"
-	"github.com/jmoiron/sqlx"
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/db/postgres"
 )
@@ -200,134 +198,5 @@ func (me *PsqlDB) FindUserPostsByTag(page *db.Pager, tag, userID, space string) 
 		return nil, err
 	}
 
-	var count int
-	err = me.Db.QueryRow(`SELECT count(id) FROM posts WHERE hidden = FALSE AND cur_space=$1`, space).Scan(&count)
-	if err != nil {
-		return nil, err
-	}
-
-	pager := &db.Paginate[*db.Post]{
-		Data:  posts,
-		Total: int(math.Ceil(float64(count) / float64(page.Num))),
-	}
-	return pager, nil
-}
-
-func (me *PsqlDB) FindPostsByTag(pager *db.Pager, tag, space string) (*db.Paginate[*db.Post], error) {
-	query := `
-	SELECT
-		posts.id,
-		user_id,
-		filename,
-		slug,
-		title,
-		text,
-		description,
-		publish_at,
-		app_users.name as username,
-		posts.updated_at,
-		posts.mime_type
-	FROM posts
-	LEFT JOIN app_users ON app_users.id = posts.user_id
-	LEFT JOIN post_tags ON post_tags.post_id = posts.id
-	WHERE
-		post_tags.name = $3 AND
-		publish_at::date <= CURRENT_DATE AND
-		cur_space = $4
-	ORDER BY publish_at DESC
-	LIMIT $1 OFFSET $2`
-	rs, err := me.Db.Queryx(
-		query,
-		pager.Num,
-		pager.Num*pager.Page,
-		tag,
-		space,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rs.Close() }()
-
-	return me.postPager(rs, pager.Num, space, tag)
-}
-
-func (me *PsqlDB) postPager(rs *sqlx.Rows, pageNum int, space string, tag string) (*db.Paginate[*db.Post], error) {
-	var posts []*db.Post
-	for rs.Next() {
-		post := &db.Post{}
-		err := rs.Scan(
-			&post.ID,
-			&post.UserID,
-			&post.Filename,
-			&post.Slug,
-			&post.Title,
-			&post.Text,
-			&post.Description,
-			&post.PublishAt,
-			&post.Username,
-			&post.UpdatedAt,
-			&post.MimeType,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		posts = append(posts, post)
-	}
-	if rs.Err() != nil {
-		return nil, rs.Err()
-	}
-
-	var count int
-	var err error
-	if tag == "" {
-		err = me.Db.QueryRow(`SELECT count(id) FROM posts WHERE hidden = FALSE AND cur_space=$1`, space).Scan(&count)
-	} else {
-		err = me.Db.QueryRow(`
-	SELECT count(posts.id)
-	FROM posts
-	LEFT JOIN post_tags ON post_tags.post_id = posts.id
-	WHERE hidden = FALSE AND cur_space=$1 and post_tags.name = $2`, space, tag).Scan(&count)
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	pager := &db.Paginate[*db.Post]{
-		Data:  posts,
-		Total: int(math.Ceil(float64(count) / float64(pageNum))),
-	}
-
-	return pager, nil
-}
-
-func (me *PsqlDB) FindPopularTags(space string) ([]string, error) {
-	tags := make([]string, 0)
-	query := `
-	SELECT name, count(post_id) as "tally"
-	FROM post_tags
-	LEFT JOIN posts ON posts.id = post_id
-	WHERE posts.cur_space = $1
-	GROUP BY name
-	ORDER BY tally DESC
-	LIMIT 5`
-	rs, err := me.Db.Queryx(query, space)
-	if err != nil {
-		return tags, err
-	}
-	defer func() { _ = rs.Close() }()
-	for rs.Next() {
-		name := ""
-		tally := 0
-		err := rs.Scan(&name, &tally)
-		if err != nil {
-			return tags, err
-		}
-
-		tags = append(tags, name)
-	}
-	if rs.Err() != nil {
-		return tags, rs.Err()
-	}
-	return tags, nil
+	return &db.Paginate[*db.Post]{Data: posts}, nil
 }

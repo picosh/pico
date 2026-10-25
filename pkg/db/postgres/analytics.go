@@ -9,12 +9,9 @@ import (
 	"github.com/picosh/pico/pkg/db"
 )
 
-// mobileUserAgentExpr is a SQL expression to detect mobile user agents.
-const mobileUserAgentExpr = `(user_agent ILIKE '%mobile%' OR user_agent ILIKE '%android%' OR user_agent ILIKE '%iphone%' OR user_agent ILIKE '%ipad%' OR user_agent ILIKE '%ipod%' OR user_agent ILIKE '%blackberry%' OR user_agent ILIKE '%windows phone%')`
-
 func (me *PsqlDB) InsertVisit(visit *db.AnalyticsVisits) error {
 	_, err := me.Db.Exec(
-		`INSERT INTO analytics_visits (user_id, project_id, post_id, namespace, host, path, ip_address, user_agent, referer, status, content_type) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11);`,
+		`INSERT INTO analytics_visits (user_id, project_id, post_id, namespace, host, path, ip_address, user_agent, referer, status, content_type, is_mobile) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12);`,
 		visit.UserID,
 		newNullString(visit.ProjectID),
 		newNullString(visit.PostID),
@@ -26,6 +23,7 @@ func (me *PsqlDB) InsertVisit(visit *db.AnalyticsVisits) error {
 		visit.Referer,
 		visit.Status,
 		visit.ContentType,
+		db.IsMobileUserAgent(visit.UserAgent),
 	)
 	return err
 }
@@ -138,14 +136,14 @@ func (me *PsqlDB) visitUniqueFromRaw(opts *db.SummaryOpts) ([]*db.VisitInterval,
 	uniqueVisitors := fmt.Sprintf(`
 		SELECT
 			date_trunc('%s', created_at)::timestamptz as interval_start,
-			count(DISTINCT CASE WHEN %s THEN ip_address END) as mobile_visitors,
-			count(DISTINCT CASE WHEN NOT %s THEN ip_address END) as desktop_visitors,
+			count(DISTINCT CASE WHEN is_mobile THEN ip_address END) as mobile_visitors,
+			count(DISTINCT CASE WHEN NOT is_mobile THEN ip_address END) as desktop_visitors,
 			count(DISTINCT ip_address) as unique_visitors
 		FROM analytics_visits
 		WHERE created_at >= $1 AND created_at < $2 AND %s = $3 AND user_id = $4 AND status <> 404
 		GROUP BY interval_start
 		ORDER BY interval_start`,
-		opts.Interval, mobileUserAgentExpr, mobileUserAgentExpr, where)
+		opts.Interval, where)
 
 	rows, err := me.Db.Queryx(uniqueVisitors, effectiveStart, currentMonthStart.AddDate(0, 1, 0), with, opts.UserID)
 	if err != nil {
@@ -320,7 +318,7 @@ func (me *PsqlDB) visitRefererFromSummary(opts *db.SummaryOpts) ([]*db.VisitUrl,
 	originMonthStart := time.Date(opts.Origin.Year(), opts.Origin.Month(), 1, 0, 0, 0, 0, time.UTC)
 
 	where := ""
-	args := []interface{}{opts.UserID, originMonthStart, currentMonthStart}
+	args := []interface{}{opts.UserID, originMonthStart, previousMonthStart}
 	if opts.Host != "" {
 		where = "AND host = $4"
 		args = append(args, opts.Host)
@@ -435,7 +433,7 @@ func (me *PsqlDB) visitUrlFromSummary(opts *db.SummaryOpts) ([]*db.VisitUrl, err
 	originMonthStart := time.Date(opts.Origin.Year(), opts.Origin.Month(), 1, 0, 0, 0, 0, time.UTC)
 
 	where := ""
-	args := []interface{}{opts.UserID, originMonthStart, currentMonthStart}
+	args := []interface{}{opts.UserID, originMonthStart, previousMonthStart}
 	if opts.Host != "" {
 		where = "AND host = $4"
 		args = append(args, opts.Host)
@@ -555,7 +553,7 @@ func (me *PsqlDB) visitUrlNotFoundFromSummary(opts *db.SummaryOpts, limit int) (
 	originMonthStart := time.Date(opts.Origin.Year(), opts.Origin.Month(), 1, 0, 0, 0, 0, time.UTC)
 
 	where := ""
-	args := []interface{}{opts.UserID, originMonthStart, currentMonthStart}
+	args := []interface{}{opts.UserID, originMonthStart, previousMonthStart}
 	argIdx := 4
 	if opts.Host != "" {
 		where = "AND host = $" + fmt.Sprintf("%d", argIdx)

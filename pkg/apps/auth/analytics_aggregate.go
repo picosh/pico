@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"strings"
 	"time"
 
+	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/db/postgres"
 )
 
@@ -224,7 +224,7 @@ func aggregateDays(visits []visitRow) map[string]*dayStats {
 		}
 
 		ds.AllIPs[v.IPAddress] = true
-		if isMobile(v.UserAgent) {
+		if db.IsMobileUserAgent(v.UserAgent) {
 			ds.MobileIPs[v.IPAddress] = true
 		} else {
 			ds.DesktopIPs[v.IPAddress] = true
@@ -385,27 +385,6 @@ func upsertUserSite(dbpool *postgres.PsqlDB, userID, host string, monthUnique in
 		userID, host, monthUnique, month,
 	)
 	return err
-}
-
-// isMobile checks common mobile user-agent patterns.
-// TODO: replace with a proper UA parser library (e.g., mssola/useragent).
-func isMobile(userAgent string) bool {
-	ua := strings.ToLower(userAgent)
-	mobileKeywords := []string{
-		"mobile",
-		"android",
-		"iphone",
-		"ipad",
-		"ipod",
-		"blackberry",
-		"windows phone",
-	}
-	for _, kw := range mobileKeywords {
-		if strings.Contains(ua, kw) {
-			return true
-		}
-	}
-	return false
 }
 
 // deleteAggregatedVisits deletes raw visit data from analytics_visits for the given month.

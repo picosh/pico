@@ -3,7 +3,6 @@ package postgres
 import (
 	"database/sql"
 	"fmt"
-	"math"
 	"strings"
 
 	"github.com/picosh/pico/pkg/db"
@@ -309,17 +308,7 @@ func (me *PsqlDB) FindPostsByUser(page *db.Pager, userID string, space string) (
 		return nil, rs.Err()
 	}
 
-	var count int
-	err = me.Db.QueryRow(`SELECT count(id) FROM posts WHERE hidden = FALSE AND cur_space=$1`, space).Scan(&count)
-	if err != nil {
-		return nil, err
-	}
-
-	pager := &db.Paginate[*db.Post]{
-		Data:  posts,
-		Total: int(math.Ceil(float64(count) / float64(page.Num))),
-	}
-	return pager, nil
+	return &db.Paginate[*db.Post]{Data: posts}, nil
 }
 
 func (me *PsqlDB) FindAllPostsByUser(userID string, space string) ([]*db.Post, error) {
