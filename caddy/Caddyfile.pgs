@@ -14,8 +14,24 @@
 	}
 }
 
+# Metrics routes need ?x-authorization={$METRICS_TOKEN}. An unset token matches
+# nothing.
+(metrics_token) {
+	expression `{http.request.uri.query.x-authorization} == "{$METRICS_TOKEN}" && "{$METRICS_TOKEN}" != ""`
+}
+
+# Apps serve metrics on /_metrics, which only the token-checked routes reach.
+# Scrapes stay out of the access logs so the token does too.
+(block_app_metrics) {
+	@appmetrics path /_metrics /_metrics/*
+	respond @appmetrics 404
+	@metricsroutes path /_caddy/metrics /_ssh/metrics /_web/metrics /_imgproxy/metrics /_app/metrics
+	log_skip @metricsroutes
+}
+
 # custom domains
 :443 {
+	import block_app_metrics
 	reverse_proxy web:3000
 	log {
 		format append {
@@ -30,6 +46,7 @@
 
 # subdomains and root pgs domain
 *.{$APP_DOMAIN}, {$APP_DOMAIN} {
+	import block_app_metrics
 	reverse_proxy web:3000
 	log {
 		format append {
@@ -65,6 +82,7 @@
 	@caddymetrics {
 		host {$APP_DOMAIN} *.{$APP_DOMAIN}
 		path /_caddy/metrics
+		import metrics_token
 	}
 
 	metrics @caddymetrics {
@@ -74,6 +92,7 @@
 	@sshmetrics {
 		host {$APP_DOMAIN} *.{$APP_DOMAIN}
 		path /_ssh/metrics
+		import metrics_token
 	}
 
 	handle @sshmetrics {
@@ -84,6 +103,7 @@
 	@webmetrics {
 		host {$APP_DOMAIN} *.{$APP_DOMAIN}
 		path /_web/metrics
+		import metrics_token
 	}
 
 	handle @webmetrics {
@@ -96,6 +116,7 @@
 	@imgproxymetrics {
 		host {$APP_DOMAIN} *.{$APP_DOMAIN}
 		path /_imgproxy/metrics
+		import metrics_token
 	}
 
 	handle @imgproxymetrics {
