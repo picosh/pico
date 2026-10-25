@@ -781,6 +781,49 @@ func TestVisitSummary(t *testing.T) {
 	}
 }
 
+func TestVisitSummaryDeviceSplit(t *testing.T) {
+	cleanupTestData(t)
+
+	user, _ := testDB.RegisterUser("deviceowner", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI deviceowner", "comment", "")
+
+	// A phone user agent matches several mobile keywords at once.
+	_ = testDB.InsertVisit(&db.AnalyticsVisits{
+		UserID:    user.ID,
+		Host:      "devices.com",
+		Path:      "/",
+		IpAddress: "192.168.1.10",
+		UserAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Mobile/15E148",
+		Status:    200,
+	})
+	_ = testDB.InsertVisit(&db.AnalyticsVisits{
+		UserID:    user.ID,
+		Host:      "devices.com",
+		Path:      "/",
+		IpAddress: "192.168.1.11",
+		UserAgent: "Mozilla/5.0 (X11; Linux x86_64) Gecko/20100101 Firefox/140.0",
+		Status:    200,
+	})
+
+	summary, err := testDB.VisitSummary(&db.SummaryOpts{
+		Interval: "day",
+		Origin:   time.Now().Add(-24 * time.Hour),
+		Host:     "devices.com",
+		UserID:   user.ID,
+	})
+	if err != nil {
+		t.Fatalf("VisitSummary failed: %v", err)
+	}
+
+	var mobile, desktop int
+	for _, iv := range summary.Intervals {
+		mobile += iv.MobileVisitors
+		desktop += iv.DesktopVisitors
+	}
+	if mobile != 1 || desktop != 1 {
+		t.Errorf("got %d mobile and %d desktop visitors, want 1 and 1", mobile, desktop)
+	}
+}
+
 func TestFindVisitSiteList(t *testing.T) {
 	cleanupTestData(t)
 

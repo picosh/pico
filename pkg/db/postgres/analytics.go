@@ -10,7 +10,7 @@ import (
 )
 
 // mobileUserAgentExpr is a SQL expression to detect mobile user agents.
-const mobileUserAgentExpr = `user_agent ILIKE '%mobile%' OR user_agent ILIKE '%android%' OR user_agent ILIKE '%iphone%' OR user_agent ILIKE '%ipad%' OR user_agent ILIKE '%ipod%' OR user_agent ILIKE '%blackberry%' OR user_agent ILIKE '%windows phone%'`
+const mobileUserAgentExpr = `(user_agent ILIKE '%mobile%' OR user_agent ILIKE '%android%' OR user_agent ILIKE '%iphone%' OR user_agent ILIKE '%ipad%' OR user_agent ILIKE '%ipod%' OR user_agent ILIKE '%blackberry%' OR user_agent ILIKE '%windows phone%')`
 
 func (me *PsqlDB) InsertVisit(visit *db.AnalyticsVisits) error {
 	_, err := me.Db.Exec(
