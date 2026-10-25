@@ -11,6 +11,7 @@ import (
 	"github.com/picosh/pico/pkg/db/postgres"
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/pico/pkg/shared/router"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -84,6 +85,7 @@ func (web *webRouter) blogHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "user not found", http.StatusNotFound)
 		return
 	}
+	router.SetUser(r, user.Name)
 	logger = shared.LoggerWithUser(blogger, user)
 
 	pager, err := dbpool.FindPostsByUser(&db.Pager{Num: 1000, Page: 0}, user.ID, cfg.Space)
@@ -169,6 +171,7 @@ func (web *webRouter) postHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "paste not found", http.StatusNotFound)
 		return
 	}
+	router.SetUser(r, user.Name)
 	logger = shared.LoggerWithUser(logger, user)
 
 	blogName := GetBlogName(username)
@@ -266,6 +269,7 @@ func (web *webRouter) postHandlerRaw(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "user not found", http.StatusNotFound)
 		return
 	}
+	router.SetUser(r, user.Name)
 	logger = shared.LoggerWithUser(blogger, user)
 
 	post, err := dbpool.FindPostWithSlug(slug, user.ID, cfg.Space)
@@ -364,6 +368,7 @@ func StartApiServer() {
 
 	web := &webRouter{cfg: cfg, db: db}
 	handler := router.NewHostRouter(cfg.Domain, cfg.Space, web.mainMux(), web.sitesMux())
+	handler = router.NewUserMetrics("pastes", prometheus.DefaultRegisterer, router.UserMetricsOpts{}).Handler(handler)
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)
 	logger.Info(

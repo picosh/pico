@@ -118,6 +118,7 @@ func handleLogin(w http.ResponseWriter, r *http.Request, cfg *Config) {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
+	router.SetUser(r, user.Name)
 
 	project, err := cfg.DB.FindProjectByName(user.ID, projectName)
 	if err != nil {

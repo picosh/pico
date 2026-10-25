@@ -43,6 +43,7 @@ func handleAutoForm(w http.ResponseWriter, r *http.Request, cfg *Config) {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
+	router.SetUser(r, user.Name)
 
 	ff, err := cfg.DB.FindFeature(user.ID, "plus")
 	if err != nil || (ff != nil && !ff.IsValid()) {

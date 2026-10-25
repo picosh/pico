@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"strings"
 	"sync"
 	"time"
 	"unicode/utf8"
@@ -349,7 +350,7 @@ func (s *SSHServer) ListenAndServe() error {
 			ConstLabels: prometheus.Labels{
 				"app": s.Config.App,
 			},
-		}, []string{"command"})
+		}, []string{"command", "user"})
 
 		s.SessionsFinished = promauto.With(prometheus.DefaultRegisterer).NewCounterVec(prometheus.CounterOpts{
 			Name: "pssh_sessions_finished_total",
@@ -357,7 +358,7 @@ func (s *SSHServer) ListenAndServe() error {
 			ConstLabels: prometheus.Labels{
 				"app": s.Config.App,
 			},
-		}, []string{"command"})
+		}, []string{"command", "user"})
 
 		s.SessionsDuration = promauto.With(prometheus.DefaultRegisterer).NewCounterVec(prometheus.CounterOpts{
 			Name: "pssh_sessions_duration_seconds",
@@ -365,7 +366,7 @@ func (s *SSHServer) ListenAndServe() error {
 			ConstLabels: prometheus.Labels{
 				"app": s.Config.App,
 			},
-		}, []string{"command"})
+		}, []string{"command", "user"})
 
 		// The handler reads the default registerer, so build it before the
 		// listener is published rather than in the goroutine.
@@ -618,10 +619,11 @@ func NewSSHServer(ctx context.Context, logger *slog.Logger, config *SSHServerCon
 							}
 
 							if sc.SSHServer.Config.PromListenAddr != "" {
-								sc.SSHServer.SessionsCreated.WithLabelValues(command).Inc()
+								labels := []string{sessionCommand(command), sessionUser(sesh)}
+								sc.SSHServer.SessionsCreated.WithLabelValues(labels...).Inc()
 								defer func() {
-									sc.SSHServer.SessionsFinished.WithLabelValues(command).Inc()
-									sc.SSHServer.SessionsDuration.WithLabelValues(command).Add(time.Since(sc.Start).Seconds())
+									sc.SSHServer.SessionsFinished.WithLabelValues(labels...).Inc()
+									sc.SSHServer.SessionsDuration.WithLabelValues(labels...).Add(time.Since(sc.Start).Seconds())
 								}()
 							}
 
@@ -693,6 +695,23 @@ func NewSSHServer(ctx context.Context, logger *slog.Logger, config *SSHServerCon
 	}
 
 	return server
+}
+
+// sessionCommand is the subcommand alone, since arguments would add a series
+// for every distinct command line.
+func sessionCommand(command string) string {
+	if fields := strings.Fields(command); len(fields) > 0 {
+		return fields[0]
+	}
+	return command
+}
+
+// sessionUser is the name the auth handler confirmed, or "" without one.
+func sessionUser(s *SSHServerConnSession) string {
+	if perms := s.Permissions(); perms != nil {
+		return perms.Extensions["user"]
+	}
+	return ""
 }
 
 type PubKeyAuthHandler func(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error)

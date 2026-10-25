@@ -132,6 +132,7 @@ func (r *SshAuthHandler) PubkeyAuthHandler(conn ssh.ConnMetadata, key ssh.Public
 	perms := &ssh.Permissions{
 		Extensions: map[string]string{
 			"user_id":  user.ID,
+			"user":     user.Name,
 			"pubkey":   authed.Pubkey,
 			"identity": authed.Identity,
 		},

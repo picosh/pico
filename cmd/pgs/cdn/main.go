@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/picosh/pico/pkg/apps/pgs"
-	"github.com/picosh/pico/pkg/httpcache"
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -29,9 +28,11 @@ func main() {
 	cfg := pgs.NewConfig(logger, nil, nil, drain)
 	proxy := newProxyServe(cfg.Logger)
 	httpCache, cache := pgs.NewPgsHttpCache(cfg, proxy)
+	// The CDN can't look users up, but origin fails every site route for a
+	// site that doesn't exist, so a success proves the owner is real.
 	cacher := &cachedHttp{
 		Logger: cfg.Logger,
-		Cache:  httpCache,
+		Cache:  pgs.NewSiteMetrics(cfg, "pgs-cdn", true).Handler(httpCache),
 	}
 
 	go pgs.CacheMgmt(ctx, cfg, cache, nil)
@@ -118,7 +119,7 @@ func (p *proxyServe) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 type cachedHttp struct {
 	Logger *slog.Logger
-	Cache  *httpcache.HttpCache
+	Cache  http.Handler
 }
 
 func (c *cachedHttp) ServeHTTP(writer http.ResponseWriter, req *http.Request) {

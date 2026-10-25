@@ -19,6 +19,7 @@ import (
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/pico/pkg/shared/router"
 	"github.com/picosh/pico/pkg/storage"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -130,6 +131,7 @@ func (web *webRouter) blogStyleHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "blog not found", http.StatusNotFound)
 		return
 	}
+	router.SetUser(r, user.Name)
 	logger = shared.LoggerWithUser(logger, user)
 
 	styles, err := dbpool.FindPostWithFilename("_styles.css", user.ID, cfg.Space)
@@ -160,6 +162,7 @@ func (web *webRouter) blogHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "blog not found", http.StatusNotFound)
 		return
 	}
+	router.SetUser(r, user.Name)
 	logger = shared.LoggerWithUser(logger, user)
 
 	tag := r.URL.Query().Get("tag")
@@ -291,6 +294,7 @@ func (web *webRouter) postRawHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "blog not found", http.StatusNotFound)
 		return
 	}
+	router.SetUser(r, user.Name)
 	logger = shared.LoggerWithUser(logger, user)
 
 	post, err := dbpool.FindPostWithSlug(slug, user.ID, cfg.Space)
@@ -320,6 +324,7 @@ func (web *webRouter) robotsHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "blog not found", http.StatusNotFound)
 		return
 	}
+	router.SetUser(r, user.Name)
 	logger = shared.LoggerWithUser(logger, user)
 	w.Header().Add("Content-Type", "text/plain")
 
@@ -350,6 +355,7 @@ func (web *webRouter) postHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "blog not found", http.StatusNotFound)
 		return
 	}
+	router.SetUser(r, user.Name)
 
 	logger = shared.LoggerWithUser(logger, user)
 	logger = logger.With("slug", slug)
@@ -591,6 +597,7 @@ func (web *webRouter) rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "rss feed not found", http.StatusNotFound)
 		return
 	}
+	router.SetUser(r, user.Name)
 	logger = shared.LoggerWithUser(logger, user)
 	logger.Info("fetching blog rss")
 
@@ -852,6 +859,7 @@ func (web *webRouter) imgRequest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "could find user", http.StatusNotFound)
 		return
 	}
+	router.SetUser(r, user.Name)
 	logger = shared.LoggerWithUser(logger, user)
 
 	rawname := r.PathValue("file")
@@ -983,6 +991,7 @@ func StartApiServer() {
 
 	web := &webRouter{cfg: cfg, db: dbpool, storage: st}
 	handler := router.NewHostRouter(cfg.Domain, cfg.Space, web.mainMux(), web.sitesMux())
+	handler = router.NewUserMetrics("prose", prometheus.DefaultRegisterer, router.UserMetricsOpts{}).Handler(handler)
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)
 	logger.Info(

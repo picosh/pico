@@ -133,6 +133,26 @@ func NewPgsHttpCache(cfg *Config, upstream http.Handler) (*httpcache.HttpCache, 
 	return httpCache, cache
 }
 
+// NewSiteMetrics counts requests for each site owner. The owner comes from
+// the host, so responses served from a cache count too.
+func NewSiteMetrics(cfg *Config, app string, trustSuccess bool) *router.UserMetrics {
+	return router.NewUserMetrics(app, prometheus.DefaultRegisterer, router.UserMetricsOpts{
+		SiteUser:     siteUser(cfg),
+		TrustSuccess: trustSuccess,
+	})
+}
+
+func siteUser(cfg *Config) func(r *http.Request) string {
+	return func(r *http.Request) string {
+		subdomain := router.GetSubdomainFromRequest(r, cfg.Domain, cfg.TxtPrefix)
+		if subdomain == "" {
+			return ""
+		}
+		props, _ := router.GetProjectFromSubdomain(subdomain)
+		return props.Username
+	}
+}
+
 func StartApiServer(cfg *Config) {
 	ctx := context.Background()
 
@@ -146,7 +166,7 @@ func StartApiServer(cfg *Config) {
 		"port", cfg.WebPort,
 		"domain", cfg.Domain,
 	)
-	err := http.ListenAndServe(portStr, httpCache)
+	err := http.ListenAndServe(portStr, NewSiteMetrics(cfg, "pgs", false).Handler(httpCache))
 	cfg.Logger.Error(
 		"listen and serve",
 		"err", err.Error(),
@@ -500,6 +520,7 @@ func (web *WebRouter) ServeAsset(fname string, opts *storage.ImgProcessOpts, has
 		http.Error(w, msg, status)
 		return
 	}
+	router.SetUser(r, site.user.Name)
 	user, project, bucket := site.user, site.project, site.bucket
 
 	logger = logger.With(

@@ -19,6 +19,7 @@ import (
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/pico/pkg/shared/router"
 	"github.com/picosh/utils/pipe"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"golang.org/x/crypto/ssh"
 )
@@ -408,6 +409,7 @@ func rssHandler(cfg *Config, dbpool DB) http.HandlerFunc {
 			http.Error(w, "invalid token", http.StatusNotFound)
 			return
 		}
+		router.SetUser(r, user.Name)
 		rss, err := MonitorRss(dbpool, user, cfg.Domain)
 		if err != nil {
 			cfg.Logger.Error(
@@ -511,6 +513,7 @@ func StartApiServer() {
 
 	web := &webRouter{cfg: cfg, db: db, conn: newPipeConn(info)}
 	handler := router.NewHostRouter(cfg.Domain, cfg.Space, web.mainMux(), web.sitesMux())
+	handler = router.NewUserMetrics("pipe", prometheus.DefaultRegisterer, router.UserMetricsOpts{}).Handler(handler)
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)
 	logger.Info(
