@@ -88,12 +88,18 @@ func (m *UserMetrics) Handler(next http.Handler) http.Handler {
 		next.ServeHTTP(mw, r.WithContext(context.WithValue(r.Context(), ctxUserKey{}, &user)))
 
 		status := mw.Status()
-		user = m.resolveUser(r, user, status)
-		labels := []string{user, strconv.Itoa(status), metricMethod(r.Method)}
-		m.requests.WithLabelValues(labels...).Inc()
-		m.duration.WithLabelValues(labels...).Observe(time.Since(start).Seconds())
-		m.bytes.WithLabelValues(user).Add(float64(mw.bytes))
+		m.Observe(m.resolveUser(r, user, status), status, r.Method, time.Since(start), mw.bytes)
 	})
+}
+
+// Observe records one request for servers that can't use Handler, such as
+// tuns's gin logger. user must already be confirmed to exist. A negative
+// size, which gin reports when nothing was written, counts as zero bytes.
+func (m *UserMetrics) Observe(user string, status int, method string, elapsed time.Duration, bytes int64) {
+	labels := []string{user, strconv.Itoa(status), metricMethod(method)}
+	m.requests.WithLabelValues(labels...).Inc()
+	m.duration.WithLabelValues(labels...).Observe(elapsed.Seconds())
+	m.bytes.WithLabelValues(user).Add(float64(max(bytes, 0)))
 }
 
 func (m *UserMetrics) resolveUser(r *http.Request, user string, status int) string {

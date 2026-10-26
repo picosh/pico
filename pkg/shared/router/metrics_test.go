@@ -129,6 +129,24 @@ func TestUserMetricsMethod(t *testing.T) {
 	}
 }
 
+func TestUserMetricsObserve(t *testing.T) {
+	reg := prometheus.NewRegistry()
+	m := NewUserMetrics("test", reg, UserMetricsOpts{})
+
+	m.Observe("carol", http.StatusOK, http.MethodGet, 0, 7)
+	m.Observe("carol", http.StatusNotModified, "MADEUP", 0, -1)
+
+	if got := metricValue(t, reg, "pico_http_requests_total", map[string]string{"user": "carol", "status": "200", "method": "GET"}); got != 1 {
+		t.Errorf("200 requests = %v, want 1", got)
+	}
+	if got := metricValue(t, reg, "pico_http_requests_total", map[string]string{"user": "carol", "status": "304", "method": "OTHER"}); got != 1 {
+		t.Errorf("304 requests = %v, want 1", got)
+	}
+	if got := metricValue(t, reg, "pico_http_response_bytes_total", map[string]string{"user": "carol"}); got != 7 {
+		t.Errorf("bytes = %v, want 7", got)
+	}
+}
+
 func TestUserMetricsHijack(t *testing.T) {
 	reg := prometheus.NewRegistry()
 	h := NewUserMetrics("test", reg, UserMetricsOpts{}).Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
