@@ -11,7 +11,9 @@ import (
 	"strings"
 
 	"github.com/picosh/pico/pkg/apps/pgs"
+	"github.com/picosh/pico/pkg/metrics"
 	"github.com/picosh/pico/pkg/shared"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -36,6 +38,7 @@ func main() {
 	}
 
 	go pgs.CacheMgmt(ctx, cfg, cache, nil)
+	metrics.RegisterServerInfo(prometheus.DefaultRegisterer, "pgs-cdn")
 
 	portStr := fmt.Sprintf(":%s", cfg.WebPort)
 	cfg.Logger.Info(

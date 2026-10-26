@@ -16,6 +16,7 @@ import (
 	"github.com/gorilla/feeds"
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/db/postgres"
+	"github.com/picosh/pico/pkg/metrics"
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/pico/pkg/shared/router"
 	"github.com/picosh/pico/pkg/storage"
@@ -992,6 +993,7 @@ func StartApiServer() {
 	web := &webRouter{cfg: cfg, db: dbpool, storage: st}
 	handler := router.NewHostRouter(cfg.Domain, cfg.Space, web.mainMux(), web.sitesMux())
 	handler = router.NewUserMetrics("prose", prometheus.DefaultRegisterer, router.UserMetricsOpts{}).Handler(handler)
+	metrics.RegisterServerInfo(prometheus.DefaultRegisterer, "prose")
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)
 	logger.Info(

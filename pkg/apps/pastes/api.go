@@ -9,6 +9,7 @@ import (
 
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/db/postgres"
+	"github.com/picosh/pico/pkg/metrics"
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/pico/pkg/shared/router"
 	"github.com/prometheus/client_golang/prometheus"
@@ -369,6 +370,7 @@ func StartApiServer() {
 	web := &webRouter{cfg: cfg, db: db}
 	handler := router.NewHostRouter(cfg.Domain, cfg.Space, web.mainMux(), web.sitesMux())
 	handler = router.NewUserMetrics("pastes", prometheus.DefaultRegisterer, router.UserMetricsOpts{}).Handler(handler)
+	metrics.RegisterServerInfo(prometheus.DefaultRegisterer, "pastes")
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)
 	logger.Info(

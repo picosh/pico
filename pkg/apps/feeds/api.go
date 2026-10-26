@@ -7,8 +7,10 @@ import (
 	"time"
 
 	"github.com/picosh/pico/pkg/db/postgres"
+	"github.com/picosh/pico/pkg/metrics"
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/pico/pkg/shared/router"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -143,5 +145,6 @@ func StartApiServer() {
 		"domain", cfg.Domain,
 	)
 
+	metrics.RegisterServerInfo(prometheus.DefaultRegisterer, "feeds")
 	logger.Error(http.ListenAndServe(portStr, web.mux()).Error())
 }

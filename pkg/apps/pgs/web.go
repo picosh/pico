@@ -18,6 +18,7 @@ import (
 	"github.com/hashicorp/golang-lru/v2/expirable"
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/httpcache"
+	"github.com/picosh/pico/pkg/metrics"
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/pico/pkg/shared/router"
 	"github.com/picosh/pico/pkg/storage"
@@ -166,6 +167,7 @@ func StartApiServer(cfg *Config) {
 		"port", cfg.WebPort,
 		"domain", cfg.Domain,
 	)
+	metrics.RegisterServerInfo(prometheus.DefaultRegisterer, "pgs")
 	err := http.ListenAndServe(portStr, NewSiteMetrics(cfg, "pgs", false).Handler(httpCache))
 	cfg.Logger.Error(
 		"listen and serve",

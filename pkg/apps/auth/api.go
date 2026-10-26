@@ -19,10 +19,12 @@ import (
 
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/db/postgres"
+	picoMetrics "github.com/picosh/pico/pkg/metrics"
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/pico/pkg/shared/router"
 	"github.com/picosh/utils/pipe"
 	"github.com/picosh/utils/pipe/metrics"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"golang.org/x/crypto/ssh"
 )
@@ -956,6 +958,7 @@ func StartApiServer() {
 	portStr := fmt.Sprintf(":%s", cfg.Port)
 	logger.Info("starting server on port", "port", cfg.Port)
 
+	picoMetrics.RegisterServerInfo(prometheus.DefaultRegisterer, "auth")
 	err := http.ListenAndServe(portStr, mux)
 	if err != nil {
 		logger.Info("http-serve", "err", err.Error())

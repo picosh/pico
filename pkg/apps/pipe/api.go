@@ -16,6 +16,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/picosh/pico/pkg/db/postgres"
+	"github.com/picosh/pico/pkg/metrics"
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/pico/pkg/shared/router"
 	"github.com/picosh/utils/pipe"
@@ -514,6 +515,7 @@ func StartApiServer() {
 	web := &webRouter{cfg: cfg, db: db, conn: newPipeConn(info)}
 	handler := router.NewHostRouter(cfg.Domain, cfg.Space, web.mainMux(), web.sitesMux())
 	handler = router.NewUserMetrics("pipe", prometheus.DefaultRegisterer, router.UserMetricsOpts{}).Handler(handler)
+	metrics.RegisterServerInfo(prometheus.DefaultRegisterer, "pipe")
 
 	portStr := fmt.Sprintf(":%s", cfg.Port)
 	logger.Info(

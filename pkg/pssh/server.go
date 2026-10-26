@@ -23,6 +23,7 @@ import (
 
 	"github.com/antoniomika/syncmap"
 	"github.com/go-andiamo/splitter"
+	"github.com/picosh/pico/pkg/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -367,6 +368,8 @@ func (s *SSHServer) ListenAndServe() error {
 				"app": s.Config.App,
 			},
 		}, []string{"command", "user"})
+
+		metrics.RegisterServerInfo(prometheus.DefaultRegisterer, s.Config.App)
 
 		// The handler reads the default registerer, so build it before the
 		// listener is published rather than in the goroutine.
