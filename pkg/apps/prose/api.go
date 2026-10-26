@@ -443,6 +443,16 @@ func (web *webRouter) postHandler(w http.ResponseWriter, r *http.Request) {
 				unlisted = true
 			}
 			contents = template.HTML(parsedText.Html)
+		case ".gmi":
+			parsedText, err := parseGemText(post.Text)
+			if err != nil {
+				logger.Error("could not parse gmi text", "err", err.Error())
+			}
+			tags = parsedText.Tags
+			if post.Hidden || post.PublishAt.After(time.Now()) {
+				unlisted = true
+			}
+			contents = template.HTML(parsedText.Html)
 		}
 
 		data = PostPageData{
@@ -711,7 +721,20 @@ func (web *webRouter) rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 			content = tpl.String()
-
+		case ".gmi":
+			parsedText, err := parseGemText(post.Text)
+			if err != nil {
+				logger.Error("parse post gmi text", "err", err.Error())
+			}
+			var tpl bytes.Buffer
+			data := &PostPageData{
+				Contents: template.HTML(parsedText.Html),
+			}
+			if err := ts.Execute(&tpl, data); err != nil {
+				logger.Error("gmi template", "err", err)
+				continue
+			}
+			content = tpl.String()
 		}
 
 		realUrl := curl.FullPostURL(post.Username, post.Slug)
@@ -809,7 +832,19 @@ func (web *webRouter) rssHandler(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 			content = tpl.String()
-
+		case ".gmi":
+			parsedText, err := parseGemText(post.Text)
+			if err != nil {
+				logger.Error(err.Error())
+			}
+			var tpl bytes.Buffer
+			data := &PostPageData{
+				Contents: template.HTML(parsedText.Html),
+			}
+			if err := ts.Execute(&tpl, data); err != nil {
+				continue
+			}
+			content = tpl.String()
 		}
 
 		realUrl := curl.FullPostURL(post.Username, post.Slug)
@@ -950,7 +985,7 @@ func (web *webRouter) pathRoute(w http.ResponseWriter, r *http.Request) {
 		web.postRawHandler(w, r)
 		return
 	}
-	for _, ext := range []string{".md", ".lxt"} {
+	for _, ext := range []string{".md", ".lxt", ".gmi"} {
 		if slug, ok := strings.CutSuffix(path, ext); ok && slug != "" {
 			r.SetPathValue("slug", slug)
 			web.postRawHandler(w, r)

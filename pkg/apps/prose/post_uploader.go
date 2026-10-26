@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/postfs"
@@ -171,6 +172,10 @@ func (h *postUploader) setMeta(post *db.Post) ([]string, error) {
 			post.PublishAt = parsedText.PublishAt
 		}
 		post.Hidden = parsedText.Hidden
+	case ".gmi":
+		post.Title = shared.ToLower(post.Slug)
+		now := time.Now()
+		post.PublishAt = &now
 	case ".md":
 		parsedText, err := shared.ParseText(post.Text)
 		if err != nil {

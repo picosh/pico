@@ -51,6 +51,7 @@ func NewConfig(service string) *Config {
 		AllowedExt: []string{
 			".md",
 			".lxt",
+			".gmi",
 			".jpg",
 			".jpeg",
 			".png",

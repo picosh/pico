@@ -38,6 +38,7 @@ func TestRouterSharedHandler(t *testing.T) {
 	router := newFileRouter("prose", map[string]ReadWriteHandler{
 		".md":      posts,
 		".lxt":     posts,
+		".gmi":     posts,
 		".txt":     &listHandler{names: []string{"a.md"}},
 		"fallback": &listHandler{names: []string{"x.png"}},
 	})

@@ -58,6 +58,7 @@ require (
 	go.abhg.dev/goldmark/toc v0.12.0
 	go.rockorager.dev/vaxis v0.17.1
 	golang.org/x/crypto v0.57.0
+	golang.org/x/net v0.59.0
 	gopkg.in/yaml.v2 v2.4.0
 	modernc.org/sqlite v1.60.1
 )
@@ -162,7 +163,6 @@ require (
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/image v0.46.0 // indirect
 	golang.org/x/mod v0.41.0 // indirect
-	golang.org/x/net v0.59.0 // indirect
 	golang.org/x/sync v0.23.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/telemetry v0.0.0-20260908163034-4bcc4b2ee518 // indirect

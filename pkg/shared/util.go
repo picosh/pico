@@ -49,6 +49,17 @@ func ToUpper(str string) string {
 	return string(r)
 }
 
+func ToLower(str string) string {
+	pre := fnameRe.ReplaceAllString(str, " ")
+
+	r := []rune(pre)
+	if len(r) > 0 {
+		r[0] = unicode.ToLower(r[0])
+	}
+
+	return string(r)
+}
+
 func SanitizeFileExt(fname string) string {
 	return strings.TrimSuffix(fname, filepath.Ext(fname))
 }
