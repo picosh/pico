@@ -541,7 +541,7 @@ func TestSSHServerCommandParsing(t *testing.T) {
 
 	expectedCommand := []string{"accept", "--comment", "here we go", "101"}
 	if !slices.Equal(expectedCommand, capturedCommand) {
-		t.Error("command not exected", capturedCommand, len(capturedCommand), expectedCommand, len(expectedCommand))
+		t.Error("command not expected", capturedCommand, len(capturedCommand), expectedCommand, len(expectedCommand))
 	}
 
 	// Trigger cancellation to stop the server

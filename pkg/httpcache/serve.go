@@ -141,7 +141,7 @@ func (c *HttpCache) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	c.Upstream.ServeHTTP(wrapped, r)
 	c.AddUpstreamRequest()
 	if wrapped.streaming {
-		log.Info("not cachable", "err", "response body too large")
+		log.Info("not cacheable", "err", "response body too large")
 		return
 	}
 
@@ -221,7 +221,7 @@ func (c *HttpCache) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		c.AddCacheItem(float64(len(enc)))
 		wrapped.Header().Set("cache-status", cacheStatusMiss(cacheKey, true))
 	} else {
-		log.Info("not cachable", "err", err)
+		log.Info("not cacheable", "err", err)
 		wrapped.Header().Set("cache-status", cacheStatusMiss(cacheKey, false))
 	}
 
@@ -413,7 +413,7 @@ func isResponseCachable(r *http.Request, resp *responseWriter) error {
 
 	isValidStatus := isCacheableStatusCode(resp.StatusCode())
 	if !isValidStatus {
-		return fmt.Errorf("response status code not cachable: %d", resp.StatusCode())
+		return fmt.Errorf("response status code not cacheable: %d", resp.StatusCode())
 	}
 
 	state := parseCacheControl(resp.Header().Get("cache-control"))
@@ -424,7 +424,7 @@ func isResponseCachable(r *http.Request, resp *responseWriter) error {
 	return nil
 }
 
-// RFC 9110 15.1-2: Heuristically cachable status codes
+// RFC 9110 15.1-2: Heuristically cacheable status codes
 // 200, 203, 204,
 // 206, 300, 301,
 // 308, 404, 405,

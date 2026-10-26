@@ -114,7 +114,7 @@ func (c *Cmd) accessLogs(_ context.Context) error {
 	for _, log := range logs {
 		jsonData, err := json.Marshal(log)
 		if err != nil {
-			c.Log.Error("json marshall", "err", err)
+			c.Log.Error("json marshal", "err", err)
 			continue
 		}
 		c.output(string(jsonData))

@@ -77,7 +77,7 @@ func (c *Cmd) bail(err error) {
 
 func (c *Cmd) notice() {
 	if !c.Write {
-		c.output("\nNOTICE: changes not commited, use `--write` to save operation")
+		c.output("\nNOTICE: changes not committed, use `--write` to save operation")
 	}
 }
 

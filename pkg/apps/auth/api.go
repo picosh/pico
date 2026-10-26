@@ -171,7 +171,7 @@ func authorizeHandler(apiConfig *ApiConfig) http.HandlerFunc {
 		})
 
 		if err != nil {
-			apiConfig.Cfg.Logger.Error("cannot execture template", "err", err.Error())
+			apiConfig.Cfg.Logger.Error("cannot execute template", "err", err.Error())
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
 		}

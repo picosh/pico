@@ -140,7 +140,7 @@ func (web *webRouter) blogHandler(w http.ResponseWriter, r *http.Request) {
 
 	err = ts.Execute(w, data)
 	if err != nil {
-		logger.Error("could not execute tempalte", "err", err)
+		logger.Error("could not execute template", "err", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
