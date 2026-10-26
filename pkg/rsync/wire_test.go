@@ -177,22 +177,21 @@ func TestChecksum1(t *testing.T) {
 func TestSumSizes(t *testing.T) {
 	tests := []struct {
 		length int64
-		proto  int
 		want   sumHead
 	}{
-		{0, 31, sumHead{0, 700, 2, 0}},
-		{1, 31, sumHead{1, 700, 2, 1}},
-		{1_000_000, 31, sumHead{1000, 1000, 2, 0}},
-		{100 << 20, 31, sumHead{10240, 10240, 3, 0}},
-		{100<<20 + 1, 29, sumHead{10241, 10240, 3, 1}},
+		{0, sumHead{0, 700, 2, 0}},
+		{1, sumHead{1, 700, 2, 1}},
+		{1_000_000, sumHead{1000, 1000, 2, 0}},
+		{100 << 20, sumHead{10240, 10240, 3, 0}},
+		{100<<20 + 1, sumHead{10241, 10240, 3, 1}},
 	}
 	for _, tt := range tests {
-		got, err := sumSizesSqroot(tt.length, tt.proto, 0, shortSumLength, 16)
+		got, err := sumSizesSqroot(tt.length, 0, shortSumLength, 16)
 		if err != nil || got != tt.want {
-			t.Errorf("sumSizes(%d, %d) = %+v, %v; want %+v", tt.length, tt.proto, got, err, tt.want)
+			t.Errorf("sumSizes(%d) = %+v, %v; want %+v", tt.length, got, err, tt.want)
 		}
 	}
-	got, _ := sumSizesSqroot(1_000_000, 31, 0, sumLength, 8)
+	got, _ := sumSizesSqroot(1_000_000, 0, sumLength, 8)
 	if got.s2length != 8 {
 		t.Errorf("full checksum length capped at digest size: got %d", got.s2length)
 	}

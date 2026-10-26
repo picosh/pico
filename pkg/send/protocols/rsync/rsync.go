@@ -141,11 +141,30 @@ func Middleware(writeHandler utils.CopyFromClientHandler) pssh.SSHServerMiddlewa
 				}
 			}()
 
+			user := session.Permissions().Extensions["user_id"]
+			if user == "" {
+				user = session.Permissions().Extensions["pubkey"]
+			}
+			if user == "" || !transfers.acquire(user) {
+				_, _ = io.WriteString(session.Stderr(), "rsync: transfer limit reached, retry later\n")
+				_ = session.Exit(12)
+				_ = session.Close()
+				return nil
+			}
+			defer transfers.release(user)
+			abort := func() {
+				session.CancelFunc()
+				// Closing the transport unblocks reads and writes even if the peer ignores channel close.
+				_ = session.Conn.Close()
+			}
+			stream := newIdleReadWriter(session, transferIdleTimeout, abort)
+			defer stream.stop()
 			err := rsync.Serve(rsync.Config{
 				FS:     &storageFS{session: session, handler: writeHandler},
 				Logger: logger,
 				Stderr: session.Stderr(),
-			}, session, cmd[1:])
+				Abort:  abort,
+			}, stream, cmd[1:])
 			if err == nil {
 				return nil
 			}

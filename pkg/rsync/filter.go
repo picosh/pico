@@ -7,6 +7,7 @@ import (
 	"path"
 	"slices"
 	"strings"
+	"unsafe"
 )
 
 // Filter rule flags (rsync.h FILTRULE_*).
@@ -62,6 +63,9 @@ type filterList struct {
 	otherSide      int
 	deleteExcluded bool
 	cvsPerishable  bool
+	mergeBytes     int
+	mergeRules     int
+	scopeBytes     int
 }
 
 // filterScope is the per-directory merge-file rules in effect in one
@@ -386,6 +390,9 @@ func (t *scopeTree) scope(rel string) (*filterScope, error) {
 	if sc, ok := t.scopes[rel]; ok {
 		return sc, nil
 	}
+	if err := t.l.reserveScope(len(rel) + int(unsafe.Sizeof(rel)) + int(unsafe.Sizeof((*filterScope)(nil)))); err != nil {
+		return nil, err
+	}
 	var sc *filterScope
 	if rel == "." {
 		var err error
@@ -456,6 +463,9 @@ func (s *session) mergeReader(tree string, files map[string]bool) func(string) (
 // is an ancestor of dir first reads the file in that directory and each
 // one below it down to dir's parent (setup_merge_file).
 func (l *filterList) newScope(root, dir string, read func(string) ([]byte, error)) (*filterScope, error) {
+	if err := l.reserveScope(int(unsafe.Sizeof(filterScope{})) + len(root) + len(dir) + int(unsafe.Sizeof([]*filterRule{}))*len(l.merges)); err != nil {
+		return nil, err
+	}
 	parent := &filterScope{root: root, lists: make([][]*filterRule, len(l.merges))}
 	for i, m := range l.merges {
 		if !strings.Contains(m.pattern, "/") {
@@ -483,7 +493,9 @@ func (l *filterList) newScope(root, dir string, read func(string) ([]byte, error
 				parent.lists[i] = nil
 			}
 			if m.flags&ruleNoInherit == 0 {
-				parent.lists[i] = append(rules, parent.lists[i]...)
+				if parent.lists[i], err = l.inheritRules(rules, parent.lists[i]); err != nil {
+					return nil, err
+				}
 			}
 			d = path.Join(d, elem)
 		}
@@ -496,6 +508,9 @@ func (l *filterList) newScope(root, dir string, read func(string) ([]byte, error
 func (l *filterList) enter(parent *filterScope, dir string, read func(string) ([]byte, error)) (*filterScope, error) {
 	if len(l.merges) == 0 {
 		return parent, nil
+	}
+	if err := l.reserveScope(int(unsafe.Sizeof(filterScope{})) + len(dir) + int(unsafe.Sizeof([]*filterRule{}))*len(l.merges)); err != nil {
+		return nil, err
 	}
 	sc := &filterScope{root: parent.root, lists: make([][]*filterRule, len(l.merges))}
 	for i, m := range l.merges {
@@ -510,9 +525,32 @@ func (l *filterList) enter(parent *filterScope, dir string, read func(string) ([
 		if cleared {
 			inherited = nil
 		}
-		sc.lists[i] = append(rules, inherited...)
+		if sc.lists[i], err = l.inheritRules(rules, inherited); err != nil {
+			return nil, err
+		}
 	}
 	return sc, nil
+}
+
+func (l *filterList) reserveScope(size int) error {
+	if size > maxFileListBytes-l.scopeBytes {
+		return errFilterListLimit
+	}
+	l.scopeBytes += size
+	return nil
+}
+
+func (l *filterList) inheritRules(rules, inherited []*filterRule) ([]*filterRule, error) {
+	if len(rules) == 0 {
+		return inherited, nil
+	}
+	if len(inherited) == 0 {
+		return rules, nil
+	}
+	if err := l.reserveScope(int(unsafe.Sizeof((*filterRule)(nil))) * (len(rules) + len(inherited))); err != nil {
+		return nil, err
+	}
+	return append(rules, inherited...), nil
 }
 
 // readMerge parses the merge file for m in dir (parse_filter_file). A "!"
@@ -523,6 +561,10 @@ func (l *filterList) readMerge(m *filterRule, dir string, read func(string) ([]b
 	if err != nil {
 		return nil, false, &mergeFileError{name: name, err: err}
 	}
+	if len(data) > maxFilterBytes-l.mergeBytes {
+		return nil, false, &mergeFileError{name: name, err: errFilterListLimit}
+	}
+	l.mergeBytes += len(data)
 	var toks []string
 	if m.flags&ruleWordSplit != 0 {
 		toks = strings.FieldsFunc(string(data), func(r rune) bool { return r < 0x80 && isSpace(byte(r)) })
@@ -549,7 +591,11 @@ func (l *filterList) readMerge(m *filterRule, dir string, read func(string) ([]b
 		case rule.flags&ruleMergeFile != 0:
 			return nil, false, &mergeFileError{name: name, err: errors.New("merge rules inside a merge file are not supported")}
 		case rule.flags&ruleCVSIgnore != 0:
-			rules = append(rules, l.cvsIgnoreRules()...)
+			defaults := l.cvsIgnoreRules()
+			if len(defaults) > maxFilterRules-l.mergeRules-len(l.rules)-len(rules) {
+				return nil, false, &mergeFileError{name: name, err: errFilterListLimit}
+			}
+			rules = append(rules, defaults...)
 			continue
 		}
 		if l.deleteExcluded && rule.flags&sideFlags == 0 {
@@ -567,8 +613,12 @@ func (l *filterList) readMerge(m *filterRule, dir string, read func(string) ([]b
 			}
 		}
 		r := newRule(pat, rule.flags)
+		if len(rules) >= maxFilterRules-l.mergeRules-len(l.rules) {
+			return nil, false, &mergeFileError{name: name, err: errFilterListLimit}
+		}
 		rules = append(rules, r)
 	}
+	l.mergeRules += len(rules)
 	return rules, cleared, nil
 }
 

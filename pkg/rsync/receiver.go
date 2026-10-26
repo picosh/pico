@@ -75,11 +75,19 @@ func (s *session) runReceiver(args []string) error {
 	errc := make(chan error, 2)
 	go func() { errc <- g.run() }()
 	go func() { errc <- r.run() }()
+	var firstErr error
 	for range 2 {
-		if err := <-errc; err != nil {
+		if err := <-errc; err != nil && firstErr == nil {
+			firstErr = err
 			cancel()
-			return err
+			if s.abort == nil {
+				return err
+			}
+			s.abort()
 		}
+	}
+	if firstErr != nil {
+		return firstErr
 	}
 	return s.finish()
 }
@@ -87,6 +95,7 @@ func (s *session) runReceiver(args []string) error {
 func (s *session) recvFileList() ([]*fileEntry, error) {
 	codec := s.newFlistCodec()
 	var files []*fileEntry
+	budget := metadataBudget{maxItems: maxFileListEntries, maxBytes: maxFileListBytes}
 	for {
 		xflags, ok, ioErr, err := codec.recvFlags(s.c)
 		if err != nil {
@@ -98,13 +107,21 @@ func (s *session) recvFileList() ([]*fileEntry, error) {
 			}
 			break
 		}
+		if len(files) >= maxFileListEntries {
+			return nil, s.fatal(exitProtocol, errFileListLimit)
+		}
 		f, err := codec.recvEntry(s.c, xflags)
 		if err != nil {
 			return nil, s.fatal(exitProtocol, err)
 		}
+		// Normalized names can retain the original filename's backing storage.
+		if !budget.add(len(codec.lastName) + len(f.link) + len(f.sum)) {
+			return nil, s.fatal(exitProtocol, errFileListLimit)
+		}
 		files = append(files, f)
 	}
 	if !s.opts.numericIDs {
+		ids := metadataBudget{maxItems: 2 * maxFileListEntries, maxBytes: maxFileListBytes}
 		for _, want := range []bool{s.opts.preserveUID, s.opts.preserveGID} {
 			if !want {
 				continue
@@ -117,8 +134,12 @@ func (s *session) recvFileList() ([]*fileEntry, error) {
 				if id == 0 {
 					break
 				}
-				if _, err := codec.readIDName(s.c); err != nil {
+				name, err := codec.readIDName(s.c)
+				if err != nil {
 					return nil, err
+				}
+				if !ids.add(len(name) + 4) {
+					return nil, s.fatal(exitProtocol, errFileListLimit)
 				}
 			}
 			if s.xmitID0Names {
@@ -433,7 +454,7 @@ func (g *generator) signature(target string, csumLength int) (sumHead, []byte, e
 	if info.Size <= 0 {
 		return sumHead{}, nil, nil
 	}
-	head, err := sumSizesSqroot(info.Size, s.c.protocol, s.opts.blockSize, csumLength, s.cs.xfer.size())
+	head, err := sumSizesSqroot(info.Size, s.opts.blockSize, csumLength, s.cs.xfer.size())
 	if err != nil {
 		return sumHead{}, nil, err
 	}
@@ -489,6 +510,9 @@ func (g *generator) deletePass() error {
 	if err != nil {
 		s.xferError("delete: failed to list %q: %v", "/"+g.dest.dir, err)
 		return nil
+	}
+	if err := validateListing(existing); err != nil {
+		return err
 	}
 
 	listed := make(map[string]*fileEntry, len(g.files))

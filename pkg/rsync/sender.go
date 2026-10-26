@@ -21,6 +21,7 @@ const (
 // client and recorded in s.ioError.
 func (s *session) buildFileList(args []string) ([]*fileEntry, error) {
 	var files []*fileEntry
+	budget := metadataBudget{maxItems: maxFileListEntries, maxBytes: maxFileListBytes}
 	flags := 0
 	if s.opts.recurse {
 		flags = flagContentDir
@@ -79,11 +80,14 @@ func (s *session) buildFileList(args []string) ([]*fileEntry, error) {
 
 		if s.opts.recurse || (s.opts.xferDirs && nameType != nameNormal) {
 			top := s.newEntry(fn, src, info, flagTopDir|flagContentDir|flags)
+			if !budget.addFile(top) {
+				return nil, errFileListLimit
+			}
 			files = append(files, top)
 			if info.IsDir {
-				children, err := s.listDir(fn, src, dir, flags)
+				children, err := s.listDir(fn, src, dir, flags, &budget)
 				var mergeErr *mergeFileError
-				if errors.As(err, &mergeErr) {
+				if errors.As(err, &mergeErr) || errors.Is(err, errFileListLimit) || errors.Is(err, errFilterListLimit) {
 					return nil, err
 				}
 				if err != nil {
@@ -94,7 +98,11 @@ func (s *session) buildFileList(args []string) ([]*fileEntry, error) {
 				files = append(files, children...)
 			}
 		} else {
-			files = append(files, s.newEntry(fn, src, info, flags))
+			f := s.newEntry(fn, src, info, flags)
+			if !budget.addFile(f) {
+				return nil, errFileListLimit
+			}
+			files = append(files, f)
 		}
 	}
 	return files, nil
@@ -104,9 +112,12 @@ func (s *session) buildFileList(args []string) ([]*fileEntry, error) {
 // prefix. Directories missing from the listing are implied by their
 // contents, as object stores don't keep them. root is the storage path of
 // the transfer root.
-func (s *session) listDir(prefix, src, root string, flags int) ([]*fileEntry, error) {
+func (s *session) listDir(prefix, src, root string, flags int, budget *metadataBudget) ([]*fileEntry, error) {
 	entries, err := s.fs.ReadDir(src, s.opts.recurse)
 	if err != nil {
+		return nil, err
+	}
+	if err := validateListing(entries); err != nil {
 		return nil, err
 	}
 	join := func(name string) string {
@@ -117,6 +128,7 @@ func (s *session) listDir(prefix, src, root string, flags int) ([]*fileEntry, er
 	}
 
 	byName := make(map[string]FileInfo, len(entries))
+	listing := metadataBudget{maxItems: maxFileListEntries, maxBytes: maxFileListBytes}
 	for _, e := range entries {
 		name, err := cleanSourcePath(e.Name)
 		if err != nil || name == "" {
@@ -126,11 +138,17 @@ func (s *session) listDir(prefix, src, root string, flags int) ([]*fileEntry, er
 			continue
 		}
 		e.Name = name
+		if _, ok := byName[name]; !ok && !listing.add(len(name)) {
+			return nil, errFileListLimit
+		}
 		byName[name] = e
 		if s.opts.recurse {
 			for d := path.Dir(name); d != "."; d = path.Dir(d) {
 				if _, ok := byName[d]; ok {
 					break
+				}
+				if !listing.add(len(d)) {
+					return nil, errFileListLimit
 				}
 				byName[d] = FileInfo{Name: d, IsDir: true, ModTime: e.ModTime}
 			}
@@ -163,7 +181,11 @@ func (s *session) listDir(prefix, src, root string, flags int) ([]*fileEntry, er
 			}
 			continue
 		}
-		files = append(files, s.newEntry(full, path.Join(src, name), e, flags))
+		f := s.newEntry(full, path.Join(src, name), e, flags)
+		if !budget.addFile(f) {
+			return nil, errFileListLimit
+		}
+		files = append(files, f)
 	}
 	return files, nil
 }

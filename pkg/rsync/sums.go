@@ -42,10 +42,6 @@ func (c *conn) writeSumHead(h sumHead) error {
 func (c *conn) readSumHead(xferLen int) (sumHead, error) {
 	var h sumHead
 	var err error
-	maxBlength := int32(maxBlockSize)
-	if c.protocol < 30 {
-		maxBlength = oldMaxBlockSize
-	}
 	if h.count, err = c.readInt32(); err != nil {
 		return h, err
 	}
@@ -55,7 +51,7 @@ func (c *conn) readSumHead(xferLen int) (sumHead, error) {
 	if h.blength, err = c.readInt32(); err != nil {
 		return h, err
 	}
-	if h.blength < 0 || h.blength > maxBlength {
+	if h.blength < 0 || h.blength > maxBlockSize {
 		return h, fmt.Errorf("invalid block length %d", h.blength)
 	}
 	if h.count > 0 && h.blength == 0 {
@@ -78,7 +74,10 @@ func (c *conn) readSumHead(xferLen int) (sumHead, error) {
 
 // sumSizesSqroot picks the block size (about the square root of the file
 // length, rounded to a multiple of 8) and the strong checksum length.
-func sumSizesSqroot(length int64, protocol int, fixedBlock int32, csumLength int, xferLen int) (sumHead, error) {
+func sumSizesSqroot(length int64, fixedBlock int32, csumLength int, xferLen int) (sumHead, error) {
+	if length < 0 || fixedBlock < 0 || fixedBlock > maxBlockSize {
+		return sumHead{}, fmt.Errorf("invalid file length or block size")
+	}
 	maxS2 := min(sumLength, xferLen)
 	var blength int32
 	switch {
@@ -88,9 +87,6 @@ func sumSizesSqroot(length int64, protocol int, fixedBlock int32, csumLength int
 		blength = blockSize
 	default:
 		maxBlength := int32(maxBlockSize)
-		if protocol < 30 {
-			maxBlength = oldMaxBlockSize
-		}
 		c := int64(1)
 		for l := length; ; {
 			l >>= 2
@@ -146,7 +142,7 @@ func sumSizesSqroot(length int64, protocol int, fixedBlock int32, csumLength int
 	if remainder != 0 {
 		count++
 	}
-	if count > 0x7FFFFFFF {
+	if count > maxChecksumCount {
 		return sumHead{}, fmt.Errorf("file is too large for checksum sending")
 	}
 	return sumHead{
@@ -161,8 +157,12 @@ func sumSizesSqroot(length int64, protocol int, fixedBlock int32, csumLength int
 // form. They are built up front so a read error can't leave a half-written
 // signature on the stream.
 func encodeSums(r io.ReaderAt, length int64, head sumHead, cs *checksums) ([]byte, error) {
+	if length < 0 || head.count < 0 || head.count > maxChecksumCount || head.blength <= 0 || head.blength > maxBlockSize ||
+		head.s2length < 0 || int(head.s2length) > cs.xfer.size() {
+		return nil, fmt.Errorf("invalid checksum header")
+	}
 	out := make([]byte, 0, int(head.count)*(4+int(head.s2length)))
-	buf := make([]byte, head.blength)
+	buf := make([]byte, min(int64(head.blength), length))
 	var sum2 []byte
 	var offset int64
 	for i := int32(0); i < head.count; i++ {

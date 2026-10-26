@@ -36,7 +36,6 @@ const (
 	maxWireNsec          = 999999999
 	blockSize            = 700
 	maxBlockSize         = 1 << 17
-	oldMaxBlockSize      = 1 << 29
 	chunkSize            = 32 * 1024
 	maxMapSize           = 256 * 1024
 	sumLength            = 16

@@ -259,6 +259,9 @@ func (m *muxReader) fill() error {
 		if tag < 0 {
 			return fmt.Errorf("rsync: unexpected tag %d", tag)
 		}
+		if err := validateMessageHeader(byte(tag), size); err != nil {
+			return err
+		}
 		data := make([]byte, size)
 		if _, err := io.ReadFull(m.r, data); err != nil {
 			return err
@@ -268,6 +271,30 @@ func (m *muxReader) fill() error {
 		}
 	}
 	return nil
+}
+
+func validateMessageHeader(tag byte, size int) error {
+	switch tag {
+	case msgIOError, msgNoSend, msgSuccess:
+		if size == 4 {
+			return nil
+		}
+	case msgNoop:
+		if size == 0 {
+			return nil
+		}
+	case msgErrorExit:
+		if size == 0 || size == 4 {
+			return nil
+		}
+	case msgInfo, msgError, msgErrorXfer, msgWarning, msgDeleted:
+		if size <= maxMessageBytes {
+			return nil
+		}
+	default:
+		return fmt.Errorf("rsync: unexpected tag %d", tag)
+	}
+	return fmt.Errorf("rsync: invalid message length %d for tag %d", size, tag)
 }
 
 func (m *muxReader) Read(p []byte) (int, error) {

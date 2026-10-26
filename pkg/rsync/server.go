@@ -20,6 +20,8 @@ type Config struct {
 	Logger *slog.Logger
 	// Stderr receives errors raised before the protocol is running.
 	Stderr io.Writer
+	// Abort interrupts transport IO so failed receiver workers can be joined.
+	Abort func()
 }
 
 // ExitError carries the exit code the client should see. Its message has
@@ -91,6 +93,7 @@ type session struct {
 	logger *slog.Logger
 	c      *conn
 	opts   options
+	abort  func()
 
 	cs             checksums
 	compression    compression
@@ -122,6 +125,9 @@ func Serve(cfg Config, rw io.ReadWriter, args []string) error {
 		_, _ = fmt.Fprintf(stderr, "rsync: %v\n", err)
 		return &ExitError{Code: code, Err: err}
 	}
+	if err := validateArgs(args); err != nil {
+		return early(exitSyntax, err)
+	}
 
 	c := newConn(rw)
 	defer func() { _ = c.close() }()
@@ -135,7 +141,11 @@ func Serve(cfg Config, rw io.ReadWriter, args []string) error {
 		if err != nil {
 			return early(exitProtocol, err)
 		}
-		if pc, err = rsyncopts.ParseArguments(append(slices.Clone(args), extra...)); err != nil {
+		args = append(slices.Clone(args), extra...)
+		if err := validateArgs(args); err != nil {
+			return early(exitSyntax, err)
+		}
+		if pc, err = rsyncopts.ParseArguments(args); err != nil {
 			return early(exitSyntax, err)
 		}
 	}
@@ -152,6 +162,7 @@ func Serve(cfg Config, rw io.ReadWriter, args []string) error {
 		logger:  logger,
 		c:       c,
 		filters: &filterList{},
+		abort:   cfg.Abort,
 	}
 	s.opts = options{
 		sender:         o.Sender(),
@@ -243,6 +254,8 @@ func Serve(cfg Config, rw io.ReadWriter, args []string) error {
 // we don't implement, or that make no sense for a storage backend.
 func checkSupported(o *rsyncopts.Options) error {
 	switch {
+	case o.BlockSize() < 0 || o.BlockSize() > maxBlockSize:
+		return fmt.Errorf("--block-size must be between 0 and %d", maxBlockSize)
 	case o.PreserveHardLinks():
 		return errors.New("--hard-links is not supported")
 	case o.PreserveACLs():
@@ -271,22 +284,43 @@ func checkSupported(o *rsyncopts.Options) error {
 	return nil
 }
 
+func validateArgs(args []string) error {
+	budget := metadataBudget{maxItems: maxArgs, maxBytes: maxArgBytes}
+	for _, arg := range args {
+		if len(arg) > maxArgLength || !budget.add(len(arg)+1) {
+			return errors.New("rsync arguments exceed metadata limit")
+		}
+	}
+	return nil
+}
+
 // readProtectedArgs reads the arguments a --secluded-args client sends
 // before the protocol starts. The first one is the program name.
 func readProtectedArgs(c *conn) ([]string, error) {
 	var args []string
 	var cur []byte
+	total := 0
 	for {
 		b, err := c.readByte()
 		if err != nil {
 			return nil, err
 		}
+		total++
+		if total > maxArgBytes {
+			return nil, errors.New("rsync arguments exceed metadata limit")
+		}
 		if b != 0 {
+			if len(cur) >= maxArgLength {
+				return nil, errors.New("rsync argument is too long")
+			}
 			cur = append(cur, b)
 			continue
 		}
 		if len(cur) == 0 {
 			break
+		}
+		if len(args) >= maxArgs {
+			return nil, errors.New("too many rsync arguments")
 		}
 		args = append(args, string(cur))
 		cur = cur[:0]
@@ -651,6 +685,7 @@ func (s *session) newFlistCodec() *flistCodec {
 // recvFilterList reads the client's filter rules (exclude.c:recv_filter_list).
 func (s *session) recvFilterList() error {
 	receiverWants := s.opts.pruneEmptyDirs || (s.opts.deleteMode && (!s.opts.deleteExcluded || s.c.protocol >= 29))
+	budget := metadataBudget{maxItems: maxFilterRules, maxBytes: maxFilterBytes}
 	if s.opts.sender || receiverWants {
 		for {
 			n, err := s.c.readInt32()
@@ -663,12 +698,18 @@ func (s *session) recvFilterList() error {
 			if n < 0 || n >= maxPathLen*2 {
 				return s.fatal(exitProtocol, fmt.Errorf("filter rule too long: %d", n))
 			}
+			if !budget.add(int(n)) {
+				return s.fatal(exitProtocol, errFilterListLimit)
+			}
 			line := make([]byte, n)
 			if err := s.c.readFull(line); err != nil {
 				return err
 			}
 			if err := s.filters.parse(string(line), s.c.protocol < 29); err != nil {
 				return s.fatal(exitSyntax, err)
+			}
+			if len(s.filters.rules) > maxFilterRules {
+				return s.fatal(exitProtocol, errFilterListLimit)
 			}
 		}
 	}
@@ -677,6 +718,9 @@ func (s *session) recvFilterList() error {
 			return s.fatal(exitSyntax, err)
 		}
 		s.filters.rules = append(s.filters.rules, s.filters.cvsIgnoreRules()...)
+	}
+	if len(s.filters.rules) > maxFilterRules {
+		return s.fatal(exitProtocol, errFilterListLimit)
 	}
 	return nil
 }
