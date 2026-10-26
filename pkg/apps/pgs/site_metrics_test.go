@@ -26,7 +26,7 @@ func TestSiteMetricsCountCacheHits(t *testing.T) {
 	cfg.Domain = "pgs.test"
 	httpCache, _ := NewPgsHttpCache(cfg, newWebRouter(cfg))
 	reg := prometheus.NewRegistry()
-	h := router.NewUserMetrics("pgs", reg, router.UserMetricsOpts{SiteUser: siteUser(cfg)}).Handler(httpCache)
+	h := router.NewUserMetrics("pgs", reg, router.UserMetricsOpts{Owner: siteProject(cfg)}).Handler(httpCache)
 
 	var statuses []string
 	for range 2 {
@@ -42,20 +42,34 @@ func TestSiteMetricsCountCacheHits(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var count float64
-	for _, family := range families {
-		if family.GetName() != "pico_http_requests_total" {
-			continue
-		}
-		for _, m := range family.GetMetric() {
-			for _, l := range m.GetLabel() {
-				if l.GetName() == "user" && l.GetValue() == user.Name {
-					count += m.GetCounter().GetValue()
+	count := func(name string, labels map[string]string) float64 {
+		var total float64
+		for _, family := range families {
+			if family.GetName() != name {
+				continue
+			}
+		metrics:
+			for _, m := range family.GetMetric() {
+				matched := 0
+				for _, l := range m.GetLabel() {
+					if want, ok := labels[l.GetName()]; ok {
+						if want != l.GetValue() {
+							continue metrics
+						}
+						matched++
+					}
+				}
+				if matched == len(labels) {
+					total += m.GetCounter().GetValue()
 				}
 			}
 		}
+		return total
 	}
-	if count != 2 {
-		t.Errorf("requests for %s = %v, want 2", user.Name, count)
+	if got := count("pico_http_requests_total", map[string]string{"user": user.Name}); got != 2 {
+		t.Errorf("requests for %s = %v, want 2", user.Name, got)
+	}
+	if got := count("pico_http_requests_total", map[string]string{"user": user.Name, "resource": "test"}); got != 2 {
+		t.Errorf("requests for %s/test = %v, want 2", user.Name, got)
 	}
 }

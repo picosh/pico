@@ -134,23 +134,23 @@ func NewPgsHttpCache(cfg *Config, upstream http.Handler) (*httpcache.HttpCache, 
 	return httpCache, cache
 }
 
-// NewSiteMetrics counts requests for each site owner. The owner comes from
-// the host, so responses served from a cache count too.
+// NewSiteMetrics counts requests for each site owner and project. Both come
+// from the host, so responses served from a cache count too.
 func NewSiteMetrics(cfg *Config, app string, trustSuccess bool) *router.UserMetrics {
 	return router.NewUserMetrics(app, prometheus.DefaultRegisterer, router.UserMetricsOpts{
-		SiteUser:     siteUser(cfg),
+		Owner:        siteProject(cfg),
 		TrustSuccess: trustSuccess,
 	})
 }
 
-func siteUser(cfg *Config) func(r *http.Request) string {
-	return func(r *http.Request) string {
+func siteProject(cfg *Config) func(r *http.Request) (string, string) {
+	return func(r *http.Request) (string, string) {
 		subdomain := router.GetSubdomainFromRequest(r, cfg.Domain, cfg.TxtPrefix)
 		if subdomain == "" {
-			return ""
+			return "", ""
 		}
 		props, _ := router.GetProjectFromSubdomain(subdomain)
-		return props.Username
+		return props.Username, props.ProjectName
 	}
 }
 
@@ -523,6 +523,9 @@ func (web *WebRouter) ServeAsset(fname string, opts *storage.ImgProcessOpts, has
 		return
 	}
 	router.SetUser(r, site.user.Name)
+	// The name from the host, so cache hits for it count under the same
+	// project.
+	router.SetResource(r, props.ProjectName)
 	user, project, bucket := site.user, site.project, site.bucket
 
 	logger = logger.With(

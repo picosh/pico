@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -16,26 +17,28 @@ import (
 // UserMetricsOpts tells UserMetrics who a request belongs to when no
 // handler called SetUser, such as a response served from a cache.
 type UserMetricsOpts struct {
-	// SiteUser names the owner of the site a request is for, without
-	// checking that the user exists.
-	SiteUser func(r *http.Request) string
-	// TrustSuccess counts a SiteUser as real once its site returns a
-	// success, for a proxy that can't look users up. Only safe when every
-	// route on a site's host fails for a site that doesn't exist.
+	// Owner names the user and resource a request is for, read from the
+	// host without checking that either exists.
+	Owner func(r *http.Request) (user, resource string)
+	// TrustSuccess counts an Owner as real once it returns a success, for
+	// a proxy that can't look users up. Only safe when every route on a
+	// site's host fails for a site that doesn't exist.
 	TrustSuccess bool
 }
 
 // UserMetrics counts HTTP requests, latency and response bytes for each
-// site owner. Every app shares the metric names and sets the app label, so
+// site owner. Requests and bytes also carry the resource they were for,
+// such as a pgs project, which the latency histogram leaves out to keep its
+// series down. Every app shares the metric names and sets the app label, so
 // queries can aggregate across services.
 type UserMetrics struct {
 	requests *prometheus.CounterVec
 	duration *prometheus.HistogramVec
 	bytes    *prometheus.CounterVec
 	opts     UserMetricsOpts
-	// known holds the users a handler or a successful response confirmed.
-	// A name from the Host header alone never becomes a label, so made-up
-	// subdomains can't add series.
+	// known holds the users and resources a handler or a successful
+	// response confirmed. A name from the Host header alone never becomes a
+	// label, so made-up subdomains can't add series.
 	known *lru.Cache[string, struct{}]
 }
 
@@ -49,7 +52,7 @@ func NewUserMetrics(app string, reg prometheus.Registerer, opts UserMetricsOpts)
 			ConstLabels: prometheus.Labels{"app": app},
 			Name:        "requests_total",
 			Help:        "Number of HTTP requests handled.",
-		}, []string{"user", "status", "method"}),
+		}, []string{"user", "resource", "status", "method"}),
 		duration: auto.NewHistogramVec(prometheus.HistogramOpts{
 			Namespace:   "pico",
 			Subsystem:   "http",
@@ -64,62 +67,104 @@ func NewUserMetrics(app string, reg prometheus.Registerer, opts UserMetricsOpts)
 			ConstLabels: prometheus.Labels{"app": app},
 			Name:        "response_bytes_total",
 			Help:        "Number of response body bytes sent.",
-		}, []string{"user"}),
+		}, []string{"user", "resource"}),
 		opts:  opts,
 		known: known,
 	}
 }
 
-type ctxUserKey struct{}
+type owner struct {
+	user     string
+	resource string
+}
+
+type ctxOwnerKey struct{}
 
 // SetUser records name as the user a request belongs to. Handlers call it
 // once they've found the user in the database.
 func SetUser(r *http.Request, name string) {
-	if user, ok := r.Context().Value(ctxUserKey{}).(*string); ok {
-		*user = name
+	if o, ok := r.Context().Value(ctxOwnerKey{}).(*owner); ok {
+		o.user = name
+	}
+}
+
+// SetResource records name as what a request is for within the user's
+// account, such as a pgs project. Handlers call it alongside SetUser once
+// they've found it.
+func SetResource(r *http.Request, name string) {
+	if o, ok := r.Context().Value(ctxOwnerKey{}).(*owner); ok {
+		o.resource = name
 	}
 }
 
 func (m *UserMetrics) Handler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
-		var user string
+		var o owner
 		mw := &metricsWriter{ResponseWriter: w}
-		next.ServeHTTP(mw, r.WithContext(context.WithValue(r.Context(), ctxUserKey{}, &user)))
+		next.ServeHTTP(mw, r.WithContext(context.WithValue(r.Context(), ctxOwnerKey{}, &o)))
 
 		status := mw.Status()
-		m.Observe(m.resolveUser(r, user, status), status, r.Method, time.Since(start), mw.bytes)
+		user, resource := m.resolve(r, o, status)
+		m.Observe(user, resource, status, r.Method, time.Since(start), mw.bytes)
 	})
 }
 
 // Observe records one request for servers that can't use Handler, such as
-// tuns's gin logger. user must already be confirmed to exist. A negative
-// size, which gin reports when nothing was written, counts as zero bytes.
-func (m *UserMetrics) Observe(user string, status int, method string, elapsed time.Duration, bytes int64) {
-	labels := []string{user, strconv.Itoa(status), metricMethod(method)}
-	m.requests.WithLabelValues(labels...).Inc()
-	m.duration.WithLabelValues(labels...).Observe(elapsed.Seconds())
-	m.bytes.WithLabelValues(user).Add(float64(max(bytes, 0)))
+// tuns's gin logger. user and resource must already be confirmed to
+// exist, and resource may be empty. A negative size, which gin reports when
+// nothing was written, counts as zero bytes.
+func (m *UserMetrics) Observe(user, resource string, status int, method string, elapsed time.Duration, bytes int64) {
+	if user == "" {
+		resource = ""
+	}
+	code, verb := strconv.Itoa(status), metricMethod(method)
+	m.requests.WithLabelValues(user, resource, code, verb).Inc()
+	m.duration.WithLabelValues(user, code, verb).Observe(elapsed.Seconds())
+	m.bytes.WithLabelValues(user, resource).Add(float64(max(bytes, 0)))
 }
 
-func (m *UserMetrics) resolveUser(r *http.Request, user string, status int) string {
-	if user != "" {
-		m.known.Add(user, struct{}{})
-		return user
+func (m *UserMetrics) resolve(r *http.Request, o owner, status int) (string, string) {
+	var hostUser, hostResource string
+	if m.opts.Owner != nil {
+		hostUser, hostResource = m.opts.Owner(r)
 	}
-	if m.opts.SiteUser == nil {
-		return ""
-	}
-	user = m.opts.SiteUser(r)
+	trusted := m.opts.TrustSuccess && (status >= 200 && status < 300 || status == http.StatusNotModified)
+
+	user := m.confirm(o.user, hostUser, trusted)
 	if user == "" {
+		return "", ""
+	}
+	// Resources are keyed under their owner, and user names can't hold a
+	// slash.
+	prefix := user + "/"
+	set, fromHost := "", ""
+	if o.resource != "" {
+		set = prefix + o.resource
+	}
+	if hostUser == user && hostResource != "" {
+		fromHost = prefix + hostResource
+	}
+	resource := strings.TrimPrefix(m.confirm(set, fromHost, trusted), prefix)
+	return user, resource
+}
+
+// confirm returns the name a handler set, or else the name from the host
+// once it's known or trusted.
+func (m *UserMetrics) confirm(set, fromHost string, trusted bool) string {
+	if set != "" {
+		m.known.Add(set, struct{}{})
+		return set
+	}
+	if fromHost == "" {
 		return ""
 	}
-	if m.known.Contains(user) {
-		return user
+	if m.known.Contains(fromHost) {
+		return fromHost
 	}
-	if m.opts.TrustSuccess && (status >= 200 && status < 300 || status == http.StatusNotModified) {
-		m.known.Add(user, struct{}{})
-		return user
+	if trusted {
+		m.known.Add(fromHost, struct{}{})
+		return fromHost
 	}
 	return ""
 }
