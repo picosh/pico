@@ -3,6 +3,7 @@ package rsync
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"path"
 	"slices"
@@ -194,6 +195,67 @@ func TestSumSizes(t *testing.T) {
 	got, _ := sumSizesSqroot(1_000_000, 31, 0, sumLength, 8)
 	if got.s2length != 8 {
 		t.Errorf("full checksum length capped at digest size: got %d", got.s2length)
+	}
+}
+
+func TestSumHeadChecksumCount(t *testing.T) {
+	tests := []struct {
+		name    string
+		count   int32
+		wantErr bool
+	}{
+		{"negative", -1, true},
+		{"empty", 0, false},
+		{"limit", maxChecksumCount, false},
+		{"over-limit", maxChecksumCount + 1, true},
+		{"max-int32", 0x7fffffff, true},
+	}
+	for protocol := minProtocol; protocol <= maxProtocol; protocol++ {
+		for _, tt := range tests {
+			t.Run(fmt.Sprintf("protocol=%d/%s", protocol, tt.name), func(t *testing.T) {
+				c, _ := newTestConn(t, protocol)
+				head := sumHead{count: tt.count, blength: blockSize, s2length: sumLength}
+				if err := c.writeSumHead(head); err != nil {
+					t.Fatal(err)
+				}
+				if err := c.flush(); err != nil {
+					t.Fatal(err)
+				}
+				got, err := c.readSumHead(sumLength)
+				if tt.wantErr {
+					if err == nil || !strings.Contains(err.Error(), "invalid checksum count") {
+						t.Fatalf("readSumHead = %+v, %v; want invalid checksum count", got, err)
+					}
+					return
+				}
+				if err != nil || got != head {
+					t.Fatalf("readSumHead = %+v, %v; want %+v", got, err, head)
+				}
+			})
+		}
+	}
+}
+
+func TestReceiveSumsRejectsExcessiveCount(t *testing.T) {
+	for _, length := range []int32{0, 8, sumLength} {
+		t.Run(fmt.Sprintf("checksum-length=%d", length), func(t *testing.T) {
+			c, _ := newTestConn(t, maxProtocol)
+			head := sumHead{count: maxChecksumCount + 1, blength: blockSize, s2length: length}
+			if err := c.writeSumHead(head); err != nil {
+				t.Fatal(err)
+			}
+			if err := c.flush(); err != nil {
+				t.Fatal(err)
+			}
+			s := &session{c: c, cs: checksums{xfer: csumMD5}}
+			_, sums, err := s.receiveSums()
+			if err == nil || !strings.Contains(err.Error(), "invalid checksum count") {
+				t.Fatalf("receiveSums error = %v; want invalid checksum count before reading signatures", err)
+			}
+			if sums != nil {
+				t.Fatal("receiveSums returned checksums for an excessive count")
+			}
+		})
 	}
 }
 

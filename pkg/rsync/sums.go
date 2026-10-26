@@ -6,6 +6,9 @@ import (
 	"io"
 )
 
+// Bound checksum allocations before reading the peer's block signatures.
+const maxChecksumCount = 1 << 20
+
 // sumHead describes the block signatures of a basis file.
 type sumHead struct {
 	count     int32
@@ -46,7 +49,7 @@ func (c *conn) readSumHead(xferLen int) (sumHead, error) {
 	if h.count, err = c.readInt32(); err != nil {
 		return h, err
 	}
-	if h.count < 0 {
+	if h.count < 0 || h.count > maxChecksumCount {
 		return h, fmt.Errorf("invalid checksum count %d", h.count)
 	}
 	if h.blength, err = c.readInt32(); err != nil {
