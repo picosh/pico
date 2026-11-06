@@ -296,7 +296,13 @@ func keyHandler(apiConfig *ApiConfig) http.HandlerFunc {
 			return
 		}
 
-		if !apiConfig.HasPlusOrSpace(user, space) {
+		privileged := apiConfig.HasPrivilegedAccess(router.GetApiToken(r))
+		// report=1 lets privileged callers accept accounts without access to
+		// the space, and tells them which accounts have it.
+		report := privileged && r.URL.Query().Get("report") == "1"
+		spaceAccess := apiConfig.HasPlusOrSpace(user, space)
+
+		if !spaceAccess && !report {
 			log.Error("key handler unauthorized")
 			w.WriteHeader(http.StatusUnauthorized)
 			return
@@ -312,14 +318,22 @@ func keyHandler(apiConfig *ApiConfig) http.HandlerFunc {
 			log.Error("cannot insert access log", "err", err)
 		}
 
-		if !apiConfig.HasPrivilegedAccess(router.GetApiToken(r)) {
+		if !privileged {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
 
+		var body any = user
+		if report {
+			body = struct {
+				*db.User
+				SpaceAccess bool `json:"space_access"`
+			}{user, spaceAccess}
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		err = json.NewEncoder(w).Encode(user)
+		err = json.NewEncoder(w).Encode(body)
 		if err != nil {
 			log.Error("json encode", "err", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)

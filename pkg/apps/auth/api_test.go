@@ -116,6 +116,50 @@ func TestKey(t *testing.T) {
 	testResponse(t, responseRecorder, 200, "application/json")
 }
 
+func TestKeyReport(t *testing.T) {
+	cases := []struct {
+		name   string
+		query  string
+		token  string
+		status int
+		want   string
+	}{
+		{name: "with access", query: "?space=picd&report=1", token: "123", status: 200, want: `"space_access":true`},
+		{name: "without access", query: "?space=nospace&report=1", token: "123", status: 200, want: `"space_access":false`},
+		{name: "without access or report", query: "?space=nospace", token: "123", status: 401},
+		{name: "report without the token", query: "?space=nospace&report=1", status: 401},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			apiConfig := setupTest()
+
+			jso, err := json.Marshal(sishData{
+				Username:  testUsername,
+				PublicKey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFxVPgEqtWOa5l0QHZV6TQKhV+l46SAXU07c9RuHlGka test@pico",
+			})
+			bail(err)
+
+			request := httptest.NewRequest("POST", mkpath("/key"+c.query), bytes.NewReader(jso))
+			if c.token != "" {
+				request.Header.Add("Authorization", "Bearer "+c.token)
+			}
+			responseRecorder := httptest.NewRecorder()
+
+			authMux(apiConfig).ServeHTTP(responseRecorder, request)
+
+			if responseRecorder.Code != c.status {
+				t.Fatalf("status = %d, want %d", responseRecorder.Code, c.status)
+			}
+
+			body := responseRecorder.Body.String()
+			if !strings.Contains(body, c.want) || (c.want != "" && !strings.Contains(body, `"name":"user-a"`)) {
+				t.Errorf("body = %s, want the user and %s", body, c.want)
+			}
+		})
+	}
+}
+
 func TestCheckout(t *testing.T) {
 	apiConfig := setupTest()
 
@@ -245,6 +289,9 @@ func (a *AuthDb) FindKeysByUser(user *db.User) ([]*db.PublicKey, error) {
 // FindFeature gives pico+ a fixed expiry for the feed snapshots, and every
 // other feature an active flag.
 func (a *AuthDb) FindFeature(userID string, feature string) (*db.FeatureFlag, error) {
+	if feature == "nospace" {
+		return nil, fmt.Errorf("feature not found")
+	}
 	now := time.Date(2021, 8, 15, 14, 30, 45, 100, time.UTC)
 	expiresAt := now.AddDate(0, 0, 1)
 	if feature != "plus" {
