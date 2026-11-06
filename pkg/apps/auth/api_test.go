@@ -160,6 +160,66 @@ func TestKeyReport(t *testing.T) {
 	}
 }
 
+// featureDB has only the features it lists, each active.
+type featureDB struct {
+	*AuthDb
+	features map[string]bool
+}
+
+func (f *featureDB) FindFeature(userID string, feature string) (*db.FeatureFlag, error) {
+	if !f.features[feature] {
+		return nil, sql.ErrNoRows
+	}
+	expiresAt := time.Now().AddDate(0, 0, 1)
+	return &db.FeatureFlag{UserID: userID, Name: feature, ExpiresAt: &expiresAt}, nil
+}
+
+func TestKeyWithoutPlus(t *testing.T) {
+	cases := []struct {
+		name     string
+		features []string
+		query    string
+		status   int
+		want     string
+	}{
+		{name: "pico+", features: []string{"auth", "plus"}, query: "?space=picd", status: 200},
+		{name: "pico+ without plus", features: []string{"auth", "plus"}, query: "?space=picd&plus=0", status: 401},
+		{name: "the space's feature without plus", features: []string{"auth", "picd"}, query: "?space=picd&plus=0", status: 200},
+		{name: "pico+ reported without plus", features: []string{"auth", "plus"}, query: "?space=picd&plus=0&report=1", status: 200, want: `"space_access":false`},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			apiConfig := setupTest()
+			features := map[string]bool{}
+			for _, f := range c.features {
+				features[f] = true
+			}
+			apiConfig.Dbpool = &featureDB{AuthDb: apiConfig.Dbpool.(*AuthDb), features: features}
+
+			jso, err := json.Marshal(sishData{
+				Username:  testUsername,
+				PublicKey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFxVPgEqtWOa5l0QHZV6TQKhV+l46SAXU07c9RuHlGka test@pico",
+			})
+			bail(err)
+
+			request := httptest.NewRequest("POST", mkpath("/key"+c.query), bytes.NewReader(jso))
+			request.Header.Add("Authorization", "Bearer 123")
+			responseRecorder := httptest.NewRecorder()
+
+			authMux(apiConfig).ServeHTTP(responseRecorder, request)
+
+			if responseRecorder.Code != c.status {
+				t.Fatalf("status = %d, want %d", responseRecorder.Code, c.status)
+			}
+
+			if body := responseRecorder.Body.String(); !strings.Contains(body, c.want) {
+				t.Errorf("body = %s, want %s", body, c.want)
+			}
+		})
+	}
+}
+
 func TestCheckout(t *testing.T) {
 	apiConfig := setupTest()
 

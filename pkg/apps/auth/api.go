@@ -301,6 +301,12 @@ func keyHandler(apiConfig *ApiConfig) http.HandlerFunc {
 		// the space, and tells them which accounts have it.
 		report := privileged && r.URL.Query().Get("report") == "1"
 		spaceAccess := apiConfig.HasPlusOrSpace(user, space)
+		// plus=0 requires the space's own feature, for services that let in
+		// only some pico+ accounts. It only narrows access, so any caller may
+		// ask for it.
+		if r.URL.Query().Get("plus") == "0" {
+			spaceAccess = db.HasFeature(apiConfig.Dbpool, user.ID, space)
+		}
 
 		if !spaceAccess && !report {
 			log.Error("key handler unauthorized")
