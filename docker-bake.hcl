@@ -102,7 +102,8 @@ target "caddy" {
 
 target "bouncer" {
   inherits   = ["_common"]
-  context    = "./bouncer"
+  context    = "."
+  dockerfile = "bouncer/Dockerfile"
   tags       = tags("picosh/pico/bouncer")
   cache-from = cache_from("bouncer")
   cache-to   = cache_to("bouncer")

@@ -109,7 +109,7 @@ bp-pico: bp-setup
 .PHONY: bp-pico
 
 bp-bouncer: bp-setup
-	$(DOCKER_BUILDX_BUILD) ghcr.io/picosh/pico/bouncer:$(DOCKER_TAG) ./bouncer
+	$(DOCKER_BUILDX_BUILD) ghcr.io/picosh/pico/bouncer:$(DOCKER_TAG) -f bouncer/Dockerfile .
 .PHONY: bp-bouncer
 
 bp-ssh-%: bp-setup
