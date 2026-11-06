@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"strings"
 
-	"net/http/httputil"
 	_ "net/http/pprof"
 
 	"github.com/picosh/pico/pkg/storage"
@@ -132,17 +131,7 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				"status", fp.Status,
 			)
 
-			proxy := &httputil.ReverseProxy{
-				Rewrite: func(r *httputil.ProxyRequest) {
-					r.SetURL(destUrl)
-					r.Out.Header.Set("Host", destUrl.Host)
-				},
-				ModifyResponse: func(resp *http.Response) error {
-					resp.Header.Set("cache-control", "no-cache")
-					return nil
-				},
-			}
-			proxy.ServeHTTP(w, r)
+			h.proxyExternal(w, r, destUrl)
 			return
 		}
 

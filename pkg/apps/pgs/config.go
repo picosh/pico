@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"html/template"
 	"log/slog"
+	"net/http"
 	"path/filepath"
 	"strconv"
 	"time"
@@ -27,6 +28,9 @@ type Config struct {
 	WebPort            string
 	WebProtocol        string
 	TxtPrefix          string
+	ProxyTimeout       time.Duration
+	ProxyMaxSize       int64
+	ProxyTransport     http.RoundTripper
 
 	// This channel will receive the surrogate key for a project (e.g. static site)
 	// which will inform the caching layer to clear the cache for that site.
@@ -87,6 +91,16 @@ var cacheMaxBodySize = int64(0)
 var maxSpecialFileSize = int64(5 * shared.KB)
 
 func NewConfig(logger *slog.Logger, dbpool pgsdb.PgsDB, st storage.StorageServe, pubsub PicoPubsub) *Config {
+	proxyTimeout, err := time.ParseDuration(shared.GetEnv("PGS_PROXY_TIMEOUT", "2m"))
+	if err != nil || proxyTimeout <= 0 {
+		logger.Warn("invalid PGS_PROXY_TIMEOUT, using default", "timeout", defaultProxyTimeout)
+		proxyTimeout = defaultProxyTimeout
+	}
+	proxyMaxSize, err := strconv.ParseInt(shared.GetEnv("PGS_PROXY_MAX_SIZE", strconv.FormatInt(defaultProxyMaxSize, 10)), 10, 64)
+	if err != nil || proxyMaxSize <= 0 || proxyMaxSize == 1<<63-1 {
+		logger.Warn("invalid PGS_PROXY_MAX_SIZE, using default", "bytes", defaultProxyMaxSize)
+		proxyMaxSize = defaultProxyMaxSize
+	}
 	domain := shared.GetEnv("PGS_DOMAIN", "pgs.sh")
 	port := shared.GetEnv("PGS_WEB_PORT", "3000")
 	protocol := shared.GetEnv("PGS_PROTOCOL", "https")
@@ -108,6 +122,9 @@ func NewConfig(logger *slog.Logger, dbpool pgsdb.PgsDB, st storage.StorageServe,
 	sshPort := shared.GetEnv("PGS_SSH_PORT", "2222")
 
 	cfg := Config{
+		ProxyTimeout:       proxyTimeout,
+		ProxyMaxSize:       proxyMaxSize,
+		ProxyTransport:     publicProxyTransport,
 		CacheTTL:           cacheTTL,
 		CacheMaxItems:      cacheMaxItems,
 		CacheMaxBodySize:   cacheMaxBody,
