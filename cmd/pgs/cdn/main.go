@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"net"
 	"net/http"
-	"net/url"
 	"strings"
+	"time"
 
 	"github.com/picosh/pico/pkg/apps/pgs"
 	"github.com/picosh/pico/pkg/metrics"
+	"github.com/picosh/pico/pkg/netguard"
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -33,8 +33,9 @@ func main() {
 	// The CDN can't look users up, but origin fails every site route for a
 	// site that doesn't exist, so a success proves the owner is real.
 	cacher := &cachedHttp{
-		Logger: cfg.Logger,
-		Cache:  pgs.NewSiteMetrics(cfg, "pgs-cdn", true).Handler(httpCache),
+		Logger:      cfg.Logger,
+		Cache:       pgs.NewSiteMetrics(cfg, "pgs-cdn", true).Handler(httpCache),
+		CheckClient: originCheckClient,
 	}
 
 	go pgs.CacheMgmt(ctx, cfg, cache, nil)
@@ -52,18 +53,17 @@ func main() {
 
 type proxyServe struct {
 	Logger    *slog.Logger
-	transport *http.Transport
+	transport http.RoundTripper
 }
 
 func newProxyServe(logger *slog.Logger) *proxyServe {
-	defaultTransport := http.DefaultTransport.(*http.Transport)
-	oldDial := defaultTransport.DialContext
-	transport := &http.Transport{
-		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			return oldDial(ctx, "tcp", "ash.pgs.sh:443")
-		},
-	}
-	return &proxyServe{Logger: logger, transport: transport}
+	return &proxyServe{Logger: logger, transport: netguard.NewTransport()}
+}
+
+var originCheckClient = &http.Client{
+	Transport:     netguard.NewTransport(),
+	Timeout:       5 * time.Second,
+	CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 }
 
 // Headers that should be stripped from upstream responses because the CDN's
@@ -78,18 +78,13 @@ func (p *proxyServe) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// Dial ash.pgs.sh but keep the original Host header so ash.pgs.sh
 	// can route the request to the correct subdomain (zmx.sh, etc.).
 	// Without the Host header, ash.pgs.sh serves its default vhost (HTML).
-	target, _ := url.Parse("https://ash.pgs.sh" + req.URL.Path)
-	if req.URL.RawQuery != "" {
-		target.RawQuery = req.URL.RawQuery
-	}
-	p.Logger.Info("proxying request to ash.pgs.sh", "url", target.String())
-
-	proxyReq := req.Clone(req.Context())
-	proxyReq.URL.Scheme = target.Scheme
-	proxyReq.URL.Host = target.Host
-	proxyReq.URL.Path = target.Path
-	proxyReq.URL.RawQuery = target.RawQuery
+	ctx, cancel := context.WithTimeout(req.Context(), 2*time.Minute)
+	defer cancel()
+	proxyReq := req.Clone(ctx)
+	proxyReq.URL.Scheme = "https"
+	proxyReq.URL.Host = "ash.pgs.sh"
 	proxyReq.RequestURI = ""
+	p.Logger.Info("proxying request to ash.pgs.sh", "url", proxyReq.URL.String())
 	// Prevent the upstream from returning a compressed body. The CDN cache
 	// stores a single representation per URL; Caddy handles per-client
 	// encoding on the way out. If we forward Accept-Encoding, origin may
@@ -121,8 +116,9 @@ func (p *proxyServe) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 type cachedHttp struct {
-	Logger *slog.Logger
-	Cache  http.Handler
+	Logger      *slog.Logger
+	Cache       http.Handler
+	CheckClient *http.Client
 }
 
 func (c *cachedHttp) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
@@ -133,20 +129,34 @@ func (c *cachedHttp) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
 
 	if req.URL.Path == "/check" {
 		c.Logger.Info("proxying `/check` request to ash.pgs.sh", "query", req.URL.RawQuery)
-		req, _ := http.NewRequest("GET", "https://ash.pgs.sh/check?"+req.URL.RawQuery, nil)
-		req.Host = "pgs.sh"
-		// reqDump, _ := httputil.DumpRequestOut(req, true)
-		// fmt.Printf("REQUEST:\n%s", string(reqDump))
-
-		resp, err := http.DefaultClient.Do(req)
+		upstream, err := http.NewRequestWithContext(req.Context(), http.MethodGet, "https://ash.pgs.sh/check", nil)
+		if err != nil {
+			http.Error(writer, "invalid origin check request", http.StatusBadGateway)
+			return
+		}
+		upstream.URL.RawQuery = req.URL.RawQuery
+		upstream.Host = "pgs.sh"
+		resp, err := c.CheckClient.Do(upstream)
 		if err != nil {
 			c.Logger.Error("check request", "err", err)
+			http.Error(writer, "origin check failed", http.StatusBadGateway)
+			return
 		}
 		defer func() {
 			_ = resp.Body.Close()
 		}()
+		if resp.StatusCode >= 300 && resp.StatusCode < 400 {
+			http.Error(writer, "origin check returned an unexpected redirect", http.StatusBadGateway)
+			return
+		}
+		body, err := netguard.ReadBody(resp.Body, 64*1024)
+		if err != nil {
+			c.Logger.Error("reading check response", "err", err)
+			http.Error(writer, "invalid origin check response", http.StatusBadGateway)
+			return
+		}
 		writer.WriteHeader(resp.StatusCode)
-		_, _ = io.Copy(writer, resp.Body)
+		_, _ = writer.Write(body)
 		return
 	}
 
