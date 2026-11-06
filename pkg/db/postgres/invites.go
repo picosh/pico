@@ -41,7 +41,7 @@ func (me *PsqlDB) FindInvitesByUser(userID string) ([]*db.Invite, error) {
 // inviteFeatures are the services an invite grants access to.
 var inviteFeatures = []string{"prose", "pgs", "pastes"}
 
-func (me *PsqlDB) hasActiveInvite(userID string) (bool, error) {
+func (me *PsqlDB) HasActiveInvite(userID string) (bool, error) {
 	var invited bool
 	err := me.Db.Get(&invited, `SELECT EXISTS (SELECT 1 FROM invites WHERE to_user_id = $1)`, userID)
 	if err != nil || !invited {
@@ -58,7 +58,7 @@ func (me *PsqlDB) hasActiveInvite(userID string) (bool, error) {
 func (me *PsqlDB) InviteUser(fromUserID string, toUserID string) error {
 	canInvite := db.HasFeature(me, fromUserID, "plus")
 	if !canInvite {
-		invited, err := me.hasActiveInvite(fromUserID)
+		invited, err := me.HasActiveInvite(fromUserID)
 		if err != nil {
 			return err
 		}

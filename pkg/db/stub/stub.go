@@ -272,6 +272,10 @@ func (me *StubDB) FindWhoInvitedUser(toUserID string) (string, error) {
 	return "", errNotImpl
 }
 
+func (me *StubDB) HasActiveInvite(userID string) (bool, error) {
+	return false, errNotImpl
+}
+
 func (me *StubDB) FindInvitesByUser(userID string) ([]*db.Invite, error) {
 	return nil, errNotImpl
 }

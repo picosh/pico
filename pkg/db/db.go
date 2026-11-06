@@ -693,6 +693,9 @@ type InviteDB interface {
 	FindWhoInvitedUser(toUserID string) (string, error)
 	FindInvitesByUser(userID string) ([]*Invite, error)
 	InviteUser(fromUserID string, toUserID string) error
+	// HasActiveInvite reports whether a user was invited and still has a
+	// service the invite granted.
+	HasActiveInvite(userID string) (bool, error)
 }
 
 // DB is the storage apps share. Each app declares the subset it uses, and

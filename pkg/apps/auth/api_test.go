@@ -160,10 +160,20 @@ func TestKeyReport(t *testing.T) {
 	}
 }
 
-// featureDB has only the features it lists, each active.
+// featureDB has only the features it lists, each active, and an invite
+// when invited is set.
 type featureDB struct {
 	*AuthDb
 	features map[string]bool
+	invited  bool
+}
+
+func newFeatureDB(apiConfig *ApiConfig, invited bool, features ...string) *featureDB {
+	f := &featureDB{AuthDb: apiConfig.Dbpool.(*AuthDb), features: map[string]bool{}, invited: invited}
+	for _, name := range features {
+		f.features[name] = true
+	}
+	return f
 }
 
 func (f *featureDB) FindFeature(userID string, feature string) (*db.FeatureFlag, error) {
@@ -172,6 +182,31 @@ func (f *featureDB) FindFeature(userID string, feature string) (*db.FeatureFlag,
 	}
 	expiresAt := time.Now().AddDate(0, 0, 1)
 	return &db.FeatureFlag{UserID: userID, Name: feature, ExpiresAt: &expiresAt}, nil
+}
+
+func (f *featureDB) HasActiveInvite(userID string) (bool, error) {
+	return f.invited, nil
+}
+
+// postKey asks /key about the test key, with the API token if one is given.
+func postKey(t *testing.T, apiConfig *ApiConfig, query, token string) *httptest.ResponseRecorder {
+	t.Helper()
+
+	jso, err := json.Marshal(sishData{
+		Username:  testUsername,
+		PublicKey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFxVPgEqtWOa5l0QHZV6TQKhV+l46SAXU07c9RuHlGka test@pico",
+	})
+	bail(err)
+
+	request := httptest.NewRequest("POST", mkpath("/key"+query), bytes.NewReader(jso))
+	if token != "" {
+		request.Header.Add("Authorization", "Bearer "+token)
+	}
+	responseRecorder := httptest.NewRecorder()
+
+	authMux(apiConfig).ServeHTTP(responseRecorder, request)
+
+	return responseRecorder
 }
 
 func TestKeyWithoutPlus(t *testing.T) {
@@ -191,29 +226,54 @@ func TestKeyWithoutPlus(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			apiConfig := setupTest()
-			features := map[string]bool{}
-			for _, f := range c.features {
-				features[f] = true
-			}
-			apiConfig.Dbpool = &featureDB{AuthDb: apiConfig.Dbpool.(*AuthDb), features: features}
+			apiConfig.Dbpool = newFeatureDB(apiConfig, false, c.features...)
 
-			jso, err := json.Marshal(sishData{
-				Username:  testUsername,
-				PublicKey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFxVPgEqtWOa5l0QHZV6TQKhV+l46SAXU07c9RuHlGka test@pico",
-			})
-			bail(err)
+			res := postKey(t, apiConfig, c.query, "123")
 
-			request := httptest.NewRequest("POST", mkpath("/key"+c.query), bytes.NewReader(jso))
-			request.Header.Add("Authorization", "Bearer 123")
-			responseRecorder := httptest.NewRecorder()
-
-			authMux(apiConfig).ServeHTTP(responseRecorder, request)
-
-			if responseRecorder.Code != c.status {
-				t.Fatalf("status = %d, want %d", responseRecorder.Code, c.status)
+			if res.Code != c.status {
+				t.Fatalf("status = %d, want %d", res.Code, c.status)
 			}
 
-			if body := responseRecorder.Body.String(); !strings.Contains(body, c.want) {
+			if body := res.Body.String(); !strings.Contains(body, c.want) {
+				t.Errorf("body = %s, want %s", body, c.want)
+			}
+		})
+	}
+}
+
+func TestKeyInvited(t *testing.T) {
+	cases := []struct {
+		name     string
+		features []string
+		invited  bool
+		token    string
+		status   int
+		want     string
+	}{
+		{name: "not invited", status: 401},
+		{name: "invited", invited: true, status: 200, want: `"space_access":false`},
+		{name: "pico+", features: []string{"plus"}, status: 200, want: `"space_access":false`},
+		{name: "the space's feature", features: []string{"picd"}, status: 200, want: `"space_access":true`},
+		{name: "invited without the token", invited: true, token: "none", status: 401},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			apiConfig := setupTest()
+			apiConfig.Dbpool = newFeatureDB(apiConfig, c.invited, append(c.features, "auth")...)
+
+			token := c.token
+			if token == "" {
+				token = "123"
+			}
+
+			res := postKey(t, apiConfig, "?space=picd&plus=0&report=1&invited=1", token)
+
+			if res.Code != c.status {
+				t.Fatalf("status = %d, want %d", res.Code, c.status)
+			}
+
+			if body := res.Body.String(); !strings.Contains(body, c.want) {
 				t.Errorf("body = %s, want %s", body, c.want)
 			}
 		})

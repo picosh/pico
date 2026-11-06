@@ -68,6 +68,14 @@ func (hc *ApiConfig) HasPlusOrSpace(user *db.User, space string) bool {
 	return db.HasPlusOrSpace(hc.Dbpool, user.ID, space)
 }
 
+// HasPlusOrInvite reports whether a user has pico+ or an active invite.
+func (hc *ApiConfig) HasPlusOrInvite(user *db.User) (bool, error) {
+	if db.HasFeature(hc.Dbpool, user.ID, "plus") {
+		return true, nil
+	}
+	return hc.Dbpool.HasActiveInvite(user.ID)
+}
+
 func wellKnownHandler(apiConfig *ApiConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		space := r.PathValue("space")
@@ -312,6 +320,24 @@ func keyHandler(apiConfig *ApiConfig) http.HandlerFunc {
 			log.Error("key handler unauthorized")
 			w.WriteHeader(http.StatusUnauthorized)
 			return
+		}
+
+		// invited=1 narrows report=1 to accounts with pico+ or an invite. It
+		// only applies to privileged callers, since refusing an account
+		// tells the caller it wasn't invited.
+		if report && !spaceAccess && r.URL.Query().Get("invited") == "1" {
+			invited, err := apiConfig.HasPlusOrInvite(user)
+			if err != nil {
+				log.Error("find invite", "err", err)
+				http.Error(w, "cannot check invite", http.StatusInternalServerError)
+				return
+			}
+
+			if !invited {
+				log.Error("key handler unauthorized: not invited")
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
 		}
 
 		err = apiConfig.Dbpool.InsertAccessLog(&db.AccessLog{
