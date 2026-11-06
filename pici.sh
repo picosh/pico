@@ -25,7 +25,7 @@ DOCKER_PLATFORM="linux/amd64,linux/arm64"
 docker buildx ls | grep pico || docker buildx create --name pico
 docker buildx use pico
 zmx run caddy -d       docker buildx build --push --platform "$DOCKER_PLATFORM" -t "ghcr.io/picosh/pico/caddy:$DOCKER_TAG" ./caddy
-zmx run bouncer        docker buildx build --push --platform "$DOCKER_PLATFORM" -t "ghcr.io/picosh/pico/bouncer:$DOCKER_TAG" ./bouncer
+zmx run bouncer        docker buildx build --push --platform "$DOCKER_PLATFORM" -t "ghcr.io/picosh/pico/bouncer:$DOCKER_TAG" -f bouncer/Dockerfile .
 zmx wait "*"
 
 zmx run pico-ssh    docker buildx build --push --platform "$DOCKER_PLATFORM" -t "ghcr.io/picosh/pico/pico-ssh:$DOCKER_TAG" --build-arg APP=pico --target release-ssh .

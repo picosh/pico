@@ -8,13 +8,16 @@ RUN apt-get install -y git ca-certificates
 
 RUN git clone https://codeberg.org/emersion/soju.git
 
-COPY subscriber-change.diff .
+COPY bouncer/subscriber-change.diff bouncer/network-security.diff ./
 
 WORKDIR /app/soju
 
 RUN git checkout v0.10.1
 
 RUN git apply ../subscriber-change.diff
+RUN git apply ../network-security.diff
+
+COPY pkg/netguard ./netguard
 
 RUN --mount=type=cache,target=/go/pkg/,rw \
   --mount=type=cache,target=/root/.cache/,rw \
@@ -22,7 +25,8 @@ RUN --mount=type=cache,target=/go/pkg/,rw \
 
 FROM builder-deps AS builder
 
-COPY . .
+COPY bouncer/ .
+COPY bouncer/testdata/network_security_test.go ./network_security_test.go
 
 ARG APP=prose
 ARG TARGETOS
@@ -31,6 +35,10 @@ ARG TARGETARCH
 ENV CGO_ENABLED=0
 ENV GOFLAGS="-tags=moderncsqlite"
 ENV LDFLAGS="-s -w"
+
+RUN --mount=type=cache,target=/go/pkg/ \
+  --mount=type=cache,target=/root/.cache/ \
+  go test ./netguard . -run '^Test(Pico|Validate|Dialer|ResponseBody)'
 
 ENV GOOS=${TARGETOS} GOARCH=${TARGETARCH}
 

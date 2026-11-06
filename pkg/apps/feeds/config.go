@@ -4,6 +4,7 @@ import (
 	"html/template"
 	"log/slog"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/picosh/pico/pkg/shared"
@@ -14,15 +15,16 @@ import (
 const staticDir = "pkg/apps/feeds"
 
 type Config struct {
-	Debug       bool
-	SendgridKey string
-	Domain      string
-	Port        string
-	Protocol    string
-	DbURL       string
-	Space       string
-	AllowedExt  []string
-	Logger      *slog.Logger
+	Debug        bool
+	SendgridKey  string
+	Domain       string
+	Port         string
+	Protocol     string
+	DbURL        string
+	Space        string
+	AllowedExt   []string
+	Logger       *slog.Logger
+	FetchMaxSize int64
 }
 
 func NewConfig(service string) *Config {
@@ -33,17 +35,24 @@ func NewConfig(service string) *Config {
 	dbURL := shared.GetEnv("DATABASE_URL", "")
 	sendgridKey := shared.GetEnv("SENDGRID_API_KEY", "")
 	withPipe := strings.ToLower(shared.GetEnv("PICO_PIPE_ENABLED", "true")) == "true"
+	logger := shared.CreateLogger(service, withPipe)
+	maxSize, err := strconv.ParseInt(shared.GetEnv("FEEDS_FETCH_MAX_SIZE", strconv.FormatInt(defaultFeedMaxSize, 10)), 10, 64)
+	if err != nil || maxSize <= 0 || maxSize == 1<<63-1 {
+		logger.Warn("invalid FEEDS_FETCH_MAX_SIZE, using default", "bytes", defaultFeedMaxSize)
+		maxSize = defaultFeedMaxSize
+	}
 
 	return &Config{
-		Debug:       debug == "1",
-		SendgridKey: sendgridKey,
-		Domain:      domain,
-		Port:        port,
-		Protocol:    protocol,
-		DbURL:       dbURL,
-		Space:       "feeds",
-		AllowedExt:  []string{".txt", ".lxt"},
-		Logger:      shared.CreateLogger(service, withPipe),
+		Debug:        debug == "1",
+		SendgridKey:  sendgridKey,
+		Domain:       domain,
+		Port:         port,
+		Protocol:     protocol,
+		DbURL:        dbURL,
+		Space:        "feeds",
+		AllowedExt:   []string{".txt", ".lxt"},
+		Logger:       logger,
+		FetchMaxSize: maxSize,
 	}
 }
 

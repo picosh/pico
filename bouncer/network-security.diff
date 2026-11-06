@@ -1,0 +1,104 @@
+diff --git a/server.go b/server.go
+--- a/server.go
++++ b/server.go
+@@ -9,12 +9,10 @@
+ 	"mime"
+ 	"net"
+ 	"net/http"
+-	"net/netip"
+ 	"runtime/debug"
+ 	"strings"
+ 	"sync"
+ 	"sync/atomic"
+-	"syscall"
+ 	"time"
+ 
+ 	"github.com/SherClockHolmes/webpush-go"
+@@ -27,6 +25,7 @@
+ 	"codeberg.org/emersion/soju/database"
+ 	"codeberg.org/emersion/soju/fileupload"
+ 	"codeberg.org/emersion/soju/identd"
++	"codeberg.org/emersion/soju/netguard"
+ )
+ 
+ var (
+@@ -47,8 +46,6 @@
+ )
+ 
+ var errWebPushSubscriptionExpired = fmt.Errorf("Web Push subscription expired")
+-
+-var errWebPushToInternalIP = fmt.Errorf("cannot connect to internal IP address")
+ 
+ var webPushHTTPClient webpush.HTTPClient = buildWebPushHTTPClient()
+ 
+@@ -807,40 +804,28 @@
+ }
+ 
+ func buildWebPushHTTPClient() *http.Client {
+-	// this is a dialer that can only connect to external IP addresses
+-	dialer := &net.Dialer{
+-		Control: func(network, address string, c syscall.RawConn) error {
+-			ip, _, err := net.SplitHostPort(address)
+-			if err != nil {
+-				return err
+-			}
+-			parsedIP, err := netip.ParseAddr(ip)
+-			if err != nil {
+-				return err
+-			}
+-			if parsedIP.IsLoopback() || parsedIP.IsMulticast() || parsedIP.IsPrivate() {
+-				return errWebPushToInternalIP
+-			}
+-			return nil
+-		},
+-	}
+-
+ 	return &http.Client{
+ 		Transport: &userAgentHTTPTransport{
+ 			userAgent: "soju",
+-			transport: http.Transport{
+-				DialContext: dialer.DialContext,
+-			},
++			transport: netguard.NewTransport(),
++		},
++		Timeout: 15 * time.Second,
++		CheckRedirect: func(req *http.Request, via []*http.Request) error {
++			if req.URL.Scheme != "https" {
++				return fmt.Errorf("Web Push redirects must use HTTPS")
++			}
++			return netguard.CheckRedirect(req, via)
+ 		},
+ 	}
+ }
+ 
+ type userAgentHTTPTransport struct {
+ 	userAgent string
+-	transport http.Transport
++	transport http.RoundTripper
+ }
+ 
+ func (ua *userAgentHTTPTransport) RoundTrip(req *http.Request) (*http.Response, error) {
++	req = req.Clone(req.Context())
+ 	req.Header.Set("User-Agent", ua.userAgent)
+ 	return ua.transport.RoundTrip(req)
+ }
+diff --git a/upstream.go b/upstream.go
+--- a/upstream.go
++++ b/upstream.go
+@@ -22,6 +22,7 @@
+ 	"gopkg.in/irc.v4"
+ 
+ 	"codeberg.org/emersion/soju/database"
++	"codeberg.org/emersion/soju/netguard"
+ 	"codeberg.org/emersion/soju/xirc"
+ )
+ 
+@@ -377,7 +378,7 @@
+ }
+ 
+ func dialTCP(ctx context.Context, user *user, addr string) (net.Conn, error) {
+-	var dialer net.Dialer
++	dialer := netguard.Dialer()
+ 	upstreamUserIPs := user.srv.Config().UpstreamUserIPs
+ 	if len(upstreamUserIPs) > 0 {
+ 		host, port, err := net.SplitHostPort(addr)

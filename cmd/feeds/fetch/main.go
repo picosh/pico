@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/mmcdole/gofeed"
@@ -16,7 +17,7 @@ func main() {
 	}()
 	fetcher := feeds.NewFetcher(dbh, cfg)
 	fp := gofeed.NewParser()
-	feed, err := fetcher.ParseURL(fp, "https://old.reddit.com/r/Watchexchange/.rss")
+	feed, err := fetcher.ParseURL(context.Background(), fp, "https://old.reddit.com/r/Watchexchange/.rss")
 	if err != nil {
 		panic(err)
 	}

@@ -140,7 +140,8 @@ services:
       - "3006:3000"
   bouncer:
     build:
-      context: bouncer/
+      context: .
+      dockerfile: bouncer/Dockerfile
     env_file:
       - .env.example
     volumes:

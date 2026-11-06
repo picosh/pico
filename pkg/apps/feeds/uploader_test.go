@@ -61,3 +61,26 @@ func TestWriteKeepsDigestState(t *testing.T) {
 		t.Errorf("feed without an email: %v", err)
 	}
 }
+
+func TestValidateFeedDestinations(t *testing.T) {
+	h := &UploadHandler{Cfg: &Config{AllowedExt: []string{".txt"}}}
+	for _, tt := range []struct {
+		name, body, want string
+	}{
+		{"public", "=: email me@pico.test\n# News\n> Comment\n=> https://example.com/rss\n", ""},
+		{"private", "=: email me@pico.test\n=> http://127.0.0.1/rss\n", "blocked"},
+		{"unsupported", "=: email me@pico.test\n=> file:///etc/passwd\n", "http or https"},
+		{"relative", "=: email me@pico.test\n=> /rss.xml\n", "http or https"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			err := h.validate(&db.Post{Filename: "rss.txt", Text: tt.body})
+			if tt.want == "" {
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("%v, want %q", err, tt.want)
+			}
+		})
+	}
+}
