@@ -1,15 +1,14 @@
 package feeds
 
 import (
-	"crypto/tls"
+	"context"
 	"errors"
 	"fmt"
-	html "html/template"
-	"io"
+	"html"
+	htmltmpl "html/template"
 	"log/slog"
 	"math"
 	"net/http"
-	"net/url"
 	"os"
 	"strings"
 	"text/template"
@@ -25,32 +24,13 @@ import (
 
 var ErrNoRecentArticles = errors.New("no recent articles")
 
-type UserAgentTransport struct {
-	http.RoundTripper
-}
-
-func (c *UserAgentTransport) RoundTrip(r *http.Request) (*http.Response, error) {
-	userAgent := "linux:feeds:v2 (by /u/pico-sh)"
-	r.Header.Set("User-Agent", userAgent)
-	r.Header.Set("Accept", "*/*")
-	return c.RoundTripper.RoundTrip(r)
-}
-
-var httpClient = http.Client{
-	Transport: &UserAgentTransport{
-		&http.Transport{
-			TLSClientConfig: &tls.Config{},
-		},
-	},
-}
-
 type FeedItemTmpl struct {
 	GUID        string
 	Title       string
 	Link        string
 	PublishedAt *time.Time
-	Content     html.HTML
-	Description html.HTML
+	Content     htmltmpl.HTML
+	Description htmltmpl.HTML
 }
 
 type Feed struct {
@@ -81,8 +61,8 @@ func itemToTemplate(item *gofeed.Item) *FeedItemTmpl {
 		Title:       item.Title,
 		Link:        item.Link,
 		PublishedAt: item.PublishedParsed,
-		Description: html.HTML(item.Description),
-		Content:     html.HTML(item.Content),
+		Description: htmltmpl.HTML(item.Description),
+		Content:     htmltmpl.HTML(item.Content),
 	}
 }
 
@@ -116,23 +96,13 @@ func getFeedItemID(logger *slog.Logger, item *gofeed.Item) string {
 	return guid
 }
 
-// see if this feed item should be emailed to user.
-func isValidItem(logger *slog.Logger, item *gofeed.Item, feedItems []*db.FeedItem) bool {
-	for _, feedItem := range feedItems {
-		if getFeedItemID(logger, item) == feedItem.GUID {
-			return false
-		}
-	}
-
-	return true
-}
-
 type Fetcher struct {
-	cfg  *Config
-	db   DB
-	auth sasl.Client
-	gron *gronx.Gronx
-	host string
+	cfg    *Config
+	db     DB
+	auth   sasl.Client
+	gron   *gronx.Gronx
+	host   string
+	client *http.Client
 }
 
 func NewFetcher(dbpool DB, cfg *Config) *Fetcher {
@@ -143,11 +113,12 @@ func NewFetcher(dbpool DB, cfg *Config) *Fetcher {
 	auth := sasl.NewPlainClient("", emailLogin, smtPass)
 	gron := gronx.New()
 	return &Fetcher{
-		db:   dbpool,
-		cfg:  cfg,
-		auth: auth,
-		gron: gron,
-		host: host,
+		db:     dbpool,
+		cfg:    cfg,
+		auth:   auth,
+		gron:   gron,
+		host:   host,
+		client: feedHTTPClient,
 	}
 }
 
@@ -195,7 +166,7 @@ func (f *Fetcher) Validate(logger *slog.Logger, post *db.Post, parsed *shared.Li
 	return nil
 }
 
-func (f *Fetcher) RunPost(logger *slog.Logger, user *db.User, isPicoPlus bool, post *db.Post, skipValidation bool, now time.Time) error {
+func (f *Fetcher) RunPost(ctx context.Context, logger *slog.Logger, user *db.User, isPicoPlus bool, post *db.Post, skipValidation bool, now time.Time) error {
 	logger = logger.With("filename", post.Filename)
 	logger.Info("running feed post")
 
@@ -226,6 +197,7 @@ func (f *Fetcher) RunPost(logger *slog.Logger, user *db.User, isPicoPlus bool, p
 	logger.Info("validation success")
 
 	urls := []string{}
+	seenURLs := map[string]bool{}
 	for _, item := range parsed.Items {
 		rawUrl := ""
 		if item.IsText {
@@ -238,11 +210,10 @@ func (f *Fetcher) RunPost(logger *slog.Logger, user *db.User, isPicoPlus bool, p
 			continue
 		}
 
-		_, err := url.Parse(rawUrl)
-		if err != nil {
-			logger.Info("invalid url", "url", rawUrl)
+		if seenURLs[rawUrl] {
 			continue
 		}
+		seenURLs[rawUrl] = true
 
 		logger.Info("found rss feed url", "url", rawUrl)
 		urls = append(urls, rawUrl)
@@ -260,7 +231,10 @@ func (f *Fetcher) RunPost(logger *slog.Logger, user *db.User, isPicoPlus bool, p
 	subject := fmt.Sprintf("%s feed digest", post.Filename)
 	unsubURL := getUnsubURL(post)
 
-	msgBody, err := f.FetchAll(logger, urls, parsed.InlineContent, user.Name, isPicoPlus, post)
+	msgBody, err := f.FetchAll(ctx, logger, urls, parsed.InlineContent, isPicoPlus, post)
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
 	if err != nil {
 		errForUser := err
 
@@ -287,10 +261,10 @@ Also, we have centralized logs in our pico.sh TUI that will display realtime fee
 			parsed.Email,
 			subject,
 			unsubURL,
-			&MsgBody{Html: strings.ReplaceAll(errBody, "\n", "<br />"), Text: errBody},
+			&MsgBody{Html: strings.ReplaceAll(html.EscapeString(errBody), "\n", "<br />"), Text: errBody},
 		)
 		if err != nil {
-			return err
+			return errors.Join(errForUser, fmt.Errorf("sending error email: %w", err))
 		}
 
 		if post.Data.Attempts >= maxAttempts {
@@ -346,7 +320,7 @@ func (f *Fetcher) RunUser(user *db.User, now time.Time) error {
 	}
 
 	for _, post := range posts.Data {
-		err = f.RunPost(logger, user, isPicoPlus, post, false, now)
+		err = f.RunPost(context.Background(), logger, user, isPicoPlus, post, false, now)
 		if err != nil {
 			logger.Error("run post failed", "err", err)
 		}
@@ -355,41 +329,10 @@ func (f *Fetcher) RunUser(user *db.User, now time.Time) error {
 	return nil
 }
 
-func (f *Fetcher) ParseURL(fp *gofeed.Parser, url string) (*gofeed.Feed, error) {
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	defer func() {
-		_ = resp.Body.Close()
-	}()
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode < 200 || resp.StatusCode > 300 {
-		return nil, fmt.Errorf("fetching feed resulted in an error: %s %s", resp.Status, body)
-	}
-
-	feed, err := fp.ParseString(string(body))
-	if err != nil {
-		return nil, err
-	}
-
-	return feed, nil
-}
-
-func (f *Fetcher) Fetch(logger *slog.Logger, fp *gofeed.Parser, url string, username string, feedItems []*db.FeedItem) (*Feed, error) {
+func (f *Fetcher) Fetch(ctx context.Context, logger *slog.Logger, fp *gofeed.Parser, url string, feedItems map[string]bool) (*Feed, error) {
 	logger.Info("fetching feed", "url", url)
 
-	feed, err := f.ParseURL(fp, url)
+	feed, err := f.ParseURL(ctx, fp, url)
 	if err != nil {
 		return nil, err
 	}
@@ -408,7 +351,7 @@ func (f *Fetcher) Fetch(logger *slog.Logger, fp *gofeed.Parser, url string, user
 			continue
 		}
 
-		if !isValidItem(logger, item, feedItems) {
+		if feedItems[getFeedItemID(logger, item)] {
 			logger.Info("feed item already served", "guid", item.GUID)
 			continue
 		}
@@ -449,7 +392,7 @@ func (f *Fetcher) PrintText(feedTmpl *DigestFeed) (string, error) {
 }
 
 func (f *Fetcher) PrintHtml(feedTmpl *DigestFeed) (string, error) {
-	ts, err := html.ParseFiles(
+	ts, err := htmltmpl.ParseFiles(
 		f.cfg.StaticPath("html/digest.page.tmpl"),
 	)
 
@@ -475,7 +418,9 @@ func getUnsubURL(post *db.Post) string {
 	return fmt.Sprintf("https://feeds.pico.sh/unsub/%s", post.ID)
 }
 
-func (f *Fetcher) FetchAll(logger *slog.Logger, urls []string, inlineContent bool, username string, isPicoPlus bool, post *db.Post) (*MsgBody, error) {
+func (f *Fetcher) FetchAll(ctx context.Context, logger *slog.Logger, urls []string, inlineContent bool, isPicoPlus bool, post *db.Post) (*MsgBody, error) {
+	fetchCtx, cancel := context.WithTimeoutCause(ctx, feedDigestTimeout, fmt.Errorf("digest exceeded the %s time limit: %w", feedDigestTimeout, context.DeadlineExceeded))
+	defer cancel()
 	logger.Info("fetching feeds", "inlineContent", inlineContent)
 	fp := gofeed.NewParser()
 	daysLeft := ""
@@ -504,20 +449,35 @@ func (f *Fetcher) FetchAll(logger *slog.Logger, urls []string, inlineContent boo
 	if len(urls) == 0 {
 		return nil, fmt.Errorf("feed file does not contain any urls")
 	}
+	seenItems := make(map[string]bool, len(feedItems))
+	for _, item := range feedItems {
+		seenItems[item.GUID] = true
+	}
 
 	var allErrors error
+	processed := 0
 	for _, url := range urls {
-		feedTmpl, err := f.Fetch(logger, fp, url, username, feedItems)
+		if fetchCtx.Err() != nil {
+			break
+		}
+		processed++
+		feedTmpl, err := f.Fetch(fetchCtx, logger, fp, url, seenItems)
 		if err != nil {
 			if errors.Is(err, ErrNoRecentArticles) {
 				logger.Info("no recent articles", "err", err)
 			} else {
 				allErrors = errors.Join(allErrors, fmt.Errorf("%s: %w", url, err))
-				logger.Error("fetch error", "err", err)
+				logger.Error("fetch error", "url", url, "err", err)
 			}
 			continue
 		}
 		feeds.Feeds = append(feeds.Feeds, feedTmpl)
+	}
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+	if fetchCtx.Err() != nil {
+		allErrors = errors.Join(allErrors, fmt.Errorf("digest stopped after %d of %d feeds: %w", processed, len(urls), context.Cause(fetchCtx)))
 	}
 
 	if len(feeds.Feeds) == 0 {
@@ -554,16 +514,16 @@ func (f *Fetcher) FetchAll(logger *slog.Logger, urls []string, inlineContent boo
 		return nil, err
 	}
 
-	html, err := f.PrintHtml(feeds)
+	htmlBody, err := f.PrintHtml(feeds)
 	if err != nil {
 		return nil, err
 	}
 
 	// cap body size to prevent abuse
-	if len(html)+len(text) > 5*shared.MB {
+	if len(htmlBody)+len(text) > 5*shared.MB {
 		feeds.Options.InlineContent = false
 		feeds.SizeWarning = true
-		html, err = f.PrintHtml(feeds)
+		htmlBody, err = f.PrintHtml(feeds)
 		if err != nil {
 			return nil, err
 		}
@@ -571,12 +531,12 @@ func (f *Fetcher) FetchAll(logger *slog.Logger, urls []string, inlineContent boo
 
 	if allErrors != nil {
 		text = fmt.Sprintf("> %s\n\n%s", allErrors, text)
-		html = fmt.Sprintf("<blockquote>%s</blockquote><br /><br/>%s", allErrors, html)
+		htmlBody = fmt.Sprintf("<blockquote>%s</blockquote><br /><br/>%s", html.EscapeString(allErrors.Error()), htmlBody)
 	}
 
 	return &MsgBody{
 		Text: text,
-		Html: html,
+		Html: htmlBody,
 	}, nil
 }
 

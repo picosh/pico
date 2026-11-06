@@ -11,6 +11,7 @@ import (
 
 	"github.com/adhocore/gronx"
 	"github.com/picosh/pico/pkg/db"
+	"github.com/picosh/pico/pkg/netguard"
 	"github.com/picosh/pico/pkg/postfs"
 	"github.com/picosh/pico/pkg/pssh"
 	sendutils "github.com/picosh/pico/pkg/send/utils"
@@ -156,8 +157,14 @@ func (h *UploadHandler) validate(post *db.Post) error {
 		} else if txt.IsURL {
 			u = string(txt.URL)
 		}
+		if u == "" {
+			continue
+		}
 
-		_, err := url.Parse(u)
+		parsedURL, err := url.Parse(u)
+		if err == nil {
+			err = netguard.ValidateHTTPURL(parsedURL)
+		}
 		if err != nil {
 			allErr = errors.Join(allErr, fmt.Errorf("%s: %w", u, err))
 			continue

@@ -11,6 +11,8 @@ import (
 	"github.com/picosh/pico/pkg/shared"
 )
 
+var manualFeedRuns = make(chan struct{}, 4)
+
 func Middleware(dbpool DB, cfg *Config) pssh.SSHServerMiddleware {
 	return func(next pssh.SSHServerHandler) pssh.SSHServerHandler {
 		return func(sesh *pssh.SSHServerConnSession) error {
@@ -156,13 +158,21 @@ func Middleware(dbpool DB, cfg *Config) pssh.SSHServerMiddleware {
 					_, _ = fmt.Fprintln(sesh.Stderr(), err)
 					return err
 				}
+				select {
+				case manualFeedRuns <- struct{}{}:
+					defer func() { <-manualFeedRuns }()
+				default:
+					err := fmt.Errorf("feed runner is busy; try again shortly")
+					_, _ = fmt.Fprintln(sesh.Stderr(), err)
+					return err
+				}
 				_, _ = fmt.Fprintf(sesh, "running feed post: %s\r\n", filename)
 				logger.Info("run cmd", "filename", filename)
 				fetcher := NewFetcher(dbpool, cfg)
 
 				isPicoPlus := db.HasPlusOrSpace(dbpool, user.ID, "feeds")
 
-				err = fetcher.RunPost(logger, user, isPicoPlus, post, true, time.Now().UTC())
+				err = fetcher.RunPost(sesh.Context(), logger, user, isPicoPlus, post, true, time.Now().UTC())
 				if err != nil {
 					_, _ = fmt.Fprintln(sesh.Stderr(), err)
 				}
