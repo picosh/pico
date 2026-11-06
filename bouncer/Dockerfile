@@ -58,8 +58,8 @@ COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /app/soju/soju .
 COPY --from=builder /app/soju/sojuctl .
 
-COPY soju.config .
-COPY motd.txt .
+COPY bouncer/soju.config .
+COPY bouncer/motd.txt .
 
 EXPOSE 6697
 EXPOSE 8080
