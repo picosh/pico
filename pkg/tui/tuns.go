@@ -4,14 +4,17 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"net/http"
+	"net/url"
 	"sort"
 	"sync"
 	"time"
 
 	"github.com/picosh/pico/pkg/db"
+	"github.com/picosh/pico/pkg/netguard"
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/utils/pipe"
 	"go.rockorager.dev/vaxis"
@@ -437,21 +440,45 @@ func (m *TunsPage) findSelected() *TunsClientSimple {
 	return nil
 }
 
-func fetch(fqdn, auth string) (map[string]*TunsClient, error) {
+var tunsHTTPClient = &http.Client{
+	Transport:     netguard.NewTransport(),
+	Timeout:       10 * time.Second,
+	CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+}
+
+const maxTunsResponseSize = 10 * 1024 * 1024
+
+func fetch(ctx context.Context, client *http.Client, fqdn, auth string) (map[string]*TunsClient, error) {
 	mapper := map[string]*TunsClient{}
-	url := fmt.Sprintf("https://%s/_sish/api/clients?x-authorization=%s", fqdn, auth)
-	resp, err := http.Get(url)
+	endpoint := url.URL{Scheme: "https", Host: fqdn, Path: "/_sish/api/clients"}
+	endpoint.RawQuery = url.Values{"x-authorization": {auth}}.Encode()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {
-		return mapper, err
+		return mapper, fmt.Errorf("invalid tunnel status endpoint")
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		var urlErr *url.Error
+		if errors.As(err, &urlErr) {
+			err = urlErr.Err
+		}
+		return mapper, fmt.Errorf("fetching tunnel status from %s: %w", fqdn, err)
 	}
 	defer func() {
 		_ = resp.Body.Close()
 	}()
 
-	var data TunsClientApi
-	err = json.NewDecoder(resp.Body).Decode(&data)
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return mapper, fmt.Errorf("tunnel status from %s: HTTP %s", fqdn, resp.Status)
+	}
+	body, err := netguard.ReadBody(resp.Body, maxTunsResponseSize)
 	if err != nil {
-		return mapper, err
+		return mapper, fmt.Errorf("reading tunnel status from %s: %w", fqdn, err)
+	}
+	var data TunsClientApi
+	err = json.Unmarshal(body, &data)
+	if err != nil {
+		return mapper, fmt.Errorf("parsing tunnel status from %s: %w", fqdn, err)
 	}
 
 	return data.Clients, nil
@@ -472,12 +499,12 @@ func (m *TunsPage) fetchEventLogs() {
 }
 
 func (m *TunsPage) fetchTuns() {
-	tMap, err := fetch("tuns.sh", m.shared.TunsSecret)
+	tMap, err := fetch(m.shared.Session.Context(), tunsHTTPClient, "tuns.sh", m.shared.TunsSecret)
 	if err != nil {
 		m.err = err
 		return
 	}
-	nMap, err := fetch("nue.tuns.sh", m.shared.TunsSecret)
+	nMap, err := fetch(m.shared.Session.Context(), tunsHTTPClient, "nue.tuns.sh", m.shared.TunsSecret)
 	if err != nil {
 		m.err = err
 		return
