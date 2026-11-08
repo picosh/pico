@@ -8,6 +8,7 @@ import (
 
 type PgsDB interface {
 	db.AuthDB
+	db.TokenDB
 	FindUsers() ([]*db.User, error)
 
 	InsertProject(userID, name, projectDir string) (string, error)

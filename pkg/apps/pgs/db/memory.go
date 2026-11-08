@@ -277,3 +277,19 @@ func (me *MemoryDB) RemoveFormEntriesByUserAndName(userID, name string) error {
 	me.FormEntries = filtered
 	return nil
 }
+
+func (me *MemoryDB) FindUserByToken(token string) (*db.User, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+func (me *MemoryDB) FindTokensByUser(userID string) ([]*db.Token, error) {
+	return []*db.Token{}, fmt.Errorf("not implemented")
+}
+func (me *MemoryDB) InsertToken(userID, name string) (string, error) {
+	return "", fmt.Errorf("not implemented")
+}
+func (me *MemoryDB) UpsertToken(userID, name string) (string, error) {
+	return "", fmt.Errorf("not implemented")
+}
+func (me *MemoryDB) RemoveToken(tokenID string) error {
+	return fmt.Errorf("not implemented")
+}

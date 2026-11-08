@@ -289,6 +289,7 @@ func (web *WebRouter) initRouters() {
 
 	rootRouter.Handle("GET /rss/updated", web.createRssHandler("updated_at"))
 	rootRouter.Handle("GET /rss", web.createRssHandler("created_at"))
+	rootRouter.HandleFunc("GET /rss/forms/{token}", web.handleAutoFormRss)
 	rootRouter.Handle("GET /{$}", files.Page("html/marketing.page.tmpl"))
 	web.RootRouter = rootRouter
 
@@ -594,4 +595,8 @@ func (web *WebRouter) handleLogin(w http.ResponseWriter, r *http.Request) {
 
 func (web *WebRouter) handleAutoForm(w http.ResponseWriter, r *http.Request) {
 	handleAutoForm(w, r, web.Cfg)
+}
+
+func (web *WebRouter) handleAutoFormRss(w http.ResponseWriter, r *http.Request) {
+	handleAutoFormRss(w, r, web.Cfg)
 }

@@ -338,3 +338,29 @@ func (me *PgsPsqlDB) RemoveFormEntriesByUserAndName(userID, name string) error {
 	_, err := me.Db.Exec("DELETE FROM form_entries WHERE user_id=$1 AND name=$2", userID, name)
 	return err
 }
+
+func (me *PgsPsqlDB) FindUserByToken(token string) (*db.User, error) {
+	user := &db.User{}
+	err := me.Db.Get(user, `
+	SELECT app_users.id, app_users.name, app_users.created_at
+	FROM app_users
+	LEFT JOIN tokens ON tokens.user_id = app_users.id
+	WHERE tokens.token = $1 AND tokens.expires_at > NOW()`, token)
+	if err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
+func (me *PgsPsqlDB) FindTokensByUser(userID string) ([]*db.Token, error) {
+	return []*db.Token{}, fmt.Errorf("not implemented")
+}
+func (me *PgsPsqlDB) InsertToken(userID, name string) (string, error) {
+	return "", fmt.Errorf("not implemented")
+}
+func (me *PgsPsqlDB) UpsertToken(userID, name string) (string, error) {
+	return "", fmt.Errorf("not implemented")
+}
+func (me *PgsPsqlDB) RemoveToken(tokenID string) error {
+	return fmt.Errorf("not implemented")
+}
