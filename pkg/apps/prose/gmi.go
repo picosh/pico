@@ -96,11 +96,11 @@ func (h *HTMLWriter) Handle(line Line) {
 	case LinePreformattedText:
 		_, _ = fmt.Fprintf(h.out, "%s\n", html.EscapeString(string(line)))
 	case LineHeading1:
-		_, _ = fmt.Fprintf(h.out, "<h1>%s</h1>\n", html.EscapeString(string(line)))
-	case LineHeading2:
 		_, _ = fmt.Fprintf(h.out, "<h2>%s</h2>\n", html.EscapeString(string(line)))
-	case LineHeading3:
+	case LineHeading2:
 		_, _ = fmt.Fprintf(h.out, "<h3>%s</h3>\n", html.EscapeString(string(line)))
+	case LineHeading3:
+		_, _ = fmt.Fprintf(h.out, "<h4>%s</h4>\n", html.EscapeString(string(line)))
 	case LineListItem:
 		_, _ = fmt.Fprintf(h.out, "<li>%s</li>\n", html.EscapeString(string(line)))
 	case LineQuote:
