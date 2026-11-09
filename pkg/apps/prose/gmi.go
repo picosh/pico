@@ -30,8 +30,10 @@ func parseGemText(text string) (*GemText, error) {
 		return nil, err
 	}
 	hw.Finish()
+	now := time.Now()
 	gem := &GemText{
-		Html: out.String(),
+		Html:      out.String(),
+		PublishAt: &now,
 	}
 
 	for k, v := range meta {
