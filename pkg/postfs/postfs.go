@@ -236,7 +236,7 @@ func renamePost(dbpool db.PostDB, user *db.User, space, fromName, toName string,
 	}
 
 	next.UpdatedAt = post.UpdatedAt
-	// The new name can parse the text differently, as .md and .lxt do.
+	// The new name can parse the text differently, as .md and .gmi do.
 	_, err = dbpool.RenamePost(post, next, replaced, next.Tags, aliases)
 	if err != nil && !errors.Is(err, db.ErrPostChanged) {
 		return fmt.Errorf("error for %s: %w", toName, err)

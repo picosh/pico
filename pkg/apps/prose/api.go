@@ -413,19 +413,6 @@ func (web *webRouter) postHandler(w http.ResponseWriter, r *http.Request) {
 		var list *shared.ListParsedText
 
 		switch ext {
-		case ".lxt":
-			list = shared.ListParseText(post.Text)
-
-			tags = list.Tags
-			if list.Image != "" {
-				ogImage = list.Image
-			}
-			if list.ImageCard != "" {
-				ogImageCard = list.ImageCard
-			}
-			if post.Hidden || post.PublishAt.After(time.Now()) {
-				unlisted = true
-			}
 		case ".md":
 			parsedText, err := shared.ParseText(post.Text)
 			if err != nil {
@@ -710,17 +697,6 @@ func (web *webRouter) rssBlogHandler(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 			content = tpl.String()
-		case ".lxt":
-			parsed := shared.ListParseText(post.Text)
-			var tpl bytes.Buffer
-			data := &PostPageData{
-				List: parsed,
-			}
-			if err := ts.Execute(&tpl, data); err != nil {
-				logger.Error("lxt template", "err", err)
-				continue
-			}
-			content = tpl.String()
 		case ".gmi":
 			parsedText, err := parseGemText(post.Text)
 			if err != nil {
@@ -817,16 +793,6 @@ func (web *webRouter) rssHandler(w http.ResponseWriter, r *http.Request) {
 			var tpl bytes.Buffer
 			data := &PostPageData{
 				Contents: template.HTML(parsed.Html),
-			}
-			if err := ts.Execute(&tpl, data); err != nil {
-				continue
-			}
-			content = tpl.String()
-		case ".lxt":
-			parsed := shared.ListParseText(post.Text)
-			var tpl bytes.Buffer
-			data := &PostPageData{
-				List: parsed,
 			}
 			if err := ts.Execute(&tpl, data); err != nil {
 				continue
@@ -985,7 +951,7 @@ func (web *webRouter) pathRoute(w http.ResponseWriter, r *http.Request) {
 		web.postRawHandler(w, r)
 		return
 	}
-	for _, ext := range []string{".md", ".lxt", ".gmi"} {
+	for _, ext := range []string{".md", ".gmi"} {
 		if slug, ok := strings.CutSuffix(path, ext); ok && slug != "" {
 			r.SetPathValue("slug", slug)
 			web.postRawHandler(w, r)

@@ -157,20 +157,6 @@ func (h *postUploader) validate(post *db.Post) error {
 func (h *postUploader) setMeta(post *db.Post) ([]string, error) {
 	var aliases []string
 	switch filepath.Ext(post.Filename) {
-	case ".lxt":
-		parsedText := shared.ListParseText(post.Text)
-		if parsedText.Title == "" {
-			post.Title = shared.ToUpper(post.Slug)
-		} else {
-			post.Title = parsedText.Title
-		}
-		aliases = parsedText.Aliases
-		post.Tags = parsedText.Tags
-		post.Description = parsedText.Description
-		if parsedText.PublishAt != nil && !parsedText.PublishAt.IsZero() {
-			post.PublishAt = parsedText.PublishAt
-		}
-		post.Hidden = parsedText.Hidden
 	case ".gmi":
 		parsedText, err := parseGemText(post.Text)
 		if err != nil {

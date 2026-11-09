@@ -50,7 +50,6 @@ func NewConfig(service string) *Config {
 		Space:    "prose",
 		AllowedExt: []string{
 			".md",
-			".lxt",
 			".gmi",
 			".jpg",
 			".jpeg",

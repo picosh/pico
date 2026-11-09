@@ -48,7 +48,6 @@ func TestRoutes(t *testing.T) {
 		{url: site + "/hello", status: http.StatusOK, body: "<html"},
 		{url: site + "/hello.html", status: http.StatusOK, body: "<html"},
 		{url: site + "/hello.md", status: http.StatusOK, body: "# hello"},
-		{url: site + "/hello.lxt", status: http.StatusOK, body: "# hello"},
 		{url: site + "/hello.gmi", status: http.StatusOK, body: "# hello"},
 		{url: site + "/raw/hello", status: http.StatusOK, body: "# hello"},
 		{url: site + "/raw", status: http.StatusOK, body: "<html"},

@@ -447,14 +447,14 @@ func TestRenamePost(t *testing.T) {
 	}
 
 	a := find("a.md")
-	got, err := testDB.RenamePost(a, renamed(a, "a.lxt", "a"), nil, []string{"x", "y"}, []string{"old-a"})
+	got, err := testDB.RenamePost(a, renamed(a, "a.gmi", "a"), nil, []string{"x", "y"}, []string{"old-a"})
 	if err != nil {
 		t.Fatalf("RenamePost failed: %v", err)
 	}
-	if got.ID != a.ID || got.Filename != "a.lxt" || got.MimeType != "text/plain" || !got.Hidden {
+	if got.ID != a.ID || got.Filename != "a.gmi" || got.MimeType != "text/plain" || !got.Hidden {
 		t.Errorf("unexpected post after rename: %+v", got)
 	}
-	a = find("a.lxt")
+	a = find("a.gmi")
 	if slices.Sort(a.Tags); !slices.Equal(a.Tags, []string{"x", "y"}) {
 		t.Errorf("tags = %q", a.Tags)
 	}
@@ -472,12 +472,12 @@ func TestRenamePost(t *testing.T) {
 	if _, err := testDB.RenamePost(&stale, renamed(&stale, "d.md", "d"), nil, nil, nil); !errors.Is(err, db.ErrPostChanged) {
 		t.Fatalf("rename of a changed post: %v", err)
 	}
-	if p := find("a.lxt"); p.Text != "saved" {
-		t.Errorf("a.lxt text = %q, want the save", p.Text)
+	if p := find("a.gmi"); p.Text != "saved" {
+		t.Errorf("a.gmi text = %q, want the save", p.Text)
 	}
 
 	// So does a save to the post it replaces.
-	a = find("a.lxt")
+	a = find("a.gmi")
 	b := find("b.md")
 	bSaved := *b
 	bSaved.Text = "b saved"
@@ -490,8 +490,8 @@ func TestRenamePost(t *testing.T) {
 	if p := find("b.md"); p.Text != "b saved" {
 		t.Errorf("b.md text = %q, want the save", p.Text)
 	}
-	if p := find("a.lxt"); p.ID != a.ID {
-		t.Errorf("a.lxt moved by a failed rename")
+	if p := find("a.gmi"); p.ID != a.ID {
+		t.Errorf("a.gmi moved by a failed rename")
 	}
 
 	// Taking another post's slug fails and keeps the post it would replace.

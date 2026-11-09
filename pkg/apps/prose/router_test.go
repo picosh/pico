@@ -37,7 +37,6 @@ func TestRouterSharedHandler(t *testing.T) {
 	posts := &listHandler{names: []string{"a.md"}}
 	router := newFileRouter("prose", map[string]ReadWriteHandler{
 		".md":      posts,
-		".lxt":     posts,
 		".gmi":     posts,
 		".txt":     &listHandler{names: []string{"a.md"}},
 		"fallback": &listHandler{names: []string{"x.png"}},
@@ -55,11 +54,11 @@ func TestRouterSharedHandler(t *testing.T) {
 		t.Errorf("listed %q, want /, a.md and x.png once each", names)
 	}
 
-	if err := router.Rename(nil, entry("a.md"), entry("a.lxt")); err != nil || posts.renamed != 1 {
+	if err := router.Rename(nil, entry("a.md"), entry("a.gmi")); err != nil || posts.renamed != 1 {
 		t.Fatalf("rename within a handler: %v, renamed %d", err, posts.renamed)
 	}
 	for _, to := range []string{"a.txt", "a.png"} {
-		if err := router.Rename(nil, entry("a.lxt"), entry(to)); !errors.Is(err, errors.ErrUnsupported) {
+		if err := router.Rename(nil, entry("a.gmi"), entry(to)); !errors.Is(err, errors.ErrUnsupported) {
 			t.Errorf("rename to %s across handlers: %v", to, err)
 		}
 	}

@@ -18,13 +18,13 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-// extRename accepts .md and .lxt files, and tags each with its extension.
+// extRename accepts .md and .gmi files, and tags each with its extension.
 // meta runs while the renamed post is made, as a save from another session
 // could.
 func extRename(meta func()) RenameFunc {
 	return func(cur, next *db.Post) ([]string, error) {
 		ext := filepath.Ext(next.Filename)
-		if ext != ".md" && ext != ".lxt" {
+		if ext != ".md" && ext != ".gmi" {
 			return nil, fmt.Errorf("%s: invalid extension", next.Filename)
 		}
 		if meta != nil {
@@ -77,10 +77,10 @@ func TestPostRename(t *testing.T) {
 		return RenamePost(session, posts, "prose", entry(from), entry(to), extRename(nil))
 	}
 
-	if err := rename("a.md", "a.lxt"); err != nil {
+	if err := rename("a.md", "a.gmi"); err != nil {
 		t.Fatal(err)
 	}
-	got, err := posts.FindPostWithFilename("a.lxt", "user-1", "prose")
+	got, err := posts.FindPostWithFilename("a.gmi", "user-1", "prose")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,18 +88,18 @@ func TestPostRename(t *testing.T) {
 		t.Errorf("renamed post = %+v, was %+v", got, a)
 	}
 
-	// c.lxt has the slug c.md has.
-	if err := rename("a.lxt", "c.lxt"); !errors.Is(err, os.ErrExist) {
+	// c.gmi has the slug c.md has.
+	if err := rename("a.gmi", "c.gmi"); !errors.Is(err, os.ErrExist) {
 		t.Errorf("rename onto a used slug: %v", err)
 	}
-	if err := rename("a.lxt", "a.txt"); err == nil {
+	if err := rename("a.gmi", "a.txt"); err == nil {
 		t.Error("rename to an invalid name succeeded")
 	}
 	if err := rename("missing.md", "m.md"); !errors.Is(err, os.ErrNotExist) {
 		t.Errorf("rename of a missing post: %v", err)
 	}
 
-	if err := rename("a.lxt", "b.md"); err != nil {
+	if err := rename("a.gmi", "b.md"); err != nil {
 		t.Fatal(err)
 	}
 	got, err = posts.FindPostWithFilename("b.md", "user-1", "prose")
@@ -118,15 +118,15 @@ func TestPostRename(t *testing.T) {
 func TestPostRenameRelations(t *testing.T) {
 	session, posts := newPostsSession(t)
 	a := insertPost(t, posts, "a.md", "# a", false)
-	if err := RenamePost(session, posts, "prose", entry("a.md"), entry("a.lxt"), extRename(nil)); err != nil {
+	if err := RenamePost(session, posts, "prose", entry("a.md"), entry("a.gmi"), extRename(nil)); err != nil {
 		t.Fatal(err)
 	}
 	got, err := posts.FindPost(a.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Equal(got.Tags, []string{".lxt"}) || !slices.Equal(posts.Aliases(a.ID), []string{"a.lxt"}) {
-		t.Errorf("tags %q and aliases %q, want the .lxt ones", got.Tags, posts.Aliases(a.ID))
+	if !slices.Equal(got.Tags, []string{".gmi"}) || !slices.Equal(posts.Aliases(a.ID), []string{"a.gmi"}) {
+		t.Errorf("tags %q and aliases %q, want the .gmi ones", got.Tags, posts.Aliases(a.ID))
 	}
 }
 

@@ -52,7 +52,6 @@ func NewFileHandler(cfg *Config, dbpool DB, st storage.StorageServe) *UploadHand
 		".md":      posts,
 		".txt":     posts,
 		".css":     posts,
-		".lxt":     posts,
 		".gmi":     posts,
 		"fallback": NewUploadImgHandler(dbpool, cfg, st),
 	})

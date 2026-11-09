@@ -792,7 +792,6 @@ func deserializeCaddyAccessLog(dbpool db.DB, access *AccessLog) (*db.AnalyticsVi
 		cleanPath = strings.TrimSuffix(cleanPath, "/")
 		cleanPath = strings.TrimSuffix(cleanPath, ".html")
 		cleanPath = strings.TrimSuffix(cleanPath, ".md")
-		cleanPath = strings.TrimSuffix(cleanPath, ".lxt")
 		cleanPath = strings.TrimSuffix(cleanPath, ".gmi")
 		cleanPath = strings.TrimPrefix(cleanPath, "raw/")
 

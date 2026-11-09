@@ -50,7 +50,7 @@ func NewConfig(service string) *Config {
 		Protocol:     protocol,
 		DbURL:        dbURL,
 		Space:        "feeds",
-		AllowedExt:   []string{".txt", ".lxt"},
+		AllowedExt:   []string{".txt"},
 		Logger:       logger,
 		FetchMaxSize: maxSize,
 	}

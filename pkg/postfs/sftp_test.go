@@ -239,14 +239,14 @@ func TestPostsSshfs(t *testing.T) {
 		name string
 		text string
 		// public is set when the new name drops the draft setting, which
-		// .lxt files don't read from front matter.
+		// .gmi files don't read from front matter.
 		public bool
 	}{
 		"prose": {
 			{cmd: "echo more >> a.md", name: "a.md", text: seedText("prose") + "more\n"},
 			{cmd: "mv a.md b.md", name: "b.md", text: seedText("prose") + "more\n"},
-			{cmd: "mv b.md b.lxt", name: "b.lxt", text: seedText("prose") + "more\n", public: true},
-			{cmd: "mv b.lxt c.md", name: "c.md", text: seedText("prose") + "more\n"},
+			{cmd: "mv b.md b.gmi", name: "b.gmi", text: seedText("prose") + "more\n", public: true},
+			{cmd: "mv b.gmi c.md", name: "c.md", text: seedText("prose") + "more\n"},
 		},
 		"pastes": {
 			{cmd: "echo more >> a.txt", name: "a.txt", text: "seeded\nmore\n"},
