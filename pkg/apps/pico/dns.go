@@ -29,6 +29,7 @@ var customDomainServices = []customDomainService{
 	// tuns accepts a match under either prefix; _sish is what sish uses.
 	{space: "tuns", check: checkTunsRecords, wildcard: true},
 	{space: "sish", check: checkTunsRecords, wildcard: true},
+	{space: "picd", check: checkPicdRecords},
 }
 
 // siteCheck checks a record whose value names a site. Like the services,
@@ -107,6 +108,26 @@ func checkTunsRecords(c *Cmd, records []string) string {
 		quoted[i] = fmt.Sprintf("%q", r)
 	}
 	return fmt.Sprintf("%s is invalid: no record is your username or the SHA256 fingerprint of one of your keys", strings.Join(quoted, ", "))
+}
+
+// checkPicdRecords looks for a record naming a user, as picd's domains add
+// does. picd accepts the domain only for the user that record names.
+func checkPicdRecords(c *Cmd, records []string) string {
+	for _, r := range records {
+		if strings.TrimSpace(r) == c.User.Name {
+			return fmt.Sprintf("%q is valid, picd's domains add accepts it for %s", r, c.User.Name)
+		}
+	}
+	for _, r := range records {
+		if user, err := c.Dbpool.FindUserByName(strings.TrimSpace(r)); err == nil {
+			return fmt.Sprintf("%q is valid, picd's domains add accepts it for %s (not your account)", r, user.Name)
+		}
+	}
+	quoted := make([]string, len(records))
+	for i, r := range records {
+		quoted[i] = fmt.Sprintf("%q", r)
+	}
+	return fmt.Sprintf("%s is invalid: no record is a username", strings.Join(quoted, ", "))
 }
 
 // lookupHost resolves host and returns its canonical name, or "" when it has
@@ -203,6 +224,6 @@ func (c *Cmd) dnsCheck(domain string) error {
 			c.output(fmt.Sprintf("%s: %s", name, svc.check(c, records)))
 		}
 	}
-	c.output("pgs and prose remember a missing record for 30 seconds and a found record for 2 minutes. tuns checks when a tunnel connects.")
+	c.output("pgs and prose remember a missing record for 30 seconds and a found record for 2 minutes. tuns checks when a tunnel connects, and picd when you run domains add.")
 	return nil
 }

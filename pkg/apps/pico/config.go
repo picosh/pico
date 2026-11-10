@@ -31,6 +31,7 @@ func NewConfig(service string) *Config {
 			hostOnly(shared.GetEnv("PROSE_DOMAIN", "prose.sh")),
 			"tuns.sh",
 			"nue.tuns.sh",
+			"cd.pico.sh",
 		},
 	}
 }

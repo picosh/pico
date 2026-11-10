@@ -84,24 +84,32 @@ func TestDNSCheck(t *testing.T) {
 			"_prose.example.com: no TXT record",
 			"_tuns.example.com: no TXT record",
 			"_sish.example.com: no TXT record",
+			"_picd.example.com: no TXT record",
 		}},
 		{"valid", "", map[string][]string{
 			"pgs":   {"antonio-blog"},
 			"prose": {"erock"},
 			"sish":  {"SHA256:someone-else", fingerprint},
+			"picd":  {"other", " antonio "},
 		}, []string{
 			`_pgs.example.com: "antonio-blog" is valid, serving pgs project "blog" of antonio`,
 			`_prose.example.com: "erock" is valid, serving prose blog of erock (not your account)`,
 			fmt.Sprintf(`_sish.example.com: %q is valid, tunnels from your key "laptop" can use this domain`, fingerprint),
+			`_picd.example.com: " antonio " is valid, picd's domains add accepts it for antonio`,
+		}},
+		{"picd record for another user", "", map[string][]string{"picd": {"nobody", "erock"}}, []string{
+			`_picd.example.com: "erock" is valid, picd's domains add accepts it for erock (not your account)`,
 		}},
 		{"invalid", "", map[string][]string{
 			"pgs":   {"antonio-blgo"},
 			"prose": {"nobody"},
 			"sish":  {"SHA256:someone-else"},
+			"picd":  {"nobody", "antonio-blog"},
 		}, []string{
 			`_pgs.example.com: "antonio-blgo" is invalid: user "antonio" has no project "blgo"`,
 			`_prose.example.com: "nobody" is invalid: user "nobody" not found`,
 			`_sish.example.com: "SHA256:someone-else" is invalid: no record is your username or the SHA256 fingerprint of one of your keys`,
+			`_picd.example.com: "nobody", "antonio-blog" is invalid: no record is a username`,
 		}},
 		{"tuns record with whitespace", "", map[string][]string{"sish": {fingerprint + " "}}, []string{
 			fmt.Sprintf(`_sish.example.com: %q is invalid: it has surrounding whitespace, and tuns needs an exact match`, fingerprint+" "),
@@ -113,6 +121,7 @@ func TestDNSCheck(t *testing.T) {
 		{"wildcard", "*.example.com", map[string][]string{"pgs": {"antonio-blog"}, "sish": {"antonio"}}, []string{
 			"_pgs.*.example.com: wildcard domains are not supported\r\n",
 			"_prose.*.example.com: wildcard domains are not supported\r\n",
+			"_picd.*.example.com: wildcard domains are not supported\r\n",
 			`.example.com: "antonio" is valid, tunnels from any of your keys can use this domain`,
 			"_tuns.",
 		}},

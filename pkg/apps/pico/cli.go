@@ -63,7 +63,7 @@ func (c *Cmd) help() {
 	helpStr += "access-logs - fetch access logs from the last 30 days\n"
 	helpStr += "chat - IRC chat (must enable pty with `-t` to the SSH command)\n"
 	helpStr += "not-found - return all status 404 requests for a host (hostname.com [year|month])\n"
-	helpStr += "dns-check - check a domain's CNAME/A and TXT records for pgs, prose and tuns custom domains (hostname.com or *.hostname.com)\n"
+	helpStr += "dns-check - check a domain's CNAME/A and TXT records for pgs, prose, tuns and picd custom domains (hostname.com or *.hostname.com)\n"
 	c.output(helpStr)
 }
 
