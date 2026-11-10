@@ -8,6 +8,7 @@ import (
 type Pager struct {
 	Surface vxfw.Surface
 	pos     int
+	height  int
 }
 
 func NewPager() *Pager {
@@ -18,7 +19,7 @@ func (m *Pager) HandleEvent(ev vaxis.Event, ph vxfw.EventPhase) (vxfw.Command, e
 	switch msg := ev.(type) {
 	case vaxis.Key:
 		if msg.Matches('j') || msg.Matches(vaxis.KeyDown) {
-			if m.pos == -1*int(m.Surface.Size.Height) {
+			if m.pos <= -max(0, int(m.Surface.Size.Height)-m.height) {
 				return nil, nil
 			}
 			m.pos -= 1
@@ -36,6 +37,8 @@ func (m *Pager) HandleEvent(ev vaxis.Event, ph vxfw.EventPhase) (vxfw.Command, e
 }
 
 func (m *Pager) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
+	m.height = int(ctx.Max.Height)
+	m.pos = max(-max(0, int(m.Surface.Size.Height)-m.height), min(0, m.pos))
 	root := vxfw.NewSurface(ctx.Max.Width, ctx.Max.Height, m)
 	root.AddChild(0, m.pos, m.Surface)
 	return root, nil

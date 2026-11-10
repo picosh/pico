@@ -2,7 +2,6 @@ package tui
 
 import (
 	"fmt"
-	"math"
 	"time"
 
 	"github.com/picosh/pico/pkg/db"
@@ -14,14 +13,27 @@ import (
 	"go.rockorager.dev/vaxis/vxfw/text"
 )
 
-type SitesLoaded struct{}
-type SiteStatsLoaded struct{}
+type SitesLoaded struct {
+	Request uint64
+	Sites   []*db.VisitUrl
+	Err     error
+}
+
+type SiteStatsLoaded struct {
+	Request  uint64
+	Site     string
+	Interval string
+	Summary  *db.SummaryVisits
+	Err      error
+}
 
 type AnalyticsPage struct {
 	shared *SharedModel
 
 	loadingSites   bool
 	loadingDetails bool
+	sitesRequest   uint64
+	statsRequest   uint64
 	sites          []*db.VisitUrl
 	features       []*db.FeatureFlag
 	err            error
@@ -64,6 +76,15 @@ func (m *AnalyticsPage) Footer() []Shortcut {
 }
 
 func (m *AnalyticsPage) getLeftWidget(i uint, cursor uint) vxfw.Widget {
+	if m.loadingSites || len(m.sites) == 0 {
+		if i != 0 {
+			return nil
+		}
+		if m.loadingSites {
+			return text.New("Loading ...")
+		}
+		return text.New("No sites found")
+	}
 	if int(i) >= len(m.sites) {
 		return nil
 	}
@@ -76,13 +97,25 @@ func (m *AnalyticsPage) getLeftWidget(i uint, cursor uint) vxfw.Widget {
 func (m *AnalyticsPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
 	switch msg := ev.(type) {
 	case PageIn:
-		m.loadingSites = true
-		go m.fetchSites()
-		_ = m.fetchFeatures()
+		m.err = m.fetchFeatures()
+		m.fetchSites()
 		m.focus = "page"
 		return vxfw.FocusWidgetCmd(m), nil
+	case PageOut:
+		m.sitesRequest++
+		m.statsRequest++
+		m.loadingSites = false
+		m.loadingDetails = false
 	case SitesLoaded:
-		if findAnalyticsFeature(m.features) == nil {
+		if msg.Request != m.sitesRequest {
+			return nil, nil
+		}
+		m.loadingSites = false
+		m.sites = msg.Sites
+		m.err = msg.Err
+		m.leftPane.SetCursor(0)
+		ff := findAnalyticsFeature(m.features)
+		if ff == nil || !ff.IsValid() {
 			return vxfw.RedrawCmd{}, nil
 		}
 		m.focus = "sites"
@@ -91,16 +124,27 @@ func (m *AnalyticsPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw
 			vxfw.RedrawCmd{},
 		}), nil
 	case SiteStatsLoaded:
+		if msg.Request != m.statsRequest {
+			return nil, nil
+		}
+		m.loadingDetails = false
+		m.err = msg.Err
+		if msg.Err == nil {
+			m.stats[msg.Site+":"+msg.Interval] = msg.Summary
+		}
 		return vxfw.RedrawCmd{}, nil
 	case vaxis.Key:
+		if msg.EventType == vaxis.EventRelease {
+			return nil, nil
+		}
 		if msg.Matches('f') {
 			if m.interval == "day" {
 				m.interval = "month"
 			} else {
 				m.interval = "day"
 			}
-			m.loadingDetails = true
-			go m.fetchSiteStats(m.selected, m.interval)
+			m.rightPane.pos = 0
+			m.fetchSiteStats(m.selected, m.interval)
 			return vxfw.RedrawCmd{}, nil
 		}
 		if msg.Matches('t') {
@@ -121,29 +165,29 @@ func (m *AnalyticsPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw
 			}), nil
 		}
 		if msg.Matches(vaxis.KeyEnter) {
+			if m.loadingSites {
+				return nil, nil
+			}
 			cursor := int(m.leftPane.Cursor())
 			if cursor >= len(m.sites) {
 				return nil, nil
 			}
 			m.selected = m.sites[m.leftPane.Cursor()].Url
-			m.loadingDetails = true
-			go m.fetchSiteStats(m.selected, m.interval)
+			m.rightPane.pos = 0
+			m.fetchSiteStats(m.selected, m.interval)
 			return vxfw.RedrawCmd{}, nil
 		}
-		if msg.Matches(vaxis.KeyTab) {
-			var cmd vxfw.Widget
-			if findAnalyticsFeature(m.features) == nil {
+		if msg.Matches(vaxis.KeyTab) || msg.Matches(vaxis.KeyTab, vaxis.ModShift) {
+			var cmd vxfw.Widget = &m.leftPane
+			ff := findAnalyticsFeature(m.features)
+			if ff == nil || !ff.IsValid() {
 				return nil, nil
 			}
 			if m.focus == "sites" && m.selected != "" {
 				m.focus = "details"
 				cmd = m.rightPane
-			} else if m.focus == "details" {
+			} else {
 				m.focus = "sites"
-				cmd = &m.leftPane
-			} else if m.focus == "page" {
-				m.focus = "sites"
-				cmd = &m.leftPane
 			}
 			return vxfw.BatchCmd([]vxfw.Command{
 				vxfw.FocusWidgetCmd(cmd),
@@ -165,25 +209,25 @@ func (m *AnalyticsPage) focusBorder(brd *Border) {
 
 func (m *AnalyticsPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	root := vxfw.NewSurface(ctx.Max.Width, ctx.Max.Height, m)
+	top := 0
+	if m.err != nil {
+		errText := text.New(m.err.Error())
+		errText.Style = vaxis.Style{Foreground: red}
+		surf, _ := errText.Draw(createDrawCtx(ctx, 1))
+		root.AddChild(0, 0, surf)
+		top = 2
+		ctx = createDrawCtx(ctx, max(1, int(ctx.Max.Height)-top))
+	}
 	ff := findAnalyticsFeature(m.features)
 	if ff == nil || !ff.IsValid() {
 		surf := m.banner(ctx)
-		root.AddChild(0, 0, surf)
+		root.AddChild(0, top, surf)
 		return root, nil
 	}
 
 	leftPaneW := float32(ctx.Max.Width) * 0.35
 
-	var wdgt vxfw.Widget = text.New("No sites found")
-	if len(m.sites) > 0 {
-		wdgt = &m.leftPane
-	}
-
-	if m.loadingSites {
-		wdgt = text.New("Loading ...")
-	}
-
-	leftPane := NewBorder(wdgt)
+	leftPane := NewBorder(&m.leftPane)
 	leftPane.Label = "sites"
 	m.focusBorder(leftPane)
 	leftSurf, _ := leftPane.Draw(vxfw.DrawContext{
@@ -194,7 +238,7 @@ func (m *AnalyticsPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 		},
 	})
 
-	root.AddChild(0, 0, leftSurf)
+	root.AddChild(0, top, leftSurf)
 
 	rightPaneW := float32(ctx.Max.Width) * 0.65
 	if m.selected == "" {
@@ -206,9 +250,9 @@ func (m *AnalyticsPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 				Height: ctx.Max.Height,
 			},
 		})
-		root.AddChild(int(leftPaneW), 0, rightSurf)
+		root.AddChild(int(leftPaneW), top, rightSurf)
 	} else {
-		rightSurf := vxfw.NewSurface(uint16(rightPaneW), math.MaxUint16, m)
+		rightSurf := vxfw.NewSurface(uint16(rightPaneW), 0, m)
 
 		ah := 0
 
@@ -228,8 +272,7 @@ func (m *AnalyticsPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 				Characters: ctx.Characters,
 				Max:        vxfw.Size{Width: uint16(rightPaneW), Height: ctx.Max.Height},
 			})
-			rightSurf.AddChild(0, 0, pagerSurf)
-			root.AddChild(int(leftPaneW), 0, rightSurf)
+			root.AddChild(int(leftPaneW), top, pagerSurf)
 			return root, nil
 		}
 
@@ -240,29 +283,31 @@ func (m *AnalyticsPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 				Height: ctx.Max.Height,
 			},
 		}
+		contentCtx := createDrawCtx(rightCtx, max(2, len(data.Intervals), len(data.TopUrls), len(data.NotFoundUrls), len(data.TopReferers))+3)
 
-		detailSurf, _ := m.detail(rightCtx, data.Intervals).Draw(rightCtx)
+		detailSurf, _ := m.detail(contentCtx, data.Intervals).Draw(contentCtx)
 		rightSurf.AddChild(0, ah, detailSurf)
 		ah += int(detailSurf.Size.Height)
 
-		urlSurf, _ := m.urls(rightCtx, data.TopUrls, "urls").Draw(rightCtx)
+		urlSurf, _ := m.urls(contentCtx, data.TopUrls, "urls").Draw(contentCtx)
 		rightSurf.AddChild(0, ah, urlSurf)
 		ah += int(urlSurf.Size.Height)
 
-		urlSurf, _ = m.urls(rightCtx, data.NotFoundUrls, "not found").Draw(rightCtx)
+		urlSurf, _ = m.urls(contentCtx, data.NotFoundUrls, "not found").Draw(contentCtx)
 		rightSurf.AddChild(0, ah, urlSurf)
 		ah += int(urlSurf.Size.Height)
 
-		urlSurf, _ = m.urls(rightCtx, data.TopReferers, "referers").Draw(rightCtx)
+		urlSurf, _ = m.urls(contentCtx, data.TopReferers, "referers").Draw(contentCtx)
 		rightSurf.AddChild(0, ah, urlSurf)
 		ah += int(urlSurf.Size.Height)
 
-		deviceSurf, _ := m.devices(rightCtx, data.Intervals).Draw(rightCtx)
+		deviceSurf, _ := m.devices(contentCtx, data.Intervals).Draw(contentCtx)
 		rightSurf.AddChild(0, ah, deviceSurf)
 		ah += int(deviceSurf.Size.Height)
 
-		surf, _ := m.visits(rightCtx, data.Intervals).Draw(rightCtx)
+		surf, _ := m.visits(contentCtx, data.Intervals).Draw(contentCtx)
 		rightSurf.AddChild(0, ah, surf)
+		rightSurf.Size.Height = uint16(ah) + surf.Size.Height
 
 		m.rightPane.Surface = rightSurf
 		rightPane := NewBorder(m.rightPane)
@@ -270,7 +315,7 @@ func (m *AnalyticsPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 		m.focusBorder(rightPane)
 		pagerSurf, _ := rightPane.Draw(rightCtx)
 
-		root.AddChild(int(leftPaneW), 0, pagerSurf)
+		root.AddChild(int(leftPaneW), top, pagerSurf)
 	}
 
 	return root, nil
@@ -382,21 +427,29 @@ func (m *AnalyticsPage) visits(ctx vxfw.DrawContext, intervals []*db.VisitInterv
 }
 
 func (m *AnalyticsPage) fetchSites() {
-	siteList, err := m.shared.Dbpool.FindVisitSiteList(&db.SummaryOpts{
+	m.loadingSites = true
+	m.sitesRequest++
+	request := m.sitesRequest
+	m.leftPane.SetCursor(0)
+	opts := &db.SummaryOpts{
 		UserID: m.shared.User.ID,
 		Origin: shared.StartOfMonth(),
-	})
-	if err != nil {
-		m.loadingSites = false
-		m.err = err
-		return
 	}
-	m.sites = siteList
-	m.loadingSites = false
-	m.shared.App.PostEvent(SitesLoaded{})
+	pool, app := m.shared.Dbpool, m.shared.App
+	go func() {
+		sites, err := pool.FindVisitSiteList(opts)
+		app.PostEvent(SitesLoaded{Request: request, Sites: sites, Err: err})
+	}()
 }
 
 func (m *AnalyticsPage) fetchSiteStats(site string, interval string) {
+	if site == "" {
+		return
+	}
+	m.loadingDetails = true
+	m.err = nil
+	m.statsRequest++
+	request := m.statsRequest
 	opts := &db.SummaryOpts{
 		Host: site,
 
@@ -410,15 +463,11 @@ func (m *AnalyticsPage) fetchSiteStats(site string, interval string) {
 		opts.Origin = shared.StartOfYear()
 	}
 
-	summary, err := m.shared.Dbpool.VisitSummary(opts)
-	if err != nil {
-		m.err = err
-		m.loadingDetails = false
-		return
-	}
-	m.stats[site+":"+interval] = summary
-	m.loadingDetails = false
-	m.shared.App.PostEvent(SiteStatsLoaded{})
+	pool, app := m.shared.Dbpool, m.shared.App
+	go func() {
+		summary, err := pool.VisitSummary(opts)
+		app.PostEvent(SiteStatsLoaded{Request: request, Site: site, Interval: interval, Summary: summary, Err: err})
+	}()
 }
 
 func (m *AnalyticsPage) fetchFeatures() error {

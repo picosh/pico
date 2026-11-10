@@ -17,9 +17,9 @@ type TokensPage struct {
 	shared *SharedModel
 	list   list.Dynamic
 
-	tokens  []*db.Token
-	err     error
-	confirm bool
+	tokens        []*db.Token
+	err           error
+	pendingDelete *db.Token
 }
 
 func NewTokensPage(shrd *SharedModel) *TokensPage {
@@ -47,40 +47,46 @@ func (m *TokensPage) fetchTokens() error {
 
 	}
 	m.tokens = tokens
+	m.list.SetCursor(min(m.list.Cursor(), uint(max(0, len(tokens)-1))))
 	return nil
 }
 
 func (m *TokensPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
 	switch msg := ev.(type) {
 	case PageIn:
+		m.pendingDelete = nil
 		m.err = m.fetchTokens()
 		return vxfw.FocusWidgetCmd(&m.list), nil
+	case PageOut:
+		m.pendingDelete = nil
 	case vaxis.Key:
+		if msg.EventType == vaxis.EventRelease {
+			return nil, nil
+		}
 		if msg.Matches('c') {
 			m.shared.App.PostEvent(Navigate{To: "add-token"})
 		}
 		if msg.Matches('x') {
-			m.confirm = true
+			if int(m.list.Cursor()) < len(m.tokens) {
+				m.pendingDelete = m.tokens[m.list.Cursor()]
+			}
 			return vxfw.RedrawCmd{}, nil
 		}
 		if msg.Matches('y') {
-			if m.confirm {
-				cursor := int(m.list.Cursor())
-				if cursor >= len(m.tokens) {
-					return nil, nil
-				}
-				m.confirm = false
-				err := m.shared.Dbpool.RemoveToken(m.tokens[m.list.Cursor()].ID)
+			if m.pendingDelete != nil {
+				id := m.pendingDelete.ID
+				m.pendingDelete = nil
+				err := m.shared.Dbpool.RemoveToken(id)
 				if err != nil {
 					m.err = err
-					return nil, nil
+					return vxfw.RedrawCmd{}, nil
 				}
 				m.err = m.fetchTokens()
 				return vxfw.RedrawCmd{}, nil
 			}
 		}
 		if msg.Matches('n') {
-			m.confirm = false
+			m.pendingDelete = nil
 			return vxfw.RedrawCmd{}, nil
 		}
 	}
@@ -134,9 +140,9 @@ func (m *TokensPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	root.AddChild(0, ah, listSurf)
 
 	segs := []vaxis.Segment{}
-	if m.confirm {
+	if m.pendingDelete != nil {
 		segs = append(segs, vaxis.Segment{
-			Text:  "are you sure? y/n\n",
+			Text:  fmt.Sprintf("delete token %q? y/n\n", m.pendingDelete.Name),
 			Style: vaxis.Style{Foreground: red},
 		})
 	}
@@ -171,12 +177,14 @@ func NewAddTokenPage(shrd *SharedModel) *AddTokenPage {
 		Default: vaxis.Style{Background: grey},
 		Focus:   vaxis.Style{Background: oj, Foreground: black},
 	}
-	return &AddTokenPage{
+	m := &AddTokenPage{
 		shared: shrd,
 
 		input: NewTextInput("enter name"),
 		btn:   btn,
 	}
+	m.btn.OnClick = m.submit
+	return m
 }
 
 func (m *AddTokenPage) Footer() []Shortcut {
@@ -190,38 +198,49 @@ func (m *AddTokenPage) Footer() []Shortcut {
 func (m *AddTokenPage) CaptureEvent(ev vaxis.Event) (vxfw.Command, error) {
 	switch msg := ev.(type) {
 	case vaxis.Key:
-		if msg.Matches(vaxis.KeyEnter) {
-			if m.token != "" {
-				copyToken := m.token
-				m.token = ""
-				m.err = nil
-				m.input.Reset()
-				m.shared.App.PostEvent(Navigate{To: "tokens"})
-				return vxfw.BatchCmd([]vxfw.Command{
-					vxfw.CopyToClipboardCmd(copyToken),
-					vxfw.RedrawCmd{},
-				}), nil
-			}
-			token, err := m.addToken(m.input.GetValue())
-			m.token = token
-			m.focus = "button"
-			m.err = err
-
-			return vxfw.BatchCmd([]vxfw.Command{
-				vxfw.FocusWidgetCmd(m.btn),
-				vxfw.RedrawCmd{},
-			}), err
+		if msg.EventType != vaxis.EventRelease && msg.Matches(vaxis.KeyEnter) {
+			return m.submit()
 		}
 	}
 	return nil, nil
 }
 
+func (m *AddTokenPage) submit() (vxfw.Command, error) {
+	if m.token != "" {
+		copyToken := m.token
+		m.token = ""
+		m.err = nil
+		m.input.Reset()
+		m.shared.App.PostEvent(Navigate{To: "tokens"})
+		return vxfw.BatchCmd{
+			vxfw.CopyToClipboardCmd(copyToken),
+			vxfw.ConsumeAndRedraw(),
+		}, nil
+	}
+	token, err := m.addToken(m.input.GetValue())
+	m.err = err
+	if err != nil {
+		m.focus = "input"
+		cmd, _ := m.input.FocusIn()
+		return vxfw.BatchCmd{cmd, vxfw.ConsumeAndRedraw()}, nil
+	}
+	m.token = token
+	m.focus = "button"
+	cmd, _ := m.input.FocusOut()
+	return vxfw.BatchCmd{cmd, vxfw.FocusWidgetCmd(m.btn), vxfw.ConsumeAndRedraw()}, nil
+}
+
 func (m *AddTokenPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
 	switch msg := ev.(type) {
 	case PageIn:
+		m.token = ""
+		m.err = nil
 		m.focus = "input"
 		m.input.Reset()
 		return m.input.FocusIn()
+	case PageOut:
+		m.token = ""
+		return m.input.FocusOut()
 	case vaxis.Key:
 		if msg.Matches(vaxis.KeyTab) {
 			if m.focus == "input" {

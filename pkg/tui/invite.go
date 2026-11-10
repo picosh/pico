@@ -1,6 +1,10 @@
 package tui
 
 import (
+	"database/sql"
+	"errors"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/picosh/pico/pkg/db"
@@ -36,13 +40,15 @@ func NewAddInvitePage(shrd *SharedModel) *AddInvitePage {
 		btn:   btn,
 	}
 	m.list = list.Dynamic{DrawCursor: true, Builder: m.getWidget, Gap: 1}
+	m.btn.OnClick = m.submit
 	return m
 }
 
 func (m *AddInvitePage) Footer() []Shortcut {
 	return []Shortcut{
 		{Shortcut: "tab", Text: "focus"},
-		{Shortcut: "enter", Text: "invite user"},
+		{Shortcut: "↑/↓ j/k", Text: "scroll invites"},
+		{Shortcut: "enter", Text: "send"},
 	}
 }
 
@@ -73,40 +79,68 @@ func (m *AddInvitePage) getWidget(i uint, cursor uint) vxfw.Widget {
 func (m *AddInvitePage) CaptureEvent(ev vaxis.Event) (vxfw.Command, error) {
 	switch msg := ev.(type) {
 	case vaxis.Key:
-		if msg.Matches(vaxis.KeyEnter) {
-			err := m.addInvite(m.input.GetValue())
-			m.err = err
-			if err == nil {
-				m.input.Reset()
-				m.shared.App.PostEvent(Navigate{To: HOME})
-				return nil, nil
+		if msg.EventType == vaxis.EventRelease {
+			return nil, nil
+		}
+		if msg.Matches(vaxis.KeyTab) || msg.Matches(vaxis.KeyTab, vaxis.ModShift) {
+			next := "input"
+			if msg.Matches(vaxis.KeyTab, vaxis.ModShift) {
+				switch m.focus {
+				case "input":
+					next = "list"
+				case "list":
+					next = "button"
+				}
+			} else {
+				switch m.focus {
+				case "input":
+					next = "button"
+				case "button":
+					next = "list"
+				}
 			}
-			return vxfw.RedrawCmd{}, nil
+			cmd, err := m.setFocus(next)
+			return vxfw.BatchCmd{cmd, vxfw.ConsumeEventCmd{}}, err
+		}
+		if msg.Matches(vaxis.KeyEnter) && m.focus == "input" {
+			return m.submit()
 		}
 	}
 	return nil, nil
 }
 
+func (m *AddInvitePage) submit() (vxfw.Command, error) {
+	m.err = m.addInvite(m.input.GetValue())
+	if m.err == nil {
+		m.input.Reset()
+		m.shared.App.PostEvent(Navigate{To: HOME})
+	}
+	return vxfw.ConsumeAndRedraw(), nil
+}
+
+func (m *AddInvitePage) setFocus(focus string) (vxfw.Command, error) {
+	m.focus = focus
+	if focus == "input" {
+		cmd, err := m.input.FocusIn()
+		return vxfw.BatchCmd{cmd, vxfw.RedrawCmd{}}, err
+	}
+	cmd, _ := m.input.FocusOut()
+	var widget vxfw.Widget = m.btn
+	if focus == "list" {
+		widget = &m.list
+	}
+	return vxfw.BatchCmd{cmd, vxfw.FocusWidgetCmd(widget), vxfw.RedrawCmd{}}, nil
+}
+
 func (m *AddInvitePage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
-	switch msg := ev.(type) {
+	switch ev.(type) {
 	case PageIn:
 		m.err = m.fetchInvites()
-		m.focus = "input"
+		m.list.SetCursor(0)
 		m.input.Reset()
-		return m.input.FocusIn()
-	case vaxis.Key:
-		if msg.Matches(vaxis.KeyTab) {
-			if m.focus == "input" {
-				m.focus = "button"
-				cmd, _ := m.input.FocusOut()
-				return vxfw.BatchCmd([]vxfw.Command{
-					vxfw.FocusWidgetCmd(m.btn),
-					cmd,
-				}), nil
-			}
-			m.focus = "input"
-			return m.input.FocusIn()
-		}
+		return m.setFocus("input")
+	case PageOut:
+		return m.input.FocusOut()
 	}
 
 	return nil, nil
@@ -123,8 +157,15 @@ func (m *AddInvitePage) fetchInvites() error {
 }
 
 func (m *AddInvitePage) addInvite(username string) error {
+	username = strings.TrimSpace(username)
+	if username == "" {
+		return fmt.Errorf("enter a pico username")
+	}
 	db := m.shared.Dbpool
 	user, err := db.FindUserByName(username)
+	if errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("pico user not found")
+	}
 	if err != nil {
 		return err
 	}
@@ -147,10 +188,16 @@ func (m *AddInvitePage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	headerSurf, _ := header.Draw(ctx)
 	root.AddChild(0, ah, headerSurf)
 	ah += int(headerSurf.Size.Height) + 1
+	if ah >= int(h) {
+		return root, nil
+	}
 
-	inputSurf, _ := m.input.Draw(ctx)
+	inputSurf, _ := m.input.Draw(createDrawCtx(ctx, min(4, int(h)-ah)))
 	root.AddChild(0, ah, inputSurf)
-	ah += int(headerSurf.Size.Height) + 1
+	ah += int(inputSurf.Size.Height) + 1
+	if ah >= int(h) {
+		return root, nil
+	}
 
 	btnSurf, _ := m.btn.Draw(vxfw.DrawContext{
 		Characters: ctx.Characters,
@@ -158,6 +205,9 @@ func (m *AddInvitePage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	})
 	root.AddChild(0, ah, btnSurf)
 	ah += int(btnSurf.Size.Height) + 1
+	if ah >= int(h) {
+		return root, nil
+	}
 
 	if m.err != nil {
 		e := richtext.New([]vaxis.Segment{
@@ -171,7 +221,21 @@ func (m *AddInvitePage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 		ah += int(errSurf.Size.Height) + 1
 	}
 
-	listSurf, _ := m.list.Draw(createDrawCtx(ctx, int(ctx.Max.Height)-ah))
+	if ah >= int(h) {
+		return root, nil
+	}
+	count := text.New(fmt.Sprintf("%d invites sent", len(m.invites)))
+	countSurf, _ := count.Draw(createDrawCtx(ctx, 1))
+	root.AddChild(0, ah, countSurf)
+	ah += int(countSurf.Size.Height) + 1
+	if ah >= int(h) || w <= 2 {
+		return root, nil
+	}
+	listSurf, _ := m.list.Draw(createDrawCtx(ctx, int(h)-ah))
+	if len(m.invites) == 0 {
+		emptySurf, _ := text.New("No invites sent yet.").Draw(createDrawCtx(ctx, 1))
+		listSurf.AddChild(0, 0, emptySurf)
+	}
 	root.AddChild(0, ah, listSurf)
 
 	return root, nil

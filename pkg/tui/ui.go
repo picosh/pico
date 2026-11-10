@@ -21,6 +21,12 @@ const (
 	HOME        = "dash"
 )
 
+type Application interface {
+	PostEvent(vaxis.Event)
+	Suspend() error
+	Resume() error
+}
+
 type SharedModel struct {
 	Logger             *slog.Logger
 	Session            *pssh.SSHServerConnSession
@@ -32,7 +38,7 @@ type SharedModel struct {
 	PlusFeatureFlag    *db.FeatureFlag
 	BouncerFeatureFlag *db.FeatureFlag
 	Impersonator       string
-	App                *vxfw.App
+	App                Application
 }
 
 type Navigate struct{ To string }
@@ -84,6 +90,13 @@ type App struct {
 
 func (app *App) CaptureEvent(ev vaxis.Event) (vxfw.Command, error) {
 	switch msg := ev.(type) {
+	case SitesLoaded, SiteStatsLoaded, AccessLogsLoaded:
+		// Results can arrive before the focus path reflects navigation.
+		if page, ok := app.GetCurPage().(vxfw.EventHandler); ok {
+			cmd, err := page.HandleEvent(ev, vxfw.TargetPhase)
+			return vxfw.BatchCmd{cmd, vxfw.ConsumeEventCmd{}}, err
+		}
+		return vxfw.ConsumeEventCmd{}, nil
 	case vaxis.Key:
 		if msg.Matches('c', vaxis.ModCtrl) {
 			return vxfw.QuitCmd{}, nil

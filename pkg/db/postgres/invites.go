@@ -30,7 +30,8 @@ func (me *PsqlDB) FindInvitesByUser(userID string) ([]*db.Invite, error) {
 		app_users.name as to_user_name
 	FROM invites
 	LEFT JOIN app_users ON app_users.id = invites.to_user_id
-	WHERE from_user_id=$1`
+	WHERE from_user_id=$1
+	ORDER BY invites.created_at DESC, invites.id DESC`
 	err := me.Db.Select(&invites, query, userID)
 	if err != nil {
 		return nil, err
@@ -69,19 +70,36 @@ func (me *PsqlDB) InviteUser(fromUserID string, toUserID string) error {
 		return fmt.Errorf("must have valid pico+ membership or an active invite from someone")
 	}
 
-	_, err := me.Db.Exec(
-		`INSERT INTO invites (from_user_id, to_user_id) VALUES ($1, $2)`,
+	tx, err := me.Db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	result, err := tx.Exec(
+		`INSERT INTO invites (from_user_id, to_user_id) VALUES ($1, $2)
+		ON CONFLICT (to_user_id) DO NOTHING`,
 		fromUserID, toUserID,
 	)
 	if err != nil {
 		return err
 	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return fmt.Errorf("user has already been invited")
+	}
 
 	expiresAt := time.Now().Add(5 * 365 * 24 * time.Hour)
 	for _, name := range inviteFeatures {
-		if _, err := me.InsertFeature(toUserID, name, expiresAt); err != nil {
+		if _, err := tx.Exec(
+			`INSERT INTO feature_flags (user_id, name, expires_at) VALUES ($1, $2, $3)`,
+			toUserID, name, expiresAt,
+		); err != nil {
 			return err
 		}
 	}
-	return nil
+	return tx.Commit()
 }

@@ -19,9 +19,9 @@ type PubkeysPage struct {
 	shared *SharedModel
 	list   list.Dynamic
 
-	keys    []*db.PublicKey
-	err     error
-	confirm bool
+	keys          []*db.PublicKey
+	err           error
+	pendingDelete *db.PublicKey
 }
 
 func NewPubkeysPage(shrd *SharedModel) *PubkeysPage {
@@ -49,44 +49,49 @@ func (m *PubkeysPage) fetchKeys() error {
 
 	}
 	m.keys = keys
+	m.list.SetCursor(min(m.list.Cursor(), uint(max(0, len(keys)-1))))
 	return nil
 }
 
 func (m *PubkeysPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command, error) {
 	switch msg := ev.(type) {
 	case PageIn:
+		m.pendingDelete = nil
 		m.err = m.fetchKeys()
 		return vxfw.FocusWidgetCmd(&m.list), nil
+	case PageOut:
+		m.pendingDelete = nil
 	case vaxis.Key:
+		if msg.EventType == vaxis.EventRelease {
+			return nil, nil
+		}
 		if msg.Matches('c') {
 			m.shared.App.PostEvent(Navigate{To: "add-pubkey"})
 		}
 		if msg.Matches('x') {
+			m.pendingDelete = nil
 			if len(m.keys) < 2 {
 				m.err = fmt.Errorf("cannot delete last key")
-			} else {
-				m.confirm = true
+			} else if int(m.list.Cursor()) < len(m.keys) {
+				m.pendingDelete = m.keys[m.list.Cursor()]
 			}
 			return vxfw.RedrawCmd{}, nil
 		}
 		if msg.Matches('y') {
-			if m.confirm {
-				cursor := int(m.list.Cursor())
-				if cursor >= len(m.keys) {
-					return nil, nil
-				}
-				m.confirm = false
-				err := m.shared.Dbpool.RemoveKeys([]string{m.keys[m.list.Cursor()].ID})
+			if m.pendingDelete != nil {
+				id := m.pendingDelete.ID
+				m.pendingDelete = nil
+				err := m.shared.Dbpool.RemoveKeys([]string{id})
 				if err != nil {
 					m.err = err
-					return nil, nil
+					return vxfw.RedrawCmd{}, nil
 				}
 				m.err = m.fetchKeys()
 				return vxfw.RedrawCmd{}, nil
 			}
 		}
 		if msg.Matches('n') {
-			m.confirm = false
+			m.pendingDelete = nil
 			return vxfw.RedrawCmd{}, nil
 		}
 	}
@@ -154,9 +159,13 @@ func (m *PubkeysPage) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	root.AddChild(0, ah, listSurf)
 
 	segs := []vaxis.Segment{}
-	if m.confirm {
+	if m.pendingDelete != nil {
+		label := m.pendingDelete.ID
+		if key, _, _, _, err := ssh.ParseAuthorizedKey([]byte(m.pendingDelete.Key)); err == nil {
+			label = ssh.FingerprintSHA256(key)
+		}
 		segs = append(segs, vaxis.Segment{
-			Text:  "are you sure? y/n\n",
+			Text:  fmt.Sprintf("delete key %s? y/n\n", label),
 			Style: vaxis.Style{Foreground: red},
 		})
 	}
