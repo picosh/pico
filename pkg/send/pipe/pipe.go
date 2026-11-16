@@ -3,6 +3,8 @@ package pipe
 import (
 	"fmt"
 	"io/fs"
+	"path"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -36,10 +38,14 @@ func Middleware(writeHandler utils.CopyFromClientHandler, ext string) pssh.SSHSe
 			if name == "" {
 				name = fmt.Sprintf("%s%s", strconv.Itoa(int(postTime.UnixNano())), ext)
 			}
-			// add a `/` prefix mainly for pgs support
-			if !strings.HasPrefix(name, "/") {
-				name = "/" + name
+			// A ".." segment could only point outside the upload root.
+			if slices.Contains(strings.Split(name, "/"), "..") {
+				err := fmt.Errorf("invalid file name (%s), \"..\" is not allowed", name)
+				utils.ErrorHandler(session, err)
+				return err
 			}
+			// add a `/` prefix mainly for pgs support
+			name = path.Clean("/" + name)
 
 			result, err := writeHandler.Write(session, &utils.FileEntry{
 				Filepath: name,

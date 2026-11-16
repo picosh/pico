@@ -726,6 +726,10 @@ func TestFindPostWithSlug_Alias(t *testing.T) {
 	if found.Title != "Original" {
 		t.Errorf("expected title 'Original', got '%s'", found.Title)
 	}
+
+	if found, err := testDB.FindPostWithSlug("my-alias", user.ID, "pastes"); err == nil {
+		t.Errorf("alias resolved in another space: %s", found.ID)
+	}
 }
 
 // ============ Analytics Tests ============
@@ -1443,5 +1447,20 @@ func TestInviteUser_ExpiredInvite(t *testing.T) {
 
 	if err := testDB.InviteUser(expired.ID, to.ID); err == nil {
 		t.Fatal("expected error for user whose invite access expired")
+	}
+}
+
+func TestInsertPublicKey_RejectsCertificates(t *testing.T) {
+	cleanupTestData(t)
+	cert := "ssh-ed25519-cert-v01@openssh.com AAAAIHNzaC1lZDI1NTE5LWNlcnQtdjAxQG9wZW5zc2guY29t certowner"
+	if _, err := testDB.RegisterUser("certowner", cert, "comment", ""); !errors.Is(err, db.ErrPublicKeyIsCert) {
+		t.Fatalf("RegisterUser with a cert err = %v", err)
+	}
+	user, err := testDB.RegisterUser("keyowner", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI keyowner", "comment", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := testDB.InsertPublicKey(user.ID, cert, "cert"); !errors.Is(err, db.ErrPublicKeyIsCert) {
+		t.Fatalf("InsertPublicKey with a cert err = %v", err)
 	}
 }

@@ -88,7 +88,7 @@ func (h *UploadHandler) Write(s *pssh.SSHServerConnSession, entry *sendutils.Fil
 	}
 	logger := h.GetLogger(s).With("filename", filepath.Base(entry.Filepath))
 
-	post, err := postfs.PostFromEntry(entry, user, h.Cfg.Space)
+	post, err := postfs.PostFromEntry(entry, user, h.Cfg.Space, h.Cfg.MaxAssetSize)
 	if err != nil {
 		return "", err
 	}

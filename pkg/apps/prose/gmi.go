@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"html"
 	"io"
+	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -61,6 +63,15 @@ func parseGemText(text string) (*GemText, error) {
 	return gem, nil
 }
 
+var safeLinkSchemes = []string{"", "http", "https", "gemini", "gopher", "mailto"}
+
+// safeLinkURL reports whether a gemtext link can be an href, which keeps
+// schemes like javascript: out of the page.
+func safeLinkURL(raw string) bool {
+	u, err := url.Parse(raw)
+	return err == nil && slices.Contains(safeLinkSchemes, u.Scheme)
+}
+
 type HTMLWriter struct {
 	out  io.Writer
 	pre  bool
@@ -83,6 +94,10 @@ func (h *HTMLWriter) Handle(line Line) {
 		name := html.EscapeString(line.Name)
 		if name == "" {
 			name = url
+		}
+		if !safeLinkURL(line.URL) {
+			_, _ = fmt.Fprintf(h.out, "<p>%s</p>\n", name)
+			return
 		}
 		_, _ = fmt.Fprintf(h.out, "<p><a href='%s'>%s</a></p>\n", url, name)
 	case LinePreformattingToggle:

@@ -1,6 +1,7 @@
 package prose
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -40,5 +41,32 @@ func TestGemtextPublishDate(t *testing.T) {
 				t.Fatalf("publish date = %v, want %v", post.PublishAt, want)
 			}
 		})
+	}
+}
+
+func TestGemtextLinkSchemes(t *testing.T) {
+	text := strings.Join([]string{
+		"=> https://pico.sh pico",
+		"=> gemini://example.test/ capsule",
+		"=> /posts/other relative",
+		"=> javascript:alert(1) click",
+		"=> JaVaScRiPt:alert(1) mixed",
+		"=> data:text/html,<script>x</script> data",
+	}, "\n")
+	gem, err := parseGemText(text)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, href := range []string{"href='https://pico.sh'", "href='gemini://example.test/'", "href='/posts/other'"} {
+		if !strings.Contains(gem.Html, href) {
+			t.Errorf("missing %s in %s", href, gem.Html)
+		}
+	}
+	lower := strings.ToLower(gem.Html)
+	if strings.Contains(lower, "href='javascript") || strings.Contains(lower, "href='data:") {
+		t.Errorf("unsafe link rendered: %s", gem.Html)
+	}
+	if !strings.Contains(gem.Html, "<p>click</p>") {
+		t.Errorf("unsafe link text missing: %s", gem.Html)
 	}
 }

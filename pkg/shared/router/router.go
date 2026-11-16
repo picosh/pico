@@ -44,7 +44,7 @@ func GetSubdomainFromRequest(r *http.Request, domain, space string) string {
 	appDomain := strings.ToLower(strings.Split(domain, ":")[0])
 
 	if hostDomain != appDomain && strings.Contains(hostDomain, ".") {
-		if strings.Contains(hostDomain, appDomain) {
+		if IsAppSubdomain(hostDomain, appDomain) {
 			subdomain := strings.TrimSuffix(hostDomain, fmt.Sprintf(".%s", appDomain))
 			return subdomain
 		} else {
@@ -54,6 +54,12 @@ func GetSubdomainFromRequest(r *http.Request, domain, space string) string {
 	}
 
 	return ""
+}
+
+// IsAppSubdomain reports whether host is a subdomain of appDomain. Any other
+// host is a custom domain, even one with appDomain in its name.
+func IsAppSubdomain(host, appDomain string) bool {
+	return strings.HasSuffix(strings.ToLower(host), "."+strings.ToLower(appDomain))
 }
 
 // NewHostRouter serves requests for users' sites with sites, and the rest

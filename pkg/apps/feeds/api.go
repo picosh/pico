@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/db/postgres"
 	"github.com/picosh/pico/pkg/metrics"
 	"github.com/picosh/pico/pkg/shared"
@@ -14,12 +15,25 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+// findFeedPost finds a feeds post. Every space shares the posts table, and
+// these links act on a post with no login, so other spaces are off limits.
+func findFeedPost(dbpool DB, postID string) (*db.Post, error) {
+	post, err := dbpool.FindPost(postID)
+	if err != nil {
+		return nil, err
+	}
+	if post.Space != "feeds" {
+		return nil, fmt.Errorf("post %s is not a feeds post", postID)
+	}
+	return post, nil
+}
+
 func (web *webRouter) keepAliveHandler(w http.ResponseWriter, r *http.Request) {
 	dbpool := web.db
 	logger := web.cfg.Logger
 	postID, _ := url.PathUnescape(r.PathValue("id"))
 
-	post, err := dbpool.FindPost(postID)
+	post, err := findFeedPost(dbpool, postID)
 	if err != nil {
 		logger.Error("post not found", "err", err)
 		http.Error(w, "post not found", http.StatusNotFound)
@@ -67,7 +81,7 @@ func (web *webRouter) unsubHandler(w http.ResponseWriter, r *http.Request) {
 	logger := web.cfg.Logger
 	postID, _ := url.PathUnescape(r.PathValue("id"))
 
-	post, err := dbpool.FindPost(postID)
+	post, err := findFeedPost(dbpool, postID)
 	if err != nil {
 		logger.Error("post not found", "err", err)
 		http.Error(w, "post not found", http.StatusNotFound)

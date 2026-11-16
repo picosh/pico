@@ -126,7 +126,7 @@ func (f *handler) Filecmd(r *sftp.Request) error {
 			f.mu.Lock()
 			p.dirty = true
 			f.mu.Unlock()
-			p.buf.truncate(int64(r.Attributes().Size))
+			return p.buf.truncate(int64(r.Attributes().Size))
 		}
 		return nil
 	}
@@ -529,7 +529,7 @@ func (f *handler) Filewrite(r *sftp.Request) (io.WriterAt, error) {
 	if p, ok := f.pending[r.Filepath]; ok {
 		p.handles++
 		if trunc {
-			p.buf.truncate(0)
+			_ = p.buf.truncate(0)
 			p.dirty = true
 		}
 		return &pendingWriter{handler: f, file: p}, nil
@@ -547,6 +547,10 @@ func (f *handler) Filewrite(r *sftp.Request) (io.WriterAt, error) {
 		if stored, data, err = f.stored(entry, !trunc); err != nil {
 			return nil, err
 		}
+	}
+	// Open files are held in memory, so a session can only have a few.
+	if len(f.pending) >= maxPendingFiles {
+		return nil, fmt.Errorf("too many files open at once, the limit is %d", maxPendingFiles)
 	}
 	p := &pendingFile{path: r.Filepath, entry: entry, buf: &buffer{}, modTime: time.Now(), handles: 1, stored: stored, dirty: trunc}
 	if _, err := p.buf.WriteAt(data, 0); err != nil {

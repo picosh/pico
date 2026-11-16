@@ -300,6 +300,31 @@ func TestCheckout(t *testing.T) {
 	}
 }
 
+func TestRedirect(t *testing.T) {
+	apiConfig := setupTest()
+	mux := authMux(apiConfig)
+
+	for redirectURI, want := range map[string]int{
+		"https://chat.pico.test/callback":  http.StatusFound,
+		"https://evil.test/callback":       http.StatusBadRequest,
+		"http://chat.pico.test/callback":   http.StatusBadRequest,
+		"https://chat.pico.test.evil.test": http.StatusBadRequest,
+	} {
+		form := fmt.Sprintf("token=123&response_type=code&redirect_uri=%s", redirectURI)
+		request := httptest.NewRequest("POST", mkpath("/redirect"), strings.NewReader(form))
+		request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		responseRecorder := httptest.NewRecorder()
+		mux.ServeHTTP(responseRecorder, request)
+
+		if responseRecorder.Code != want {
+			t.Errorf("redirect_uri %s: status %d, want %d", redirectURI, responseRecorder.Code, want)
+		}
+		if want == http.StatusFound && responseRecorder.Header().Get("Location") != "https://chat.pico.test/callback?code=123" {
+			t.Errorf("Location = %s", responseRecorder.Header().Get("Location"))
+		}
+	}
+}
+
 func TestIntrospect(t *testing.T) {
 	apiConfig := setupTest()
 
@@ -454,6 +479,7 @@ func setupTest() *ApiConfig {
 		Port:          "3000",
 		Secret:        "",
 		SecretWebhook: "my-secret",
+		RedirectHosts: []string{"chat.pico.test"},
 	}
 	cfg.Logger = logger
 	db := NewAuthDb(cfg.Logger)

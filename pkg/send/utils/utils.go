@@ -84,6 +84,12 @@ type FileRenamer interface {
 	Rename(s *pssh.SSHServerConnSession, from, to *FileEntry) error
 }
 
+// RootProtector is implemented by handlers whose root holds separate
+// projects, so a sync with --delete must name one of them.
+type RootProtector interface {
+	ProtectRoot() bool
+}
+
 // ImplicitDirs is implemented by handlers with directories that exist
 // before anything is stored in them. A stat of one reports a directory, so
 // a client copying a single file there puts the file inside it.

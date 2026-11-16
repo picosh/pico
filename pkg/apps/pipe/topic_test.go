@@ -292,6 +292,22 @@ func TestResolveTopic(t *testing.T) {
 				WithoutUser: "restricted",
 			},
 		},
+		{
+			name: "admin bypasses access control on public topics",
+			input: TopicResolveInput{
+				UserName:           "root",
+				Topic:              "restricted",
+				IsAdmin:            true,
+				IsPublic:           true,
+				ExistingAccessList: []string{"bob"},
+				HasExistingAccess:  true,
+				HasUserAccess:      false,
+			},
+			expect: TopicResolveOutput{
+				Name:        "public/restricted",
+				WithoutUser: "public/restricted",
+			},
+		},
 	}
 
 	for _, tt := range tests {

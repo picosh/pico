@@ -202,3 +202,60 @@ func TestWildcardSubLiteralCharsWithoutStar(t *testing.T) {
 		t.Errorf("literal subscriber should not have matched topicXone, got: %q", subBuf.String())
 	}
 }
+
+// TestWildcardFilterSkipsProtectedTopics verifies that a wildcard subscriber
+// isn't attached to a topic the broker's filter refuses, whether that topic
+// existed before the subscription or was made after it.
+func TestWildcardFilterSkipsProtectedTopics(t *testing.T) {
+	cast := NewMulticast(slog.Default())
+	cast.Broker.(*BaseBroker).WildcardFilter = func(_, topic string) bool {
+		return topic != "public/old-secret" && topic != "public/new-secret"
+	}
+
+	// A listed reader keeps the older protected topic alive.
+	readerCtx, cancelReader := context.WithCancel(context.Background())
+	defer cancelReader()
+	readerBuf := new(Buffer)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		_ = cast.Sub(readerCtx, "reader", readerBuf, []*Channel{NewChannel("public/old-secret")}, false)
+	}()
+	time.Sleep(50 * time.Millisecond)
+
+	subBuf := new(Buffer)
+	subCtx, cancelSub := context.WithCancel(context.Background())
+	defer cancelSub()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		_ = cast.Sub(subCtx, "sub-wildcard", subBuf, []*Channel{NewChannel("public/*")}, false)
+	}()
+	time.Sleep(50 * time.Millisecond)
+
+	for topic, msg := range map[string]string{
+		"public/old-secret": "old-secret-data\n",
+		"public/new-secret": "new-secret-data\n",
+		"public/open":       "open-data\n",
+	} {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		_ = cast.Pub(ctx, "pub-"+topic, &Buffer{b: *bytes.NewBufferString(msg)}, []*Channel{NewChannel(topic)}, false)
+		cancel()
+	}
+	time.Sleep(100 * time.Millisecond)
+
+	cancelSub()
+	cancelReader()
+	wg.Wait()
+
+	got := subBuf.String()
+	if !bytes.Contains([]byte(got), []byte("open-data\n")) {
+		t.Errorf("wildcard subscriber should receive open-data, got: %q", got)
+	}
+	for _, secret := range []string{"old-secret-data\n", "new-secret-data\n"} {
+		if bytes.Contains([]byte(got), []byte(secret)) {
+			t.Errorf("wildcard subscriber received %q from a protected topic: %q", secret, got)
+		}
+	}
+}

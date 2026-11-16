@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+
+	"github.com/picosh/pico/pkg/apps/pgs"
 )
 
 type roundTripFunc func(*http.Request) (*http.Response, error)
@@ -97,5 +99,50 @@ func TestOriginProxyPinsTargetAndPreservesPath(t *testing.T) {
 	proxy.ServeHTTP(res, req)
 	if res.Code != http.StatusOK || res.Body.String() != "asset" {
 		t.Fatalf("status %d: %s", res.Code, res.Body)
+	}
+}
+
+// An http-basic site's credentials reach origin through the CDN, and the CDN
+// cache doesn't hand an authenticated page to the next visitor.
+func TestCdnPassesBasicAuthAndSkipsCache(t *testing.T) {
+	logger := slog.New(slog.DiscardHandler)
+	cfg := pgs.NewConfig(logger, nil, nil, nil)
+	cfg.Domain = "pgs.test"
+	var hits atomic.Int32
+	proxy := newProxyServe(logger)
+	proxy.transport = roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		hits.Add(1)
+		header := http.Header{"Cache-Control": {"private, no-store"}}
+		if user, pass, ok := req.BasicAuth(); !ok || user != "alice" || pass != "pw" {
+			header.Set("WWW-Authenticate", `Basic realm="site"`)
+			return &http.Response{StatusCode: http.StatusUnauthorized, Header: header, Body: io.NopCloser(strings.NewReader("Unauthorized"))}, nil
+		}
+		header.Set("Set-Cookie", "pgs_session_site=token; HttpOnly")
+		return &http.Response{StatusCode: http.StatusOK, Header: header, Body: io.NopCloser(strings.NewReader("secret"))}, nil
+	})
+	httpCache, _ := pgs.NewPgsHttpCache(cfg, proxy)
+
+	get := func(auth bool) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodGet, "https://u-site.pgs.test/", nil)
+		if auth {
+			req.SetBasicAuth("alice", "pw")
+		}
+		res := httptest.NewRecorder()
+		httpCache.ServeHTTP(res, req)
+		return res
+	}
+
+	if res := get(true); res.Code != http.StatusOK || res.Body.String() != "secret" {
+		t.Fatalf("with credentials: %d %q", res.Code, res.Body.String())
+	}
+	res := get(false)
+	if res.Code != http.StatusUnauthorized || strings.Contains(res.Body.String(), "secret") {
+		t.Fatalf("without credentials: %d %q", res.Code, res.Body.String())
+	}
+	if res.Header().Get("WWW-Authenticate") == "" {
+		t.Error("challenge header dropped")
+	}
+	if hits.Load() != 2 {
+		t.Errorf("origin hit %d times, want 2", hits.Load())
 	}
 }

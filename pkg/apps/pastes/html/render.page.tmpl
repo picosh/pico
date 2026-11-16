@@ -1,0 +1,17 @@
+{{template "base" .}}
+
+{{define "title"}}{{.Title}}{{end}}
+
+{{define "meta"}}
+<meta name="robots" content="noindex" />
+{{end}}
+
+{{define "attrs"}}class="container"{{end}}
+
+{{define "body"}}
+<main>
+    <article class="md">
+        {{.Contents}}
+    </article>
+</main>
+{{end}}

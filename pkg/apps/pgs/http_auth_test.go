@@ -58,7 +58,11 @@ func TestLoginPreservesRequestURL(t *testing.T) {
 		t.Fatal(err)
 	}
 	project.Acl.Type = "http-pass"
-	project.Acl.Data = []string{"test-password"}
+	hash, err := hashPassword("test-password")
+	if err != nil {
+		t.Fatal(err)
+	}
+	project.Acl.Data = []string{hash}
 	st, err := storage.NewStorageMemory(map[string]map[string]string{
 		shared.GetAssetBucketName(dbpool.Users[0].ID): {},
 	})
@@ -113,7 +117,7 @@ func TestLoginPreservesRequestURL(t *testing.T) {
 					t.Errorf("redirect = %q, want %q", got, path)
 				}
 				cookies := response.Result().Cookies()
-				if len(cookies) != 1 || cookies[0].Name != getCookieName(project.Name) || cookies[0].Value != project.ID {
+				if len(cookies) != 1 || cookies[0].Name != getCookieName(project.Name) || !validSession(project, cookies[0].Value) {
 					t.Errorf("login did not set the project session cookie")
 				}
 			}

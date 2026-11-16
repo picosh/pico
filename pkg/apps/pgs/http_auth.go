@@ -1,18 +1,141 @@
 package pgs
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/shared/router"
+	"golang.org/x/crypto/bcrypt"
 )
 
-func validatePassword(expectedPass, actualPass string) bool {
-	return expectedPass == actualPass
+const sessionTTL = 24 * time.Hour
+
+const maxLoginFormSize = 16 * 1024
+
+func hashPassword(password string) (string, error) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return string(hash), nil
+}
+
+func validatePassword(stored, actual string) bool {
+	return bcrypt.CompareHashAndPassword([]byte(stored), []byte(actual)) == nil
+}
+
+// hashBasicCredentials turns http-basic entries of "user:password" into
+// "user:hash".
+func hashBasicCredentials(entries []string) ([]string, error) {
+	if len(entries) == 0 {
+		return nil, fmt.Errorf("http-basic needs at least one user: --acl <user>:<password>")
+	}
+	seen := map[string]bool{}
+	hashed := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		user, password, ok := strings.Cut(entry, ":")
+		if !ok || user == "" || password == "" {
+			return nil, fmt.Errorf("http-basic entries look like <user>:<password>")
+		}
+		if seen[user] {
+			return nil, fmt.Errorf("http-basic user %s is listed twice", user)
+		}
+		seen[user] = true
+		hash, err := hashPassword(password)
+		if err != nil {
+			return nil, fmt.Errorf("http-basic user %s: %w", user, err)
+		}
+		hashed = append(hashed, user+":"+hash)
+	}
+	return hashed, nil
+}
+
+// dummyHash is checked for an unknown basic auth user, so the time taken
+// doesn't reveal which users exist.
+var dummyHash, _ = bcrypt.GenerateFromPassword([]byte("pgs"), bcrypt.DefaultCost)
+
+// validBasicAuth checks a request's basic auth credentials against an
+// http-basic project.
+func validBasicAuth(r *http.Request, project *db.Project) bool {
+	user, password, ok := r.BasicAuth()
+	if !ok || user == "" {
+		return false
+	}
+	hash, found := string(dummyHash), false
+	for _, entry := range project.Acl.Data {
+		if u, h, ok := strings.Cut(entry, ":"); ok && u == user {
+			hash, found = h, true
+			break
+		}
+	}
+	match := validatePassword(hash, password)
+	return found && match
+}
+
+// basicAuthChallenge asks the browser for http-basic credentials.
+func basicAuthChallenge(w http.ResponseWriter, project *db.Project) {
+	w.Header().Set("WWW-Authenticate", fmt.Sprintf(`Basic realm="%s", charset="UTF-8"`, project.Name))
+	http.Error(w, "Unauthorized", http.StatusUnauthorized)
+}
+
+// setSessionCookie logs the visitor in to project for sessionTTL.
+func setSessionCookie(w http.ResponseWriter, project *db.Project, secure bool) {
+	expires := time.Now().Add(sessionTTL)
+	http.SetCookie(w, &http.Cookie{
+		Name:     getCookieName(project.Name),
+		Value:    sessionToken(project, expires),
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   secure,
+		SameSite: http.SameSiteStrictMode,
+		Expires:  expires,
+		MaxAge:   int(sessionTTL.Seconds()),
+	})
+}
+
+// sessionToken signs a session for a project until expires. The stored
+// credentials are the key, so changing any of them ends every session.
+func sessionToken(project *db.Project, expires time.Time) string {
+	exp := strconv.FormatInt(expires.Unix(), 10)
+	mac := hmac.New(sha256.New, []byte(strings.Join(project.Acl.Data, "\n")))
+	mac.Write([]byte(project.ID + "|" + exp))
+	return exp + "." + hex.EncodeToString(mac.Sum(nil))
+}
+
+// hasValidSession checks every session cookie for the project, since another
+// site under the same domain can set one with the same name.
+func hasValidSession(r *http.Request, project *db.Project) bool {
+	name := getCookieName(project.Name)
+	for _, cookie := range r.Cookies() {
+		if cookie.Name == name && validSession(project, cookie.Value) {
+			return true
+		}
+	}
+	return false
+}
+
+func validSession(project *db.Project, token string) bool {
+	if len(project.Acl.Data) == 0 {
+		return false
+	}
+	exp, _, ok := strings.Cut(token, ".")
+	if !ok {
+		return false
+	}
+	unix, err := strconv.ParseInt(exp, 10, 64)
+	if err != nil || time.Now().Unix() >= unix {
+		return false
+	}
+	return hmac.Equal([]byte(token), []byte(sessionToken(project, time.Unix(unix, 0))))
 }
 
 func getCookieName(projectName string) string {
@@ -68,6 +191,7 @@ func handleLogin(w http.ResponseWriter, r *http.Request, cfg *Config) {
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, maxLoginFormSize)
 	err := r.ParseForm()
 	if err != nil {
 		cfg.Logger.Error("failed to parse login form", "err", err.Error())
@@ -146,19 +270,7 @@ func handleLogin(w http.ResponseWriter, r *http.Request, cfg *Config) {
 		return
 	}
 
-	expiresAt := time.Hour * 24
-	cookieName := getCookieName(projectName)
-	cookie := &http.Cookie{
-		Name:     cookieName,
-		Value:    project.ID,
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   cfg.WebProtocol == "https",
-		SameSite: http.SameSiteStrictMode,
-		Expires:  time.Now().Add(expiresAt),
-		MaxAge:   int(expiresAt.Seconds()),
-	}
-	http.SetCookie(w, cookie)
+	setSessionCookie(w, project, cfg.WebProtocol == "https")
 
 	cfg.Logger.Info("successful login", "projectName", projectName, "username", props.Username)
 	http.Redirect(w, r, redirectPath, http.StatusSeeOther)

@@ -51,7 +51,7 @@ func CheckHandler(domain, txtPrefix string, users interface {
 		hostDomain := r.URL.Query().Get("domain")
 		appDomain := strings.Split(domain, ":")[0]
 
-		if !strings.Contains(hostDomain, appDomain) {
+		if !strings.EqualFold(hostDomain, appDomain) && !IsAppSubdomain(hostDomain, appDomain) {
 			subdomain := GetCustomDomain(hostDomain, txtPrefix)
 			if subdomain != "" {
 				u, err := users.FindUserByName(subdomain)

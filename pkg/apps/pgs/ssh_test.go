@@ -1,6 +1,7 @@
 package pgs
 
 import (
+	"bytes"
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
@@ -395,6 +396,16 @@ func TestSshServerRsync(t *testing.T) {
 		return
 	}
 
+	// --delete at the root would remove every project not in the upload.
+	emptyDir := t.TempDir()
+	rootDelCmd := exec.Command("rsync", "-rv", "--delete", "-e", eCmd, emptyDir+"/", host+":/")
+	if result, err := rootDelCmd.CombinedOutput(); err == nil {
+		t.Errorf("rsync --delete to the root succeeded: %s", result)
+	}
+	if _, err := client.Lstat("/test/index.html"); err != nil {
+		t.Errorf("rsync --delete to the root removed a project's files: %v", err)
+	}
+
 	close(done)
 	time.Sleep(100 * time.Millisecond)
 }
@@ -515,4 +526,62 @@ func WriteFilesMultProjectsWithSftp(cfg *Config, conn *ssh.Client) (*os.FileInfo
 	}
 
 	return &fi, nil
+}
+
+func TestSshServerPipeStaysInBucket(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
+	dbpool := pgsdb.NewDBMemory(logger)
+	dbpool.SetupTestData()
+	base := t.TempDir()
+	storeDir := filepath.Join(base, "store")
+	st, err := storage.NewStorageFS(logger, storeDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pubsub := NewPubsubChan()
+	defer func() { _ = pubsub.Close() }()
+	_ = os.Setenv("PGS_SSH_PORT", "0")
+	cfg := NewConfig(logger, dbpool, st, pubsub)
+	done := make(chan error)
+	readyCh := make(chan *pssh.SSHServer)
+	go StartSshServerForTesting(cfg, done, readyCh)
+	server := <-readyCh
+	var addr string
+	for i := 0; i < 100 && addr == ""; i++ {
+		server.Mu.Lock()
+		if server.Listener != nil {
+			addr = server.Listener.Addr().String()
+		}
+		server.Mu.Unlock()
+		time.Sleep(10 * time.Millisecond)
+	}
+	user := GenerateUser()
+	dbpool.Pubkeys = append(dbpool.Pubkeys, &db.PublicKey{ID: "k", UserID: dbpool.Users[0].ID, Key: shared.KeyForKeyText(user.signer.PublicKey())})
+	client, err := user.NewClientAddr(addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = client.Close() }()
+	run := func(cmd, stdin string) (string, error) {
+		s, err := client.NewSession()
+		if err != nil {
+			t.Fatal(err)
+		}
+		s.Stdin = bytes.NewBufferString(stdin)
+		o, err := s.CombinedOutput(cmd)
+		return string(o), err
+	}
+	o, err := run("/escaped/_pgs_ignore", "\n")
+	if err != nil {
+		t.Fatalf("ignore upload: %q %v", o, err)
+	}
+	if o, err := run("/../../escaped/pwned.txt", "pwned\n"); err == nil {
+		t.Errorf("pipe upload with .. succeeded: %q", o)
+	}
+	escaped := filepath.Join(base, "escaped", "pwned.txt")
+	if _, err := os.Stat(escaped); err == nil {
+		t.Errorf("pipe upload wrote outside the storage dir: %s", escaped)
+	}
+
+	close(done)
 }

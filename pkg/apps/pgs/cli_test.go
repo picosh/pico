@@ -100,3 +100,34 @@ func TestRmProjectAssetsRemovesDirs(t *testing.T) {
 		t.Fatalf("another project was touched: %v", err)
 	}
 }
+
+// An http-pass password is stored as a hash and never printed.
+func TestCliAclHttpPass(t *testing.T) {
+	logger := slog.New(slog.DiscardHandler)
+	dbpool := NewPgsDb(logger)
+	user := dbpool.Users[0]
+	st, err := storage.NewStorageMemory(map[string]map[string]string{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := NewConfig(logger, dbpool, st, discardPubsub{})
+	sesh := &fakeCmdSession{}
+	cmd := &Cmd{User: user, Session: sesh, Log: logger, Store: st, Dbpool: dbpool, Write: true, Cfg: cfg}
+
+	if err := cmd.acl("test", "http-pass", nil); err == nil {
+		t.Fatal("http-pass without a password was accepted")
+	}
+	if err := cmd.acl("test", "http-pass", []string{"hunter2"}); err != nil {
+		t.Fatal(err)
+	}
+	project, err := dbpool.FindProjectByName(user.ID, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stored := project.Acl.Data[0]; stored == "hunter2" || !validatePassword(stored, "hunter2") {
+		t.Fatalf("stored password = %q, want a hash of it", stored)
+	}
+	if strings.Contains(sesh.String(), "hunter2") {
+		t.Fatalf("password printed: %s", sesh.String())
+	}
+}

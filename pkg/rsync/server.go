@@ -20,6 +20,9 @@ type Config struct {
 	Logger *slog.Logger
 	// Stderr receives errors raised before the protocol is running.
 	Stderr io.Writer
+	// ProtectRoot refuses --delete when the destination is the root, where
+	// it would delete everything not in the upload.
+	ProtectRoot bool
 }
 
 // ExitError carries the exit code the client should see. Its message has
@@ -87,10 +90,11 @@ type stats struct {
 
 // session is one rsync server run.
 type session struct {
-	fs     FS
-	logger *slog.Logger
-	c      *conn
-	opts   options
+	fs          FS
+	logger      *slog.Logger
+	protectRoot bool
+	c           *conn
+	opts        options
 
 	cs             checksums
 	compression    compression
@@ -148,10 +152,11 @@ func Serve(cfg Config, rw io.ReadWriter, args []string) error {
 	}
 
 	s := &session{
-		fs:      cfg.FS,
-		logger:  logger,
-		c:       c,
-		filters: &filterList{},
+		fs:          cfg.FS,
+		logger:      logger,
+		protectRoot: cfg.ProtectRoot,
+		c:           c,
+		filters:     &filterList{},
 	}
 	s.opts = options{
 		sender:         o.Sender(),
@@ -273,13 +278,21 @@ func checkSupported(o *rsyncopts.Options) error {
 
 // readProtectedArgs reads the arguments a --secluded-args client sends
 // before the protocol starts. The first one is the program name.
+// maxProtectedArgsLen bounds the arguments a client sends on stdin, which
+// are read before anything else limits the session.
+const maxProtectedArgsLen = 1 << 20
+
 func readProtectedArgs(c *conn) ([]string, error) {
 	var args []string
 	var cur []byte
+	total := 0
 	for {
 		b, err := c.readByte()
 		if err != nil {
 			return nil, err
+		}
+		if total++; total > maxProtectedArgsLen {
+			return nil, fmt.Errorf("protected arguments are longer than %d bytes", maxProtectedArgsLen)
 		}
 		if b != 0 {
 			cur = append(cur, b)
@@ -669,6 +682,9 @@ func (s *session) recvFilterList() error {
 			}
 			if err := s.filters.parse(string(line), s.c.protocol < 29); err != nil {
 				return s.fatal(exitSyntax, err)
+			}
+			if len(s.filters.rules) > maxFilterRules {
+				return s.fatal(exitProtocol, fmt.Errorf("more than %d filter rules", maxFilterRules))
 			}
 		}
 	}

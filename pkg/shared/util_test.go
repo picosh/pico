@@ -18,3 +18,17 @@ func TestStorageUsage(t *testing.T) {
 		}
 	}
 }
+
+// Frontmatter lists of the wrong type are an error for the author.
+func TestParseTextRejectsNonStringFrontmatter(t *testing.T) {
+	for _, fm := range []string{
+		"tags: [123]",
+		"aliases: [[a]]",
+		"nav:\n  - {1: 2}",
+		"nav: {home: [x]}",
+	} {
+		if _, err := ParseText("---\n" + fm + "\n---\nhi\n"); err == nil {
+			t.Errorf("%q: want an error", fm)
+		}
+	}
+}

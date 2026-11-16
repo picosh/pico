@@ -46,7 +46,9 @@ func (c *conn) readSumHead(xferLen int) (sumHead, error) {
 	if h.count, err = c.readInt32(); err != nil {
 		return h, err
 	}
-	if h.count < 0 {
+	// The count sizes allocations before any checksum arrives, so a peer
+	// can't claim more blocks than a sane basis file has.
+	if h.count < 0 || h.count > maxSumCount {
 		return h, fmt.Errorf("invalid checksum count %d", h.count)
 	}
 	if h.blength, err = c.readInt32(); err != nil {

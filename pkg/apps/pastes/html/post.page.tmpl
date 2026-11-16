@@ -33,6 +33,8 @@
       <a href="{{.BlogURL}}">{{.BlogName}}</a>
       <span> &middot; <span>
       <a href="{{.RawURL}}">raw</a>
+      {{if .RenderURL}}<span> &middot; <span>
+      <a href="{{.RenderURL}}">rendered</a>{{end}}
     </p>
     <p class="font-bold m-0">expires: {{.ExpiresAt}}</p>
     <script>

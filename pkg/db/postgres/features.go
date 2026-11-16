@@ -2,7 +2,8 @@ package postgres
 
 import (
 	"database/sql"
-	"fmt"
+	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/picosh/pico/pkg/db"
@@ -58,11 +59,15 @@ func (me *PsqlDB) RemoveFeature(userID string, name string) error {
 
 func (me *PsqlDB) createFeatureExpiresAt(userID, name string) time.Time {
 	ff, _ := me.FindFeature(userID, name)
-	// if the feature flag has already expired we don't want to add a year to it since that will
-	// not grant the user a full year
+	return featureExpiresAt(ff)
+}
+
+// featureExpiresAt is a year past a valid flag's expiry, or a year from now.
+// An expired flag doesn't count, since adding to it wouldn't grant a full
+// year.
+func featureExpiresAt(ff *db.FeatureFlag) time.Time {
 	if ff == nil || !ff.IsValid() {
-		t := time.Now()
-		return t.AddDate(1, 0, 0)
+		return time.Now().AddDate(1, 0, 0)
 	}
 	return ff.ExpiresAt.AddDate(1, 0, 0)
 }
@@ -80,6 +85,26 @@ func (me *PsqlDB) AddPicoPlusUser(username, email, paymentType, txId string) err
 	defer func() {
 		_ = tx.Rollback()
 	}()
+
+	// Serializes upgrades for a user, so a redelivered webhook sees the
+	// payment the first delivery recorded.
+	if _, err := tx.Exec(`SELECT id FROM app_users WHERE id = $1 FOR UPDATE`, user.ID); err != nil {
+		return err
+	}
+
+	if paymentType != "" && txId != "" {
+		var recorded bool
+		err := tx.QueryRow(
+			`SELECT EXISTS(SELECT 1 FROM payment_history WHERE user_id = $1 AND payment_type = $2 AND data->>'tx_id' = $3)`,
+			user.ID, paymentType, txId,
+		).Scan(&recorded)
+		if err != nil {
+			return err
+		}
+		if recorded {
+			return db.ErrPaymentRecorded
+		}
+	}
 
 	var paymentHistoryId sql.NullString
 	if paymentType != "" {
@@ -99,10 +124,28 @@ func (me *PsqlDB) AddPicoPlusUser(username, email, paymentType, txId string) err
 		}
 	}
 
-	plus := me.createFeatureExpiresAt(user.ID, "plus")
-	plusQuery := fmt.Sprintf(`INSERT INTO feature_flags (user_id, name, data, expires_at, payment_history_id)
-	VALUES ($1, 'plus', '{"storage_max":5000000000, "file_max":100000000, "email": "%s"}'::jsonb, $2, $3);`, email)
-	_, err = tx.Exec(plusQuery, user.ID, plus, paymentHistoryId)
+	// Read in the transaction, which holds the user's lock.
+	current := &db.FeatureFlag{}
+	if err := tx.Get(current, `SELECT * FROM feature_flags WHERE user_id = $1 AND name = 'plus' ORDER BY expires_at DESC LIMIT 1`, user.ID); err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+		current = nil
+	}
+	plus := featureExpiresAt(current)
+	data, err := json.Marshal(map[string]any{
+		"storage_max": 5000000000,
+		"file_max":    100000000,
+		"email":       email,
+	})
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(
+		`INSERT INTO feature_flags (user_id, name, data, expires_at, payment_history_id)
+		VALUES ($1, 'plus', $2::jsonb, $3, $4);`,
+		user.ID, string(data), plus, paymentHistoryId,
+	)
 	if err != nil {
 		return err
 	}

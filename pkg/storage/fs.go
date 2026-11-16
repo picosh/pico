@@ -51,6 +51,12 @@ func NewStorageFS(logger *slog.Logger, dir string) (*StorageFS, error) {
 	return &StorageFS{Logger: logger, Dir: dir}, nil
 }
 
+// objectPath is where fpath lives in bucket. fpath is rooted before it is
+// cleaned, so ".." can't climb out of the bucket.
+func objectPath(bucket Bucket, fpath string) string {
+	return filepath.Join(bucket.Path, filepath.FromSlash(path.Clean("/"+fpath)))
+}
+
 func (s *StorageFS) GetBucket(name string) (Bucket, error) {
 	dirPath := filepath.Join(s.Dir, name)
 	bucket := Bucket{
@@ -112,7 +118,7 @@ func (s *StorageFS) GetObject(bucket Bucket, fpath string) (utils.ReadAndReaderA
 		ContentType:  contentType,
 	}
 
-	dat, err := os.Open(filepath.Join(bucket.Path, fpath))
+	dat, err := os.Open(objectPath(bucket, fpath))
 	if err != nil {
 		return nil, objInfo, err
 	}
@@ -140,7 +146,7 @@ func fillObjectInfo(objInfo *ObjectInfo, info os.FileInfo) {
 }
 
 func (s *StorageFS) StatObject(bucket Bucket, fpath string) (*ObjectInfo, error) {
-	info, err := os.Stat(filepath.Join(bucket.Path, fpath))
+	info, err := os.Stat(objectPath(bucket, fpath))
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +159,7 @@ func (s *StorageFS) StatObject(bucket Bucket, fpath string) (*ObjectInfo, error)
 }
 
 func (s *StorageFS) PutObject(bucket Bucket, fpath string, contents io.Reader, info *ObjectInfo) (string, int64, error) {
-	loc := filepath.Join(bucket.Path, fpath)
+	loc := objectPath(bucket, fpath)
 	err := os.MkdirAll(filepath.Dir(loc), os.ModePerm)
 	if err != nil {
 		return "", 0, err
@@ -181,11 +187,14 @@ func (s *StorageFS) PutObject(bucket Bucket, fpath string, contents io.Reader, i
 }
 
 func (s *StorageFS) PutDir(bucket Bucket, dir string) error {
-	return os.MkdirAll(filepath.Join(bucket.Path, dir), os.ModePerm)
+	return os.MkdirAll(objectPath(bucket, dir), os.ModePerm)
 }
 
 func (s *StorageFS) DeleteObject(bucket Bucket, fpath string) error {
-	loc := filepath.Join(bucket.Path, fpath)
+	loc := objectPath(bucket, fpath)
+	if loc == filepath.Clean(bucket.Path) {
+		return nil
+	}
 	// A leftover marker would keep an otherwise empty directory in place.
 	_ = os.Remove(filepath.Join(loc, legacyKeepDir))
 	err := os.Remove(loc)
@@ -214,7 +223,7 @@ func (s *StorageFS) ListBuckets() ([]string, error) {
 func (s *StorageFS) ListObjects(bucket Bucket, dir string, recursive bool) ([]os.FileInfo, error) {
 	fileList := []os.FileInfo{}
 
-	fpath := path.Join(bucket.Path, dir)
+	fpath := objectPath(bucket, dir)
 
 	info, err := os.Stat(fpath)
 	if err != nil {

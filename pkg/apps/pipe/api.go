@@ -56,14 +56,20 @@ const (
 	writeWait  = 10 * time.Second
 )
 
+// webTopic is the topic named in a request's path. pipe-web connects as an
+// admin, and an admin topic starting with "/" skips user namespaces and access
+// lists, so leading slashes are dropped.
+func webTopic(r *http.Request) string {
+	topic, _ := url.PathUnescape(r.PathValue("topic"))
+	return strings.TrimLeft(cleanRegex.ReplaceAllString(topic, ""), "/")
+}
+
 func (web *webRouter) handleSub(pubsub bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := web.cfg.Logger
 
 		clientInfo := shared.NewPicoPipeClient()
-		topic, _ := url.PathUnescape(r.PathValue("topic"))
-
-		topic = cleanRegex.ReplaceAllString(topic, "")
+		topic := webTopic(r)
 
 		logger.Info("sub", "topic", topic, "info", clientInfo, "pubsub", pubsub)
 
@@ -89,8 +95,12 @@ func (web *webRouter) handleSub(pubsub bool) http.HandlerFunc {
 		defer context.AfterFunc(r.Context(), func() { _ = p.Close() })()
 
 		if mime := r.URL.Query().Get("mime"); mime != "" {
-			w.Header().Add("Content-Type", r.URL.Query().Get("mime"))
+			w.Header().Set("Content-Type", mime)
 		}
+		// Anyone can publish to a public topic, so its content is never run as
+		// a page on this origin.
+		w.Header().Set("Content-Security-Policy", "sandbox")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
 
 		w.WriteHeader(http.StatusOK)
 
@@ -107,9 +117,7 @@ func (web *webRouter) handlePub(pubsub bool) http.HandlerFunc {
 		logger := web.cfg.Logger
 
 		clientInfo := shared.NewPicoPipeClient()
-		topic, _ := url.PathUnescape(r.PathValue("topic"))
-
-		topic = cleanRegex.ReplaceAllString(topic, "")
+		topic := webTopic(r)
 
 		logger.Info("pub", "topic", topic, "info", clientInfo)
 
@@ -232,6 +240,9 @@ func (web *webRouter) handlePub(pubsub bool) http.HandlerFunc {
 	}
 }
 
+// maxPrefixMessage bounds one message split out of a pipe with ?prefix=.
+const maxPrefixMessage = 1 << 20
+
 func (web *webRouter) handlePipe() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := web.cfg.Logger
@@ -247,9 +258,7 @@ func (web *webRouter) handlePipe() http.HandlerFunc {
 		}()
 
 		clientInfo := shared.NewPicoPipeClient()
-		topic, _ := url.PathUnescape(r.PathValue("topic"))
-
-		topic = cleanRegex.ReplaceAllString(topic, "")
+		topic := webTopic(r)
 
 		logger.Info("pipe", "topic", topic, "info", clientInfo)
 
@@ -340,6 +349,7 @@ func (web *webRouter) handlePipe() http.HandlerFunc {
 			}()
 
 			var messageBuffer []byte
+			var tooLarge bool
 			buf := make([]byte, 32*1024)
 
 			for {
@@ -370,6 +380,10 @@ func (web *webRouter) handlePipe() http.HandlerFunc {
 
 						// We have a complete message, extract and send it
 						messageToSend := messageBuffer[firstIdx : firstIdx+len(prefix)+secondIdx]
+						if len(messageToSend) > maxPrefixMessage {
+							tooLarge = true
+							break
+						}
 						err = c.WriteMessage(messageType, messageToSend)
 						if err != nil {
 							logger.Error("pipe write error", "topic", topic, "info", clientInfo, "err", err.Error())
@@ -378,6 +392,13 @@ func (web *webRouter) handlePipe() http.HandlerFunc {
 
 						// Update buffer to remove sent message
 						messageBuffer = messageBuffer[firstIdx+len(prefix)+secondIdx:]
+					}
+					// What's left is one unfinished message, which would
+					// otherwise grow without bound, and maybe the start of the
+					// next prefix.
+					if tooLarge || len(messageBuffer) > maxPrefixMessage+len(prefix) {
+						logger.Error("pipe message too large", "topic", topic, "info", clientInfo, "size", len(messageBuffer))
+						break
 					}
 				} else {
 					// No prefix set, send all data as-is

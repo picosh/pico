@@ -1165,3 +1165,32 @@ func TestCacheMaxBodySize(t *testing.T) {
 		})
 	}
 }
+
+// A response that sets a cookie or says no-store is never stored, so the next
+// visitor gets a fresh response from upstream.
+func TestCacheDoesNotStoreCookiesOrNoStore(t *testing.T) {
+	for name, header := range map[string][2]string{
+		"set-cookie": {"Set-Cookie", "session=abc"},
+		"no-store":   {"Cache-Control", "no-store"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			calls := 0
+			upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				calls++
+				w.Header().Set(header[0], header[1])
+				_, _ = w.Write([]byte("hello"))
+			})
+			handler := NewHttpCache(slog.New(slog.DiscardHandler), upstream)
+			for range 2 {
+				rec := httptest.NewRecorder()
+				handler.ServeHTTP(rec, httptest.NewRequest("GET", "http://example.com/", nil))
+				if strings.Contains(rec.Header().Get("cache-status"), "hit") {
+					t.Fatal("response was served from the cache")
+				}
+			}
+			if calls != 2 {
+				t.Fatalf("upstream called %d times, want 2", calls)
+			}
+		})
+	}
+}

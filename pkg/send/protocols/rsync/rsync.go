@@ -141,10 +141,15 @@ func Middleware(writeHandler utils.CopyFromClientHandler) pssh.SSHServerMiddlewa
 				}
 			}()
 
+			protect := false
+			if p, ok := writeHandler.(utils.RootProtector); ok {
+				protect = p.ProtectRoot()
+			}
 			err := rsync.Serve(rsync.Config{
-				FS:     &storageFS{session: session, handler: writeHandler},
-				Logger: logger,
-				Stderr: session.Stderr(),
+				FS:          &storageFS{session: session, handler: writeHandler},
+				Logger:      logger,
+				Stderr:      session.Stderr(),
+				ProtectRoot: protect,
 			}, session, cmd[1:])
 			if err == nil {
 				return nil

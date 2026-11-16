@@ -6,6 +6,7 @@ import (
 	"crypto/hmac"
 	"embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"io"
@@ -209,6 +210,13 @@ func redirectHandler(apiConfig *ApiConfig) http.HandlerFunc {
 			return
 		}
 
+		// The redirect carries the user's API token.
+		if url.Scheme != "https" || !slices.Contains(apiConfig.Cfg.RedirectHosts, url.Hostname()) {
+			apiConfig.Cfg.Logger.Error("redirect uri not allowed", "redirectURI", redirectURI)
+			http.Error(w, "redirect_uri not allowed", http.StatusBadRequest)
+			return
+		}
+
 		urlQuery := url.Query()
 		urlQuery.Add("code", token)
 
@@ -294,6 +302,11 @@ func keyHandler(apiConfig *ApiConfig) http.HandlerFunc {
 		if err != nil {
 			log.Error("pubkey cert verify", "err", err)
 			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if err := authed.CheckSourceAddress(data.RemoteAddress); err != nil {
+			log.Error("pubkey cert source address", "err", err)
+			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 
@@ -436,6 +449,8 @@ func rssHandler(apiConfig *ApiConfig) http.HandlerFunc {
 
 		feed, err := shared.UserFeed(apiConfig.Dbpool, user, apiToken)
 		if err != nil {
+			apiConfig.Cfg.Logger.Error("could not generate user feed", "err", err.Error())
+			http.Error(w, "could not generate user feed", http.StatusInternalServerError)
 			return
 		}
 
@@ -443,6 +458,7 @@ func rssHandler(apiConfig *ApiConfig) http.HandlerFunc {
 		if err != nil {
 			apiConfig.Cfg.Logger.Error("could not generate atom rss feed", "err", err.Error())
 			http.Error(w, "could not generate atom rss feed", http.StatusInternalServerError)
+			return
 		}
 
 		w.Header().Add("Content-Type", "application/atom+xml")
@@ -539,21 +555,21 @@ func paymentWebhookHandler(apiConfig *ApiConfig) http.HandlerFunc {
 			return
 		}
 
-		event := OrderEvent{}
-
-		if err := json.Unmarshal(payload, &event); err != nil {
-			logger.Error("failed to parse webhook body JSON", "err", err.Error())
-			w.WriteHeader(http.StatusOK)
-			_, _ = fmt.Fprintf(w, "failed to parse webhook body JSON %s", err.Error())
-			return
-		}
-
 		hash := router.HmacString(apiConfig.Cfg.SecretWebhook, string(payload))
 		sig := r.Header.Get("X-Signature")
 		if !hmac.Equal([]byte(hash), []byte(sig)) {
 			logger.Error("invalid signature X-Signature")
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte("invalid signature x-signature"))
+			return
+		}
+
+		event := OrderEvent{}
+
+		if err := json.Unmarshal(payload, &event); err != nil {
+			logger.Error("failed to parse webhook body JSON", "err", err.Error())
+			w.WriteHeader(http.StatusOK)
+			_, _ = fmt.Fprintf(w, "failed to parse webhook body JSON %s", err.Error())
 			return
 		}
 
@@ -629,6 +645,12 @@ func paymentWebhookHandler(apiConfig *ApiConfig) http.HandlerFunc {
 		}
 
 		err = dbpool.AddPicoPlusUser(username, email, "lemonsqueezy", txID)
+		if errors.Is(err, db.ErrPaymentRecorded) {
+			log.Info("order already processed")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("order already processed"))
+			return
+		}
 		if err != nil {
 			log.Error("failed to add pico+ user", "err", err)
 			w.WriteHeader(http.StatusOK)
@@ -696,12 +718,12 @@ func checkoutHandler() http.HandlerFunc {
 		username := r.PathValue("username")
 		// link := "https://checkout.pico.sh/buy/73c26cf9-3fac-44c3-b744-298b3032a96b"
 		link := "https://picosh.lemonsqueezy.com/buy/73c26cf9-3fac-44c3-b744-298b3032a96b"
-		url := fmt.Sprintf(
+		dest := fmt.Sprintf(
 			"%s?discount=0&checkout[custom][username]=%s",
 			link,
-			username,
+			url.QueryEscape(username),
 		)
-		http.Redirect(w, r, url, http.StatusMovedPermanently)
+		http.Redirect(w, r, dest, http.StatusMovedPermanently)
 	}
 }
 

@@ -46,6 +46,9 @@ func (m *ChatPage) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Comm
 		return vxfw.FocusWidgetCmd(m), nil
 	case vaxis.Key:
 		if msg.Matches(vaxis.KeyEnter) {
+			if !m.hasAccess() {
+				return nil, nil
+			}
 			_ = m.shared.App.Suspend()
 			loadChat(m.shared)
 			_ = m.shared.App.Resume()

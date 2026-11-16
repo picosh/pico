@@ -6,7 +6,6 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/antoniomika/syncmap"
 	"github.com/picosh/pico/pkg/db/postgres"
 	"github.com/picosh/pico/pkg/pssh"
 	psub "github.com/picosh/pico/pkg/pubsub"
@@ -36,14 +35,7 @@ func StartSshServer() {
 	cfg.PortOverride = portOverride
 
 	pubsub := psub.NewMulticast(logger)
-	handler := &CliHandler{
-		Logger:  logger,
-		DBPool:  dbh,
-		PubSub:  pubsub,
-		Cfg:     cfg,
-		Waiters: syncmap.New[string, []string](),
-		Access:  syncmap.New[string, []string](),
-	}
+	handler := NewCliHandler(logger, dbh, pubsub, cfg)
 
 	sshAuth := shared.NewSshAuthHandler(dbh, logger, "pipe")
 
@@ -57,7 +49,12 @@ func StartSshServer() {
 		promPort,
 		"ssh_data/term_info_ed25519",
 		func(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
-			perms, _ := sshAuth.PubkeyAuthHandler(conn, key)
+			perms, err := sshAuth.PubkeyAuthHandler(conn, key)
+			// Unknown keys may use public topics, but a cert that failed its
+			// checks is refused.
+			if _, isCert := key.(*ssh.Certificate); isCert && err != nil {
+				return nil, err
+			}
 			if perms == nil {
 				perms = &ssh.Permissions{
 					Extensions: map[string]string{

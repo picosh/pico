@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -266,6 +267,11 @@ func (sc *SSHServerConn) Handle(chans <-chan ssh.NewChannel, reqs <-chan *ssh.Re
 			}
 
 			go func() {
+				defer func() {
+					if r := recover(); r != nil {
+						sc.Logger.Error("channel middleware panic", "err", r, "stack", string(debug.Stack()))
+					}
+				}()
 				err := chanFunc(newChan, sc)
 				if err != nil {
 					sc.Logger.Error("channel middleware", "err", err)
@@ -541,6 +547,14 @@ func NewSSHServer(ctx context.Context, logger *slog.Logger, config *SSHServerCon
 					}
 
 					go func() {
+						// A panic in a handler ends its session and leaves the
+						// server running.
+						defer func() {
+							if r := recover(); r != nil {
+								sc.Logger.Error("session request panic", "type", req.Type, "err", r, "stack", string(debug.Stack()))
+								sesh.Fatal(fmt.Errorf("internal server error"))
+							}
+						}()
 						sc.Logger.Info("new session request", "type", req.Type, "wantReply", req.WantReply, "payload", req.Payload)
 						switch req.Type {
 						case "subsystem":
@@ -674,6 +688,12 @@ func NewSSHServer(ctx context.Context, logger *slog.Logger, config *SSHServerCon
 							if ok {
 								sesh.mu.Lock()
 								sesh.pty.Window = win
+								// Only the latest size matters, and a handler that
+								// never reads sizes mustn't block this send.
+								select {
+								case <-sesh.winch:
+								default:
+								}
 								sesh.winch <- win
 								sesh.mu.Unlock()
 							}

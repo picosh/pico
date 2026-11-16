@@ -50,15 +50,19 @@ func NewPost(filename string, text []byte) *db.Post {
 	}
 }
 
-// PostFromEntry reads an uploaded file into a new post for user in space.
-func PostFromEntry(entry *sendutils.FileEntry, user *db.User, space string) (*db.Post, error) {
+// PostFromEntry reads an uploaded file of at most maxSize bytes into a new
+// post for user in space.
+func PostFromEntry(entry *sendutils.FileEntry, user *db.User, space string, maxSize int64) (*db.Post, error) {
 	if entry.Mode.IsDir() {
 		return nil, os.ErrInvalid
 	}
 	filename := filepath.Base(entry.Filepath)
-	text, err := io.ReadAll(entry.Reader)
+	text, err := io.ReadAll(io.LimitReader(entry.Reader, maxSize+1))
 	if err != nil {
 		return nil, fmt.Errorf("could not read file (%s): %w", filename, err)
+	}
+	if int64(len(text)) > maxSize {
+		return nil, fmt.Errorf("file (%s) is larger than %d bytes", filename, maxSize)
 	}
 	post := NewPost(filename, text)
 	post.UserID = user.ID

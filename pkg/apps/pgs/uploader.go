@@ -6,7 +6,9 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -103,6 +105,9 @@ func (h *UploadAssetHandler) Read(s *pssh.SSHServerConnSession, entry *sendutils
 		return nil, nil, err
 	}
 
+	if err := cleanEntryPath(entry); err != nil {
+		return nil, nil, err
+	}
 	fname := shared.GetAssetFileName(entry)
 	contents, info, err := h.Cfg.Storage.GetObject(bucket, fname)
 	if err != nil {
@@ -162,6 +167,9 @@ func (h *UploadAssetHandler) List(s *pssh.SSHServerConnSession, fpath string, is
 
 	return fileList, nil
 }
+
+// ProtectRoot keeps rsync --delete at the root from deleting every project.
+func (h *UploadAssetHandler) ProtectRoot() bool { return true }
 
 // IsImplicitDir reports top-level project names. A project holds its files
 // whether or not it exists yet.
@@ -252,7 +260,7 @@ func (h *UploadAssetHandler) findDenylist(bucket storage.Bucket, project *db.Pro
 	}()
 
 	buf := new(strings.Builder)
-	_, err = io.Copy(buf, fp)
+	_, err = io.Copy(buf, io.LimitReader(fp, h.Cfg.MaxSpecialFileSize))
 	if err != nil {
 		logger.Error("io copy", "err", err.Error())
 		return "", err
@@ -293,6 +301,9 @@ func (h *UploadAssetHandler) write(s *pssh.SSHServerConnSession, entry *sendutil
 		return "", err
 	}
 
+	if err := cleanEntryPath(entry); err != nil {
+		return "", err
+	}
 	if entry.Mode.IsDir() && strings.Count(entry.Filepath, "/") == 1 {
 		entry.Filepath = strings.TrimPrefix(entry.Filepath, "/")
 	}
@@ -412,6 +423,16 @@ func (h *UploadAssetHandler) write(s *pssh.SSHServerConnSession, entry *sendutil
 	return str, err
 }
 
+// cleanEntryPath roots and cleans an upload's path. A ".." segment is an
+// error, since it could only mean a file outside the user's projects.
+func cleanEntryPath(entry *sendutils.FileEntry) error {
+	if slices.Contains(strings.Split(filepath.ToSlash(entry.Filepath), "/"), "..") {
+		return fmt.Errorf("ERROR: invalid path (%s), \"..\" is not allowed", entry.Filepath)
+	}
+	entry.Filepath = path.Clean("/" + entry.Filepath)
+	return nil
+}
+
 func isSpecialFile(entry string) bool {
 	fname := filepath.Base(entry)
 	return fname == "_headers" || fname == "_redirects" || fname == "_pgs_ignore"
@@ -427,6 +448,9 @@ func (h *UploadAssetHandler) Delete(s *pssh.SSHServerConnSession, entry *senduti
 		return err
 	}
 
+	if err := cleanEntryPath(entry); err != nil {
+		return err
+	}
 	if entry.Mode.IsDir() && strings.Count(entry.Filepath, "/") == 1 {
 		entry.Filepath = strings.TrimPrefix(entry.Filepath, "/")
 	}
@@ -446,6 +470,9 @@ func (h *UploadAssetHandler) Delete(s *pssh.SSHServerConnSession, entry *senduti
 
 	projectName := shared.GetProjectName(entry)
 	logger = logger.With("project", projectName)
+	if !shared.IsValidSubdomain(projectName) {
+		return fmt.Errorf("ERROR: invalid project name, you must delete files in a project folder (e.g. pgs.sh:/project-name)")
+	}
 
 	logger.Info("deleting file")
 

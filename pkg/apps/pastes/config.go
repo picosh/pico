@@ -72,3 +72,7 @@ func (c *Config) PostURL(username, slug string) string {
 func (c *Config) RawPostURL(username, slug string) string {
 	return fmt.Sprintf("%s://%s.%s/raw/%s", c.Protocol, username, c.Domain, url.PathEscape(slug))
 }
+
+func (c *Config) RenderPostURL(username, slug string) string {
+	return fmt.Sprintf("%s://%s.%s/render/%s", c.Protocol, username, c.Domain, url.PathEscape(slug))
+}

@@ -11,38 +11,33 @@ func HasProjectAccess(project *db.Project, owner *db.User, requester *db.User, p
 	aclType := project.Acl.Type
 	data := project.Acl.Data
 
-	if aclType == "public" {
+	if aclType == "public" || aclType == "" {
 		return true
 	}
 
-	if requester != nil {
-		if owner.ID == requester.ID {
-			return true
-		}
+	if requester != nil && owner != nil && owner.ID == requester.ID {
+		return true
 	}
 
-	if aclType == "private" {
-		return false
-	}
-
-	if aclType == "pico" {
+	switch aclType {
+	case "pico":
 		if requester == nil {
 			return false
 		}
-
 		if len(data) == 0 {
 			return true
 		}
 		return slices.Contains(data, requester.Name)
-	}
-
-	if aclType == "pubkeys" {
-		key := ssh.FingerprintSHA256(pubkey)
+	case "pubkeys":
+		if pubkey == nil {
+			return false
+		}
 		if len(data) == 0 {
 			return true
 		}
-		return slices.Contains(data, key)
+		return slices.Contains(data, ssh.FingerprintSHA256(pubkey))
 	}
 
-	return true
+	// private, http-pass, http-basic and unknown types are for the owner only.
+	return false
 }

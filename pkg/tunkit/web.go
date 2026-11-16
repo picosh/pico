@@ -46,6 +46,12 @@ func httpServe(handler WebTunnel, ctx *pssh.SSHServerConnSession, log *slog.Logg
 	setListenerCtx(ctx, listener)
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Error("tunnel http handler panic", "err", r)
+				_ = listener.Close()
+			}
+		}()
 		httpHandler := handler.GetHttpHandler()
 		err := http.Serve(listener, httpHandler(ctx))
 		if err != nil {

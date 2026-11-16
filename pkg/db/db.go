@@ -15,7 +15,17 @@ var ErrNameTaken = errors.New("username has already been claimed")
 var ErrNameDenied = errors.New("username is on the denylist")
 var ErrNameInvalid = errors.New("username has invalid characters in it")
 var ErrPublicKeyTaken = errors.New("public key is already associated with another user")
+var ErrPublicKeyIsCert = errors.New("ssh certificates can't be added as keys, add the certificate authority's public key instead")
+
+// IsCertKey reports whether an authorized_keys line holds an ssh certificate.
+// Accounts hold plain keys: a cert's own key is checked only through its CA.
+func IsCertKey(key string) bool {
+	keyType, _, _ := strings.Cut(strings.TrimSpace(key), " ")
+	return strings.HasSuffix(keyType, "-cert-v01@openssh.com")
+}
+
 var ErrPostChanged = errors.New("post changed while it was being updated")
+var ErrPaymentRecorded = errors.New("payment has already been recorded")
 
 // sqlite uses string to BLOB type and postgres uses []uint8 for JSONB.
 func tcast(value any) ([]byte, error) {
@@ -91,8 +101,26 @@ type Project struct {
 }
 
 type ProjectAcl struct {
-	Type string   `json:"type" db:"type"` // public, pico, pubkeys, private, http-pass
+	Type string   `json:"type" db:"type"` // public, pico, pubkeys, private, http-pass, http-basic
 	Data []string `json:"data" db:"data"`
+}
+
+// DisplayData is the ACL data safe to print, with passwords hidden.
+func (p ProjectAcl) DisplayData() []string {
+	switch p.Type {
+	case "http-pass":
+		if len(p.Data) > 0 {
+			return []string{"(password set)"}
+		}
+	case "http-basic":
+		users := make([]string, 0, len(p.Data))
+		for _, entry := range p.Data {
+			user, _, _ := strings.Cut(entry, ":")
+			users = append(users, user)
+		}
+		return users
+	}
+	return p.Data
 }
 
 // Make the Attrs struct implement the driver.Valuer interface. This method

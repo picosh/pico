@@ -219,9 +219,9 @@ func (web *webRouter) blogHandler(w http.ResponseWriter, r *http.Request) {
 
 		headerTxt.Nav = []shared.Link{}
 		for _, nav := range parsedText.Nav {
-			u, _ := url.Parse(nav.URL)
+			u, err := url.Parse(nav.URL)
 			finURL := nav.URL
-			if !u.IsAbs() {
+			if err == nil && !u.IsAbs() {
 				finURL = curl.FullPostURL(readme.Username,
 					nav.URL,
 				)

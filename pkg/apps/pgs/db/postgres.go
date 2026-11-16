@@ -93,7 +93,10 @@ func (me *PgsPsqlDB) FindUserByName(name string) (*db.User, error) {
 func (me *PgsPsqlDB) FindFeature(userID, name string) (*db.FeatureFlag, error) {
 	ff := db.FeatureFlag{}
 	err := me.Db.Get(&ff, "SELECT * FROM feature_flags WHERE user_id=$1 AND name=$2 ORDER BY expires_at DESC LIMIT 1", userID, name)
-	return &ff, err
+	if err != nil {
+		return nil, err
+	}
+	return &ff, nil
 }
 
 func (me *PgsPsqlDB) InsertAccessLog(log *db.AccessLog) error {

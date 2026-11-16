@@ -65,6 +65,9 @@ func (s *session) runReceiver(args []string) error {
 	if err != nil {
 		return s.fatal(exitFileSelect, err)
 	}
+	if s.protectRoot && s.opts.deleteMode && dest.dir == "" {
+		return s.fatal(exitFileSelect, errors.New("ERROR: --delete needs a destination folder, not the root (e.g. host:/project-name/)"))
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -101,6 +104,9 @@ func (s *session) recvFileList() ([]*fileEntry, error) {
 		f, err := codec.recvEntry(s.c, xflags)
 		if err != nil {
 			return nil, s.fatal(exitProtocol, err)
+		}
+		if len(files) >= maxFileListLen {
+			return nil, s.fatal(exitProtocol, fmt.Errorf("file list has more than %d entries", maxFileListLen))
 		}
 		files = append(files, f)
 	}

@@ -48,6 +48,7 @@ type PostPageData struct {
 	PageTitle    string
 	URL          template.URL
 	RawURL       template.URL
+	RenderURL    template.URL
 	BlogURL      template.URL
 	Title        string
 	Description  string
@@ -116,6 +117,9 @@ func (web *webRouter) blogHandler(w http.ResponseWriter, r *http.Request) {
 	curl := shared.CreateURLFromRequest(cfg.Protocol, cfg.Domain, r)
 	postCollection := make([]PostItemData, 0, len(posts))
 	for _, post := range posts {
+		if isExpired(post) {
+			continue
+		}
 		p := PostItemData{
 			URL:            template.URL(curl.FullPostURL(post.Username, post.Slug)),
 			BlogURL:        template.URL(curl.FullBlogURL(post.Username)),
@@ -179,11 +183,21 @@ func (web *webRouter) postHandler(w http.ResponseWriter, r *http.Request) {
 
 	var data PostPageData
 	post, err := dbpool.FindPostWithSlug(slug, user.ID, cfg.Space)
+	if err == nil && isExpired(post) {
+		err = fmt.Errorf("paste has expired")
+	}
 	if err == nil {
 		logger = logger.With("filename", post.Filename)
 		logger.Info("paste found")
 		expiresAt := "never"
-		unlisted := false
+		if post.ExpiresAt != nil {
+			expiresAt = post.ExpiresAt.Format(time.DateOnly)
+		}
+		unlisted := post.Hidden
+		var renderURL template.URL
+		if renderKind(post.Filename) != "" {
+			renderURL = template.URL(cfg.RenderPostURL(post.Username, post.Slug))
+		}
 		parsedText := ""
 		// we dont want to syntax highlight huge files
 		if post.FileSize > 1*shared.MB {
@@ -195,13 +209,6 @@ func (web *webRouter) postHandler(w http.ResponseWriter, r *http.Request) {
 				logger.Error("could not parse text", "err", err)
 				parsedText = "<pre>" + template.HTMLEscapeString(post.Text) + "</pre>"
 			}
-			if post.ExpiresAt != nil {
-				expiresAt = post.ExpiresAt.Format(time.DateOnly)
-			}
-
-			if post.Hidden {
-				unlisted = true
-			}
 		}
 
 		data = PostPageData{
@@ -209,6 +216,7 @@ func (web *webRouter) postHandler(w http.ResponseWriter, r *http.Request) {
 			PageTitle:    post.Filename,
 			URL:          template.URL(cfg.PostURL(post.Username, post.Slug)),
 			RawURL:       template.URL(cfg.RawPostURL(post.Username, post.Slug)),
+			RenderURL:    renderURL,
 			BlogURL:      template.URL(cfg.BlogURL(username)),
 			Description:  post.Description,
 			Title:        post.Filename,
@@ -245,6 +253,7 @@ func (web *webRouter) postHandler(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	logger.Info("serving paste")
@@ -274,7 +283,7 @@ func (web *webRouter) postHandlerRaw(w http.ResponseWriter, r *http.Request) {
 	logger = shared.LoggerWithUser(blogger, user)
 
 	post, err := dbpool.FindPostWithSlug(slug, user.ID, cfg.Space)
-	if err != nil {
+	if err != nil || isExpired(post) {
 		logger.Info("paste not found")
 		http.Error(w, "paste not found", http.StatusNotFound)
 		return
@@ -333,20 +342,28 @@ func (web *webRouter) sitesMux() *http.ServeMux {
 	return mux
 }
 
-// rawRoute serves a raw paste at .../{slug}/raw or raw/.../{slug}, with the
-// user first on the main domain. The two overlap as patterns, so a path
-// that fits both, like /raw/raw, is the first kind.
+// rawRoute serves a raw or rendered paste at .../{slug}/{view} or
+// {view}/.../{slug}, where view is raw or render, with the user first on the
+// main domain. The forms overlap, so raw wins over render, and then the
+// trailing form wins: /raw/raw is the raw paste "raw" and /raw/render the raw
+// paste "render", as they were before render existed.
 func (web *webRouter) rawRoute(w http.ResponseWriter, r *http.Request) {
 	segs := []string{r.PathValue("first"), r.PathValue("second")}
 	if third := r.PathValue("third"); third != "" {
 		segs = append(segs, third)
 	}
-	switch {
-	case segs[len(segs)-1] == "raw":
-		segs = segs[:len(segs)-1]
-	case segs[0] == "raw":
-		segs = segs[1:]
-	default:
+	var view string
+	for _, v := range []string{"raw", "render"} {
+		if segs[len(segs)-1] == v {
+			view, segs = v, segs[:len(segs)-1]
+			break
+		}
+		if segs[0] == v {
+			view, segs = v, segs[1:]
+			break
+		}
+	}
+	if view == "" {
 		http.NotFound(w, r)
 		return
 	}
@@ -354,6 +371,10 @@ func (web *webRouter) rawRoute(w http.ResponseWriter, r *http.Request) {
 		r.SetPathValue("user", segs[0])
 	}
 	r.SetPathValue("slug", segs[len(segs)-1])
+	if view == "render" {
+		web.postHandlerRender(w, r)
+		return
+	}
 	web.postHandlerRaw(w, r)
 }
 
@@ -380,4 +401,10 @@ func StartApiServer() {
 	)
 
 	logger.Error(http.ListenAndServe(portStr, handler).Error())
+}
+
+// isExpired reports whether a paste is past its expiry. Expired pastes are
+// deleted on a schedule, so until then they are hidden here.
+func isExpired(post *db.Post) bool {
+	return post.ExpiresAt != nil && !post.ExpiresAt.IsZero() && post.ExpiresAt.Before(time.Now())
 }

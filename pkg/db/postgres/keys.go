@@ -19,6 +19,9 @@ func (me *PsqlDB) insertPublicKeyWithTx(userID, key, name string, tx *sqlx.Tx) e
 }
 
 func (me *PsqlDB) InsertPublicKey(userID, key, name string) error {
+	if db.IsCertKey(key) {
+		return db.ErrPublicKeyIsCert
+	}
 	pk, _ := me.findPublicKeyByKey(key)
 	if pk != nil {
 		return db.ErrPublicKeyTaken

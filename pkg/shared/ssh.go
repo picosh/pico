@@ -3,8 +3,8 @@ package shared
 import (
 	"fmt"
 	"log/slog"
+	"net"
 	"strings"
-	"time"
 
 	"github.com/picosh/pico/pkg/db"
 	"golang.org/x/crypto/ssh"
@@ -30,6 +30,17 @@ type AuthedPubkey struct {
 	OrigPubkey string
 	Pubkey     string
 	Identity   string
+	// CriticalOptions holds a cert's source-address restriction, which the
+	// caller enforces against the client's address.
+	CriticalOptions map[string]string
+}
+
+const sourceAddressOption = "source-address"
+
+// certChecker verifies a cert's CA signature, validity window and critical
+// options.
+var certChecker = &ssh.CertChecker{
+	SupportedCriticalOptions: []string{sourceAddressOption},
 }
 
 func PubkeyCertVerify(key ssh.PublicKey, srcPrincipal string) (*AuthedPubkey, error) {
@@ -46,32 +57,64 @@ func PubkeyCertVerify(key ssh.PublicKey, srcPrincipal string) (*AuthedPubkey, er
 			return nil, fmt.Errorf("ssh-cert has type %d", cert.CertType)
 		}
 
-		found := false
+		principal := ""
 		for _, princ := range cert.ValidPrincipals {
 			if princ == "admin" || princ == srcPrincipal {
-				found = true
+				principal = princ
 				break
 			}
 		}
-		if !found {
+		if principal == "" {
 			return nil, fmt.Errorf("ssh-cert principals not valid")
 		}
 
-		clock := time.Now
-		unixNow := clock().Unix()
-		if after := int64(cert.ValidAfter); after < 0 || unixNow < int64(cert.ValidAfter) {
-			return nil, fmt.Errorf("ssh-cert is not yet valid")
-		}
-		if before := int64(cert.ValidBefore); cert.ValidBefore != uint64(ssh.CertTimeInfinity) && (unixNow >= before || before < 0) {
-			return nil, fmt.Errorf("ssh-cert has expired")
+		// The account is found by the CA key, so the cert must be signed by it.
+		if err := certChecker.CheckCert(principal, cert); err != nil {
+			return nil, fmt.Errorf("ssh-cert invalid: %w", err)
 		}
 
 		authed.Pubkey = KeyForKeyText(cert.SignatureKey)
 		authed.Identity = cert.KeyId
+		authed.CriticalOptions = cert.CriticalOptions
 		return authed, nil
 	}
 
 	return authed, nil
+}
+
+// CheckSourceAddress enforces a cert's source-address restriction on a client
+// address given as "host:port" or a bare IP.
+func (a *AuthedPubkey) CheckSourceAddress(remoteAddr string) error {
+	sourceAddrs, ok := a.CriticalOptions[sourceAddressOption]
+	if !ok {
+		return nil
+	}
+
+	host := remoteAddr
+	if h, _, err := net.SplitHostPort(remoteAddr); err == nil {
+		host = h
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return fmt.Errorf("ssh-cert requires source-address but client address %q is unknown", remoteAddr)
+	}
+
+	for _, allowed := range strings.Split(sourceAddrs, ",") {
+		if allowedIP := net.ParseIP(allowed); allowedIP != nil {
+			if allowedIP.Equal(ip) {
+				return nil
+			}
+			continue
+		}
+		_, ipNet, err := net.ParseCIDR(allowed)
+		if err != nil {
+			return fmt.Errorf("ssh-cert has invalid source-address %q: %w", allowed, err)
+		}
+		if ipNet.Contains(ip) {
+			return nil
+		}
+	}
+	return fmt.Errorf("ssh-cert source-address does not allow %s", ip)
 }
 
 func (r *SshAuthHandler) PubkeyAuthHandler(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
@@ -130,6 +173,8 @@ func (r *SshAuthHandler) PubkeyAuthHandler(conn ssh.ConnMetadata, key ssh.Public
 	}
 
 	perms := &ssh.Permissions{
+		// x/crypto enforces source-address against the connection.
+		CriticalOptions: authed.CriticalOptions,
 		Extensions: map[string]string{
 			"user_id":  user.ID,
 			"user":     user.Name,

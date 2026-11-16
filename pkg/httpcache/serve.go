@@ -420,6 +420,14 @@ func isResponseCachable(r *http.Request, resp *responseWriter) error {
 	if state.private {
 		return fmt.Errorf("shared cache cannot store private directives")
 	}
+	// RFC 9111 3: a no-store response must not be stored.
+	if state.noStore {
+		return fmt.Errorf("response has no-store")
+	}
+	// A cookie set for one visitor must not be replayed to the next.
+	if resp.Header().Get("set-cookie") != "" {
+		return fmt.Errorf("response sets a cookie")
+	}
 
 	return nil
 }

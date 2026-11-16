@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"slices"
 	"strings"
-	"time"
 
 	pgsdb "github.com/picosh/pico/pkg/apps/pgs/db"
 	"github.com/picosh/pico/pkg/db"
@@ -119,12 +118,17 @@ func Middleware(handler *UploadAssetHandler) pssh.SSHServerMiddleware {
 
 			projectName := strings.TrimSpace(args[1])
 			cmdArgs := args[2:]
+			logArgs, logCmdArgs := args, cmdArgs
+			if cmd == "acl" {
+				// may hold an http-pass or http-basic password
+				logArgs, logCmdArgs = []string{cmd, projectName}, nil
+			}
 			log.Info(
 				"pgs middleware detected command",
-				"args", args,
+				"args", logArgs,
 				"cmd", cmd,
 				"projectName", projectName,
-				"cmdArgs", cmdArgs,
+				"cmdArgs", logCmdArgs,
 			)
 
 			switch cmd {
@@ -239,36 +243,28 @@ func Middleware(handler *UploadAssetHandler) pssh.SSHServerMiddleware {
 				return err
 			case "acl":
 				aclCmd, write := flagSet("acl", sesh)
-				aclType := aclCmd.String("type", "", "access type: public, pico, pubkeys, http-pass")
+				aclType := aclCmd.String("type", "", "access type: public, pico, pubkeys, http-pass, http-basic")
 				var acls arrayFlags
 				aclCmd.Var(
 					&acls,
 					"acl",
-					"list of pico usernames or sha256 public keys, delimited by commas (for http-pass: the password)",
+					"list of pico usernames or sha256 public keys, delimited by commas (for http-pass: the password, for http-basic: <user>:<password>)",
 				)
 				if !flagCheck(aclCmd, projectName, cmdArgs) {
 					return nil
 				}
 				opts.Write = *write
 
-				if !slices.Contains([]string{"public", "pubkeys", "pico", "http-pass"}, *aclType) {
+				if !slices.Contains([]string{"public", "pubkeys", "pico", "http-pass", "http-basic"}, *aclType) {
 					err := fmt.Errorf(
-						"acl type must be one of the following: [public, pubkeys, pico, http-pass], found %s",
+						"acl type must be one of the following: [public, pubkeys, pico, http-pass, http-basic], found %s",
 						*aclType,
 					)
 					opts.bail(err)
 					return err
 				}
 
-				hasPicoPlus := false
-				ff, _ := dbpool.FindFeature(user.ID, "plus")
-				if ff != nil {
-					if ff.ExpiresAt.After(time.Now()) {
-						hasPicoPlus = true
-					}
-				}
-
-				if !hasPicoPlus {
+				if !db.HasFeature(dbpool, user.ID, "plus") {
 					err = fmt.Errorf("setting acl on a project requires pico+")
 					opts.bail(err)
 					return err

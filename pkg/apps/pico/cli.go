@@ -223,19 +223,9 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 					return err
 				}
 
-				ff, err := dbpool.FindFeature(user.ID, "plus")
-				if err != nil {
-					handler.Logger.Error("Unable to find plus feature flag", "err", err, "user", user, "command", args)
-					ff, err = dbpool.FindFeature(user.ID, "bouncer")
-					if err != nil {
-						handler.Logger.Error("Unable to find bouncer feature flag", "err", err, "user", user, "command", args)
-						sesh.Fatal(err)
-						return err
-					}
-				}
-
-				if ff == nil {
-					err = fmt.Errorf("unable to find plus or bouncer feature flag")
+				if !db.HasFeature(dbpool, user.ID, "plus") && !db.HasFeature(dbpool, user.ID, "bouncer") {
+					err := fmt.Errorf("chat requires pico+ or bouncer access")
+					handler.Logger.Error("chat access denied", "user", user.Name)
 					sesh.Fatal(err)
 					return err
 				}

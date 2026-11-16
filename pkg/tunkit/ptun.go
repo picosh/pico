@@ -52,7 +52,13 @@ func LocalForwardHandler(handler Tunnel) pssh.SSHServerChannelMiddleware {
 			return err
 		}
 
-		origCtx, cancel := context.WithCancel(context.Background())
+		// The channel's context ends when its copies finish or the
+		// connection closes, which is when the handler is closed.
+		parent := sc.Ctx
+		if parent == nil {
+			parent = context.Background()
+		}
+		origCtx, cancel := context.WithCancel(parent)
 		ctx := &pssh.SSHServerConnSession{
 			Channel:       ch,
 			SSHServerConn: sc,
@@ -63,6 +69,13 @@ func LocalForwardHandler(handler Tunnel) pssh.SSHServerChannelMiddleware {
 		go ssh.DiscardRequests(reqs)
 
 		go func() {
+			defer cancel()
+			defer func() {
+				if r := recover(); r != nil {
+					log.Error("tunnel connection panic", "err", r)
+					_ = ch.Close()
+				}
+			}()
 			downConn, err := handler.CreateConn(ctx)
 			if err != nil {
 				log.Error("unable to connect to conn", "err", err)

@@ -2,12 +2,17 @@ package pgs
 
 import (
 	"fmt"
+	"html"
 	"net/http"
 	"time"
 
 	"github.com/gorilla/feeds"
+	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/shared/router"
 )
+
+// maxFormSize caps a form submission, which anyone can send.
+const maxFormSize = 64 * 1024
 
 func handleAutoForm(w http.ResponseWriter, r *http.Request, cfg *Config) {
 	formName := r.PathValue("fname")
@@ -16,6 +21,7 @@ func handleAutoForm(w http.ResponseWriter, r *http.Request, cfg *Config) {
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, maxFormSize)
 	err := r.ParseForm()
 	if err != nil {
 		cfg.Logger.Error("failed to parse auto form", "err", err)
@@ -48,8 +54,7 @@ func handleAutoForm(w http.ResponseWriter, r *http.Request, cfg *Config) {
 	}
 	router.SetUser(r, user.Name)
 
-	ff, err := cfg.DB.FindFeature(user.ID, "plus")
-	if err != nil || (ff != nil && !ff.IsValid()) {
+	if !db.HasFeature(cfg.DB, user.ID, "plus") {
 		cfg.Logger.Error("pico+ required for auto-forms", "username", props.Username)
 		http.Error(w, "pico+ required for auto-forms", http.StatusPaymentRequired)
 		return
@@ -70,12 +75,9 @@ type FormData struct {
 }
 
 func serveAutoFormSubmitted(w http.ResponseWriter, r *http.Request, cfg *Config) {
-	errorMsg := r.URL.Query().Get("error")
-	data := loginFormData{
-		Error: errorMsg,
+	data := FormData{
+		Error: r.URL.Query().Get("error"),
 	}
-
-	w.WriteHeader(http.StatusUnprocessableEntity)
 
 	ts, err := router.RenderTemplate(staticDir, []string{cfg.StaticPath("html/auto_form.page.tmpl")})
 	if err != nil {
@@ -124,9 +126,10 @@ func handleAutoFormRss(w http.ResponseWriter, r *http.Request, cfg *Config) {
 		}
 
 		for _, entry := range entries {
+			// Anyone can submit a form, so its fields are escaped.
 			content := "<ul>"
 			for key, val := range entry.Data {
-				content += fmt.Sprintf("<li>%s: %s</li>\n", key, val)
+				content += fmt.Sprintf("<li>%s: %s</li>\n", html.EscapeString(key), html.EscapeString(fmt.Sprint(val)))
 			}
 			content += "</ul>"
 
@@ -151,6 +154,7 @@ func handleAutoFormRss(w http.ResponseWriter, r *http.Request, cfg *Config) {
 	if err != nil {
 		logger.Error("could not convert feed to atom", "err", err.Error())
 		http.Error(w, "Could not generate atom rss feed", http.StatusInternalServerError)
+		return
 	}
 
 	w.Header().Add("Content-Type", "application/atom+xml")

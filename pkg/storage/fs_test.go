@@ -251,3 +251,49 @@ func TestFsLegacyKeepDir(t *testing.T) {
 		t.Fatalf("directory still exists: %v", err)
 	}
 }
+
+func TestFsAdapterStaysInBucket(t *testing.T) {
+	base := t.TempDir()
+	st, err := NewStorageFS(slog.Default(), filepath.Join(base, "store"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	mine, err := st.UpsertBucket("mine")
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, err := st.UpsertBucket("other")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := st.PutObject(other, "/secret.txt", strings.NewReader("secret"), &ObjectInfo{}); err != nil {
+		t.Fatal(err)
+	}
+
+	loc, _, err := st.PutObject(mine, "/../../escaped.txt", strings.NewReader("x"), &ObjectInfo{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := filepath.Join(mine.Path, "escaped.txt"); loc != want {
+		t.Fatalf("wrote to %s, want %s", loc, want)
+	}
+	if _, err := os.Stat(filepath.Join(base, "escaped.txt")); err == nil {
+		t.Fatal("PutObject wrote outside the storage dir")
+	}
+
+	if _, _, err := st.GetObject(mine, "../other/secret.txt"); err == nil {
+		t.Fatal("GetObject read another bucket")
+	}
+	if _, err := st.StatObject(mine, "../other/secret.txt"); err == nil {
+		t.Fatal("StatObject reached another bucket")
+	}
+	if err := st.DeleteObject(mine, "../other/secret.txt"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.StatObject(other, "secret.txt"); err != nil {
+		t.Fatal("DeleteObject removed a file in another bucket")
+	}
+	if list, err := st.ListObjects(mine, "../other/", true); err != nil || len(list) != 0 {
+		t.Fatalf("ListObjects listed another bucket: %v %v", list, err)
+	}
+}

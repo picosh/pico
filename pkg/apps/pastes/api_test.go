@@ -104,6 +104,15 @@ func TestRoutes(t *testing.T) {
 		{url: "https://tester.pastes.test/a.txt/raw", status: http.StatusOK, raw: true, user: "tester", slug: "a.txt"},
 		{url: "https://tester.pastes.test/raw/a.txt", status: http.StatusOK, raw: true, user: "tester", slug: "a.txt"},
 		{url: "https://tester.pastes.test/a.txt/other", status: http.StatusNotFound},
+		// raw wins over render, so these are raw pastes named render, as
+		// before render existed.
+		{url: "https://tester.pastes.test/raw/render", status: http.StatusOK, raw: true, user: "tester", slug: "render"},
+		{url: "https://tester.pastes.test/render/raw", status: http.StatusOK, raw: true, user: "tester", slug: "render"},
+		{url: "https://pastes.test/raw/tester/render", status: http.StatusOK, raw: true, user: "tester", slug: "render"},
+		{url: "https://pastes.test/tester/render/raw", status: http.StatusOK, raw: true, user: "tester", slug: "render"},
+		// a.txt has no rendered view.
+		{url: "https://tester.pastes.test/render/a.txt", status: http.StatusNotFound, user: "tester", slug: "a.txt"},
+		{url: "https://pastes.test/tester/a.txt/render", status: http.StatusNotFound, user: "tester", slug: "a.txt"},
 	} {
 		dbpool.user, dbpool.slug = "", ""
 		res := httptest.NewRecorder()
@@ -113,5 +122,36 @@ func TestRoutes(t *testing.T) {
 			t.Errorf("%s = %d raw %v for %q/%q, want %d raw %v for %q/%q",
 				tt.url, res.Code, raw, dbpool.user, dbpool.slug, tt.status, tt.raw, tt.user, tt.slug)
 		}
+	}
+}
+
+// An expired paste is gone before the cleanup job deletes it.
+func TestExpiredPasteNotServed(t *testing.T) {
+	t.Chdir("../../..")
+	logger := slog.New(slog.DiscardHandler)
+	cfg := &Config{
+		Domain: "pastes.test", Protocol: "https", Space: "pastes", Logger: logger,
+	}
+	now := time.Now()
+	expired := now.Add(-time.Minute)
+	dbpool := &pasteDB{
+		StubDB: stub.NewStubDB(logger),
+		post: &db.Post{
+			Filename: "temp.txt", Slug: "temp.txt", Username: "tester",
+			Text: "secret", FileSize: 6, PublishAt: &now, UpdatedAt: &now, ExpiresAt: &expired,
+		},
+	}
+	web := &webRouter{cfg: cfg, db: dbpool}
+	handler := router.NewHostRouter(cfg.Domain, cfg.Space, web.mainMux(), web.sitesMux())
+
+	page := httptest.NewRecorder()
+	handler.ServeHTTP(page, httptest.NewRequest(http.MethodGet, "https://tester.pastes.test/temp.txt", nil))
+	if strings.Contains(page.Body.String(), "secret") {
+		t.Error("page served an expired paste")
+	}
+	raw := httptest.NewRecorder()
+	handler.ServeHTTP(raw, httptest.NewRequest(http.MethodGet, "https://tester.pastes.test/temp.txt/raw", nil))
+	if raw.Code != http.StatusNotFound || strings.Contains(raw.Body.String(), "secret") {
+		t.Errorf("raw served an expired paste: %d", raw.Code)
 	}
 }

@@ -105,6 +105,11 @@ func Middleware(dbpool DB, cfg *Config) pssh.SSHServerMiddleware {
 				}
 				return writer.Flush()
 			case "rm":
+				if len(args) < 2 {
+					err := fmt.Errorf("must provide filename of post to remove")
+					_, _ = fmt.Fprintln(sesh.Stderr(), err)
+					return err
+				}
 				filename := args[1]
 				_, _ = fmt.Fprintf(sesh, "removing digest post %s\r\n", filename)
 				write := false
@@ -171,6 +176,11 @@ func Middleware(dbpool DB, cfg *Config) pssh.SSHServerMiddleware {
 				fetcher := NewFetcher(dbpool, cfg)
 
 				isPicoPlus := db.HasPlusOrSpace(dbpool, user.ID, "feeds")
+				if !isPicoPlus {
+					err := fmt.Errorf("must have pico+ or feeds access to receive rss digests")
+					_, _ = fmt.Fprintln(sesh.Stderr(), err)
+					return err
+				}
 
 				err = fetcher.RunPost(sesh.Context(), logger, user, isPicoPlus, post, true, time.Now().UTC())
 				if err != nil {

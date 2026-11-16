@@ -88,3 +88,31 @@ func TestCreatePProfRoutesMux(t *testing.T) {
 		}
 	}
 }
+
+// A custom domain with the app domain in its name is looked up by TXT
+// record instead of being read as a subdomain.
+func TestGetSubdomainFromRequestCustomDomainWithAppName(t *testing.T) {
+	lookupTXT = func(name string) ([]string, error) {
+		if name == "_pgs.mypgs.sh.example." {
+			return []string{"antonio-blog"}, nil
+		}
+		return nil, &net.DNSError{Err: "no such host", Name: name, IsNotFound: true}
+	}
+	t.Cleanup(func() {
+		lookupTXT = net.LookupTXT
+		txtCache.Purge()
+		txtMissCache.Purge()
+	})
+
+	for host, want := range map[string]string{
+		"antonio-blog.pgs.sh": "antonio-blog",
+		"Antonio-Blog.PGS.sh": "antonio-blog",
+		"pgs.sh":              "",
+		"mypgs.sh.example":    "antonio-blog",
+	} {
+		r := httptest.NewRequest(http.MethodGet, "https://"+host+"/", nil)
+		if got := GetSubdomainFromRequest(r, "pgs.sh", "pgs"); got != want {
+			t.Errorf("%s: got %q, want %q", host, got, want)
+		}
+	}
+}

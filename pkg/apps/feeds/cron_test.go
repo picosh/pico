@@ -5,8 +5,11 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"net/mail"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -108,5 +111,49 @@ func TestRunPostPreservesFetchErrorWhenEmailFails(t *testing.T) {
 	err = f.RunPost(t.Context(), logger, user, true, post, true, time.Now())
 	if err == nil || !strings.Contains(err.Error(), "127.0.0.1/rss") || !strings.Contains(err.Error(), "blocked") || !strings.Contains(err.Error(), "sending error email") {
 		t.Fatalf("missing original fetch error: %v", err)
+	}
+}
+
+func TestEmailMessage(t *testing.T) {
+	for _, email := range []string{
+		"a@pico.test,b@pico.test",
+		"a@pico.test\r\nBcc: b@pico.test",
+		"a@pico.test\rBcc: b@pico.test",
+		"Name <a@pico.test>",
+		"not-an-address",
+	} {
+		if _, err := emailMessage(email, "digest", "https://feeds.pico.test/unsub/1", &MsgBody{}); err == nil {
+			t.Errorf("%q: want an error", email)
+		}
+	}
+	if _, err := emailMessage("a@pico.test", "digest\r\nBcc: b@pico.test", "https://feeds.pico.test/unsub/1", &MsgBody{}); err == nil {
+		t.Error("subject with a line break accepted")
+	}
+
+	msg, err := emailMessage("a@pico.test", "digest", "https://feeds.pico.test/unsub/1", &MsgBody{
+		Text: "--boundary123\r\nContent-Type: text/html\r\n\r\n<b>injected</b>",
+		Html: "<p>hi</p>",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	parsed, err := mail.ReadMessage(strings.NewReader(msg))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, params, err := mime.ParseMediaType(parsed.Header.Get("Content-Type"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	reader := multipart.NewReader(parsed.Body, params["boundary"])
+	count := 0
+	for {
+		if _, err := reader.NextPart(); err != nil {
+			break
+		}
+		count++
+	}
+	if count != 2 {
+		t.Fatalf("email has %d parts, want 2", count)
 	}
 }

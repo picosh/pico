@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"testing"
@@ -164,5 +165,65 @@ func TestAnalyticsContentHeight(t *testing.T) {
 	}
 	if page.rightPane.pos != -(int(page.rightPane.Surface.Size.Height) - page.rightPane.height) {
 		t.Fatal("analytics pager did not stop at the final page")
+	}
+}
+
+// A terminal smaller than the layout needs gets a message, since laying the
+// pages out in it would wrap sizes around to a huge surface.
+func TestAppDrawTinyTerminal(t *testing.T) {
+	app := &App{page: "dash", pages: map[string]vxfw.Widget{}}
+	for _, size := range []vxfw.Size{{Width: 0, Height: 0}, {Width: 1, Height: 40}, {Width: 120, Height: 1}, {Width: 39, Height: 11}} {
+		surface, err := app.Draw(vxfw.DrawContext{Max: size, Characters: vaxis.Characters})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if surface.Size.Width > size.Width || surface.Size.Height > size.Height {
+			t.Fatalf("%v: surface is %v", size, surface.Size)
+		}
+	}
+}
+
+type toggleTestDB struct {
+	db.DB
+	plus     *db.FeatureFlag
+	inserted []string
+}
+
+func (d *toggleTestDB) FindFeature(_, name string) (*db.FeatureFlag, error) {
+	if name == "plus" && d.plus != nil {
+		return d.plus, nil
+	}
+	return nil, sql.ErrNoRows
+}
+
+func (d *toggleTestDB) InsertFeature(_, name string, _ time.Time) (*db.FeatureFlag, error) {
+	d.inserted = append(d.inserted, name)
+	return &db.FeatureFlag{Name: name}, nil
+}
+
+func (d *toggleTestDB) FindFeaturesByUser(string) ([]*db.FeatureFlag, error) { return nil, nil }
+
+// Analytics is a pico+ feature, so the toggle won't turn it on without it.
+func TestAnalyticsToggleRequiresPlus(t *testing.T) {
+	expired := time.Now().Add(-time.Hour)
+	for name, plus := range map[string]*db.FeatureFlag{
+		"none":    nil,
+		"expired": {Name: "plus", ExpiresAt: &expired},
+	} {
+		pool := &toggleTestDB{plus: plus}
+		page := NewAnalyticsPage(&SharedModel{Dbpool: pool, User: &db.User{ID: "fixture"}})
+		if enabled, err := page.toggleAnalytics(); enabled || err == nil {
+			t.Errorf("%s: toggle enabled analytics (%v, %v)", name, enabled, err)
+		}
+		if len(pool.inserted) != 0 {
+			t.Errorf("%s: inserted %v", name, pool.inserted)
+		}
+	}
+
+	valid := time.Now().Add(time.Hour)
+	pool := &toggleTestDB{plus: &db.FeatureFlag{Name: "plus", ExpiresAt: &valid}}
+	page := NewAnalyticsPage(&SharedModel{Dbpool: pool, User: &db.User{ID: "fixture"}})
+	if enabled, err := page.toggleAnalytics(); !enabled || err != nil {
+		t.Fatalf("pico+ toggle = %v, %v", enabled, err)
 	}
 }

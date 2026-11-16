@@ -47,6 +47,14 @@ type Broker interface {
 type BaseBroker struct {
 	Channels *syncmap.Map[string, *Channel]
 	Logger   *slog.Logger
+	// WildcardFilter, when set, reports whether the wildcard subscriber
+	// clientID may join topic. It keeps patterns out of topics with their own
+	// access rules.
+	WildcardFilter func(clientID, topic string) bool
+}
+
+func (b *BaseBroker) wildcardAllowed(clientID, topic string) bool {
+	return b.WildcardFilter == nil || b.WildcardFilter(clientID, topic)
 }
 
 func (b *BaseBroker) Cleanup() {
@@ -91,7 +99,7 @@ func (b *BaseBroker) Connect(client *Client, channels []*Channel) (error, error)
 		// attach client to all existing concrete channels matching the pattern.
 		if (client.Direction == ChannelDirectionOutput || client.Direction == ChannelDirectionInputOutput) && HasWildcard(channel.Topic) {
 			for _, existingChannel := range b.GetChannels() {
-				if existingChannel.Topic != channel.Topic && !HasWildcard(existingChannel.Topic) && MatchTopic(channel.Topic, existingChannel.Topic) {
+				if existingChannel.Topic != channel.Topic && !HasWildcard(existingChannel.Topic) && MatchTopic(channel.Topic, existingChannel.Topic) && b.wildcardAllowed(client.ID, existingChannel.Topic) {
 					existingChannel.Clients.Store(client.ID, client)
 					client.Channels.Store(existingChannel.Topic, existingChannel)
 				}
@@ -268,6 +276,9 @@ func (b *BaseBroker) ensureChannel(channel *Channel) *Channel {
 		for _, existingChannel := range b.GetChannels() {
 			if HasWildcard(existingChannel.Topic) && MatchTopic(existingChannel.Topic, channel.Topic) {
 				for _, client := range existingChannel.GetClients() {
+					if !b.wildcardAllowed(client.ID, channel.Topic) {
+						continue
+					}
 					if client.Direction == ChannelDirectionOutput || client.Direction == ChannelDirectionInputOutput {
 						dataChannel.Clients.Store(client.ID, client)
 						client.Channels.Store(dataChannel.Topic, dataChannel)

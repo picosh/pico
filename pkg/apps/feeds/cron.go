@@ -1,14 +1,19 @@
 package feeds
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"html"
 	htmltmpl "html/template"
+	"io"
 	"log/slog"
 	"math"
+	"mime/multipart"
 	"net/http"
+	"net/mail"
+	"net/textproto"
 	"os"
 	"strings"
 	"text/template"
@@ -61,8 +66,9 @@ func itemToTemplate(item *gofeed.Item) *FeedItemTmpl {
 		Title:       item.Title,
 		Link:        item.Link,
 		PublishedAt: item.PublishedParsed,
-		Description: htmltmpl.HTML(item.Description),
-		Content:     htmltmpl.HTML(item.Content),
+		// Feed HTML comes from anywhere and goes out as our email.
+		Description: htmltmpl.HTML(shared.HtmlPolicy().Sanitize(item.Description)),
+		Content:     htmltmpl.HTML(shared.HtmlPolicy().Sanitize(item.Content)),
 	}
 }
 
@@ -544,15 +550,58 @@ func (f *Fetcher) SendEmail(logger *slog.Logger, username, email, subject, unsub
 	if email == "" {
 		return fmt.Errorf("(%s) does not have an email associated with their feed post", username)
 	}
-	smtpAddr := f.host
-	fromEmail := "hello@pico.sh"
-	to := []string{email}
+	content, err := emailMessage(email, subject, unsubURL, msg)
+	if err != nil {
+		return fmt.Errorf("(%s) %w", username, err)
+	}
+
+	logger.Info("sending email digest")
+	return smtp.SendMail(
+		f.host,
+		f.auth,
+		emailFrom,
+		[]string{email},
+		strings.NewReader(content),
+	)
+}
+
+const emailFrom = "hello@pico.sh"
+
+// emailMessage builds a digest email to one plain address, so a feed post
+// can't add recipients or headers and feed content can't add MIME parts.
+func emailMessage(email, subject, unsubURL string, msg *MsgBody) (string, error) {
+	addr, err := mail.ParseAddress(email)
+	if err != nil || addr.Name != "" || addr.Address != email {
+		return "", fmt.Errorf("invalid email address on feed post: %q", email)
+	}
+	if strings.ContainsAny(subject, "\r\n") || strings.ContainsAny(unsubURL, "\r\n") {
+		return "", fmt.Errorf("email header contains a line break")
+	}
+
+	var body bytes.Buffer
+	parts := multipart.NewWriter(&body)
+	for _, part := range []struct{ contentType, content string }{
+		{`text/plain; charset="utf-8"`, msg.Text},
+		{`text/html; charset="utf-8"`, msg.Html},
+	} {
+		w, err := parts.CreatePart(textproto.MIMEHeader{"Content-Type": {part.contentType}})
+		if err != nil {
+			return "", err
+		}
+		if _, err := io.WriteString(w, part.content); err != nil {
+			return "", err
+		}
+	}
+	if err := parts.Close(); err != nil {
+		return "", err
+	}
+
 	headers := map[string]string{
-		"From":             fromEmail,
+		"From":             emailFrom,
 		"Subject":          subject,
 		"To":               email,
 		"MIME-Version":     "1.0",
-		"Content-Type":     `multipart/alternative; boundary="boundary123"`,
+		"Content-Type":     "multipart/alternative; boundary=" + parts.Boundary(),
 		"List-Unsubscribe": "<" + unsubURL + ">",
 	}
 	var content strings.Builder
@@ -560,24 +609,8 @@ func (f *Fetcher) SendEmail(logger *slog.Logger, username, email, subject, unsub
 		fmt.Fprintf(&content, "%s: %s\r\n", k, v)
 	}
 	content.WriteString("\r\n")
-	content.WriteString("\r\n--boundary123\r\n")
-	content.WriteString("Content-Type: text/plain; charset=\"utf-8\"\r\n")
-	content.WriteString("\r\n" + msg.Text + "\r\n")
-	content.WriteString("--boundary123\r\n")
-	content.WriteString("Content-Type: text/html; charset=\"utf-8\"\r\n")
-	content.WriteString("\r\n" + msg.Html + "\r\n")
-	content.WriteString("--boundary123--")
-
-	reader := strings.NewReader(content.String())
-	logger.Info("sending email digest")
-	err := smtp.SendMail(
-		smtpAddr,
-		f.auth,
-		fromEmail,
-		to,
-		reader,
-	)
-	return err
+	content.Write(body.Bytes())
+	return content.String(), nil
 }
 
 func (f *Fetcher) Run(now time.Time) error {

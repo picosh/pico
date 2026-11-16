@@ -70,18 +70,24 @@ func TestDispatcherClientDirection(t *testing.T) {
 
 		var wg sync.WaitGroup
 
+		// Subscriber (output only), joined first so the message isn't dropped
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_ = cast.Sub(context.TODO(), "sub", subBuf, []*Channel{channel}, false)
+		}()
+		for joined := false; !joined; {
+			for range cast.GetSubs() {
+				joined = true
+			}
+			time.Sleep(time.Millisecond)
+		}
+
 		// Publisher (input only)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			_ = cast.Pub(context.TODO(), "pub", &Buffer{b: *bytes.NewBufferString("test")}, []*Channel{channel}, false)
-		}()
-
-		// Subscriber (output only)
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			_ = cast.Sub(context.TODO(), "sub", subBuf, []*Channel{channel}, false)
 		}()
 
 		wg.Wait()

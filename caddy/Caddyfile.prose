@@ -4,7 +4,8 @@
 	}
 	servers {
 		metrics
-		trusted_proxies static 0.0.0.0/0
+		# Proxies allowed to set the client IP, such as the pgs CDN nodes.
+		trusted_proxies static {$CADDY_TRUSTED_PROXIES:private_ranges}
 	}
 }
 

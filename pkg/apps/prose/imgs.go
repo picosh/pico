@@ -144,9 +144,18 @@ func (h *UploadImgHandler) Write(s *pssh.SSHServerConnSession, entry *sendutils.
 
 	filename := filepath.Base(entry.Filepath)
 
-	var text []byte
-	if b, err := io.ReadAll(entry.Reader); err == nil {
-		text = b
+	featureFlag, _ := h.DBPool.FindFeature(user.ID, "plus")
+	// we have free tiers so users might not have a feature flag
+	// in which case we set sane defaults
+	if featureFlag == nil || !featureFlag.IsValid() {
+		featureFlag = db.NewFeatureFlag(user.ID, "plus", h.Cfg.MaxSize, h.Cfg.MaxAssetSize, h.Cfg.MaxSpecialFileSize)
+	}
+	featureFlag.SetLimits(h.Cfg.MaxSize, h.Cfg.MaxAssetSize, h.Cfg.MaxSpecialFileSize)
+
+	// Read no more than the file limit, which validateImg then enforces.
+	text, err := io.ReadAll(io.LimitReader(entry.Reader, featureFlag.Data.FileMax+1))
+	if err != nil {
+		return "", fmt.Errorf("could not read file (%s): %w", filename, err)
 	}
 	mimeType := http.DetectContentType(text)
 	ext := filepath.Ext(filename)
@@ -169,13 +178,6 @@ func (h *UploadImgHandler) Write(s *pssh.SSHServerConnSession, entry *sendutils.
 	}
 
 	fileSize := binary.Size(text)
-	featureFlag, _ := h.DBPool.FindFeature(user.ID, "plus")
-	// we have free tiers so users might not have a feature flag
-	// in which case we set sane defaults
-	if featureFlag == nil {
-		featureFlag = db.NewFeatureFlag(user.ID, "plus", h.Cfg.MaxSize, h.Cfg.MaxAssetSize, h.Cfg.MaxSpecialFileSize)
-	}
-	featureFlag.SetLimits(h.Cfg.MaxSize, h.Cfg.MaxAssetSize, h.Cfg.MaxSpecialFileSize)
 
 	bucket, err := h.Storage.UpsertBucket(shared.GetAssetBucketName(user.ID))
 	if err != nil {

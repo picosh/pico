@@ -10,7 +10,6 @@ import (
 	"slices"
 	"strings"
 	"text/tabwriter"
-	"time"
 
 	pgsdb "github.com/picosh/pico/pkg/apps/pgs/db"
 	"github.com/picosh/pico/pkg/db"
@@ -38,7 +37,7 @@ func projectTable(sesh io.Writer, projects []*db.Project) {
 			project.UpdatedAt.Format("2006-01-02 15:04:05"),
 			links,
 			project.Acl.Type,
-			strings.Join(project.Acl.Data, " "),
+			strings.Join(project.Acl.DisplayData(), " "),
 			project.Blocked,
 		)
 	}
@@ -88,6 +87,10 @@ func (c *Cmd) purge(projectName string) {
 }
 
 func (c *Cmd) RmProjectAssets(projectName string) error {
+	// A name like ".." would reach every project in the bucket.
+	if !shared.IsValidSubdomain(projectName) {
+		return fmt.Errorf("'%s' is not a valid project name", projectName)
+	}
 	bucketName := shared.GetAssetBucketName(c.User.ID)
 	bucket, err := c.Store.GetBucket(bucketName)
 	if err != nil {
@@ -236,7 +239,7 @@ This means only you can access the site through a web tunnel or by downloading t
 		},
 		{
 			fmt.Sprintf("acl %s", projectName),
-			"Access control for project (--type public, pico, pubkeys, http-pass)",
+			"Access control for project (--type public, pico, pubkeys, http-pass, http-basic)",
 		},
 		{
 			fmt.Sprintf("cache %s", projectName),
@@ -362,11 +365,18 @@ func (c *Cmd) fzf(projectName string) error {
 func (c *Cmd) link(projectName, linkTo string) error {
 	c.Log.Info("user running `link` command", "user", c.User.Name, "project", projectName, "link", linkTo)
 
+	if projectName == linkTo {
+		return fmt.Errorf("cannot link (%s) to itself, use `unlink` instead", projectName)
+	}
+
 	projectDir := linkTo
-	_, err := c.Dbpool.FindProjectByName(c.User.ID, linkTo)
+	target, err := c.Dbpool.FindProjectByName(c.User.ID, linkTo)
 	if err != nil {
 		e := fmt.Errorf("(%s) project doesn't exist", linkTo)
 		return e
+	}
+	if target.Blocked != "" {
+		return fmt.Errorf("(%s) has been blocked and cannot be linked to: %s", linkTo, target.Blocked)
 	}
 
 	project, err := c.Dbpool.FindProjectByName(c.User.ID, projectName)
@@ -436,7 +446,9 @@ func (c *Cmd) prune(prefix string, keepNumLatest int) error {
 	c.Log.Info("user running `clean` command", "user", c.User.Name, "prefix", prefix)
 	c.output(fmt.Sprintf("searching for projects that match prefix (%s) and are not linked to other projects", prefix))
 
-	if prefix == "" || prefix == "*" {
+	// The prefix goes into an ILIKE pattern, so only project name characters
+	// are allowed.
+	if !shared.IsValidSubdomain(prefix) {
 		e := fmt.Errorf("must provide valid prefix")
 		return e
 	}
@@ -548,18 +560,35 @@ func (c *Cmd) rm(projectName string) error {
 }
 
 func (c *Cmd) acl(projectName, aclType string, acls []string) error {
+	acl := db.ProjectAcl{
+		Type: aclType,
+		Data: acls,
+	}
 	c.Log.Info(
 		"user running `acl` command",
 		"user", c.User.Name,
 		"project", projectName,
 		"actType", aclType,
-		"acls", acls,
+		"acls", acl.DisplayData(),
 	)
-	c.output(fmt.Sprintf("setting acl for %s to %s (%s)", projectName, aclType, strings.Join(acls, ",")))
-	acl := db.ProjectAcl{
-		Type: aclType,
-		Data: acls,
+	if aclType == "http-pass" {
+		if len(acls) != 1 || acls[0] == "" {
+			return fmt.Errorf("http-pass needs one password: --acl <password>")
+		}
+		hash, err := hashPassword(acls[0])
+		if err != nil {
+			return err
+		}
+		acl.Data = []string{hash}
 	}
+	if aclType == "http-basic" {
+		hashed, err := hashBasicCredentials(acls)
+		if err != nil {
+			return err
+		}
+		acl.Data = hashed
+	}
+	c.output(fmt.Sprintf("setting acl for %s to %s (%s)", projectName, aclType, strings.Join(acl.DisplayData(), ",")))
 	if c.Write {
 		if err := c.Dbpool.UpdateProjectAcl(c.User.ID, projectName, acl); err != nil {
 			return err
@@ -586,15 +615,7 @@ func (c *Cmd) cache(projectName string) error {
 }
 
 func (c *Cmd) cacheAll() error {
-	isAdmin := false
-	ff, _ := c.Dbpool.FindFeature(c.User.ID, "admin")
-	if ff != nil {
-		if ff.ExpiresAt.After(time.Now()) {
-			isAdmin = true
-		}
-	}
-
-	if !isAdmin {
+	if !db.HasFeature(c.Dbpool, c.User.ID, "admin") {
 		return fmt.Errorf("must be admin to use this command")
 	}
 

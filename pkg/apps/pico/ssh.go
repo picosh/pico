@@ -80,6 +80,10 @@ func StartSshServer() {
 		func(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
 			perms, err := sshAuth.PubkeyAuthHandler(conn, key)
 			logger.Warn("pubkey auth handler", "err", err)
+			// Unknown keys may sign up, but a cert that failed its checks is refused.
+			if _, isCert := key.(*ssh.Certificate); isCert && err != nil {
+				return nil, err
+			}
 			if perms == nil {
 				perms = &ssh.Permissions{
 					Extensions: map[string]string{

@@ -15,6 +15,8 @@ type Config struct {
 	Port          string
 	Secret        string
 	SecretWebhook string
+	// RedirectHosts are the hosts /redirect may send an API token to.
+	RedirectHosts []string
 	Logger        *slog.Logger
 }
 
@@ -30,6 +32,17 @@ func NewConfig() *Config {
 		Port:          shared.GetEnv("AUTH_WEB_PORT", "3000"),
 		Secret:        shared.GetEnv("PICO_SECRET", ""),
 		SecretWebhook: shared.GetEnv("PICO_SECRET_WEBHOOK", ""),
+		RedirectHosts: parseList(shared.GetEnv("AUTH_REDIRECT_HOSTS", "chat.pico.sh")),
 		Logger:        shared.CreateLogger("auth-web", withPipe),
 	}
+}
+
+func parseList(s string) []string {
+	list := []string{}
+	for _, item := range strings.Split(s, ",") {
+		if item = strings.TrimSpace(item); item != "" {
+			list = append(list, item)
+		}
+	}
+	return list
 }

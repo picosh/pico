@@ -495,3 +495,20 @@ func TestFilterRules(t *testing.T) {
 		t.Error("! clears the list")
 	}
 }
+
+// A sum head claiming more blocks than a basis file could have is refused
+// before anything is allocated for it.
+func TestReadSumHeadRejectsHugeCount(t *testing.T) {
+	c, _ := newTestConn(t, 31)
+	for _, v := range []int32{0x7fffffff, 700, 16, 0} {
+		if err := c.writeInt32(v); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := c.flush(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.readSumHead(0); err == nil {
+		t.Fatal("huge checksum count accepted")
+	}
+}

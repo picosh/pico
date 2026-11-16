@@ -173,8 +173,8 @@ func pageToWidget(project *db.Project, username string, isSelected bool) vxfw.Wi
 
 	if project.Acl.Type != "" && project.Acl.Type != "public" {
 		aclStr := project.Acl.Type
-		if len(project.Acl.Data) > 0 {
-			aclStr += " (" + strings.Join(project.Acl.Data, ", ") + ")"
+		if data := project.Acl.DisplayData(); len(data) > 0 {
+			aclStr += " (" + strings.Join(data, ", ") + ")"
 		}
 		segs = append(segs,
 			vaxis.Segment{Text: "\n"},

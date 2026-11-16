@@ -3,7 +3,6 @@ package pgs
 import (
 	"bufio"
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -16,6 +15,7 @@ import (
 
 	"github.com/gorilla/feeds"
 	"github.com/hashicorp/golang-lru/v2/expirable"
+	pgsdb "github.com/picosh/pico/pkg/apps/pgs/db"
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/httpcache"
 	"github.com/picosh/pico/pkg/metrics"
@@ -192,10 +192,12 @@ type siteInfo struct {
 	project *db.Project
 	bucket  storage.Bucket
 	plus    *db.FeatureFlag
+	// blocked is why the project, or the project it links to, is blocked.
+	blocked string
 }
 
 func (s *siteInfo) hasPicoPlus() bool {
-	return s.plus != nil && s.plus.ExpiresAt.After(time.Now())
+	return s.plus != nil && s.plus.IsValid()
 }
 
 func NewWebRouter(cfg *Config) *WebRouter {
@@ -264,7 +266,14 @@ func (web *WebRouter) findSite(props *router.SubdomainProps, logger *slog.Logger
 	}
 	plus, _ := web.Cfg.DB.FindFeature(user.ID, "plus")
 
-	site := &siteInfo{user: user, project: project, bucket: bucket, plus: plus}
+	blocked := project.Blocked
+	if blocked == "" && project.ProjectDir != project.Name {
+		if target, err := web.Cfg.DB.FindProjectByName(user.ID, project.ProjectDir); err == nil {
+			blocked = target.Blocked
+		}
+	}
+
+	site := &siteInfo{user: user, project: project, bucket: bucket, plus: plus, blocked: blocked}
 	web.SiteCache.Add(key, site)
 	return site, http.StatusOK, ""
 }
@@ -317,7 +326,7 @@ func (web *WebRouter) checkHandler(w http.ResponseWriter, r *http.Request) {
 	// we do *not* want to cache this handler
 	w.Header().Set("cache-control", "no-store")
 
-	if !strings.Contains(hostDomain, appDomain) {
+	if !strings.EqualFold(hostDomain, appDomain) && !router.IsAppSubdomain(hostDomain, appDomain) {
 		subdomain := router.GetCustomDomain(hostDomain, cfg.TxtPrefix)
 		props, err := router.GetProjectFromSubdomain(subdomain)
 		if err != nil {
@@ -410,6 +419,10 @@ func (web *WebRouter) createRssHandler(by string) http.HandlerFunc {
 
 		var feedItems []*feeds.Item
 		for _, project := range projects {
+			// The feed is public, so it only lists sites anyone can visit.
+			if !WebPerm(project) || project.Blocked != "" || pgsdb.IsProjectPrivate(project.Name) {
+				continue
+			}
 			realUrl := strings.TrimSuffix(
 				cfg.AssetURL(project.Username, project.Name, ""),
 				"/",
@@ -441,6 +454,7 @@ func (web *WebRouter) createRssHandler(by string) http.HandlerFunc {
 		if err != nil {
 			logger.Error("could not convert feed to atom", "err", err.Error())
 			http.Error(w, "Could not generate atom rss feed", http.StatusInternalServerError)
+			return
 		}
 
 		w.Header().Add("Content-Type", "application/atom+xml")
@@ -535,35 +549,38 @@ func (web *WebRouter) ServeAsset(fname string, opts *storage.ImgProcessOpts, has
 		"project", project.Name,
 	)
 
-	if project.Blocked != "" {
+	if site.blocked != "" {
 		logger.Error("project has been blocked")
-		http.Error(w, project.Blocked, http.StatusForbidden)
+		http.Error(w, site.blocked, http.StatusForbidden)
 		return
 	}
 
-	if project.Acl.Type == "http-pass" {
-		cookie, err := r.Cookie(getCookieName(project.Name))
-		if err == nil {
-			if cookie.Valid() != nil || cookie.Value != project.ID {
-				logger.Error("cookie not valid", "err", err)
+	if project.Acl.Type == "http-pass" || project.Acl.Type == "http-basic" {
+		w = noStoreWriter{w}
+	}
+	// A tunnel has already checked access, so only the web asks for a
+	// password.
+	if !hasPerm(project) {
+		switch project.Acl.Type {
+		case "http-pass":
+			if !hasValidSession(r, project) {
 				web.serveLoginForm(w, r, project, logger)
 				return
 			}
-		} else {
-			if errors.Is(err, http.ErrNoCookie) {
-				web.serveLoginForm(w, r, project, logger)
-				return
-			} else {
-				// Some other error occurred
-				logger.Error("failed to fetch cookie", "err", err)
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
+		case "http-basic":
+			// The session cookie spares a bcrypt check on every request.
+			if !hasValidSession(r, project) {
+				if !validBasicAuth(r, project) {
+					basicAuthChallenge(w, project)
+					return
+				}
+				setSessionCookie(w, project, web.Cfg.WebProtocol == "https")
 			}
+		default:
+			logger.Error("You do not have access to this site")
+			http.Error(w, "You do not have access to this site", http.StatusUnauthorized)
+			return
 		}
-	} else if !hasPerm(project) {
-		logger.Error("You do not have access to this site")
-		http.Error(w, "You do not have access to this site", http.StatusUnauthorized)
-		return
 	}
 
 	asset := &ApiAssetHandler{
@@ -579,11 +596,27 @@ func (web *WebRouter) ServeAsset(fname string, opts *storage.ImgProcessOpts, has
 		Bucket:         bucket,
 		ImgProcessOpts: opts,
 		HasPicoPlus:    site.hasPicoPlus(),
-		HttpPass:       project.Acl.Type == "http-pass",
 	}
 
 	asset.ServeHTTP(w, r)
 }
+
+// noStoreWriter keeps a password-protected site's responses out of shared
+// caches. The http cache is checked before the password, so anything it
+// stored would be served without one.
+type noStoreWriter struct{ http.ResponseWriter }
+
+func (w noStoreWriter) WriteHeader(code int) {
+	w.Header().Set("cache-control", "private, no-store")
+	w.ResponseWriter.WriteHeader(code)
+}
+
+func (w noStoreWriter) Write(b []byte) (int, error) {
+	w.Header().Set("cache-control", "private, no-store")
+	return w.ResponseWriter.Write(b)
+}
+
+func (w noStoreWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
 
 func (web *WebRouter) serveLoginForm(w http.ResponseWriter, r *http.Request, project *db.Project, logger *slog.Logger) {
 	serveLoginFormWithConfig(w, r, project, web.Cfg, logger)

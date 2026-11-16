@@ -788,3 +788,119 @@ func TestPtyVisibleToCommand(t *testing.T) {
 		t.Fatalf("command ran before its pty request in %d of 200 sessions", missed)
 	}
 }
+
+func startTestServer(t *testing.T, mw pssh.SSHServerMiddleware) string {
+	t.Helper()
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	user := GenerateKey()
+	server := pssh.NewSSHServer(ctx, slog.New(slog.DiscardHandler), &pssh.SSHServerConfig{
+		ListenAddr: "127.0.0.1:0",
+		Middleware: []pssh.SSHServerMiddleware{mw},
+		ServerConfig: &ssh.ServerConfig{
+			NoClientAuth: true,
+			NoClientAuthCallback: func(ssh.ConnMetadata) (*ssh.Permissions, error) {
+				return &ssh.Permissions{Extensions: map[string]string{}}, nil
+			},
+		},
+	})
+	server.Config.AddHostKey(user.signer)
+	go func() { _ = server.ListenAndServe() }()
+
+	for range 50 {
+		server.Mu.Lock()
+		l := server.Listener
+		server.Mu.Unlock()
+		if l != nil {
+			return l.Addr().String()
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("server listener not ready")
+	return ""
+}
+
+// A handler that panics ends its own session and leaves the server serving.
+func TestSessionPanicIsRecovered(t *testing.T) {
+	addr := startTestServer(t, func(next pssh.SSHServerHandler) pssh.SSHServerHandler {
+		return func(sesh *pssh.SSHServerConnSession) error {
+			if sesh.Command()[0] == "boom" {
+				var args []string
+				_ = args[1]
+			}
+			_, _ = sesh.Write([]byte("ok"))
+			return next(sesh)
+		}
+	})
+
+	client, err := ssh.Dial("tcp", addr, &ssh.ClientConfig{User: "user", HostKeyCallback: ssh.InsecureIgnoreHostKey()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = client.Close() }()
+
+	session, err := client.NewSession()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = session.CombinedOutput("boom")
+
+	session, err = client.NewSession()
+	if err != nil {
+		t.Fatalf("server stopped after a panic: %v", err)
+	}
+	out, err := session.Output("hello")
+	if err != nil || string(out) != "ok" {
+		t.Fatalf("session after panic = %q, %v", out, err)
+	}
+}
+
+// Window changes a handler never reads don't block the session.
+func TestWindowChangeWithoutReader(t *testing.T) {
+	release := make(chan struct{})
+	addr := startTestServer(t, func(next pssh.SSHServerHandler) pssh.SSHServerHandler {
+		return func(sesh *pssh.SSHServerConnSession) error {
+			<-release
+			_, _ = sesh.Write([]byte("done"))
+			return next(sesh)
+		}
+	})
+
+	client, err := ssh.Dial("tcp", addr, &ssh.ClientConfig{User: "user", HostKeyCallback: ssh.InsecureIgnoreHostKey()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = client.Close() }()
+	session, err := client.NewSession()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := session.RequestPty("xterm", 24, 80, ssh.TerminalModes{}); err != nil {
+		t.Fatal(err)
+	}
+	var out strings.Builder
+	session.Stdout = &out
+	if err := session.Start("cmd"); err != nil {
+		t.Fatal(err)
+	}
+	for i := range 3 {
+		if err := session.WindowChange(30+i, 100); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// The window-change replies aren't awaited, so give them time to land.
+	time.Sleep(100 * time.Millisecond)
+	close(release)
+
+	done := make(chan error, 1)
+	go func() { done <- session.Wait() }()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("session blocked after window changes")
+	}
+	if !strings.Contains(out.String(), "done") {
+		t.Fatalf("output = %q", out.String())
+	}
+}

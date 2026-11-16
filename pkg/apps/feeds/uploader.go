@@ -43,6 +43,9 @@ func (h *UploadHandler) Validate(s *pssh.SSHServerConnSession) error {
 	if err != nil {
 		return err
 	}
+	if _, err := db.FindAccess(h.DB, user.ID, "feeds"); err != nil {
+		return err
+	}
 	h.GetLogger(s).Info("attempting to upload files", "user", user.Name, "space", h.Cfg.Space)
 	return nil
 }
@@ -70,6 +73,9 @@ func (h *UploadHandler) ValidateWrite(s *pssh.SSHServerConnSession, entry *sendu
 	return h.validate(postfs.NewPost(filepath.Base(entry.Filepath), nil))
 }
 
+// maxPostSize bounds a feed post, which is a list of feed URLs.
+var maxPostSize = int64(3 * shared.MB)
+
 func (h *UploadHandler) Write(s *pssh.SSHServerConnSession, entry *sendutils.FileEntry) (string, error) {
 	user, err := postfs.SessionUser(s)
 	if err != nil {
@@ -77,7 +83,7 @@ func (h *UploadHandler) Write(s *pssh.SSHServerConnSession, entry *sendutils.Fil
 	}
 	logger := h.GetLogger(s).With("filename", filepath.Base(entry.Filepath))
 
-	post, err := postfs.PostFromEntry(entry, user, h.Cfg.Space)
+	post, err := postfs.PostFromEntry(entry, user, h.Cfg.Space, maxPostSize)
 	if err != nil {
 		return "", err
 	}

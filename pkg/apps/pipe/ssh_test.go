@@ -16,7 +16,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antoniomika/syncmap"
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/db/stub"
 	"github.com/picosh/pico/pkg/pssh"
@@ -259,14 +258,7 @@ func NewTestSSHServer(t *testing.T) *TestSSHServer {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	pubsub := psub.NewMulticast(logger)
-	handler := &CliHandler{
-		Logger:  logger,
-		DBPool:  dbpool,
-		PubSub:  pubsub,
-		Cfg:     cfg,
-		Waiters: syncmap.New[string, []string](),
-		Access:  syncmap.New[string, []string](),
-	}
+	handler := NewCliHandler(logger, dbpool, pubsub, cfg)
 
 	sshAuth := shared.NewSshAuthHandler(dbpool, logger, "pipe")
 
@@ -348,13 +340,15 @@ func (s *TestSSHServer) waitForClients(t *testing.T, n int) {
 	ps := s.PipeHandler.PubSub.(*psub.Multicast)
 	deadline := time.Now().Add(5 * time.Second)
 	for {
-		joined := 0
-		for range ps.GetSubs() {
-			joined++
+		// A wildcard subscriber is listed once per channel it joined.
+		ids := map[string]bool{}
+		for _, c := range ps.GetSubs() {
+			ids[c.ID] = true
 		}
-		for range ps.GetPipes() {
-			joined++
+		for _, c := range ps.GetPipes() {
+			ids[c.ID] = true
 		}
+		joined := len(ids)
 		if joined == n {
 			return
 		}
@@ -399,8 +393,13 @@ func (u UserSSH) PublicKey() string {
 }
 
 func (u UserSSH) NewClient() (*ssh.Client, error) {
+	return u.NewClientAs(u.username)
+}
+
+// NewClientAs connects with sshUser as the ssh username, such as admin__<name>.
+func (u UserSSH) NewClientAs(sshUser string) (*ssh.Client, error) {
 	config := &ssh.ClientConfig{
-		User: u.username,
+		User: sshUser,
 		Auth: []ssh.AuthMethod{
 			ssh.PublicKeys(u.signer),
 		},
@@ -488,6 +487,13 @@ func RegisterUserWithServer(server *TestSSHServer, user UserSSH) {
 		UserID: dbUser.ID,
 		Key:    user.PublicKey(),
 	})
+}
+
+func grantAdmin(server *TestSSHServer, userID string) {
+	expires := time.Now().Add(time.Hour)
+	server.DBPool.mu.Lock()
+	defer server.DBPool.mu.Unlock()
+	server.DBPool.Features = append(server.DBPool.Features, &db.FeatureFlag{UserID: userID, Name: "admin", ExpiresAt: &expires})
 }
 
 func TestLs_UnauthenticatedUserDenied(t *testing.T) {
@@ -850,6 +856,500 @@ func TestAccessControl_AllowedUserViaFullPath(t *testing.T) {
 
 	if !strings.Contains(string(aliceReceived[:n]), "bob allowed") {
 		t.Errorf("alice should receive bob's message on shared topic, got: %q", string(aliceReceived[:n]))
+	}
+}
+
+// A user missing from a topic's access list who names the topic in full gets
+// their own topic, and leaving doesn't remove the owner's access list.
+func TestAccessControl_UnlistedUserViaFullPath(t *testing.T) {
+	server := NewTestSSHServer(t)
+	defer server.Shutdown()
+
+	alice := GenerateUser("alice")
+	bob := GenerateUser("bob")
+	mallory := GenerateUser("mallory")
+	RegisterUserWithServer(server, alice)
+	RegisterUserWithServer(server, bob)
+	RegisterUserWithServer(server, mallory)
+
+	aliceClient, err := alice.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect alice: %v", err)
+	}
+	defer func() { _ = aliceClient.Close() }()
+
+	aliceSession, err := aliceClient.NewSession()
+	if err != nil {
+		t.Fatalf("failed to create alice session: %v", err)
+	}
+	defer func() { _ = aliceSession.Close() }()
+
+	aliceStdout, err := aliceSession.StdoutPipe()
+	if err != nil {
+		t.Fatalf("failed to get alice stdout: %v", err)
+	}
+
+	if err := aliceSession.Start("sub sharedtopic -a alice,bob -c"); err != nil {
+		t.Fatalf("failed to start alice sub: %v", err)
+	}
+
+	server.waitForClients(t, 1)
+
+	malloryClient, err := mallory.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect mallory: %v", err)
+	}
+	defer func() { _ = malloryClient.Close() }()
+
+	_, err = mallory.RunCommandWithStdin(malloryClient, "pub alice/sharedtopic -b=false -c", "mallory snuck in\n")
+	if err != nil {
+		t.Logf("mallory pub completed: %v", err)
+	}
+
+	if list, ok := server.PipeHandler.Access.Load("alice/sharedtopic"); !ok || len(list) == 0 {
+		t.Fatalf("mallory leaving removed alice's access list: %v %v", list, ok)
+	}
+
+	bobClient, err := bob.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect bob: %v", err)
+	}
+	defer func() { _ = bobClient.Close() }()
+
+	_, err = bob.RunCommandWithStdin(bobClient, "pub alice/sharedtopic -c", "bob allowed\n")
+	if err != nil {
+		t.Logf("bob pub completed: %v", err)
+	}
+
+	aliceReceived := make([]byte, 100)
+	n, _ := aliceStdout.Read(aliceReceived)
+	got := string(aliceReceived[:n])
+	if strings.Contains(got, "mallory") {
+		t.Errorf("alice received a message from a user missing from the access list: %q", got)
+	}
+	if !strings.Contains(got, "bob allowed") {
+		t.Errorf("alice should receive bob's message on shared topic, got: %q", got)
+	}
+}
+
+// A public topic's access list holds for anonymous keys too, which have no
+// namespace of their own.
+func TestAccessControl_AnonymousUserPublicTopic(t *testing.T) {
+	server := NewTestSSHServer(t)
+	defer server.Shutdown()
+
+	alice := GenerateUser("alice")
+	bob := GenerateUser("bob")
+	anon := GenerateUser("anon")
+	RegisterUserWithServer(server, alice)
+	RegisterUserWithServer(server, bob)
+
+	aliceClient, err := alice.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect alice: %v", err)
+	}
+	defer func() { _ = aliceClient.Close() }()
+	aliceSession, err := aliceClient.NewSession()
+	if err != nil {
+		t.Fatalf("failed to create alice session: %v", err)
+	}
+	defer func() { _ = aliceSession.Close() }()
+	aliceStdout, err := aliceSession.StdoutPipe()
+	if err != nil {
+		t.Fatalf("failed to get alice stdout: %v", err)
+	}
+	if err := aliceSession.Start("sub payroll -p -a alice,bob -c"); err != nil {
+		t.Fatalf("failed to start alice sub: %v", err)
+	}
+	server.waitForClients(t, 1)
+
+	anonClient, err := anon.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect anon: %v", err)
+	}
+	defer func() { _ = anonClient.Close() }()
+	for _, cmd := range []string{"pub payroll -b=false -c", "pub public/payroll -b=false -c", "pub payroll -p -b=false -c"} {
+		if _, err := anon.RunCommandWithStdin(anonClient, cmd, "anon snuck in\n"); err != nil {
+			t.Logf("anon %q completed: %v", cmd, err)
+		}
+	}
+
+	bobClient, err := bob.NewClient()
+	if err != nil {
+		t.Fatalf("failed to connect bob: %v", err)
+	}
+	defer func() { _ = bobClient.Close() }()
+	if _, err := bob.RunCommandWithStdin(bobClient, "pub payroll -p -c", "bob allowed\n"); err != nil {
+		t.Logf("bob pub completed: %v", err)
+	}
+
+	received := make([]byte, 100)
+	n, _ := aliceStdout.Read(received)
+	got := string(received[:n])
+	if strings.Contains(got, "anon") {
+		t.Errorf("alice received a message from an anonymous key: %q", got)
+	}
+	if !strings.Contains(got, "bob allowed") {
+		t.Errorf("alice should receive bob's message, got: %q", got)
+	}
+}
+
+// An access list can't be set while someone off it is on the topic, since
+// lists are only checked as clients join.
+func TestAccessControl_ListRefusedWithUnlistedClients(t *testing.T) {
+	server := NewTestSSHServer(t)
+	defer server.Shutdown()
+
+	alice := GenerateUser("alice")
+	bob := GenerateUser("bob")
+	mallory := GenerateUser("mallory")
+	admin := GenerateUser("root")
+	for _, u := range []UserSSH{alice, bob, mallory, admin} {
+		RegisterUserWithServer(server, u)
+	}
+	grantAdmin(server, "root-id")
+
+	_ = startAs(t, mallory, "mallory", "sub early -p -c")
+	_ = startAs(t, bob, "bob", "sub listed -p -c")
+	_ = startAs(t, admin, "admin__root", "sub watched -p -c")
+	server.waitForClients(t, 3)
+	_ = startAs(t, mallory, "mallory", "pub waiting -p -c")
+	waitFor(t, func() bool {
+		w, _ := server.PipeHandler.Waiters.Load("public/waiting")
+		return len(w) == 1
+	})
+
+	aliceClient, err := alice.NewClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = aliceClient.Close() }()
+	for _, topic := range []string{"early", "waiting"} {
+		done := make(chan string, 1)
+		go func() {
+			out, _ := alice.RunCommand(aliceClient, "sub "+topic+" -p -a alice -c")
+			done <- out
+		}()
+		select {
+		case out := <-done:
+			if !strings.Contains(out, "has clients not on the access list") {
+				t.Errorf("%s: got %q", topic, out)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatalf("%s: access list accepted with mallory on the topic", topic)
+		}
+		if list, ok := server.PipeHandler.Access.Load("public/" + topic); ok {
+			t.Errorf("%s: access list %v kept", topic, list)
+		}
+	}
+
+	_ = startAs(t, alice, "alice", "sub listed -p -a alice,bob -c")
+	_ = startAs(t, alice, "alice", "sub watched -p -a alice -c")
+	waitFor(t, func() bool {
+		_, listed := server.PipeHandler.Access.Load("public/listed")
+		_, watched := server.PipeHandler.Access.Load("public/watched")
+		return listed && watched
+	})
+}
+
+// A client that has resolved a topic but not yet joined its channel still
+// blocks a claim, so it can't slip in after the list is set.
+func TestClaimAccessSeesResolvedClients(t *testing.T) {
+	logger := slog.New(slog.DiscardHandler)
+	handler := NewCliHandler(logger, nil, psub.NewMulticast(logger), &Config{})
+	handler.Clients.Store("mallory-1", clientIdentity{userName: "mallory"})
+	handler.Clients.Store("alice-1", clientIdentity{userName: "alice"})
+
+	result, leave := handler.resolveJoin("mallory-1", "public/x", TopicResolveInput{UserName: "mallory", Topic: "x", IsPublic: true})
+	if result.Name != "public/x" {
+		t.Fatalf("resolved %q", result.Name)
+	}
+	if _, err := handler.claimAccess("public/x", []string{"alice"}, "alice-1"); err == nil {
+		t.Fatal("claim succeeded with mallory about to join")
+	}
+	leave()
+	if created, err := handler.claimAccess("public/x", []string{"alice"}, "alice-1"); err != nil || !created {
+		t.Fatalf("claim after mallory left: %v %v", created, err)
+	}
+	if result, _ := handler.resolveJoin("mallory-1", "public/x", TopicResolveInput{UserName: "mallory", Topic: "x", IsPublic: true}); !result.AccessDenied {
+		t.Fatal("mallory joined after the claim")
+	}
+}
+
+// A wildcard topic can't carry an access list, since a listed user would
+// subscribe to the pattern and reach the owner's other topics.
+func TestClaimAccessRefusesWildcardTopics(t *testing.T) {
+	logger := slog.New(slog.DiscardHandler)
+	handler := NewCliHandler(logger, nil, psub.NewMulticast(logger), &Config{})
+	handler.Clients.Store("alice-1", clientIdentity{userName: "alice"})
+	if _, err := handler.claimAccess("alice/*", []string{"mallory"}, "alice-1"); err == nil || !strings.Contains(err.Error(), "wildcard") {
+		t.Fatalf("claim on alice/*: %v", err)
+	}
+	if _, ok := handler.Access.Load("alice/*"); ok {
+		t.Fatal("access list stored on a wildcard topic")
+	}
+}
+
+// A publisher that waited for a subscriber is no longer listed as waiting
+// once it starts sending.
+func TestWaiterRemovedOnceSending(t *testing.T) {
+	server := NewTestSSHServer(t)
+	defer server.Shutdown()
+
+	alice := GenerateUser("alice")
+	RegisterUserWithServer(server, alice)
+	client, err := alice.NewClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = client.Close() }()
+	session, err := client.NewSession()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = session.Close() }()
+	stdin, err := session.StdinPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = stdin.Close() }()
+	if err := session.Start("pub stream -c"); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, func() bool {
+		w, _ := server.PipeHandler.Waiters.Load("alice/stream")
+		return len(w) == 1
+	})
+
+	out := startAs(t, alice, "alice", "sub stream -c")
+	if _, err := stdin.Write([]byte("hello\n")); err != nil {
+		t.Fatal(err)
+	}
+	if got := readWithin(out, 2*time.Second); !strings.Contains(got, "hello") {
+		t.Fatalf("sub got %q", got)
+	}
+	if w, ok := server.PipeHandler.Waiters.Load("alice/stream"); ok {
+		t.Fatalf("publisher still listed as waiting: %v", w)
+	}
+}
+
+// A publisher that timed out waiting for a subscriber doesn't block a later
+// access list, and an owner's own session doesn't block one on their private
+// topic.
+func TestAccessControl_ClaimIgnoresGoneAndOwnClients(t *testing.T) {
+	server := NewTestSSHServer(t)
+	defer server.Shutdown()
+
+	alice := GenerateUser("alice")
+	mallory := GenerateUser("mallory")
+	RegisterUserWithServer(server, alice)
+	RegisterUserWithServer(server, mallory)
+
+	malloryClient, err := mallory.NewClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = malloryClient.Close() }()
+	if out, _ := mallory.RunCommand(malloryClient, "pub payroll -p -t 50ms"); !strings.Contains(out, "timeout reached") {
+		t.Fatalf("mallory pub: %q", out)
+	}
+	if w, ok := server.PipeHandler.Waiters.Load("public/payroll"); ok {
+		t.Fatalf("waiters left behind: %v", w)
+	}
+
+	_ = startAs(t, alice, "alice", "sub payroll -p -a alice -c")
+	_ = startAs(t, alice, "alice", "sub private -c")
+	server.waitForClients(t, 2)
+	aliceClient, err := alice.NewClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = aliceClient.Close() }()
+	if out, err := alice.RunCommand(aliceClient, "pub private -a bob -e -b=false -c"); err != nil || strings.Contains(out, "access list") {
+		t.Fatalf("alice private pub: %q %v", out, err)
+	}
+	waitFor(t, func() bool {
+		_, ok := server.PipeHandler.Access.Load("public/payroll")
+		return ok
+	})
+}
+
+func waitFor(t *testing.T, ok func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for !ok() {
+		if time.Now().After(deadline) {
+			t.Fatal("timed out")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+// Wildcards on public topics are refused, for users and anonymous keys alike.
+func TestPublicWildcardRefused(t *testing.T) {
+	server := NewTestSSHServer(t)
+	defer server.Shutdown()
+
+	alice := GenerateUser("alice")
+	anon := GenerateUser("anon")
+	RegisterUserWithServer(server, alice)
+
+	for _, user := range []UserSSH{alice, anon} {
+		client, err := user.NewClient()
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, cmd := range []string{"sub * -p", "sub public/* -p", "pub * -p -b=false", "pipe * -p"} {
+			if user.username == "anon" {
+				cmd = strings.TrimSuffix(strings.Replace(cmd, " -p", "", 1), " ")
+			}
+			done := make(chan string, 1)
+			go func() {
+				out, _ := user.RunCommand(client, cmd)
+				done <- out
+			}()
+			select {
+			case out := <-done:
+				if !strings.Contains(out, "wildcards aren't allowed on public topics") {
+					t.Errorf("%s %q: %q", user.username, cmd, out)
+				}
+			case <-time.After(2 * time.Second):
+				t.Fatalf("%s %q was accepted", user.username, cmd)
+			}
+		}
+		_ = client.Close()
+	}
+	server.waitForClients(t, 0)
+}
+
+// startAs runs cmd in a new session as sshUser and returns its stdout.
+func startAs(t *testing.T, user UserSSH, sshUser, cmd string) io.Reader {
+	t.Helper()
+	client, err := user.NewClientAs(sshUser)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = client.Close() })
+	session, err := client.NewSession()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = session.Close() })
+	out, err := session.StdoutPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := session.Start(cmd); err != nil {
+		t.Fatal(err)
+	}
+	return out
+}
+
+// readWithin returns what r yields within d, or "" if nothing arrives.
+func readWithin(r io.Reader, d time.Duration) string {
+	got := make(chan string, 1)
+	go func() {
+		buf := make([]byte, 100)
+		n, _ := r.Read(buf)
+		got <- string(buf[:n])
+	}()
+	select {
+	case msg := <-got:
+		return msg
+	case <-time.After(d):
+		return ""
+	}
+}
+
+func TestAdminReadsProtectedTopics(t *testing.T) {
+	server := NewTestSSHServer(t)
+	defer server.Shutdown()
+
+	alice := GenerateUser("alice")
+	admin := GenerateUser("root")
+	RegisterUserWithServer(server, alice)
+	RegisterUserWithServer(server, admin)
+	grantAdmin(server, "root-id")
+
+	// alice's sub holds the access list before the admin joins.
+	_ = startAs(t, alice, "alice", "sub payroll -p -a alice -c")
+	server.waitForClients(t, 1)
+
+	subs := map[string]io.Reader{}
+	for _, cmd := range []string{
+		"sub /alice/secret -c",
+		"sub /*/* -c -k",
+		"sub /public/* -c -k",
+		"sub payroll -p -c",
+		"sub * -p -c -k",
+	} {
+		subs[cmd] = startAs(t, admin, "admin__root", cmd)
+	}
+	server.waitForClients(t, len(subs)+1)
+
+	aliceClient, err := alice.NewClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = aliceClient.Close() }()
+	if out, err := alice.RunCommandWithStdin(aliceClient, "pub secret -b=false -c", "private-msg\n"); err != nil {
+		t.Fatalf("alice private pub: %q %v", out, err)
+	}
+	if out, err := alice.RunCommandWithStdin(aliceClient, "pub payroll -p -b=false -c", "payroll-msg\n"); err != nil {
+		t.Fatalf("alice public pub: %q %v", out, err)
+	}
+
+	for cmd, want := range map[string]string{
+		"sub /alice/secret -c": "private-msg",
+		"sub /*/* -c -k":       "private-msg",
+		"sub /public/* -c -k":  "payroll-msg",
+		"sub payroll -p -c":    "payroll-msg",
+		"sub * -p -c -k":       "payroll-msg",
+	} {
+		if got := readWithin(subs[cmd], 2*time.Second); !strings.Contains(got, want) {
+			t.Errorf("%q got %q, want %q", cmd, got, want)
+		}
+	}
+}
+
+// An admin account's plain login, as a service uses, has no admin powers.
+func TestAdminNeedsAdminSession(t *testing.T) {
+	server := NewTestSSHServer(t)
+	defer server.Shutdown()
+
+	alice := GenerateUser("alice")
+	admin := GenerateUser("root")
+	RegisterUserWithServer(server, alice)
+	RegisterUserWithServer(server, admin)
+	grantAdmin(server, "root-id")
+
+	raw := startAs(t, admin, "root", "sub /alice/secret -c")
+	server.waitForClients(t, 1)
+
+	aliceClient, err := alice.NewClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = aliceClient.Close() }()
+	if out, err := alice.RunCommandWithStdin(aliceClient, "pub secret -b=false -c", "private-msg\n"); err != nil {
+		t.Fatalf("alice private pub: %q %v", out, err)
+	}
+	if got := readWithin(raw, 500*time.Millisecond); strings.Contains(got, "private-msg") {
+		t.Fatalf("plain admin login read alice's topic: %q", got)
+	}
+
+	_ = startAs(t, alice, "alice", "sub payroll -p -a alice -c")
+	server.waitForClients(t, 2)
+	adminClient, err := admin.NewClientAs("root")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = adminClient.Close() }()
+	for _, cmd := range []string{"sub payroll -p -c", "sub * -p"} {
+		out, _ := admin.RunCommand(adminClient, cmd)
+		if !strings.Contains(out, "access denied") && !strings.Contains(out, "wildcards aren't allowed") {
+			t.Errorf("plain admin login %q: %q", cmd, out)
+		}
 	}
 }
 
@@ -1467,8 +1967,9 @@ func TestAccessControl_UnauthorizedUserDenied(t *testing.T) {
 
 	server.waitForClients(t, 1)
 
-	// Charlie tries to publish to alice's restricted topic - should be denied
-	output, err := charlie.RunCommandWithStdin(charlieClient, "pub alice/restrictedtopic -c", "unauthorized message")
+	// Charlie's publish goes to his own topic, which has no subscriber, so it
+	// mustn't block waiting for one.
+	output, err := charlie.RunCommandWithStdin(charlieClient, "pub alice/restrictedtopic -b=false -c", "unauthorized message")
 	if err != nil {
 		t.Logf("charlie pub completed with error (expected): %v", err)
 	}

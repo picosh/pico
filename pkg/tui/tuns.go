@@ -179,8 +179,10 @@ func (m *TunsPage) connectToLogs() error {
 	ctx, cancel := context.WithCancel(m.shared.Session.Context())
 	defer cancel()
 
+	m.mu.Lock()
 	m.ctx = ctx
 	m.done = cancel
+	m.mu.Unlock()
 
 	conn := shared.NewPicoPipeClient()
 	drain, err := pipe.Sub(ctx, m.shared.Logger, conn, "sub tuns-result-drain -k")
@@ -241,10 +243,7 @@ func (m *TunsPage) HandleEvent(ev vaxis.Event, ph vxfw.EventPhase) (vxfw.Command
 	switch msg := ev.(type) {
 	case PageIn:
 		m.loading = true
-		ff, _ := m.shared.Dbpool.FindFeature(m.shared.User.ID, "admin")
-		if ff != nil {
-			m.isAdmin = true
-		}
+		m.isAdmin = db.HasFeature(m.shared.Dbpool, m.shared.User.ID, "admin")
 		go m.fetchTuns()
 		go func() {
 			_ = m.connectToLogs()
@@ -256,8 +255,13 @@ func (m *TunsPage) HandleEvent(ev vaxis.Event, ph vxfw.EventPhase) (vxfw.Command
 		m.selected = ""
 		m.logs = []*ResultLog{}
 		m.err = nil
+		done := m.done
 		m.mu.Unlock()
-		m.done()
+		// connectToLogs sets done once it connects, which may not have
+		// happened yet.
+		if done != nil {
+			done()
+		}
 	case ResultLogLineLoaded:
 		m.logs = append(m.logs, &msg.Line)
 		// scroll to bottom

@@ -120,23 +120,30 @@ func toLinks(orderedMetaData yaml.MapSlice) ([]Link, error) {
 		return links, nil
 	}
 
-	addLinks := func(raw yaml.MapSlice) {
+	addLinks := func(raw yaml.MapSlice) error {
 		for _, k := range raw {
-			links = append(links, Link{
-				Text: k.Key.(string),
-				URL:  k.Value.(string),
-			})
+			text, ok := k.Key.(string)
+			href, ok2 := k.Value.(string)
+			if !ok || !ok2 {
+				return fmt.Errorf("`nav` links must be `text: href` strings, found %v: %v", k.Key, k.Value)
+			}
+			links = append(links, Link{Text: text, URL: href})
 		}
+		return nil
 	}
 
 	switch raw := navData.(type) {
 	case yaml.MapSlice:
-		addLinks(raw)
+		if err := addLinks(raw); err != nil {
+			return links, err
+		}
 	case []interface{}:
 		for _, v := range raw {
 			switch linkRaw := v.(type) {
 			case yaml.MapSlice:
-				addLinks(v.(yaml.MapSlice))
+				if err := addLinks(linkRaw); err != nil {
+					return links, err
+				}
 			default:
 				return links, fmt.Errorf("unsupported type for `nav` link item (%T), looking for map (`text: href`)", linkRaw)
 			}
@@ -157,7 +164,11 @@ func toAliases(obj interface{}) ([]string, error) {
 	switch raw := obj.(type) {
 	case []interface{}:
 		for _, alias := range raw {
-			als := strings.TrimSpace(alias.(string))
+			str, ok := alias.(string)
+			if !ok {
+				return arr, fmt.Errorf("`aliases` must be strings, found %v", alias)
+			}
+			als := strings.TrimSpace(str)
 			arr = append(arr, strings.TrimPrefix(als, "/"))
 		}
 	case string:
@@ -182,7 +193,11 @@ func toTags(obj interface{}) ([]string, error) {
 	switch raw := obj.(type) {
 	case []interface{}:
 		for _, tag := range raw {
-			arr = append(arr, tag.(string))
+			str, ok := tag.(string)
+			if !ok {
+				return arr, fmt.Errorf("`tags` must be strings, found %v", tag)
+			}
+			arr = append(arr, str)
 		}
 	case string:
 		tags := strings.Split(raw, " ")

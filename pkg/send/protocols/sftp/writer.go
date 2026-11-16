@@ -3,6 +3,7 @@ package sftp
 import (
 	"bytes"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -14,34 +15,47 @@ type buffer struct {
 	m   sync.Mutex
 }
 
+// maxBufferSize bounds a file held in memory until it is stored. It is above
+// any service's file limit, which is enforced when the file is stored.
+const maxBufferSize = 128 << 20
+
+// maxPendingFiles bounds the files a session holds in memory at once.
+const maxPendingFiles = 8
+
+var errFileTooLarge = fmt.Errorf("file is larger than %d bytes", maxBufferSize)
+
 func (b *buffer) WriteAt(p []byte, pos int64) (n int, err error) {
-	pLen := len(p)
-	expLen := pos + int64(pLen)
+	if pos < 0 {
+		return 0, fmt.Errorf("invalid offset %d", pos)
+	}
+	if pos > maxBufferSize || pos+int64(len(p)) > maxBufferSize {
+		return 0, errFileTooLarge
+	}
+	expLen := int(pos) + len(p)
 	b.m.Lock()
 	defer b.m.Unlock()
-	if int64(len(b.buf)) < expLen {
+	if len(b.buf) < expLen {
 		oldLen := len(b.buf)
-		if int64(cap(b.buf)) < expLen {
-			newBuf := make([]byte, expLen)
-			copy(newBuf, b.buf)
-			b.buf = newBuf
-		}
+		b.buf = slices.Grow(b.buf, expLen-oldLen)[:expLen]
 		// A truncated buffer keeps its old bytes past its length.
-		b.buf = b.buf[:expLen]
 		clear(b.buf[oldLen:])
 	}
 	copy(b.buf[pos:], p)
-	return pLen, nil
+	return len(p), nil
 }
 
-func (b *buffer) truncate(size int64) {
+func (b *buffer) truncate(size int64) error {
+	if size < 0 || size > maxBufferSize {
+		return errFileTooLarge
+	}
 	b.m.Lock()
 	defer b.m.Unlock()
 	if size < int64(len(b.buf)) {
 		b.buf = b.buf[:size]
-		return
+		return nil
 	}
 	b.buf = append(b.buf, make([]byte, size-int64(len(b.buf)))...)
+	return nil
 }
 
 func (b *buffer) bytes() []byte {

@@ -1,9 +1,9 @@
 package pgs
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/pssh"
@@ -43,7 +43,30 @@ func getInfoFromUser(user string) (string, string) {
 	return "", user
 }
 
+// tunnelRequester is the user a tunnel acts as: the key's owner, or for an
+// admin, the user named in the ssh username.
+func tunnelRequester(cfg *Config, pubkey, asUser string) (*db.User, error) {
+	requester, err := cfg.DB.FindUserByPubkey(pubkey)
+	if err != nil {
+		return nil, fmt.Errorf("find user for pubkey: %w", err)
+	}
+	if asUser == "" {
+		return requester, nil
+	}
+	if !db.HasFeature(cfg.DB, requester.ID, "admin") {
+		return nil, fmt.Errorf("%s is not an admin and cannot impersonate %s", requester.Name, asUser)
+	}
+	impersonated, err := cfg.DB.FindUserByName(asUser)
+	if err != nil {
+		return nil, fmt.Errorf("find user to impersonate: %w", err)
+	}
+	return impersonated, nil
+}
+
 func CreateHttpHandler(cfg *Config) CtxHttpBridge {
+	// Tunnels share one set of caches, since each cache runs a goroutine
+	// for as long as it exists.
+	base := newWebRouter(cfg)
 	return func(ctx *pssh.SSHServerConnSession) http.Handler {
 		logger := cfg.Logger
 		asUser, subdomain := getInfoFromUser(ctx.User())
@@ -87,31 +110,15 @@ func CreateHttpHandler(cfg *Config) CtxHttpBridge {
 			return http.HandlerFunc(router.UnauthorizedHandler)
 		}
 
-		requester, _ := cfg.DB.FindUserByPubkey(pubkey)
-		if requester != nil {
-			log = log.With(
-				"requester", requester.Name,
-			)
+		requester, err := tunnelRequester(cfg, pubkey, asUser)
+		if err != nil {
+			log.Error("tunnel requester", "err", err)
+			return http.HandlerFunc(router.UnauthorizedHandler)
 		}
+		log = log.With(
+			"requester", requester.Name,
+		)
 
-		// impersonation logic
-		if asUser != "" {
-			isAdmin := false
-			ff, _ := cfg.DB.FindFeature(requester.ID, "admin")
-			if ff != nil {
-				if ff.ExpiresAt.Before(time.Now()) {
-					isAdmin = true
-				}
-			}
-
-			if !isAdmin {
-				log.Error("impersonation attempt failed")
-				return http.HandlerFunc(router.UnauthorizedHandler)
-			}
-			requester, _ = cfg.DB.FindUserByName(asUser)
-		}
-
-		ctx.Permissions().Extensions["user_id"] = requester.ID
 		publicKey, _, _, _, err := ssh.ParseAuthorizedKey([]byte(pubkey))
 		if err != nil {
 			log.Error("could not parse public key", "pubkey", pubkey, "err", err)
@@ -124,8 +131,8 @@ func CreateHttpHandler(cfg *Config) CtxHttpBridge {
 
 		log.Info("user has access to site")
 
-		routes := newWebRouter(cfg)
-		tunnelRouter := TunnelWebRouter{routes, subdomain}
+		routes := *base
+		tunnelRouter := TunnelWebRouter{&routes, subdomain}
 		tunnelRouter.InitRouter()
 		return &tunnelRouter
 	}

@@ -141,8 +141,8 @@ func genRedirectRoute(actual string, fromStr string, to string) string {
 	prefix := ""
 	var toList []string
 	if hasProtocol(to) {
-		u, _ := url.Parse(to)
-		if u.Path == "" {
+		u, err := url.Parse(to)
+		if err != nil || u.Path == "" {
 			return to
 		}
 		toList = splitFp(u.Path)

@@ -20,6 +20,9 @@ func (me *PsqlDB) shouldBlockSingup(ip string) error {
 }
 
 func (me *PsqlDB) RegisterUser(username, pubkey, comment, ip string) (*db.User, error) {
+	if db.IsCertKey(pubkey) {
+		return nil, db.ErrPublicKeyIsCert
+	}
 	lowerName := strings.ToLower(username)
 	valid, err := me.validateName(lowerName)
 	if !valid {

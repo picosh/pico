@@ -504,33 +504,35 @@ func TestApiBasic(t *testing.T) {
 	}
 }
 
-// TestApiHttpPassNotCached verifies that responses for password-protected
-// (http-pass) projects are served with `cache-control: private, no-store` so
-// the shared cache never stores them. Without this, the first authenticated
-// request would populate the cache and let later unauthenticated visitors
-// bypass the password gate. The asset here ships a `_headers` file that tries
-// to mark the response aggressively cacheable, to prove the http-pass override
-// wins over user-supplied headers.
+// TestApiHttpPassNotCached verifies that every response for a password-
+// protected (http-pass) project is `private, no-store`, so the shared cache,
+// which is checked before the password, never stores one. The `_headers`
+// file tries to make responses cacheable to prove the override wins.
 func TestApiHttpPassNotCached(t *testing.T) {
 	logger := slog.Default()
 	dbpool := NewPgsDb(logger)
 	user := dbpool.Users[0]
 	bucketName := shared.GetAssetBucketName(user.ID)
 
-	projectID, err := dbpool.InsertProject(user.ID, "secret", "secret")
-	if err != nil {
+	if _, err := dbpool.InsertProject(user.ID, "secret", "secret"); err != nil {
 		t.Fatal(err)
 	}
 	project, err := dbpool.FindProjectByName(user.ID, "secret")
 	if err != nil {
 		t.Fatal(err)
 	}
-	project.Acl = db.ProjectAcl{Type: "http-pass", Data: []string{"hunter2"}}
+	hash, err := hashPassword("hunter2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	project.Acl = db.ProjectAcl{Type: "http-pass", Data: []string{hash}}
 
 	store := map[string]map[string]string{
 		bucketName: {
-			"/secret/index.html": "top secret!",
-			"/secret/_headers":   "/*\n\tcache-control: public, max-age=31536000, immutable",
+			"/secret/index.html":     "top secret!",
+			"/secret/docs/readme.md": "# Readme",
+			"/secret/_redirects":     "/old /index.html 301",
+			"/secret/_headers":       "/*\n\tcache-control: public, max-age=31536000, immutable",
 		},
 	}
 
@@ -547,26 +549,69 @@ func TestApiHttpPassNotCached(t *testing.T) {
 	cfg.Domain = "pgs.test"
 	router := NewWebRouter(cfg)
 
-	url := fmt.Sprintf("https://%s-secret.pgs.test/", user.Name)
-	request := httptest.NewRequest("GET", url, strings.NewReader(""))
-	// Supply a valid session cookie so we get past the password gate and
-	// actually serve the protected asset (the path we need to not cache).
-	request.AddCookie(&http.Cookie{
+	session := &http.Cookie{
 		Name:  getCookieName("secret"),
-		Value: projectID,
-	})
-	responseRecorder := httptest.NewRecorder()
-	router.ServeHTTP(responseRecorder, request)
+		Value: sessionToken(project, time.Now().Add(time.Hour)),
+	}
+	for _, tc := range []struct {
+		path   string
+		status int
+	}{
+		{"/", http.StatusOK},
+		{"/docs/", http.StatusOK},
+		{"/old", http.StatusMovedPermanently},
+		{"/missing.html", http.StatusNotFound},
+	} {
+		url := fmt.Sprintf("https://%s-secret.pgs.test%s", user.Name, tc.path)
+		request := httptest.NewRequest("GET", url, strings.NewReader(""))
+		request.AddCookie(session)
+		responseRecorder := httptest.NewRecorder()
+		router.ServeHTTP(responseRecorder, request)
 
-	if responseRecorder.Code != http.StatusOK {
-		t.Fatalf("Want status '%d', got '%d'", http.StatusOK, responseRecorder.Code)
+		if responseRecorder.Code != tc.status {
+			t.Errorf("%s: want status %d, got %d", tc.path, tc.status, responseRecorder.Code)
+		}
+		if cc := responseRecorder.Header().Get("cache-control"); cc != "private, no-store" {
+			t.Errorf("%s: want cache-control 'private, no-store', got '%s'", tc.path, cc)
+		}
 	}
-	if body := strings.TrimSpace(responseRecorder.Body.String()); body != "top secret!" {
-		t.Fatalf("Want body 'top secret!', got '%s'", body)
+}
+
+func TestHttpPassSession(t *testing.T) {
+	hash, err := hashPassword("hunter2")
+	if err != nil {
+		t.Fatal(err)
 	}
-	cc := responseRecorder.Header().Get("cache-control")
-	if cc != "private, no-store" {
-		t.Errorf("http-pass response must be non-cacheable; want 'private, no-store', got '%s'", cc)
+	project := &db.Project{ID: "project-id", Acl: db.ProjectAcl{Type: "http-pass", Data: []string{hash}}}
+	token := sessionToken(project, time.Now().Add(time.Hour))
+
+	if !validSession(project, token) {
+		t.Fatal("fresh session rejected")
+	}
+	if validSession(project, project.ID) {
+		t.Fatal("project ID accepted as a session")
+	}
+	if validSession(project, sessionToken(project, time.Now().Add(-time.Second))) {
+		t.Fatal("expired session accepted")
+	}
+	if validSession(project, "9999999999."+strings.Repeat("0", 64)) {
+		t.Fatal("unsigned session accepted")
+	}
+
+	rotated, err := hashPassword("new-password")
+	if err != nil {
+		t.Fatal(err)
+	}
+	project.Acl.Data = []string{rotated}
+	if validSession(project, token) {
+		t.Fatal("session survived a password change")
+	}
+
+	if !validatePassword(rotated, "new-password") || validatePassword(rotated, "hunter2") {
+		t.Fatal("bcrypt password check is wrong")
+	}
+	if validatePassword("legacy", "legacy") {
+		t.Fatal("plaintext password accepted")
 	}
 }
 

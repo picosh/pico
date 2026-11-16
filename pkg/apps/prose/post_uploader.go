@@ -56,7 +56,7 @@ func (h *postUploader) Write(s *pssh.SSHServerConnSession, entry *sendutils.File
 	}
 	logger := pssh.GetLogger(s).With("filename", filepath.Base(entry.Filepath))
 
-	post, err := postfs.PostFromEntry(entry, user, h.Cfg.Space)
+	post, err := postfs.PostFromEntry(entry, user, h.Cfg.Space, int64(MAX_FILE_SIZE))
 	if err != nil {
 		return "", err
 	}

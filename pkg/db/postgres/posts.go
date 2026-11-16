@@ -84,8 +84,8 @@ func (me *PsqlDB) FindPostWithSlug(slug string, user_id string, space string) (*
 		alias := me.Db.QueryRow(
 			`SELECT post_aliases.post_id FROM post_aliases
 			INNER JOIN posts ON posts.id = post_aliases.post_id
-			WHERE post_aliases.slug = $1 AND posts.user_id = $2`,
-			slug, user_id,
+			WHERE post_aliases.slug = $1 AND posts.user_id = $2 AND posts.cur_space = $3`,
+			slug, user_id, space,
 		)
 		postID := ""
 		err := alias.Scan(&postID)

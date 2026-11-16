@@ -515,6 +515,9 @@ func (m *AnalyticsPage) banner(ctx vxfw.DrawContext) vxfw.Surface {
 func (m *AnalyticsPage) toggleAnalytics() (bool, error) {
 	enabled := false
 	if findAnalyticsFeature(m.features) == nil {
+		if !db.HasFeature(m.shared.Dbpool, m.shared.User.ID, "plus") {
+			return false, fmt.Errorf("analytics requires pico+")
+		}
 		now := time.Now()
 		expiresAt := now.AddDate(100, 0, 0)
 		_, err := m.shared.Dbpool.InsertFeature(m.shared.User.ID, "analytics", expiresAt)

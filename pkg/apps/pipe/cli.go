@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"slices"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"text/tabwriter"
 	"time"
@@ -42,8 +43,11 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 			uuidStr := uuid.NewString()
 			isAdmin := false
 			if user != nil {
-				isAdmin = db.HasFeature(handler.DBPool, user.ID, "admin")
-				if isAdmin && strings.HasPrefix(sesh.User(), "admin__") {
+				// Admin powers need an admin session (ssh admin__<name>@), so
+				// an admin account's other logins, such as a service's, are
+				// treated as a user's.
+				isAdmin = strings.HasPrefix(sesh.User(), "admin__") && db.HasFeature(handler.DBPool, user.ID, "admin")
+				if isAdmin {
 					uuidStr = fmt.Sprintf("admin-%s", uuidStr)
 				}
 
@@ -130,6 +134,12 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 				userNameAddition,
 				sesh.RemoteAddr().String(),
 			)
+			identity := clientIdentity{userName: userName, admin: isAdmin}
+			if key := sesh.PublicKey(); key != nil {
+				identity.fingerprint = gossh.FingerprintSHA256(key)
+			}
+			handler.Clients.Store(clientID, identity)
+			defer handler.Clients.Delete(clientID)
 
 			go func() {
 				defer cancel()
@@ -190,6 +200,162 @@ type CliHandler struct {
 	Cfg     *Config
 	Waiters *syncmap.Map[string, []string]
 	Access  *syncmap.Map[string, []string]
+	// Clients holds who each connected client is, by client ID.
+	Clients *syncmap.Map[string, clientIdentity]
+
+	// membersMu orders access list claims against clients resolving topics,
+	// so a claim sees every client that resolved its topic before it.
+	membersMu sync.Mutex
+	// members holds the client IDs that resolved each topic.
+	members map[string]map[string]struct{}
+}
+
+// clientIdentity is what an access list can name a client by.
+type clientIdentity struct {
+	userName    string
+	fingerprint string
+	admin       bool
+}
+
+// allowed reports whether the client may be on topic under accessList. A
+// private topic's owner always is.
+func (c clientIdentity) allowed(topic string, accessList []string) bool {
+	if c.admin || c.listed(accessList) {
+		return true
+	}
+	return !strings.HasPrefix(topic, "public/") && strings.HasPrefix(topic, c.userName+"/")
+}
+
+func (c clientIdentity) listed(accessList []string) bool {
+	for _, acc := range accessList {
+		if acc == c.userName || (c.fingerprint != "" && acc == c.fingerprint) {
+			return true
+		}
+	}
+	return false
+}
+
+func NewCliHandler(logger *slog.Logger, dbpool DB, pubsub *psub.Multicast, cfg *Config) *CliHandler {
+	handler := &CliHandler{
+		Logger:  logger,
+		DBPool:  dbpool,
+		PubSub:  pubsub,
+		Cfg:     cfg,
+		Waiters: syncmap.New[string, []string](),
+		Access:  syncmap.New[string, []string](),
+		Clients: syncmap.New[string, clientIdentity](),
+	}
+	if broker, ok := pubsub.Broker.(*psub.BaseBroker); ok {
+		broker.WildcardFilter = handler.wildcardAllowed
+	}
+	return handler
+}
+
+// public reports whether a command works on public topics. Anonymous users
+// have no namespace of their own, so all their topics are public ones.
+func (c *CliCmd) public(flag bool) bool {
+	return flag || c.user == nil
+}
+
+// checkWildcard refuses a wildcard on a public topic, where it would match
+// every user's public topics. Private topics start with the user's own name,
+// which a wildcard can't match past. Admin sessions may use any wildcard.
+func (c *CliCmd) checkWildcard(public bool, topic string) error {
+	if c.isAdmin {
+		return nil
+	}
+	if c.public(public) && psub.HasWildcard(topic) {
+		return fmt.Errorf("wildcards aren't allowed on public topics")
+	}
+	return nil
+}
+
+// wildcardAllowed keeps wildcard subscribers out of topics with an access
+// list, which only the listed users and admins may read.
+func (h *CliHandler) wildcardAllowed(clientID, topic string) bool {
+	if id, ok := h.Clients.Load(clientID); ok && id.admin {
+		return true
+	}
+	list, ok := h.Access.Load(topic)
+	return !ok || len(list) == 0
+}
+
+// claimAccess stores accessList for topic unless one is already set, and
+// reports whether it did. Lists are only checked as clients resolve a topic,
+// so the claim is refused while anyone the list wouldn't allow has resolved
+// the topic or joined it by wildcard.
+func (h *CliHandler) claimAccess(topic string, accessList []string, clientID string) (bool, error) {
+	if len(accessList) == 0 {
+		return false, nil
+	}
+	// A listed user would subscribe to the pattern itself, and a wildcard
+	// subscriber joins matching topics outside membersMu, so only the topic
+	// owner and admins may hold one.
+	if psub.HasWildcard(topic) {
+		return false, fmt.Errorf("access lists can't be set on wildcard topics")
+	}
+	h.membersMu.Lock()
+	defer h.membersMu.Unlock()
+	if _, loaded := h.Access.LoadOrStore(topic, accessList); loaded {
+		return false, nil
+	}
+
+	var present []string
+	for id := range h.members[topic] {
+		present = append(present, id)
+	}
+	for name, channel := range h.PubSub.GetChannels() {
+		if name == topic {
+			for id := range channel.GetClients() {
+				present = append(present, id)
+			}
+		}
+	}
+
+	for _, id := range present {
+		if id == clientID {
+			continue
+		}
+		if who, ok := h.Clients.Load(id); ok && who.allowed(topic, accessList) {
+			continue
+		}
+		h.Access.Delete(topic)
+		return false, fmt.Errorf("topic %s has clients not on the access list", topic)
+	}
+	return true, nil
+}
+
+// resolveJoin resolves the topic clientID will use, checking the access list
+// stored under lookup, and records the client on that topic until leave is
+// called. It holds membersMu so it can't interleave with a claim.
+func (h *CliHandler) resolveJoin(clientID, lookup string, input TopicResolveInput) (TopicResolveOutput, func()) {
+	h.membersMu.Lock()
+	defer h.membersMu.Unlock()
+
+	who, _ := h.Clients.Load(clientID)
+	input.ExistingAccessList, input.HasExistingAccess = h.Access.Load(lookup)
+	input.HasUserAccess = who.listed(input.ExistingAccessList)
+	result := resolveTopic(input)
+	if result.AccessDenied {
+		return result, func() {}
+	}
+
+	if h.members == nil {
+		h.members = map[string]map[string]struct{}{}
+	}
+	topic := result.Name
+	if h.members[topic] == nil {
+		h.members[topic] = map[string]struct{}{}
+	}
+	h.members[topic][clientID] = struct{}{}
+	return result, func() {
+		h.membersMu.Lock()
+		defer h.membersMu.Unlock()
+		delete(h.members[topic], clientID)
+		if len(h.members[topic]) == 0 {
+			delete(h.members, topic)
+		}
+	}
 }
 
 func (h *CliHandler) GetLogger(s *pssh.SSHServerConnSession) *slog.Logger {
@@ -609,6 +775,10 @@ func (handler *CliHandler) pub(cmd *CliCmd, topic string, clientID string) error
 		topic = pubCmd.Arg(0)
 	}
 
+	if err := cmd.checkWildcard(*public, topic); err != nil {
+		return err
+	}
+
 	handler.Logger.Info(
 		"flags parsed",
 		"cmd", "pub",
@@ -649,31 +819,34 @@ func (handler *CliHandler) pub(cmd *CliCmd, topic string, clientID string) error
 		UserName: cmd.userName,
 		Topic:    topic,
 		IsAdmin:  cmd.isAdmin,
-		IsPublic: *public,
+		IsPublic: cmd.public(*public),
 	})
 	name := initialResult.Name
 
-	var accessListCreator bool
-	_, loaded := handler.Access.LoadOrStore(name, accessList)
-	if !loaded {
-		defer func() {
-			handler.Access.Delete(name)
-		}()
-		accessListCreator = true
+	// name is reassigned below, so the entry this session made is kept apart.
+	// Only a real list is stored, so a client without one can't claim the
+	// topic before its owner sets one.
+	accessKey := name
+	created, claimErr := handler.claimAccess(accessKey, accessList, clientID)
+	if claimErr != nil {
+		return claimErr
 	}
+	if created {
+		defer handler.Access.Delete(accessKey)
+	}
+	// Making an entry only owns the topic when it is the one looked up next,
+	// which isn't so for a topic named after another user.
+	accessListCreator := created && accessKey == initialResult.WithoutUser
 
 	// Check for existing access list and resolve final topic name
-	existingAccessList, hasExistingAccess := handler.Access.Load(initialResult.WithoutUser)
-	result := resolveTopic(TopicResolveInput{
-		UserName:           cmd.userName,
-		Topic:              topic,
-		IsAdmin:            cmd.isAdmin,
-		IsPublic:           *public,
-		ExistingAccessList: existingAccessList,
-		HasExistingAccess:  hasExistingAccess,
-		IsAccessCreator:    accessListCreator,
-		HasUserAccess:      checkAccess(existingAccessList, cmd.userName, cmd.sesh),
+	result, leave := handler.resolveJoin(clientID, initialResult.WithoutUser, TopicResolveInput{
+		UserName:        cmd.userName,
+		Topic:           topic,
+		IsAdmin:         cmd.isAdmin,
+		IsPublic:        cmd.public(*public),
+		IsAccessCreator: accessListCreator,
 	})
+	defer leave()
 	name = result.Name
 
 	if result.GenerateNewTopic {
@@ -701,6 +874,9 @@ func (handler *CliHandler) pub(cmd *CliCmd, topic string, clientID string) error
 		for topic, channel := range handler.PubSub.GetChannels() {
 			if topic == name || (psub.HasWildcard(topic) && psub.MatchTopic(topic, name)) {
 				for _, client := range channel.GetClients() {
+					if topic != name && !handler.wildcardAllowed(client.ID, name) {
+						continue
+					}
 					if client.Direction == psub.ChannelDirectionOutput || client.Direction == psub.ChannelDirectionInputOutput {
 						count++
 					}
@@ -715,6 +891,22 @@ func (handler *CliHandler) pub(cmd *CliCmd, topic string, clientID string) error
 		if count == 0 {
 			currentWaiters, _ := handler.Waiters.LoadOrStore(name, nil)
 			handler.Waiters.Store(name, append(currentWaiters, clientID))
+			var removeOnce sync.Once
+			removeWaiter := func() {
+				removeOnce.Do(func() {
+					newWaiters, _ := handler.Waiters.LoadOrStore(name, nil)
+					newWaiters = slices.DeleteFunc(newWaiters, func(cl string) bool {
+						return cl == clientID
+					})
+					if len(newWaiters) == 0 {
+						handler.Waiters.Delete(name)
+					} else {
+						handler.Waiters.Store(name, newWaiters)
+					}
+				})
+			}
+			// A timeout returns early, so the entry is also removed on exit.
+			defer removeWaiter()
 
 			termMsg := "no subs found ... waiting"
 			if tt > 0 {
@@ -738,6 +930,9 @@ func (handler *CliHandler) pub(cmd *CliCmd, topic string, clientID string) error
 						for topic, channel := range handler.PubSub.GetChannels() {
 							if topic == name || (psub.HasWildcard(topic) && psub.MatchTopic(topic, name)) {
 								for _, client := range channel.GetClients() {
+									if topic != name && !handler.wildcardAllowed(client.ID, name) {
+										continue
+									}
 									if client.Direction == psub.ChannelDirectionOutput || client.Direction == psub.ChannelDirectionInputOutput {
 										count++
 									}
@@ -773,24 +968,7 @@ func (handler *CliHandler) pub(cmd *CliCmd, topic string, clientID string) error
 					_ = cmd.sesh.Close()
 				}
 			}
-
-			newWaiters, _ := handler.Waiters.LoadOrStore(name, nil)
-			newWaiters = slices.DeleteFunc(newWaiters, func(cl string) bool {
-				return cl == clientID
-			})
-			handler.Waiters.Store(name, newWaiters)
-
-			var toDelete []string
-
-			for channel, clients := range handler.Waiters.Range {
-				if len(clients) == 0 {
-					toDelete = append(toDelete, channel)
-				}
-			}
-
-			for _, channel := range toDelete {
-				handler.Waiters.Delete(channel)
-			}
+			removeWaiter()
 		}
 	}
 
@@ -953,6 +1131,10 @@ func (handler *CliHandler) sub(cmd *CliCmd, topic string, clientID string) error
 		topic = subCmd.Arg(0)
 	}
 
+	if err := cmd.checkWildcard(*public, topic); err != nil {
+		return err
+	}
+
 	handler.Logger.Info(
 		"flags parsed",
 		"cmd", cmd,
@@ -974,32 +1156,34 @@ func (handler *CliHandler) sub(cmd *CliCmd, topic string, clientID string) error
 		UserName: cmd.userName,
 		Topic:    topic,
 		IsAdmin:  cmd.isAdmin,
-		IsPublic: *public,
+		IsPublic: cmd.public(*public),
 	})
 	name := initialResult.Name
 
-	var accessListCreator bool
-
-	_, loaded := handler.Access.LoadOrStore(name, accessList)
-	if !loaded {
-		defer func() {
-			handler.Access.Delete(name)
-		}()
-		accessListCreator = true
+	// name is reassigned below, so the entry this session made is kept apart.
+	// Only a real list is stored, so a client without one can't claim the
+	// topic before its owner sets one.
+	accessKey := name
+	created, claimErr := handler.claimAccess(accessKey, accessList, clientID)
+	if claimErr != nil {
+		return claimErr
 	}
+	if created {
+		defer handler.Access.Delete(accessKey)
+	}
+	// Making an entry only owns the topic when it is the one looked up next,
+	// which isn't so for a topic named after another user.
+	accessListCreator := created && accessKey == initialResult.WithoutUser
 
 	// Check for existing access list and resolve final topic name
-	existingAccessList, hasExistingAccess := handler.Access.Load(initialResult.WithoutUser)
-	result := resolveTopic(TopicResolveInput{
-		UserName:           cmd.userName,
-		Topic:              topic,
-		IsAdmin:            cmd.isAdmin,
-		IsPublic:           *public,
-		ExistingAccessList: existingAccessList,
-		HasExistingAccess:  hasExistingAccess,
-		IsAccessCreator:    accessListCreator,
-		HasUserAccess:      checkAccess(existingAccessList, cmd.userName, cmd.sesh),
+	result, leave := handler.resolveJoin(clientID, initialResult.WithoutUser, TopicResolveInput{
+		UserName:        cmd.userName,
+		Topic:           topic,
+		IsAdmin:         cmd.isAdmin,
+		IsPublic:        cmd.public(*public),
+		IsAccessCreator: accessListCreator,
 	})
+	defer leave()
 	name = result.Name
 
 	if result.AccessDenied {
@@ -1039,6 +1223,10 @@ func (handler *CliHandler) pipe(cmd *CliCmd, topic string, clientID string) erro
 		topic = pipeCmd.Arg(0)
 	}
 
+	if err := cmd.checkWildcard(*public, topic); err != nil {
+		return err
+	}
+
 	handler.Logger.Info(
 		"flags parsed",
 		"cmd", cmd,
@@ -1071,32 +1259,34 @@ func (handler *CliHandler) pipe(cmd *CliCmd, topic string, clientID string) erro
 		UserName: cmd.userName,
 		Topic:    topic,
 		IsAdmin:  cmd.isAdmin,
-		IsPublic: *public,
+		IsPublic: cmd.public(*public),
 	})
 	name := initialResult.Name
 
-	var accessListCreator bool
-
-	_, loaded := handler.Access.LoadOrStore(name, accessList)
-	if !loaded {
-		defer func() {
-			handler.Access.Delete(name)
-		}()
-		accessListCreator = true
+	// name is reassigned below, so the entry this session made is kept apart.
+	// Only a real list is stored, so a client without one can't claim the
+	// topic before its owner sets one.
+	accessKey := name
+	created, claimErr := handler.claimAccess(accessKey, accessList, clientID)
+	if claimErr != nil {
+		return claimErr
 	}
+	if created {
+		defer handler.Access.Delete(accessKey)
+	}
+	// Making an entry only owns the topic when it is the one looked up next,
+	// which isn't so for a topic named after another user.
+	accessListCreator := created && accessKey == initialResult.WithoutUser
 
 	// Check for existing access list and resolve final topic name
-	existingAccessList, hasExistingAccess := handler.Access.Load(initialResult.WithoutUser)
-	result := resolveTopic(TopicResolveInput{
-		UserName:           cmd.userName,
-		Topic:              topic,
-		IsAdmin:            cmd.isAdmin,
-		IsPublic:           *public,
-		ExistingAccessList: existingAccessList,
-		HasExistingAccess:  hasExistingAccess,
-		IsAccessCreator:    accessListCreator,
-		HasUserAccess:      checkAccess(existingAccessList, cmd.userName, cmd.sesh),
+	result, leave := handler.resolveJoin(clientID, initialResult.WithoutUser, TopicResolveInput{
+		UserName:        cmd.userName,
+		Topic:           topic,
+		IsAdmin:         cmd.isAdmin,
+		IsPublic:        cmd.public(*public),
+		IsAccessCreator: accessListCreator,
 	})
+	defer leave()
 	name = result.Name
 
 	if result.GenerateNewTopic {
@@ -1167,21 +1357,6 @@ func parseArgList(arg string) []string {
 		argList[i] = strings.TrimSpace(acc)
 	}
 	return argList
-}
-
-// checkAccess checks if the user has access to a topic based on an access list.
-func checkAccess(accessList []string, userName string, sesh *pssh.SSHServerConnSession) bool {
-	for _, acc := range accessList {
-		if acc == userName {
-			return true
-		}
-
-		if key := sesh.PublicKey(); key != nil && acc == gossh.FingerprintSHA256(key) {
-			return true
-		}
-	}
-
-	return false
 }
 
 func flagSet(cmdName string, sesh *pssh.SSHServerConnSession) *flag.FlagSet {

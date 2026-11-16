@@ -161,9 +161,26 @@ func (app *App) HandleEvent(ev vaxis.Event, phase vxfw.EventPhase) (vxfw.Command
 	return nil, nil
 }
 
+// minWidth and minHeight are the smallest terminal the pages are laid out
+// for. Sizes are unsigned, so laying out a smaller one wraps around to a
+// huge surface.
+const (
+	minWidth  = 40
+	minHeight = 12
+)
+
 func (app *App) Draw(ctx vxfw.DrawContext) (vxfw.Surface, error) {
 	w := ctx.Max.Width
 	h := ctx.Max.Height
+	if w < minWidth || h < minHeight {
+		root := vxfw.NewSurface(w, h, app)
+		msg := fmt.Sprintf("need %dx%d", minWidth, minHeight)
+		if int(w) >= len(msg) && h > 0 {
+			txt, _ := richtext.New([]vaxis.Segment{{Text: msg}}).Draw(ctx)
+			root.AddChild(0, 0, txt)
+		}
+		return root, nil
+	}
 	root := vxfw.NewSurface(w, ctx.Min.Height, app)
 
 	ah := 1

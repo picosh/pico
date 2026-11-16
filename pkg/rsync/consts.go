@@ -36,6 +36,9 @@ const (
 	maxWireNsec          = 999999999
 	blockSize            = 700
 	maxBlockSize         = 1 << 17
+	maxSumCount          = 1 << 20
+	maxFileListLen       = 1 << 20
+	maxFilterRules       = 1 << 16
 	oldMaxBlockSize      = 1 << 29
 	chunkSize            = 32 * 1024
 	maxMapSize           = 256 * 1024
