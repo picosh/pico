@@ -47,9 +47,9 @@ func parseGemText(text string) (*GemText, error) {
 			}
 			gem.PublishAt = &nextDate
 		case "tags":
-			gem.Tags = strings.Split(v, " ")
+			gem.Tags = splitMetaValues(v)
 		case "aliases":
-			gem.Aliases = strings.Split(v, " ")
+			gem.Aliases = splitAliases(v)
 		case "draft":
 			if v == "true" {
 				gem.Hidden = true
@@ -64,6 +64,23 @@ func parseGemText(text string) (*GemText, error) {
 	}
 
 	return gem, nil
+}
+
+// splitMetaValues splits a space-separated meta value into trimmed parts,
+// dropping empties so extra spaces do not create blank entries.
+func splitMetaValues(v string) []string {
+	return strings.Fields(v)
+}
+
+// splitAliases splits a meta value into aliases, trimming each and dropping
+// empties and leading slashes so they match the slugs used for lookups,
+// mirroring the markdown meta parser.
+func splitAliases(v string) []string {
+	var aliases []string
+	for _, alias := range strings.Fields(v) {
+		aliases = append(aliases, strings.TrimPrefix(alias, "/"))
+	}
+	return aliases
 }
 
 var safeLinkSchemes = []string{"", "http", "https", "gemini", "gopher", "mailto"}
