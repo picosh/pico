@@ -148,3 +148,43 @@ func TestPostWriteTagsAndAliases(t *testing.T) {
 		t.Errorf("updated post kept tags %q and aliases %q", post.Tags, posts.Aliases(post.ID))
 	}
 }
+
+func TestPostWriteGmiTagsAndAliases(t *testing.T) {
+	logger := slog.New(slog.DiscardHandler)
+	session := &pssh.SSHServerConnSession{
+		SSHServerConn: &pssh.SSHServerConn{
+			Conn:   &ssh.ServerConn{Permissions: &ssh.Permissions{Extensions: map[string]string{}}},
+			Logger: logger,
+		},
+		Ctx: context.Background(),
+	}
+	user := &db.User{ID: "user-1", Name: "tester"}
+	pssh.SetUser(session, user)
+	posts := stub.NewPostsDB(logger, user)
+	cfg := NewConfig("prose-test")
+	h := &postUploader{Cfg: cfg, DB: posts}
+
+	_, err := h.Write(session, &sendutils.FileEntry{Filepath: "/hello.gmi", Reader: strings.NewReader("=: title Hello\n=: tags a b\n=: aliases /hi\n# hello\n"), Mtime: 100})
+	if err != nil {
+		t.Fatal(err)
+	}
+	post, err := posts.FindPostWithFilename("hello.gmi", user.ID, cfg.Space)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if post.Title != "Hello" || !slices.Equal(post.Tags, []string{"a", "b"}) || !slices.Equal(posts.Aliases(post.ID), []string{"hi"}) {
+		t.Errorf("new post = %q tags %q aliases %q", post.Title, post.Tags, posts.Aliases(post.ID))
+	}
+
+	_, err = h.Write(session, &sendutils.FileEntry{Filepath: "/hello.gmi", Reader: strings.NewReader("# hello again\n"), Mtime: 200})
+	if err != nil {
+		t.Fatal(err)
+	}
+	post, err = posts.FindPostWithFilename("hello.gmi", user.ID, cfg.Space)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(post.Tags) != 0 || len(posts.Aliases(post.ID)) != 0 {
+		t.Errorf("updated post kept tags %q and aliases %q", post.Tags, posts.Aliases(post.ID))
+	}
+}

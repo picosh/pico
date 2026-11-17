@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/postfs"
@@ -152,46 +154,73 @@ func (h *postUploader) validate(post *db.Post) error {
 	return nil
 }
 
+// filenameDateRe matches "YYYY-MM-DD-file-name" filenames.
+var filenameDateRe = regexp.MustCompile(`^(\d{4}-\d{2}-\d{2})-(.+)$`)
+
+// filenameMeta splits a "YYYY-MM-DD-file-name" filename into its publish
+// date and title, with the title's hyphens replaced by spaces. It returns
+// nil and "" when the filename does not match or its date is invalid.
+func filenameMeta(filename string) (*time.Time, string) {
+	name := strings.TrimSuffix(filepath.Base(filename), filepath.Ext(filename))
+	m := filenameDateRe.FindStringSubmatch(name)
+	if m == nil {
+		return nil, ""
+	}
+	date, err := time.Parse("2006-01-02", m[1])
+	if err != nil {
+		return nil, ""
+	}
+	return &date, strings.ReplaceAll(m[2], "-", " ")
+}
+
 // setMeta fills in a post's title, description, tags, publish date and
-// hidden flag from its text, and returns its aliases.
+// hidden flag from its text, and returns its aliases. A "YYYY-MM-DD-"
+// filename prefix supplies the publish date and title, but frontmatter for
+// either trumps it.
 func (h *postUploader) setMeta(post *db.Post) ([]string, error) {
-	var aliases []string
+	var (
+		aliases   []string
+		title     string
+		publishAt *time.Time
+		hidden    bool
+	)
 	switch filepath.Ext(post.Filename) {
 	case ".gmi":
 		parsedText, err := parseGemText(post.Text)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", post.Filename, err)
 		}
-		if parsedText.Title == "" {
-			post.Title = shared.ToLower(post.Slug)
-		} else {
-			post.Title = parsedText.Title
-		}
-		aliases = parsedText.Aliases
+		aliases, title, publishAt, hidden = parsedText.Aliases, parsedText.Title, parsedText.PublishAt, parsedText.Hidden
 		post.Tags = parsedText.Tags
 		post.Description = parsedText.Description
-		if parsedText.PublishAt != nil && !parsedText.PublishAt.IsZero() {
-			post.PublishAt = parsedText.PublishAt
-		}
 	case ".md":
 		parsedText, err := shared.ParseText(post.Text)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", post.Filename, err)
 		}
-		if parsedText.Title == "" {
-			post.Title = shared.ToUpper(post.Slug)
-		} else {
-			post.Title = parsedText.Title
-		}
-		aliases = parsedText.Aliases
+		aliases, title, publishAt, hidden = parsedText.Aliases, parsedText.Title, parsedText.PublishAt, parsedText.Hidden
 		post.Tags = parsedText.Tags
 		post.Description = parsedText.Description
-		if parsedText.PublishAt != nil && !parsedText.PublishAt.IsZero() {
-			post.PublishAt = parsedText.PublishAt
-		}
-		post.Hidden = parsedText.Hidden
 	}
 
-	post.Hidden = post.Hidden || slices.Contains(h.Cfg.HiddenPosts, post.Filename)
+	fnameDate, fnameTitle := filenameMeta(post.Filename)
+	switch {
+	case title != "":
+		post.Title = title
+	case fnameTitle != "":
+		post.Title = fnameTitle
+	case filepath.Ext(post.Filename) == ".gmi":
+		post.Title = shared.ToLower(post.Slug)
+	default:
+		post.Title = shared.ToUpper(post.Slug)
+	}
+	switch {
+	case publishAt != nil && !publishAt.IsZero():
+		post.PublishAt = publishAt
+	case fnameDate != nil:
+		post.PublishAt = fnameDate
+	}
+
+	post.Hidden = hidden || slices.Contains(h.Cfg.HiddenPosts, post.Filename)
 	return aliases, nil
 }
