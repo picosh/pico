@@ -19,6 +19,7 @@ type GemText struct {
 	Hidden      bool
 	Title       string
 	Description string
+	Aliases     []string
 }
 
 func parseGemText(text string) (*GemText, error) {
@@ -47,6 +48,8 @@ func parseGemText(text string) (*GemText, error) {
 			gem.PublishAt = &nextDate
 		case "tags":
 			gem.Tags = strings.Split(v, " ")
+		case "aliases":
+			gem.Aliases = strings.Split(v, " ")
 		case "draft":
 			if v == "true" {
 				gem.Hidden = true

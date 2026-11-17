@@ -167,6 +167,7 @@ func (h *postUploader) setMeta(post *db.Post) ([]string, error) {
 		} else {
 			post.Title = parsedText.Title
 		}
+		aliases = parsedText.Aliases
 		post.Tags = parsedText.Tags
 		post.Description = parsedText.Description
 		if parsedText.PublishAt != nil && !parsedText.PublishAt.IsZero() {
