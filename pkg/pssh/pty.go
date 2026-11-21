@@ -51,7 +51,8 @@ func (p *Pty) Name() string {
 	return ""
 }
 
-func parsePtyRequest(s []byte) (pty Pty, ok bool) {
+// ParsePtyRequest reads the terminal and size from a pty-req payload.
+func ParsePtyRequest(s []byte) (pty Pty, ok bool) {
 	term, s, ok := parseString(s)
 	if !ok {
 		return
@@ -74,7 +75,8 @@ func parsePtyRequest(s []byte) (pty Pty, ok bool) {
 	return
 }
 
-func parseWinchRequest(s []byte) (win Window, ok bool) {
+// ParseWinchRequest reads the size from a window-change payload.
+func ParseWinchRequest(s []byte) (win Window, ok bool) {
 	width32, s, ok := parseUint32(s)
 	if width32 < 1 {
 		ok = false
@@ -101,11 +103,13 @@ func parseString(in []byte) (out string, rest []byte, ok bool) {
 		return
 	}
 	length := binary.BigEndian.Uint32(in)
-	if uint32(len(in)) < 4+length {
+	// Compared in uint64 so a length near the uint32 max can't wrap.
+	if uint64(length) > uint64(len(in)-4) {
 		return
 	}
-	out = string(in[4 : 4+length])
-	rest = in[4+length:]
+	end := 4 + int(length)
+	out = string(in[4:end])
+	rest = in[end:]
 	ok = true
 	return
 }

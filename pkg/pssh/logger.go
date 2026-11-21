@@ -95,7 +95,7 @@ func LogMiddleware(getLogger GetLoggerInterface, database FindUserInterface) SSH
 				logger.Error("error", "err", err)
 			}
 
-			if pty != nil {
+			if pty, _, _ = s.Pty(); pty != nil {
 				term = pty.Term
 				width = pty.Window.Width
 				height = pty.Window.Height

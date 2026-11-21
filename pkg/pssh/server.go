@@ -63,6 +63,9 @@ type SSHServerConnSession struct {
 
 	pty   *Pty
 	winch chan Window
+	// started is when the session's shell, exec or subsystem began, and zero
+	// before that.
+	started time.Time
 
 	mu sync.Mutex
 }
@@ -178,6 +181,8 @@ func (s *SSHServerConnSession) Fatal(err error) {
 	_ = s.Close()
 }
 
+// Pty returns a copy of the session's pty as it is now. Later sizes arrive
+// on the channel.
 func (s *SSHServerConnSession) Pty() (*Pty, <-chan Window, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -186,24 +191,211 @@ func (s *SSHServerConnSession) Pty() (*Pty, <-chan Window, bool) {
 		return nil, nil, false
 	}
 
-	return s.pty, s.winch, true
+	pty := *s.pty
+	return &pty, s.winch, true
 }
 
-func (s *SSHServerConnSession) handlePtyReq(req *ssh.Request) {
-	ptyReq, ok := parsePtyRequest(req.Payload)
-
+// claimCommand reports false when the session already started a shell, exec
+// or subsystem, since a channel runs only one.
+func (s *SSHServerConnSession) claimCommand() bool {
 	s.mu.Lock()
-	if ok && s.pty == nil {
-		s.pty = &ptyReq
-		s.winch = make(chan Window, 1)
-		s.winch <- ptyReq.Window
-	} else {
-		ok = false
+	defer s.mu.Unlock()
+
+	if !s.started.IsZero() {
+		return false
 	}
-	s.mu.Unlock()
+	s.started = time.Now()
+	return true
+}
+
+// SetPty allocates the session's pty. It reports false when the session
+// already has one.
+func (s *SSHServerConnSession) SetPty(pty Pty) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.pty != nil {
+		return false
+	}
+
+	s.pty = &pty
+	s.winch = make(chan Window, 1)
+	s.winch <- pty.Window
+	return true
+}
+
+// SetWindow resizes the session's pty. It reports false when the session has
+// no pty.
+func (s *SSHServerConnSession) SetWindow(win Window) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.pty == nil {
+		return false
+	}
+
+	s.pty.Window = win
+	// Only the latest size matters, and a handler that never reads sizes
+	// mustn't block this send.
+	select {
+	case <-s.winch:
+	default:
+	}
+	s.winch <- win
+	return true
+}
+
+// handleRequest runs req's handler before the session's next request is
+// read, so a command sees what earlier requests like pty-req set up. It
+// reports false when the session is ending and must not run another request.
+func (s *SSHServerConnSession) handleRequest(req *ssh.Request) bool {
+	var ok, panicked bool
+	var then func()
+	if h := s.SSHServer.Config.sessionRequestHandler(req.Type); h != nil {
+		ok, then, panicked = s.callRequestHandler(h, req)
+	}
 
 	if err := req.Reply(ok, nil); err != nil {
-		s.Logger.Error("pty-req reply", "err", err)
+		// The client never learned the request succeeded, so it can't be
+		// expecting the command to run.
+		s.Logger.Error("session request reply", "type", req.Type, "err", err)
+		_ = s.Close()
+		return false
+	}
+
+	if then == nil {
+		return true
+	}
+
+	go func() {
+		// A panic in a handler ends its session and leaves the server running.
+		defer func() {
+			if r := recover(); r != nil {
+				s.Logger.Error("session request panic", "type", req.Type, "err", r, "stack", string(debug.Stack()))
+				s.Fatal(fmt.Errorf("internal server error"))
+			}
+		}()
+		then()
+	}()
+	return !panicked
+}
+
+func (s *SSHServerConnSession) callRequestHandler(h SSHServerRequestHandler, req *ssh.Request) (ok bool, then func(), panicked bool) {
+	defer func() {
+		if r := recover(); r != nil {
+			s.Logger.Error("session request panic", "type", req.Type, "err", r, "stack", string(debug.Stack()))
+			// Fatal runs after the reply and off the request loop, since its
+			// write can block on the client's window.
+			ok, then, panicked = false, func() { s.Fatal(fmt.Errorf("internal server error")) }, true
+		}
+	}()
+	ok, then = h(req, s)
+	return ok, then, false
+}
+
+// PtyRequestHandler is the default pty-req handler.
+func PtyRequestHandler(req *ssh.Request, sesh *SSHServerConnSession) (bool, func()) {
+	pty, ok := ParsePtyRequest(req.Payload)
+	if !ok {
+		return false, nil
+	}
+	return sesh.SetPty(pty), nil
+}
+
+// WindowChangeHandler is the default window-change handler.
+func WindowChangeHandler(req *ssh.Request, sesh *SSHServerConnSession) (bool, func()) {
+	win, ok := ParseWinchRequest(req.Payload)
+	if !ok {
+		return false, nil
+	}
+	return sesh.SetWindow(win), nil
+}
+
+// ShellHandler is the default shell and exec handler. It runs the server's
+// Middleware.
+func ShellHandler(req *ssh.Request, sesh *SSHServerConnSession) (bool, func()) {
+	if !sesh.claimCommand() {
+		return false, nil
+	}
+
+	cfg := sesh.SSHServer.Config
+	if len(cfg.Middleware) == 0 {
+		return false, func() { sesh.Fatal(fmt.Errorf("%s is not supported", req.Type)) }
+	}
+
+	command := "shell"
+
+	if len(req.Payload) > 0 {
+		var payload = struct{ Value string }{}
+		if err := ssh.Unmarshal(req.Payload, &payload); err != nil {
+			sesh.Logger.Error("shell/exec unmarshal", "err", err)
+			return false, func() { sesh.Fatal(err) }
+		}
+
+		commaSplitter, _ := splitter.NewSplitter(
+			' ',
+			splitter.DoubleQuotes,
+			splitter.SingleQuotes,
+		)
+		command = payload.Value
+		cmdSlice, _ := commaSplitter.Split(command, splitter.StripQuotes)
+		sesh.SetValue("command", cmdSlice)
+	}
+
+	if !utf8.ValidString(command) {
+		command = base64.StdEncoding.EncodeToString([]byte(command))
+	}
+
+	return true, func() {
+		if cfg.PromListenAddr != "" {
+			labels := []string{sessionCommand(command), sessionUser(sesh)}
+			sesh.SSHServer.SessionsCreated.WithLabelValues(labels...).Inc()
+			defer func() {
+				sesh.SSHServer.SessionsFinished.WithLabelValues(labels...).Inc()
+				sesh.SSHServer.SessionsDuration.WithLabelValues(labels...).Add(time.Since(sesh.started).Seconds())
+			}()
+		}
+
+		runMiddleware(sesh, cfg.Middleware)
+	}
+}
+
+// SubsystemHandler is the default subsystem handler. It runs the server's
+// SubsystemMiddleware, and closes the connection when there is none.
+func SubsystemHandler(req *ssh.Request, sesh *SSHServerConnSession) (bool, func()) {
+	if !sesh.claimCommand() {
+		return false, nil
+	}
+
+	cfg := sesh.SSHServer.Config
+	if len(cfg.SubsystemMiddleware) == 0 {
+		return false, func() {
+			sesh.Fatal(fmt.Errorf("subsystem is not supported"))
+			_ = sesh.SSHServerConn.Close()
+		}
+	}
+
+	return true, func() { runMiddleware(sesh, cfg.SubsystemMiddleware) }
+}
+
+func runMiddleware(sesh *SSHServerConnSession, middleware []SSHServerMiddleware) {
+	h := func(*SSHServerConnSession) error { return nil }
+	for _, m := range middleware {
+		h = m(h)
+	}
+
+	if err := h(sesh); err != nil && !errors.Is(err, io.EOF) {
+		sesh.Logger.Error("session middleware", "err", err)
+		sesh.Fatal(err)
+		return
+	}
+
+	if err := sesh.Exit(0); err != nil {
+		sesh.Logger.Error("session exit", "err", err)
+	}
+
+	if err := sesh.Close(); err != nil {
+		sesh.Logger.Error("session close", "err", err)
 	}
 }
 
@@ -260,9 +452,12 @@ func (sc *SSHServerConn) Handle(chans <-chan ssh.NewChannel, reqs <-chan *ssh.Re
 			}
 
 			sc.Logger.Info("new channel", "type", newChan.ChannelType(), "extraData", newChan.ExtraData())
-			chanFunc, ok := sc.SSHServer.Config.ChannelMiddleware[newChan.ChannelType()]
-			if !ok {
+			chanFunc := sc.SSHServer.Config.ChannelMiddleware[newChan.ChannelType()]
+			if chanFunc == nil {
 				sc.Logger.Info("no channel middleware for type", "type", newChan.ChannelType())
+				if err := newChan.Reject(ssh.UnknownChannelType, "unsupported channel type"); err != nil {
+					sc.Logger.Error("channel reject", "err", err)
+				}
 				continue
 			}
 
@@ -282,16 +477,35 @@ func (sc *SSHServerConn) Handle(chans <-chan ssh.NewChannel, reqs <-chan *ssh.Re
 				return nil
 			}
 			sc.Logger.Info("new request", "type", req.Type, "wantReply", req.WantReply, "payload", req.Payload)
-			switch req.Type {
-			case "keepalive@openssh.com":
-				sc.Logger.Info("keepalive reply")
-				err := req.Reply(true, nil)
-				if err != nil {
-					sc.Logger.Error("keepalive", "err", err)
-				}
+			var replyOK bool
+			var payload []byte
+			if h := sc.SSHServer.Config.globalRequestHandler(req.Type); h != nil {
+				replyOK, payload = sc.callGlobalRequestHandler(h, req)
+			}
+			// RFC 4254 gives a failure reply no payload.
+			if !replyOK {
+				payload = nil
+			}
+			if err := req.Reply(replyOK, payload); err != nil {
+				sc.Logger.Error("global request reply", "type", req.Type, "err", err)
 			}
 		}
 	}
+}
+
+func (sc *SSHServerConn) callGlobalRequestHandler(h SSHServerGlobalRequestHandler, req *ssh.Request) (ok bool, payload []byte) {
+	defer func() {
+		if r := recover(); r != nil {
+			sc.Logger.Error("global request panic", "type", req.Type, "err", r, "stack", string(debug.Stack()))
+			ok, payload = false, nil
+		}
+	}()
+	return h(req, sc)
+}
+
+// KeepaliveHandler is the default keepalive@openssh.com handler.
+func KeepaliveHandler(*ssh.Request, *SSHServerConn) (bool, []byte) {
+	return true, nil
 }
 
 func NewSSHServerConn(
@@ -324,6 +538,29 @@ type SSHServerHandler func(*SSHServerConnSession) error
 type SSHServerMiddleware func(SSHServerHandler) SSHServerHandler
 type SSHServerChannelMiddleware func(ssh.NewChannel, *SSHServerConn) error
 
+// SSHServerRequestHandler handles a request on a session channel. It runs
+// before the session's next request is read, so it must not block. pssh
+// replies with ok when the client wants a reply, then runs then, if set, in
+// its own goroutine.
+type SSHServerRequestHandler func(req *ssh.Request, sesh *SSHServerConnSession) (ok bool, then func())
+
+// SSHServerGlobalRequestHandler handles a connection-level request. pssh
+// replies with ok when the client wants a reply, and sends payload only with
+// a success.
+type SSHServerGlobalRequestHandler func(req *ssh.Request, sc *SSHServerConn) (ok bool, payload []byte)
+
+var defaultSessionRequestHandlers = map[string]SSHServerRequestHandler{
+	"pty-req":       PtyRequestHandler,
+	"window-change": WindowChangeHandler,
+	"shell":         ShellHandler,
+	"exec":          ShellHandler,
+	"subsystem":     SubsystemHandler,
+}
+
+var defaultGlobalRequestHandlers = map[string]SSHServerGlobalRequestHandler{
+	"keepalive@openssh.com": KeepaliveHandler,
+}
+
 type SSHServerConfig struct {
 	*ssh.ServerConfig
 	App                 string
@@ -331,7 +568,34 @@ type SSHServerConfig struct {
 	PromListenAddr      string
 	Middleware          []SSHServerMiddleware
 	SubsystemMiddleware []SSHServerMiddleware
-	ChannelMiddleware   map[string]SSHServerChannelMiddleware
+	// A nil entry in any of these maps rejects that type, default included.
+	// Types without a handler are rejected.
+	ChannelMiddleware map[string]SSHServerChannelMiddleware
+	// SessionRequestHandlers and GlobalRequestHandlers are merged over the
+	// defaults, keyed by request type.
+	SessionRequestHandlers map[string]SSHServerRequestHandler
+	GlobalRequestHandlers  map[string]SSHServerGlobalRequestHandler
+	// HandshakeTimeout bounds the handshake and auth. Zero means
+	// DefaultHandshakeTimeout and a negative value means no limit.
+	HandshakeTimeout time.Duration
+}
+
+// DefaultHandshakeTimeout keeps a client that never finishes its handshake
+// from holding a connection open.
+const DefaultHandshakeTimeout = 30 * time.Second
+
+func (c *SSHServerConfig) sessionRequestHandler(reqType string) SSHServerRequestHandler {
+	if h, ok := c.SessionRequestHandlers[reqType]; ok {
+		return h
+	}
+	return defaultSessionRequestHandlers[reqType]
+}
+
+func (c *SSHServerConfig) globalRequestHandler(reqType string) SSHServerGlobalRequestHandler {
+	if h, ok := c.GlobalRequestHandlers[reqType]; ok {
+		return h
+	}
+	return defaultGlobalRequestHandlers[reqType]
 }
 
 type SSHServer struct {
@@ -415,7 +679,7 @@ func (s *SSHServer) ListenAndServe() error {
 	s.Listener = listen
 	s.Mu.Unlock()
 	defer func() {
-		_ = s.Listener.Close()
+		_ = listen.Close()
 	}()
 
 	go func() {
@@ -423,18 +687,26 @@ func (s *SSHServer) ListenAndServe() error {
 		_ = s.Close()
 	}()
 
-	var retErr error
-
+	// Errors like running out of file descriptors last a while, so back off
+	// instead of spinning on them.
+	var delay time.Duration
 	for {
-		conn, err := s.Listener.Accept()
+		conn, err := listen.Accept()
 		if err != nil {
-			s.Logger.Error("accept", "err", err)
 			if errors.Is(err, net.ErrClosed) {
-				retErr = err
-				break
+				return nil
+			}
+
+			delay = min(max(2*delay, 5*time.Millisecond), time.Second)
+			s.Logger.Error("accept", "err", err, "retryIn", delay)
+			select {
+			case <-time.After(delay):
+			case <-s.Ctx.Done():
+				return nil
 			}
 			continue
 		}
+		delay = 0
 
 		go func() {
 			if err := s.HandleConn(conn); err != nil && !errors.Is(err, io.EOF) {
@@ -442,12 +714,6 @@ func (s *SSHServer) ListenAndServe() error {
 			}
 		}()
 	}
-
-	if errors.Is(retErr, net.ErrClosed) {
-		return nil
-	}
-
-	return retErr
 }
 
 func (s *SSHServer) HandleConn(conn net.Conn) error {
@@ -455,9 +721,30 @@ func (s *SSHServer) HandleConn(conn net.Conn) error {
 		_ = conn.Close()
 	}()
 
+	timeout := s.Config.HandshakeTimeout
+	if timeout == 0 {
+		timeout = DefaultHandshakeTimeout
+	}
+	if timeout > 0 {
+		if err := conn.SetDeadline(time.Now().Add(timeout)); err != nil {
+			return err
+		}
+	}
+
 	sshConn, chans, reqs, err := ssh.NewServerConn(conn, s.Config.ServerConfig)
 	if err != nil {
 		return err
+	}
+
+	if timeout > 0 {
+		if err := conn.SetDeadline(time.Time{}); err != nil {
+			// x/crypto closes the conn when a client hangs up right after
+			// auth, which is a normal disconnect.
+			if errors.Is(err, net.ErrClosed) {
+				return nil
+			}
+			return err
+		}
 	}
 
 	newLogger := s.Logger.With(
@@ -487,7 +774,15 @@ func (s *SSHServer) HandleConn(conn net.Conn) error {
 
 func (s *SSHServer) Close() error {
 	s.CancelFunc()
-	return s.Listener.Close()
+
+	s.Mu.Lock()
+	listener := s.Listener
+	s.Mu.Unlock()
+
+	if listener == nil {
+		return nil
+	}
+	return listener.Close()
 }
 
 func NewSSHServer(ctx context.Context, logger *slog.Logger, config *SSHServerConfig) *SSHServer {
@@ -510,203 +805,7 @@ func NewSSHServer(ctx context.Context, logger *slog.Logger, config *SSHServerCon
 	}
 
 	if _, ok := config.ChannelMiddleware["session"]; !ok {
-		config.ChannelMiddleware["session"] = func(newChan ssh.NewChannel, sc *SSHServerConn) error {
-			channel, requests, err := newChan.Accept()
-			if err != nil {
-				sc.Logger.Error("accept session channel", "err", err)
-				return err
-			}
-
-			ctx, cancelFunc := context.WithCancel(sc.Ctx)
-			// The client closing the session ends its command, even while
-			// the connection stays open for other sessions.
-			defer cancelFunc()
-
-			sesh := &SSHServerConnSession{
-				Channel:       channel,
-				SSHServerConn: sc,
-				Ctx:           ctx,
-				CancelFunc:    cancelFunc,
-			}
-
-			for {
-				select {
-				case <-sesh.Done():
-					return nil
-				case req, ok := <-requests:
-					if !ok {
-						return nil
-					}
-
-					// Clients send pty-req before shell or exec without waiting for the
-					// reply, so it's applied here, before the next request is read.
-					if req.Type == "pty-req" {
-						sc.Logger.Info("new session request", "type", req.Type, "wantReply", req.WantReply, "payload", req.Payload)
-						sesh.handlePtyReq(req)
-						continue
-					}
-
-					go func() {
-						// A panic in a handler ends its session and leaves the
-						// server running.
-						defer func() {
-							if r := recover(); r != nil {
-								sc.Logger.Error("session request panic", "type", req.Type, "err", r, "stack", string(debug.Stack()))
-								sesh.Fatal(fmt.Errorf("internal server error"))
-							}
-						}()
-						sc.Logger.Info("new session request", "type", req.Type, "wantReply", req.WantReply, "payload", req.Payload)
-						switch req.Type {
-						case "subsystem":
-							if len(sc.SSHServer.Config.SubsystemMiddleware) == 0 {
-								err := req.Reply(false, nil)
-								if err != nil {
-									sc.Logger.Error("subsystem reply", "err", err)
-								}
-
-								err = sc.Close()
-								if err != nil {
-									sc.Logger.Error("subsystem close", "err", err)
-								}
-
-								sesh.Fatal(err)
-								return
-							}
-
-							h := func(*SSHServerConnSession) error { return nil }
-							for _, m := range sc.SSHServer.Config.SubsystemMiddleware {
-								h = m(h)
-							}
-
-							err := req.Reply(true, nil)
-							if err != nil {
-								sc.Logger.Error("subsystem reply", "err", err)
-								sesh.Fatal(err)
-								return
-							}
-
-							if err := h(sesh); err != nil && !errors.Is(err, io.EOF) {
-								sc.Logger.Error("subsystem middleware", "err", err)
-								sesh.Fatal(err)
-								return
-							}
-
-							err = sesh.Exit(0)
-							if err != nil {
-								sc.Logger.Error("subsystem exit", "err", err)
-							}
-
-							err = sesh.Close()
-							if err != nil {
-								sc.Logger.Error("subsystem close", "err", err)
-							}
-						case "shell", "exec":
-							if len(sc.SSHServer.Config.Middleware) == 0 {
-								err := req.Reply(false, nil)
-								if err != nil {
-									sc.Logger.Error("shell/exec reply", "err", err)
-								}
-								sesh.Fatal(err)
-								return
-							}
-
-							command := "shell"
-
-							if len(req.Payload) > 0 {
-								var payload = struct{ Value string }{}
-								err := ssh.Unmarshal(req.Payload, &payload)
-								if err != nil {
-									sc.Logger.Error("shell/exec unmarshal", "err", err)
-									sesh.Fatal(err)
-									return
-								}
-
-								commaSplitter, _ := splitter.NewSplitter(
-									' ',
-									splitter.DoubleQuotes,
-									splitter.SingleQuotes,
-								)
-								command = payload.Value
-								cmdSlice, _ := commaSplitter.Split(command, splitter.StripQuotes)
-								sesh.SetValue("command", cmdSlice)
-							}
-
-							if !utf8.ValidString(command) {
-								command = base64.StdEncoding.EncodeToString([]byte(command))
-							}
-
-							if sc.SSHServer.Config.PromListenAddr != "" {
-								labels := []string{sessionCommand(command), sessionUser(sesh)}
-								sc.SSHServer.SessionsCreated.WithLabelValues(labels...).Inc()
-								defer func() {
-									sc.SSHServer.SessionsFinished.WithLabelValues(labels...).Inc()
-									sc.SSHServer.SessionsDuration.WithLabelValues(labels...).Add(time.Since(sc.Start).Seconds())
-								}()
-							}
-
-							h := func(*SSHServerConnSession) error { return nil }
-							for _, m := range sc.SSHServer.Config.Middleware {
-								h = m(h)
-							}
-
-							err = req.Reply(true, nil)
-							if err != nil {
-								sc.Logger.Error("shell/exec reply", "err", err)
-								sesh.Fatal(err)
-								return
-							}
-
-							if err := h(sesh); err != nil && !errors.Is(err, io.EOF) {
-								sc.Logger.Error("exec middleware", "err", err)
-								sesh.Fatal(err)
-								return
-							}
-
-							err = sesh.Exit(0)
-							if err != nil {
-								sc.Logger.Error("subsystem exit", "err", err)
-							}
-
-							err = sesh.Close()
-							if err != nil {
-								sc.Logger.Error("subsystem close", "err", err)
-							}
-						case "window-change":
-							sesh.mu.Lock()
-							found := sesh.pty != nil
-							sesh.mu.Unlock()
-
-							if !found {
-								err := req.Reply(false, nil)
-								if err != nil {
-									sc.Logger.Error("pty-req reply", "err", err)
-								}
-								return
-							}
-
-							win, ok := parseWinchRequest(req.Payload)
-							if ok {
-								sesh.mu.Lock()
-								sesh.pty.Window = win
-								// Only the latest size matters, and a handler that
-								// never reads sizes mustn't block this send.
-								select {
-								case <-sesh.winch:
-								default:
-								}
-								sesh.winch <- win
-								sesh.mu.Unlock()
-							}
-
-							err := req.Reply(ok, nil)
-							if err != nil {
-								sc.Logger.Error("window-change reply", "err", err)
-							}
-						}
-					}()
-				}
-			}
-		}
+		config.ChannelMiddleware["session"] = handleSessionChannel
 	}
 
 	server := &SSHServer{
@@ -718,6 +817,53 @@ func NewSSHServer(ctx context.Context, logger *slog.Logger, config *SSHServerCon
 	}
 
 	return server
+}
+
+func handleSessionChannel(newChan ssh.NewChannel, sc *SSHServerConn) error {
+	channel, requests, err := newChan.Accept()
+	if err != nil {
+		sc.Logger.Error("accept session channel", "err", err)
+		return err
+	}
+
+	ctx, cancelFunc := context.WithCancel(sc.Ctx)
+	// The client closing the session ends its command, even while
+	// the connection stays open for other sessions.
+	defer cancelFunc()
+
+	sesh := &SSHServerConnSession{
+		Channel:       channel,
+		SSHServerConn: sc,
+		Ctx:           ctx,
+		CancelFunc:    cancelFunc,
+	}
+
+	// Requests left unread once the session ends would back up and stall the
+	// connection's other channels.
+	defer func() { go ssh.DiscardRequests(requests) }()
+
+	for {
+		select {
+		case <-sesh.Done():
+			return nil
+		case req, ok := <-requests:
+			if !ok {
+				return nil
+			}
+
+			// select picks at random when both cases are ready, so a request
+			// can arrive here after the session ended.
+			if sesh.Err() != nil {
+				_ = req.Reply(false, nil)
+				return nil
+			}
+
+			sc.Logger.Info("new session request", "type", req.Type, "wantReply", req.WantReply, "payload", req.Payload)
+			if !sesh.handleRequest(req) {
+				return nil
+			}
+		}
+	}
 }
 
 // sessionCommand is the subcommand alone, since arguments would add a series

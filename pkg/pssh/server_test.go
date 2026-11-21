@@ -791,20 +791,27 @@ func TestPtyVisibleToCommand(t *testing.T) {
 
 func startTestServer(t *testing.T, mw pssh.SSHServerMiddleware) string {
 	t.Helper()
+	return startTestServerWithConfig(t, &pssh.SSHServerConfig{
+		Middleware: []pssh.SSHServerMiddleware{mw},
+	})
+}
+
+// startTestServerWithConfig fills in the listener and auth on cfg and serves
+// it until the test ends.
+func startTestServerWithConfig(t *testing.T, cfg *pssh.SSHServerConfig) string {
+	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 
 	user := GenerateKey()
-	server := pssh.NewSSHServer(ctx, slog.New(slog.DiscardHandler), &pssh.SSHServerConfig{
-		ListenAddr: "127.0.0.1:0",
-		Middleware: []pssh.SSHServerMiddleware{mw},
-		ServerConfig: &ssh.ServerConfig{
-			NoClientAuth: true,
-			NoClientAuthCallback: func(ssh.ConnMetadata) (*ssh.Permissions, error) {
-				return &ssh.Permissions{Extensions: map[string]string{}}, nil
-			},
+	cfg.ListenAddr = "127.0.0.1:0"
+	cfg.ServerConfig = &ssh.ServerConfig{
+		NoClientAuth: true,
+		NoClientAuthCallback: func(ssh.ConnMetadata) (*ssh.Permissions, error) {
+			return &ssh.Permissions{Extensions: map[string]string{}}, nil
 		},
-	})
+	}
+	server := pssh.NewSSHServer(ctx, slog.New(slog.DiscardHandler), cfg)
 	server.Config.AddHostKey(user.signer)
 	go func() { _ = server.ListenAndServe() }()
 
