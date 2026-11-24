@@ -233,7 +233,12 @@ func TestUserMetricsHijack(t *testing.T) {
 		_ = rw.Flush()
 		_ = conn.Close()
 	}))
-	srv := httptest.NewServer(h)
+	// The request is counted after the client has its response.
+	done := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer close(done)
+		h.ServeHTTP(w, r)
+	}))
 	defer srv.Close()
 
 	resp, err := http.Get(srv.URL)
@@ -241,6 +246,7 @@ func TestUserMetricsHijack(t *testing.T) {
 		t.Fatalf("get: %v", err)
 	}
 	_ = resp.Body.Close()
+	<-done
 
 	if got := metricValue(t, reg, "pico_http_requests_total", map[string]string{"status": "101"}); got != 1 {
 		t.Errorf("101 requests = %v, want 1", got)
