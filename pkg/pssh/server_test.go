@@ -398,8 +398,10 @@ func TestSSHServerHandleConn(t *testing.T) {
 
 	// Wait for HandleConn to return
 	select {
-	case <-errChan:
-		// Expected HandleConn to return
+	case err := <-errChan:
+		if err == nil {
+			t.Error("HandleConn did not report the failed handshake")
+		}
 	case <-time.After(2 * time.Second):
 		t.Error("HandleConn did not return after connection closed")
 	}
@@ -903,7 +905,8 @@ func TestWindowChangeWithoutReader(t *testing.T) {
 	done := make(chan error, 1)
 	go func() { done <- session.Wait() }()
 	select {
-	case <-done:
+	case err := <-done:
+		t.Logf("session ended: %v", err)
 	case <-time.After(2 * time.Second):
 		t.Fatal("session blocked after window changes")
 	}

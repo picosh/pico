@@ -761,8 +761,8 @@ func TestPipe_Bidirectional(t *testing.T) {
 	}()
 
 	select {
-	case <-bobDone:
-		// Bob's session terminated cleanly
+	case err := <-bobDone:
+		t.Logf("bob's session ended: %v", err)
 	case <-time.After(3 * time.Second):
 		t.Fatal("bob's pipe session hung after alice disconnected")
 	}

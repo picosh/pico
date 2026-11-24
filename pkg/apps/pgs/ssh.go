@@ -101,7 +101,8 @@ func StartSshServer(cfg *Config, killCh chan error) {
 	}
 
 	select {
-	case <-killCh:
+	case err := <-killCh:
+		logger.Info("killed", "err", err)
 		exit()
 	case <-done:
 		exit()

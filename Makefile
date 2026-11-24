@@ -147,6 +147,12 @@ build-%:
 build: build-prose build-pastes build-feeds build-pgs build-pgs-cdn build-auth build-pico build-pipe
 .PHONY: build
 
+# Pulls the Dockerfiles' base images and drops the lint image so pici rebuilds it.
+pull:
+	awk '/^FROM/ { for (i = 2; i <= NF; i++) if ($$i ~ /:/) print $$i }' Dockerfile* */Dockerfile | sort -u | xargs -n 1 $(DOCKER_CMD) pull
+	$(DOCKER_CMD) image rm -f golangci-lint:local
+.PHONY: pull
+
 scripts:
 	# might need to set MINIO_URL
 	docker run --rm -it --env-file .env -v $(shell pwd):/app -w /app golang:1.27 /bin/bash

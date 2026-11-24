@@ -59,8 +59,8 @@ func StartSshServerForTesting(cfg *Config, killCh chan error, readyCh chan *pssh
 
 	go func() {
 		// Wait for kill signal and clean up
-		<-killCh
-		logger.Info("stopping ssh server")
+		err := <-killCh
+		logger.Info("stopping ssh server", "err", err)
 		cancel()
 	}()
 }
