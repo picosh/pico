@@ -63,7 +63,7 @@ func Main(m *testing.M) {
 func Clean(t testing.TB, d *sqlx.DB) {
 	t.Helper()
 	tables := []string{
-		"access_logs", "tuns_event_logs", "analytics_visits",
+		"access_logs", "cert_revocations", "tuns_event_logs", "analytics_visits",
 		"feed_items", "post_aliases", "post_tags", "posts",
 		"projects", "feature_flags", "payment_history", "tokens",
 		"public_keys", "pipe_monitors", "app_users",

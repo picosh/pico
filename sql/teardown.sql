@@ -16,6 +16,7 @@ DROP TABLE analytics_monthly_visits;
 DROP TABLE analytics_user_sites;
 DROP TABLE block_signups;
 DROP TABLE caddy_storage;
+DROP TABLE cert_revocations;
 DROP TABLE certmagic_data;
 DROP TABLE certmagic_locks;
 DROP TABLE form_entries;

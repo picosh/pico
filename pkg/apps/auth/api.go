@@ -326,6 +326,16 @@ func keyHandler(apiConfig *ApiConfig) http.HandlerFunc {
 			return
 		}
 
+		if err := authed.CheckRevoked(apiConfig.Dbpool, user.ID); err != nil {
+			log.Error("pubkey cert revoked", "err", err)
+			if !errors.Is(err, shared.ErrCertRevoked) {
+				http.Error(w, "cannot check certificate", http.StatusInternalServerError)
+				return
+			}
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
 		// report=1 lets privileged callers accept accounts without access to
 		// the space, and tells them which accounts have it.
 		report := privileged && r.URL.Query().Get("report") == "1"

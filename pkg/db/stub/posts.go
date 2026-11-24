@@ -70,6 +70,8 @@ func (m *PostsDB) FindUser(string) (*db.User, error)       { return m.User, nil 
 func (m *PostsDB) FindUserByName(string) (*db.User, error) { return m.User, nil }
 func (m *PostsDB) InsertAccessLog(*db.AccessLog) error     { return nil }
 
+func (m *PostsDB) IsCertRevoked(string, string, string) (bool, error) { return false, nil }
+
 func (m *PostsDB) FindFeature(userID, name string) (*db.FeatureFlag, error) {
 	if name != "plus" {
 		return nil, sql.ErrNoRows

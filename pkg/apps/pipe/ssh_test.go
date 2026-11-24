@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -31,6 +32,13 @@ type TestDB struct {
 	Pubkeys      []*db.PublicKey
 	Features     []*db.FeatureFlag
 	PipeMonitors []*db.PipeMonitor
+	RevokedIDs   []string
+}
+
+func (t *TestDB) IsCertRevoked(_, _, keyID string) (bool, error) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return slices.Contains(t.RevokedIDs, keyID), nil
 }
 
 func NewTestDB(logger *slog.Logger) *TestDB {
@@ -270,17 +278,7 @@ func NewTestSSHServer(t *testing.T) *TestSSHServer {
 		cfg.Port,
 		"",
 		"../../ssh_data/term_info_ed25519",
-		func(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
-			perms, _ := sshAuth.PubkeyAuthHandler(conn, key)
-			if perms == nil {
-				perms = &ssh.Permissions{
-					Extensions: map[string]string{
-						"pubkey": shared.KeyForKeyText(key),
-					},
-				}
-			}
-			return perms, nil
-		},
+		sshAuth.OpenPubkeyAuthHandler,
 		[]pssh.SSHServerMiddleware{
 			Middleware(handler),
 			pssh.LogMiddleware(handler, dbpool),

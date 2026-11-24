@@ -110,6 +110,12 @@ func (me *PgsPsqlDB) InsertAccessLog(log *db.AccessLog) error {
 	return err
 }
 
+func (me *PgsPsqlDB) IsCertRevoked(userID, fingerprint, keyID string) (bool, error) {
+	var revoked bool
+	err := me.Db.Get(&revoked, db.IsCertRevokedQuery, userID, fingerprint, keyID)
+	return revoked, err
+}
+
 func (me *PgsPsqlDB) InsertProject(userID, name, projectDir string) (string, error) {
 	if !shared.IsValidSubdomain(name) {
 		return "", fmt.Errorf("'%s' is not a valid project name, must match /^[a-z0-9-]+$/", name)

@@ -43,6 +43,8 @@ type Cmd struct {
 	Log        *slog.Logger
 	Dbpool     db.DB
 	Write      bool
+	// Scopes are the connection's. Certs with scopes can't log in to pico.
+	Scopes shared.Scopes
 
 	// DomainTargets are the hosts dns-check expects a custom domain to point at.
 	DomainTargets []string
@@ -56,11 +58,12 @@ func (c *Cmd) output(out string) {
 }
 
 func (c *Cmd) help() {
-	helpStr := "Commands: [help, user, logs, access-logs, chat, not-found, dns-check]\n"
+	helpStr := "Commands: [help, user, logs, access-logs, certs, chat, not-found, dns-check]\n"
 	helpStr += "help - this message\n"
 	helpStr += "user - display user information (returns name, id, account created, pico+ expiration)\n"
 	helpStr += "logs - stream user logs\n"
 	helpStr += "access-logs - fetch access logs from the last 30 days\n"
+	helpStr += "certs - list, revoke and unrevoke ssh certificates ([revoked | revoke | unrevoke])\n"
 	helpStr += "chat - IRC chat (must enable pty with `-t` to the SSH command)\n"
 	helpStr += "not-found - return all status 404 requests for a host (hostname.com [year|month])\n"
 	helpStr += "dns-check - check a domain's CNAME/A and TXT records for pgs, prose, tuns and picd custom domains (hostname.com or *.hostname.com)\n"
@@ -252,6 +255,7 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 				Log:        log,
 				Dbpool:     dbpool,
 				Write:      false,
+				Scopes:     shared.SessionScopes(sesh),
 
 				DomainTargets: handler.DomainTargets,
 			}
@@ -282,6 +286,14 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 					}
 					return nil
 				}
+			}
+
+			if cmd == "certs" {
+				err = opts.certs(args[1:])
+				if err != nil {
+					sesh.Fatal(err)
+				}
+				return nil
 			}
 
 			if cmd == "dns-check" {

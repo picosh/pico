@@ -287,6 +287,35 @@ type AccessLog struct {
 	CreatedAt *time.Time    `json:"created_at" db:"created_at"`
 }
 
+// Kinds of CertRevocation.
+const (
+	CertRevocationKey = "key"
+	CertRevocationID  = "id"
+)
+
+// CertRevocation refuses the certs signed by an account's CAs that are for a
+// key, by its fingerprint, or that have a KeyId.
+type CertRevocation struct {
+	UserID    string     `json:"user_id" db:"user_id"`
+	Kind      string     `json:"kind" db:"kind"`
+	Value     string     `json:"value" db:"value"`
+	Note      string     `json:"note" db:"note"`
+	CreatedAt *time.Time `json:"created_at" db:"created_at"`
+}
+
+// IsCertRevokedQuery is what postgres and sqlite run for IsCertRevoked.
+const IsCertRevokedQuery = `SELECT EXISTS (
+	SELECT 1 FROM cert_revocations
+	WHERE user_id=$1 AND ((kind='key' AND value=$2) OR (kind='id' AND value=$3))
+)`
+
+// LoggedCert is a cert as access logs hold it. Rows are written before the
+// client proves it has the key, and older ones before the cert was verified.
+type LoggedCert struct {
+	Pubkey   string     `json:"pubkey" db:"pubkey"`
+	LastSeen *time.Time `json:"last_seen" db:"last_seen"`
+}
+
 type Pager struct {
 	Num  int
 	Page int
@@ -642,6 +671,9 @@ type AuthDB interface {
 	FindUserByName(name string) (*User, error)
 	FindFeature(userID string, feature string) (*FeatureFlag, error)
 	InsertAccessLog(log *AccessLog) error
+	// IsCertRevoked reports whether an account revoked certs for a key, by its
+	// fingerprint, or certs with keyID.
+	IsCertRevoked(userID, fingerprint, keyID string) (bool, error)
 }
 
 type KeyDB interface {
@@ -717,6 +749,18 @@ type AccessLogDB interface {
 	FindAccessLogsByPubkey(pubkey string, fromDate *time.Time) ([]*AccessLog, error)
 }
 
+type CertDB interface {
+	IsCertRevoked(userID, fingerprint, keyID string) (bool, error)
+	FindCertRevocations(userID string) ([]*CertRevocation, error)
+	// InsertCertRevocation and RemoveCertRevocation report whether they
+	// changed anything.
+	InsertCertRevocation(rev *CertRevocation) (bool, error)
+	RemoveCertRevocation(userID, kind, value string) (bool, error)
+	// FindCertsInAccessLogs returns the latest certs, and whether it left out
+	// any that are too large or too many.
+	FindCertsInAccessLogs(userID string) (certs []*LoggedCert, partial bool, err error)
+}
+
 type InviteDB interface {
 	FindWhoInvitedUser(toUserID string) (string, error)
 	FindInvitesByUser(userID string) ([]*Invite, error)
@@ -739,6 +783,7 @@ type DB interface {
 	ProjectDB
 	TunsDB
 	AccessLogDB
+	CertDB
 	InviteDB
 
 	FindPosts() ([]*Post, error)

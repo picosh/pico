@@ -46,6 +46,51 @@ func (c *countingPubSub) GetChannels() iter.Seq2[string, *psub.Channel] {
 	return c.PubSub.GetChannels()
 }
 
+// A refused cert isn't let in as a key without an account, and its plain key
+// only gets what any unknown key does.
+func TestRevokedCertRefused(t *testing.T) {
+	server := NewTestSSHServer(t)
+	defer server.Shutdown()
+	alice := GenerateUser("alice")
+	RegisterUserWithServer(server, alice)
+
+	for _, principal := range []string{"admin", "pipe", "pipe:sub:deploys"} {
+		ci := alice.withCert(t, principal)
+		client, err := ci.NewClient()
+		if err != nil {
+			t.Fatalf("%s: %v", principal, err)
+		}
+		_ = client.Close()
+	}
+
+	server.DBPool.mu.Lock()
+	server.DBPool.RevokedIDs = []string{"ci"}
+	server.DBPool.mu.Unlock()
+
+	for _, principal := range []string{"admin", "pipe", "pipe:sub:deploys"} {
+		if client, err := alice.withCert(t, principal).NewClient(); err == nil {
+			_ = client.Close()
+			t.Errorf("revoked %s cert was accepted", principal)
+		}
+	}
+
+	client, err := alice.NewClient()
+	if err != nil {
+		t.Fatalf("account key: %v", err)
+	}
+	_ = client.Close()
+
+	plain := GenerateUser("ci")
+	client, err = plain.NewClient()
+	if err != nil {
+		t.Fatalf("unknown key: %v", err)
+	}
+	defer func() { _ = client.Close() }()
+	if out, _ := plain.RunCommand(client, "ls"); !strings.Contains(out, "access denied") {
+		t.Errorf("unknown key has an account: %q", out)
+	}
+}
+
 func TestRefusedScopesClaimNothing(t *testing.T) {
 	server := NewTestSSHServer(t)
 	defer server.Shutdown()

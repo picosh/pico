@@ -10,7 +10,6 @@ import (
 	"github.com/picosh/pico/pkg/pssh"
 	psub "github.com/picosh/pico/pkg/pubsub"
 	"github.com/picosh/pico/pkg/shared"
-	"golang.org/x/crypto/ssh"
 )
 
 func StartSshServer() {
@@ -48,23 +47,7 @@ func StartSshServer() {
 		port,
 		promPort,
 		"ssh_data/term_info_ed25519",
-		func(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
-			perms, err := sshAuth.PubkeyAuthHandler(conn, key)
-			// Unknown keys may use public topics, but a cert that failed its
-			// checks is refused.
-			if _, isCert := key.(*ssh.Certificate); isCert && err != nil {
-				return nil, err
-			}
-			if perms == nil {
-				perms = &ssh.Permissions{
-					Extensions: map[string]string{
-						"pubkey": shared.KeyForKeyText(key),
-					},
-				}
-			}
-
-			return perms, nil
-		},
+		sshAuth.OpenPubkeyAuthHandler,
 		[]pssh.SSHServerMiddleware{
 			Middleware(handler),
 			pssh.LogMiddleware(handler, dbh),

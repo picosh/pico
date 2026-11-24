@@ -8,6 +8,22 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+// Nothing in pgs adds revocations, but every cert login looks for one.
+const sqliteCertRevocations = `
+CREATE TABLE IF NOT EXISTS cert_revocations (
+	user_id INTEGER NOT NULL,
+	kind TEXT NOT NULL CHECK (kind IN ('key', 'id')),
+	value TEXT NOT NULL CHECK (value <> ''),
+	note TEXT NOT NULL DEFAULT '',
+	created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	PRIMARY KEY (user_id, kind, value),
+	CONSTRAINT cert_revocations_user_id_fk
+		FOREIGN KEY(user_id) REFERENCES app_users(id)
+		ON DELETE CASCADE
+		ON UPDATE CASCADE
+);
+`
+
 var sqliteSchema = `
 CREATE TABLE IF NOT EXISTS app_users (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -70,10 +86,11 @@ CREATE TABLE IF NOT EXISTS form_entries (
 		ON DELETE CASCADE
 		ON UPDATE CASCADE
 );
-`
+` + sqliteCertRevocations
 
 var sqliteMigrations = []string{
 	"", // migration #0 is reserved for schema initialization
+	sqliteCertRevocations,
 }
 
 func NewSqliteDB(databaseUrl string, logger *slog.Logger) (*PgsPsqlDB, error) {

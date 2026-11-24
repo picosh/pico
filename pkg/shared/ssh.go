@@ -2,11 +2,14 @@ package shared
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
 	"slices"
 	"strings"
+	"time"
+	"unicode/utf8"
 
 	"github.com/picosh/pico/pkg/db"
 	"golang.org/x/crypto/ssh"
@@ -68,6 +71,8 @@ type AuthedPubkey struct {
 	CriticalOptions map[string]string
 	// Scopes limit a cert to part of the service. Nil doesn't.
 	Scopes Scopes
+	// Cert is nil for a plain key.
+	Cert *ssh.Certificate
 }
 
 const sourceAddressOption = "source-address"
@@ -114,7 +119,70 @@ func verifyCert(cert *ssh.Certificate, principal string) (*AuthedPubkey, error) 
 		Pubkey:          KeyForKeyText(cert.SignatureKey),
 		Identity:        cert.KeyId,
 		CriticalOptions: cert.CriticalOptions,
+		Cert:            cert,
 	}, nil
+}
+
+// ParseCert reads an authorized_keys line holding a cert, and checks what
+// verifyCert does for any of its principals, except that the cert may have
+// expired or not be valid yet.
+func ParseCert(line string) (*ssh.Certificate, error) {
+	key, _, _, _, err := ssh.ParseAuthorizedKey([]byte(line))
+	if err != nil {
+		return nil, err
+	}
+
+	cert, ok := key.(*ssh.Certificate)
+	if !ok || len(cert.ValidPrincipals) == 0 {
+		return nil, fmt.Errorf("not an ssh-cert with principals")
+	}
+
+	if cert.CertType != ssh.UserCert {
+		return nil, fmt.Errorf("ssh-cert has type %d", cert.CertType)
+	}
+
+	checker := *certChecker
+	checker.Clock = func() time.Time { return time.Unix(int64(cert.ValidAfter), 0) }
+	if err := checker.CheckCert(cert.ValidPrincipals[0], cert); err != nil {
+		return nil, fmt.Errorf("ssh-cert invalid: %w", err)
+	}
+	return cert, nil
+}
+
+// ErrCertRevoked means the account whose CA signed a cert revoked it.
+var ErrCertRevoked = errors.New("ssh-cert is revoked")
+
+// CheckRevoked refuses a cert revoked by the account whose CA signed it.
+func (a *AuthedPubkey) CheckRevoked(dbpool interface {
+	IsCertRevoked(userID, fingerprint, keyID string) (bool, error)
+}, userID string) error {
+	if a.Cert == nil {
+		return nil
+	}
+
+	keyID := a.Cert.KeyId
+	if !RevocableKeyID(keyID) {
+		// No entry can name it, and postgres refuses to look for it.
+		keyID = ""
+	}
+
+	revoked, err := dbpool.IsCertRevoked(userID, ssh.FingerprintSHA256(a.Cert.Key), keyID)
+	if err != nil {
+		return fmt.Errorf("cannot check if ssh-cert is revoked: %w", err)
+	}
+	if revoked {
+		return ErrCertRevoked
+	}
+	return nil
+}
+
+// maxKeyIDLen keeps entries under postgres's limit on indexed values.
+const maxKeyIDLen = 1024
+
+// RevocableKeyID reports whether an entry can name a KeyId, which is any
+// bytes the CA chose.
+func RevocableKeyID(keyID string) bool {
+	return keyID != "" && len(keyID) <= maxKeyIDLen && utf8.ValidString(keyID) && !strings.Contains(keyID, "\x00")
 }
 
 // CheckSourceAddress enforces a cert's source-address restriction on a client
@@ -177,6 +245,11 @@ func (r *SshAuthHandler) PubkeyAuthHandler(conn ssh.ConnMetadata, key ssh.Public
 		return nil, fmt.Errorf("username is not set")
 	}
 
+	if err := authed.CheckRevoked(r.DB, user.ID); err != nil {
+		log.Error("ssh-cert refused", "user", user.Name, "identity", authed.Identity, "err", err)
+		return nil, err
+	}
+
 	if authed.Identity == "pubkey" && user.PublicKey != nil && user.PublicKey.Name != "" {
 		authed.Identity = user.PublicKey.Name
 	}
@@ -231,4 +304,25 @@ func (r *SshAuthHandler) PubkeyAuthHandler(conn ssh.ConnMetadata, key ssh.Public
 	}
 
 	return perms, nil
+}
+
+// OpenPubkeyAuthHandler is PubkeyAuthHandler for services that let in keys
+// without an account. A cert that failed its checks is refused, so it isn't
+// taken for an unknown key.
+func (r *SshAuthHandler) OpenPubkeyAuthHandler(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
+	perms, err := r.PubkeyAuthHandler(conn, key)
+	if err == nil {
+		return perms, nil
+	}
+
+	r.Logger.Warn("pubkey auth handler", "err", err)
+	if _, isCert := key.(*ssh.Certificate); isCert {
+		return nil, err
+	}
+
+	return &ssh.Permissions{
+		Extensions: map[string]string{
+			"pubkey": KeyForKeyText(key),
+		},
+	}, nil
 }

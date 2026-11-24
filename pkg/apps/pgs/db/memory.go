@@ -19,6 +19,7 @@ type MemoryDB struct {
 	Feature     *db.FeatureFlag
 	Features    []*db.FeatureFlag
 	FormEntries []*db.FormEntry
+	Revocations []*db.CertRevocation
 }
 
 var _ PgsDB = (*MemoryDB)(nil)
@@ -227,6 +228,13 @@ func (me *MemoryDB) RegisterAdmin(username, pubkey, pubkeyName string) error {
 
 func (me *MemoryDB) InsertAccessLog(*db.AccessLog) error {
 	return errNotImpl
+}
+
+func (me *MemoryDB) IsCertRevoked(userID, fingerprint, keyID string) (bool, error) {
+	return slices.ContainsFunc(me.Revocations, func(r *db.CertRevocation) bool {
+		return r.UserID == userID &&
+			((r.Kind == db.CertRevocationKey && r.Value == fingerprint) || (r.Kind == db.CertRevocationID && r.Value == keyID))
+	}), nil
 }
 
 func (me *MemoryDB) InsertFormEntry(userID, name string, data map[string]interface{}) error {

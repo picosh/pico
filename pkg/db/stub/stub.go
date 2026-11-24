@@ -240,6 +240,26 @@ func (me *StubDB) InsertAccessLog(log *db.AccessLog) error {
 	return errNotImpl
 }
 
+func (me *StubDB) IsCertRevoked(userID, fingerprint, keyID string) (bool, error) {
+	return false, errNotImpl
+}
+
+func (me *StubDB) FindCertRevocations(userID string) ([]*db.CertRevocation, error) {
+	return nil, errNotImpl
+}
+
+func (me *StubDB) InsertCertRevocation(rev *db.CertRevocation) (bool, error) {
+	return false, errNotImpl
+}
+
+func (me *StubDB) RemoveCertRevocation(userID, kind, value string) (bool, error) {
+	return false, errNotImpl
+}
+
+func (me *StubDB) FindCertsInAccessLogs(userID string) ([]*db.LoggedCert, bool, error) {
+	return nil, false, errNotImpl
+}
+
 func (me *StubDB) UpsertPipeMonitor(userID, topic string, dur time.Duration, winEnd *time.Time) error {
 	return errNotImpl
 }

@@ -307,6 +307,75 @@ func TestKeyScopes(t *testing.T) {
 	}
 }
 
+func TestKeyRevoked(t *testing.T) {
+	_, caKey, err := ed25519.GenerateKey(rand.Reader)
+	bail(err)
+	ca, err := ssh.NewSignerFromKey(caKey)
+	bail(err)
+	pub, _, err := ed25519.GenerateKey(rand.Reader)
+	bail(err)
+	key, err := ssh.NewPublicKey(pub)
+	bail(err)
+
+	byKey := func(userID, fingerprint, _ string) bool {
+		return userID == testUserID && fingerprint == ssh.FingerprintSHA256(key)
+	}
+	byID := func(userID, _, keyID string) bool { return userID == testUserID && keyID == "ci" }
+	other := func(userID, _, _ string) bool { return userID != testUserID }
+
+	cases := []struct {
+		name       string
+		principals []string
+		plain      bool
+		revoked    func(userID, fingerprint, keyID string) bool
+		err        error
+		status     int
+	}{
+		{name: "full, by key", principals: []string{"picd"}, revoked: byKey, status: 401},
+		{name: "full, by id", principals: []string{"picd"}, revoked: byID, status: 401},
+		{name: "admin, by key", principals: []string{"admin"}, revoked: byKey, status: 401},
+		{name: "scoped, by key", principals: []string{"picd:deploy:blog"}, revoked: byKey, status: 401},
+		{name: "scoped, by id", principals: []string{"picd:deploy:blog"}, revoked: byID, status: 401},
+		{name: "full, other account", principals: []string{"picd"}, revoked: other, status: 200},
+		{name: "scoped, other account", principals: []string{"picd:deploy:blog"}, revoked: other, status: 200},
+		{name: "full, lookup fails", principals: []string{"picd"}, err: errors.New("no table"), status: 500},
+		{name: "scoped, lookup fails", principals: []string{"picd:deploy:blog"}, err: errors.New("no table"), status: 500},
+		{name: "plain key", plain: true, revoked: byKey, status: 200},
+		{name: "plain key, lookup fails", plain: true, err: errors.New("no table"), status: 200},
+	}
+
+	for _, c := range cases {
+		for _, query := range []string{"&scopes=1", "&scopes=1&report=1&invited=1", "&scopes=1&plus=0&report=1"} {
+			t.Run(c.name+query, func(t *testing.T) {
+				offered := key
+				if !c.plain {
+					cert := &ssh.Certificate{Key: key, KeyId: "ci", CertType: ssh.UserCert, ValidPrincipals: c.principals, ValidBefore: ssh.CertTimeInfinity}
+					bail(cert.SignCert(rand.Reader, ca))
+					offered = cert
+				}
+				jso, err := json.Marshal(sishData{Username: testUsername, PublicKey: string(ssh.MarshalAuthorizedKey(offered))})
+				bail(err)
+
+				apiConfig := setupTest()
+				authDB := NewAuthDb(apiConfig.Cfg.Logger)
+				authDB.revoked, authDB.revokedErr = c.revoked, c.err
+				apiConfig.Dbpool = authDB
+				request := httptest.NewRequest("POST", mkpath("/key?space=picd"+query), bytes.NewReader(jso))
+				request.Header.Add("Authorization", "Bearer 123")
+				res := httptest.NewRecorder()
+				authMux(apiConfig).ServeHTTP(res, request)
+
+				if res.Code != c.status {
+					t.Errorf("status = %d, want %d", res.Code, c.status)
+				}
+				if ok := c.status == 200; ok != (len(authDB.logs) == 1) || (!ok && strings.Contains(res.Body.String(), testUsername)) {
+					t.Errorf("%d access logs and body %q with status %d", len(authDB.logs), res.Body, res.Code)
+				}
+			})
+		}
+	}
+}
+
 func TestKeyInvited(t *testing.T) {
 	cases := []struct {
 		name     string
@@ -472,6 +541,19 @@ type ApiExample struct {
 type AuthDb struct {
 	*stub.StubDB
 	Posts []*db.Post
+
+	revoked    func(userID, fingerprint, keyID string) bool
+	revokedErr error
+	logs       []*db.AccessLog
+}
+
+func (a *AuthDb) IsCertRevoked(userID, fingerprint, keyID string) (bool, error) {
+	return a.revoked != nil && a.revoked(userID, fingerprint, keyID), a.revokedErr
+}
+
+func (a *AuthDb) InsertAccessLog(log *db.AccessLog) error {
+	a.logs = append(a.logs, log)
+	return nil
 }
 
 func (a *AuthDb) AddPicoPlusUser(username, email, from, txid string) error {

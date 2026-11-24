@@ -17,6 +17,16 @@ import (
 type fakeAuthDB struct {
 	user *db.User
 	logs []*db.AccessLog
+
+	revoked    []db.CertRevocation
+	revokedErr error
+}
+
+func (f *fakeAuthDB) IsCertRevoked(userID, fingerprint, keyID string) (bool, error) {
+	return slices.ContainsFunc(f.revoked, func(r db.CertRevocation) bool {
+		return r.UserID == userID &&
+			((r.Kind == db.CertRevocationKey && r.Value == fingerprint) || (r.Kind == db.CertRevocationID && r.Value == keyID))
+	}), f.revokedErr
 }
 
 func (f *fakeAuthDB) FindUser(string) (*db.User, error)                   { return f.user, nil }
