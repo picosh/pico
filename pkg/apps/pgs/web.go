@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -508,6 +509,13 @@ func (web *WebRouter) ImageRequest(perm func(proj *db.Project) bool) http.Handle
 }
 
 func (web *WebRouter) ServeAsset(fname string, opts *storage.ImgProcessOpts, hasPerm HasPerm, w http.ResponseWriter, r *http.Request) {
+	// The router cleans paths before it decodes them, so an encoded ".." is
+	// still here.
+	if slices.Contains(strings.Split(fname, "/"), "..") {
+		http.Error(w, "404 not found", http.StatusNotFound)
+		return
+	}
+
 	subdomain := router.GetSubdomain(r)
 
 	logger := web.Cfg.Logger.With(

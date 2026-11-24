@@ -1,6 +1,11 @@
 package storage
 
 import (
+	"encoding/base64"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -101,5 +106,34 @@ func TestUriToImgProcessOpts(t *testing.T) {
 				t.Fatal(cmp.Diff(fixture.expect, results))
 			}
 		})
+	}
+}
+
+// imgproxy decodes the source URL, so a path has to survive that unchanged.
+func TestImgProxySourceIsEscaped(t *testing.T) {
+	var requested string
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) { requested = r.URL.Path }))
+	defer srv.Close()
+	t.Setenv("IMGPROXY_URL", srv.URL)
+
+	for _, fp := range []string{
+		"bucket/blog/a.png",
+		"bucket/blog/a b.png",
+		"bucket/blog/100%.png",
+		"bucket/blog/a?b#c.png",
+		"bucket/blog/%2e%2e/%2e%2e/other/secret.png",
+	} {
+		img := NewImgProxy(fp, &ImgProcessOpts{})
+		img.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", "/", nil))
+
+		encoded := requested[strings.LastIndex(requested, "/")+1:]
+		source, err := base64.StdEncoding.DecodeString(encoded)
+		if err != nil {
+			t.Fatalf("%s: %v in %q", fp, err, requested)
+		}
+		u, err := url.Parse(string(source))
+		if err != nil || u.Scheme != "local" || u.Host != "" || u.Path != "/"+fp || u.RawQuery != "" || u.Fragment != "" {
+			t.Errorf("%s: source = %q, %v", fp, source, err)
+		}
 	}
 }

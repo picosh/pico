@@ -22,6 +22,7 @@ import (
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/pssh"
 	psub "github.com/picosh/pico/pkg/pubsub"
+	"github.com/picosh/pico/pkg/shared"
 	gossh "golang.org/x/crypto/ssh"
 )
 
@@ -72,6 +73,7 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 				pipeCtx:  pipeCtx,
 				cancel:   cancel,
 				user:     user,
+				scopes:   shared.SessionScopes(sesh),
 			}
 
 			cmd := strings.TrimSpace(args[0])
@@ -101,6 +103,11 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 				}
 				return next(sesh)
 			case "rss":
+				// The feed holds every monitor.
+				if err := cliCmd.scopes.Check("reading the monitor feed", "", rolePub, roleSub); err != nil {
+					sesh.Fatal(err)
+					return err
+				}
 				rss, err := MonitorRss(handler.DBPool, user, handler.Cfg.Domain)
 				_, _ = fmt.Fprintln(sesh, rss)
 				if err != nil {
@@ -137,6 +144,9 @@ func Middleware(handler *CliHandler) pssh.SSHServerMiddleware {
 			identity := clientIdentity{userName: userName, admin: isAdmin}
 			if key := sesh.PublicKey(); key != nil {
 				identity.fingerprint = gossh.FingerprintSHA256(key)
+			}
+			if roles := scopeRoles(cmd); cliCmd.scopes.Limited() {
+				identity.covers = func(topic string) bool { return cliCmd.checkTopic(topic, roles...) == nil }
 			}
 			handler.Clients.Store(clientID, identity)
 			defer handler.Clients.Delete(clientID)
@@ -215,6 +225,9 @@ type clientIdentity struct {
 	userName    string
 	fingerprint string
 	admin       bool
+	// covers reports whether the client's scopes cover a topic. Nil doesn't
+	// limit it.
+	covers func(topic string) bool
 }
 
 // allowed reports whether the client may be on topic under accessList. A
@@ -270,10 +283,15 @@ func (c *CliCmd) checkWildcard(public bool, topic string) error {
 	return nil
 }
 
-// wildcardAllowed keeps wildcard subscribers out of topics with an access
-// list, which only the listed users and admins may read.
+// wildcardAllowed keeps wildcard subscribers out of topics their scopes don't
+// cover, and out of those with an access list, which only the listed users and
+// admins may read.
 func (h *CliHandler) wildcardAllowed(clientID, topic string) bool {
-	if id, ok := h.Clients.Load(clientID); ok && id.admin {
+	id, ok := h.Clients.Load(clientID)
+	if ok && id.covers != nil && !id.covers(topic) {
+		return false
+	}
+	if ok && id.admin {
 		return true
 	}
 	list, ok := h.Access.Load(topic)
@@ -370,6 +388,7 @@ type CliCmd struct {
 	pipeCtx  context.Context
 	cancel   context.CancelFunc
 	user     *db.User
+	scopes   shared.Scopes
 }
 
 func help(cfg *Config, sesh *pssh.SSHServerConnSession) {
@@ -423,13 +442,13 @@ func (handler *CliHandler) ls(cmd *CliCmd) error {
 	waitingChannels := map[string][]string{}
 
 	for topic, channel := range handler.PubSub.GetChannels() {
-		if strings.HasPrefix(topic, topicFilter) {
+		if strings.HasPrefix(topic, topicFilter) && cmd.sees(topic) {
 			channels = append(channels, channel)
 		}
 	}
 
 	for channel, clients := range handler.Waiters.Range {
-		if strings.HasPrefix(channel, topicFilter) {
+		if strings.HasPrefix(channel, topicFilter) && cmd.sees(channel) {
 			waitingChannels[channel] = clients
 		}
 	}
@@ -495,6 +514,10 @@ func (handler *CliHandler) ls(cmd *CliCmd) error {
 func (handler *CliHandler) monitor(cmd *CliCmd, user *db.User) error {
 	if user == nil {
 		return fmt.Errorf("access denied")
+	}
+
+	if err := cmd.scopes.CheckFull("changing monitors"); err != nil {
+		return err
 	}
 
 	args := cmd.sesh.Command()
@@ -581,6 +604,8 @@ func (handler *CliHandler) status(cmd *CliCmd, user *db.User) error {
 		return fmt.Errorf("failed to fetch monitors: %w", err)
 	}
 
+	monitors = slices.DeleteFunc(monitors, func(m *db.PipeMonitor) bool { return !cmd.sees(m.Topic) })
+
 	if len(monitors) == 0 {
 		_, _ = fmt.Fprintln(cmd.sesh, "no monitors found")
 		return nil
@@ -650,6 +675,9 @@ func (handler *CliHandler) uptime(cmd *CliCmd, topic string, user *db.User) erro
 		IsPublic: false,
 	})
 	resolvedTopic := topicResult.Name
+	if !cmd.sees(resolvedTopic) {
+		return cmd.scopes.Check("reading", cmd.scopeTopic(resolvedTopic), rolePub, roleSub)
+	}
 
 	monitor, err := handler.DBPool.FindPipeMonitorByTopic(user.ID, resolvedTopic)
 	if err != nil {
@@ -822,6 +850,9 @@ func (handler *CliHandler) pub(cmd *CliCmd, topic string, clientID string) error
 		IsPublic: cmd.public(*public),
 	})
 	name := initialResult.Name
+	if err := cmd.checkTopic(name, rolePub); err != nil {
+		return err
+	}
 
 	// name is reassigned below, so the entry this session made is kept apart.
 	// Only a real list is stored, so a client without one can't claim the
@@ -852,6 +883,9 @@ func (handler *CliHandler) pub(cmd *CliCmd, topic string, clientID string) error
 	if result.GenerateNewTopic {
 		topic = uuid.NewString()
 		name = toPublicTopic(topic)
+	}
+	if err := cmd.checkTopic(name, rolePub); err != nil {
+		return err
 	}
 
 	if !*clean {
@@ -1159,6 +1193,9 @@ func (handler *CliHandler) sub(cmd *CliCmd, topic string, clientID string) error
 		IsPublic: cmd.public(*public),
 	})
 	name := initialResult.Name
+	if err := cmd.checkTopic(name, roleSub); err != nil {
+		return err
+	}
 
 	// name is reassigned below, so the entry this session made is kept apart.
 	// Only a real list is stored, so a client without one can't claim the
@@ -1262,6 +1299,9 @@ func (handler *CliHandler) pipe(cmd *CliCmd, topic string, clientID string) erro
 		IsPublic: cmd.public(*public),
 	})
 	name := initialResult.Name
+	if err := cmd.checkTopic(name, rolePub, roleSub); err != nil {
+		return err
+	}
 
 	// name is reassigned below, so the entry this session made is kept apart.
 	// Only a real list is stored, so a client without one can't claim the
@@ -1292,6 +1332,9 @@ func (handler *CliHandler) pipe(cmd *CliCmd, topic string, clientID string) erro
 	if result.GenerateNewTopic {
 		topic = uuid.NewString()
 		name = toPublicTopic(topic)
+	}
+	if err := cmd.checkTopic(name, rolePub, roleSub); err != nil {
+		return err
 	}
 
 	if isCreator && !*clean {

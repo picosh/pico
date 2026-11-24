@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"slices"
 	"testing"
 	"time"
 
@@ -137,6 +138,94 @@ func TestPubkeyCertVerifyRejectsUnknownCriticalOption(t *testing.T) {
 	}
 }
 
+func TestPubkeyCertVerifyScoped(t *testing.T) {
+	ca := newTestSigner(t)
+
+	cases := []struct {
+		principals []string
+		want       []Scope
+		ok         bool
+	}{
+		{principals: []string{"picd:deploy:blog"}, want: []Scope{{Role: "deploy", Resource: "blog"}}, ok: true},
+		{principals: []string{"picd:read", "pgs", "picd:deploy:~pico/a:b"}, want: []Scope{{Role: "read"}, {Role: "deploy", Resource: "~pico/a:b"}}, ok: true},
+		{principals: []string{"picd", "picd:deploy:blog"}, ok: true},
+		{principals: []string{"picd:deploy:blog", "admin"}, ok: true},
+		{principals: []string{"pgs", "pgs:deploy:blog"}},
+		{principals: []string{"picdx:deploy:blog"}},
+		{principals: []string{"picd:"}},
+		{principals: []string{"picd::blog"}},
+		{principals: []string{"picd:deploy:"}},
+		{principals: []string{"picd:deploy:\x1b"}},
+		{principals: []string{"picd:deploy:blog", "picd:"}},
+		{},
+	}
+
+	for _, c := range cases {
+		cert := newTestCert(t, ca, newTestSigner(t).PublicKey(), c.principals)
+
+		authed, err := PubkeyCertVerifyScoped(cert, "picd")
+		if (err == nil) != c.ok {
+			t.Errorf("PubkeyCertVerifyScoped(%q) err = %v, want ok=%v", c.principals, err, c.ok)
+			continue
+		}
+		if c.ok && (!slices.Equal(authed.Scopes, c.want) || authed.Pubkey != KeyForKeyText(ca.PublicKey())) {
+			t.Errorf("PubkeyCertVerifyScoped(%q) = %+v, want scopes %v", c.principals, authed, c.want)
+		}
+
+		// Services that don't enforce scopes refuse certs that rely on them.
+		if _, err := PubkeyCertVerify(cert, "picd"); c.want != nil && err == nil {
+			t.Errorf("PubkeyCertVerify(%q) accepted a scoped cert", c.principals)
+		}
+	}
+
+	if _, err := PubkeyCertVerifyScoped(newTestCert(t, ca, ca.PublicKey(), []string{":deploy"}), ""); err == nil {
+		t.Error("accepted a scoped cert for no service")
+	}
+
+	authed, err := PubkeyCertVerifyScoped(ca.PublicKey(), "picd")
+	if err != nil || authed.Scopes != nil {
+		t.Errorf("plain key = %+v, %v", authed, err)
+	}
+}
+
+func TestPubkeyCertVerifyScopedChecksCert(t *testing.T) {
+	ca := newTestSigner(t)
+
+	sign := func(change func(*ssh.Certificate)) *ssh.Certificate {
+		cert := &ssh.Certificate{
+			Key:             newTestSigner(t).PublicKey(),
+			CertType:        ssh.UserCert,
+			ValidPrincipals: []string{"picd:deploy:blog"},
+			ValidBefore:     ssh.CertTimeInfinity,
+		}
+		change(cert)
+		if err := cert.SignCert(rand.Reader, ca); err != nil {
+			t.Fatal(err)
+		}
+		return cert
+	}
+
+	forged := sign(func(*ssh.Certificate) {})
+	forged.SignatureKey = newTestSigner(t).PublicKey()
+
+	widened := sign(func(*ssh.Certificate) {})
+	widened.ValidPrincipals = append(widened.ValidPrincipals, "picd:deploy:shop")
+
+	for name, cert := range map[string]*ssh.Certificate{
+		"forged":  forged,
+		"widened": widened,
+		"expired": sign(func(c *ssh.Certificate) { c.ValidBefore = 1 }),
+		"host":    sign(func(c *ssh.Certificate) { c.CertType = ssh.HostCert }),
+		"force-command": sign(func(c *ssh.Certificate) {
+			c.CriticalOptions = map[string]string{"force-command": "ls"}
+		}),
+	} {
+		if _, err := PubkeyCertVerifyScoped(cert, "picd"); err == nil {
+			t.Errorf("%s cert was accepted", name)
+		}
+	}
+}
+
 func TestCheckSourceAddress(t *testing.T) {
 	authed := &AuthedPubkey{CriticalOptions: map[string]string{"source-address": "10.0.0.0/8,192.168.1.5"}}
 	for addr, ok := range map[string]bool{
@@ -231,6 +320,87 @@ func TestPubkeyAuthHandlerImpersonation(t *testing.T) {
 			if perms.Extensions["user_id"] != tt.wantID || perms.Extensions["imp_id"] != tt.impID {
 				t.Errorf("%s %s: user_id %q imp_id %q, want %q %q", tt.name, service,
 					perms.Extensions["user_id"], perms.Extensions["imp_id"], tt.wantID, tt.impID)
+			}
+		}
+	}
+}
+
+func TestScopesAllows(t *testing.T) {
+	scopes := Scopes{{Role: "deploy", Resource: "blog"}, {Role: "read", Resource: "ci-*"}}
+	cases := []struct {
+		scopes   Scopes
+		resource string
+		roles    []string
+		want     bool
+	}{
+		{nil, "anything", []string{"deploy"}, true},
+		{nil, "", []string{"deploy"}, true},
+		{Scopes{}, "blog", []string{"deploy"}, false},
+		{scopes, "blog", []string{"deploy"}, true},
+		{scopes, "blog", []string{"read"}, false},
+		{scopes, "blog", []string{"read", "deploy"}, true},
+		{scopes, "Blog", []string{"deploy"}, false},
+		{scopes, "blog2", []string{"deploy"}, false},
+		{scopes, "", []string{"read", "deploy"}, false},
+		{scopes, "ci-1", []string{"read"}, true},
+		{scopes, "ci-", []string{"read"}, true},
+		{scopes, "ci", []string{"read"}, false},
+		{Scopes{{Role: "read", Resource: "*"}}, "x", []string{"read"}, true},
+		{Scopes{{Role: "read", Resource: "*"}}, "", []string{"read"}, false},
+		{Scopes{{Role: "read"}}, "", []string{"read"}, true},
+		{Scopes{{Role: "read"}}, "x", []string{"read"}, true},
+	}
+	for _, c := range cases {
+		if got := c.scopes.Allows(c.resource, c.roles...); got != c.want {
+			t.Errorf("%v.Allows(%q, %q) = %v, want %v", c.scopes, c.resource, c.roles, got, c.want)
+		}
+	}
+
+	if Scopes(nil).CheckFull("x") != nil || (Scopes{{Role: "read"}}).CheckFull("x") == nil {
+		t.Error("CheckFull doesn't tell limited connections apart")
+	}
+	if got := permissionScopes(&ssh.Permissions{Extensions: map[string]string{"scopes": "nonsense"}}); !got.Limited() || len(got) != 0 {
+		t.Errorf("unreadable scopes = %#v, want none allowed", got)
+	}
+}
+
+type asUser struct {
+	fakeConn
+	user string
+}
+
+func (c asUser) User() string { return c.user }
+
+func TestPubkeyAuthHandlerScopes(t *testing.T) {
+	ca := newTestSigner(t)
+	cases := []struct {
+		name       string
+		roles      []string
+		user       string
+		principals []string
+		want       string
+		ok         bool
+	}{
+		{name: "scoped", roles: []string{"read", "deploy"}, principals: []string{"pgs:deploy:blog"}, want: `[{"role":"deploy","resource":"blog"}]`, ok: true},
+		{name: "full", roles: []string{"read"}, principals: []string{"pgs", "pgs:read:blog"}, ok: true},
+		{name: "service without scopes", principals: []string{"pgs:read:blog"}},
+		{name: "unknown role", roles: []string{"read"}, principals: []string{"pgs:read:a", "pgs:deploy:b"}},
+		{name: "admin session", roles: []string{"read"}, user: "admin__victim", principals: []string{"pgs:read"}},
+	}
+	for _, c := range cases {
+		fdb := &fakeAuthDB{user: &db.User{ID: "1", Name: "erock"}}
+		handler := NewSshAuthHandler(fdb, slog.New(slog.DiscardHandler), "pgs", c.roles...)
+		cert := newTestCert(t, ca, newTestSigner(t).PublicKey(), c.principals)
+
+		perms, err := handler.PubkeyAuthHandler(asUser{user: c.user}, cert)
+		if (err == nil) != c.ok {
+			t.Errorf("%s: err = %v, want ok = %v", c.name, err, c.ok)
+			continue
+		}
+		if c.ok {
+			got, limited := perms.Extensions["scopes"]
+			if got != c.want || limited != (c.want != "") {
+				t.Errorf("%s: scopes = %q, want %q", c.name, got, c.want)
 			}
 		}
 	}

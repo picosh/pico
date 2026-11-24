@@ -37,7 +37,7 @@ func StartSshServer() {
 	pubsub := psub.NewMulticast(logger)
 	handler := NewCliHandler(logger, dbh, pubsub, cfg)
 
-	sshAuth := shared.NewSshAuthHandler(dbh, logger, "pipe")
+	sshAuth := shared.NewSshAuthHandler(dbh, logger, "pipe", rolePub, roleSub)
 
 	// Create a new SSH server
 	server, err := pssh.NewSSHServerWithConfig(

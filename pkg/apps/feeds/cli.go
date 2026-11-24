@@ -7,6 +7,7 @@ import (
 
 	"github.com/adhocore/gronx"
 	"github.com/picosh/pico/pkg/db"
+	"github.com/picosh/pico/pkg/postfs"
 	"github.com/picosh/pico/pkg/pssh"
 	"github.com/picosh/pico/pkg/shared"
 )
@@ -28,6 +29,8 @@ func Middleware(dbpool DB, cfg *Config) pssh.SSHServerMiddleware {
 			}
 
 			logger = shared.LoggerWithUser(logger, user)
+
+			scopes := shared.SessionScopes(sesh)
 
 			cmd := "help"
 			if len(args) > 0 {
@@ -79,6 +82,9 @@ func Middleware(dbpool DB, cfg *Config) pssh.SSHServerMiddleware {
 				writer := tabwriter.NewWriter(sesh, 0, 0, 1, ' ', tabwriter.TabIndent)
 				_, _ = fmt.Fprintln(writer, "Filename\tLast Digest\tNext Digest\tCron\tFailed Attempts")
 				for _, post := range posts.Data {
+					if !scopes.Allows(post.Filename, postfs.RoleRead, postfs.RoleWrite) {
+						continue
+					}
 					parsed := shared.ListParseText(post.Text)
 
 					nextDigest := ""
@@ -111,6 +117,9 @@ func Middleware(dbpool DB, cfg *Config) pssh.SSHServerMiddleware {
 					return err
 				}
 				filename := args[1]
+				if err := scopes.Check("removing", filename, postfs.RoleWrite); err != nil {
+					return err
+				}
 				_, _ = fmt.Fprintf(sesh, "removing digest post %s\r\n", filename)
 				write := false
 				if len(args) > 2 {
@@ -144,6 +153,9 @@ func Middleware(dbpool DB, cfg *Config) pssh.SSHServerMiddleware {
 					return err
 				}
 				filename := args[1]
+				if err := scopes.Check("reading", filename, postfs.RoleRead, postfs.RoleWrite); err != nil {
+					return err
+				}
 				post, err := dbpool.FindPostWithFilename(filename, user.ID, "feeds")
 				if err != nil {
 					_, _ = fmt.Fprintln(sesh.Stderr(), err)
@@ -158,6 +170,9 @@ func Middleware(dbpool DB, cfg *Config) pssh.SSHServerMiddleware {
 					return err
 				}
 				filename := args[1]
+				if err := scopes.Check("running", filename, postfs.RoleWrite); err != nil {
+					return err
+				}
 				post, err := dbpool.FindPostWithFilename(filename, user.ID, "feeds")
 				if err != nil {
 					_, _ = fmt.Fprintln(sesh.Stderr(), err)

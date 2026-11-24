@@ -19,9 +19,13 @@ import (
 	"github.com/picosh/pico/pkg/apps/prose"
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/db/stub"
+	"github.com/picosh/pico/pkg/postfs"
 	"github.com/picosh/pico/pkg/pssh"
 	"github.com/picosh/pico/pkg/send/list"
+	"github.com/picosh/pico/pkg/send/pipe"
+	"github.com/picosh/pico/pkg/send/protocols/rsync"
 	"github.com/picosh/pico/pkg/send/protocols/sftp"
+	"github.com/picosh/pico/pkg/send/scoped"
 	"github.com/picosh/pico/pkg/send/utils"
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/pico/pkg/storage"
@@ -74,11 +78,12 @@ func newPostsEnv(t *testing.T, app string) *postsEnv {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
-	auth := shared.NewSshAuthHandler(posts, logger, app)
+	auth := shared.NewSshAuthHandler(posts, logger, app, postfs.RoleRead, postfs.RoleWrite)
+	files := scoped.NewHandler(handler, postfs.ScopeRules)
 	server, err := pssh.NewSSHServerWithConfig(ctx, logger, app, "127.0.0.1", "0", "", filepath.Join(t.TempDir(), "host_key"),
 		auth.PubkeyAuthHandler,
-		[]pssh.SSHServerMiddleware{list.Middleware(handler), pssh.LogMiddleware(handler, posts)},
-		[]pssh.SSHServerMiddleware{sftp.Middleware(handler), pssh.LogMiddleware(handler, posts)},
+		[]pssh.SSHServerMiddleware{pipe.Middleware(files, ""), list.Middleware(files), rsync.Middleware(files), pssh.LogMiddleware(handler, posts)},
+		[]pssh.SSHServerMiddleware{sftp.Middleware(files), pssh.LogMiddleware(handler, posts)},
 		nil,
 	)
 	if err != nil {

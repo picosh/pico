@@ -298,7 +298,16 @@ func keyHandler(apiConfig *ApiConfig) http.HandlerFunc {
 			return
 		}
 
-		authed, err := shared.PubkeyCertVerify(key, space)
+		privileged := apiConfig.HasPrivilegedAccess(router.GetApiToken(r))
+
+		// scopes=1 lets privileged callers accept certs limited to part of
+		// the space, which they enforce from the scopes in the response.
+		verify := shared.PubkeyCertVerify
+		if privileged && r.URL.Query().Get("scopes") == "1" {
+			verify = shared.PubkeyCertVerifyScoped
+		}
+
+		authed, err := verify(key, space)
 		if err != nil {
 			log.Error("pubkey cert verify", "err", err)
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -317,7 +326,6 @@ func keyHandler(apiConfig *ApiConfig) http.HandlerFunc {
 			return
 		}
 
-		privileged := apiConfig.HasPrivilegedAccess(router.GetApiToken(r))
 		// report=1 lets privileged callers accept accounts without access to
 		// the space, and tells them which accounts have it.
 		report := privileged && r.URL.Query().Get("report") == "1"
@@ -368,12 +376,13 @@ func keyHandler(apiConfig *ApiConfig) http.HandlerFunc {
 			return
 		}
 
-		var body any = user
+		body := struct {
+			*db.User
+			SpaceAccess *bool         `json:"space_access,omitempty"`
+			Scopes      shared.Scopes `json:"scopes,omitempty"`
+		}{User: user, Scopes: authed.Scopes}
 		if report {
-			body = struct {
-				*db.User
-				SpaceAccess bool `json:"space_access"`
-			}{user, spaceAccess}
+			body.SpaceAccess = &spaceAccess
 		}
 
 		w.Header().Set("Content-Type", "application/json")

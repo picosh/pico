@@ -1,6 +1,7 @@
 package pgs
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"slices"
@@ -10,6 +11,7 @@ import (
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/pssh"
 	sendutils "github.com/picosh/pico/pkg/send/utils"
+	"github.com/picosh/pico/pkg/shared"
 )
 
 func getUser(s *pssh.SSHServerConnSession, dbpool pgsdb.PgsDB) (*db.User, error) {
@@ -76,6 +78,7 @@ func Middleware(handler *UploadAssetHandler) pssh.SSHServerMiddleware {
 				Width:   width,
 				Height:  height,
 				Cfg:     handler.Cfg,
+				Scopes:  shared.SessionScopes(sesh),
 			}
 
 			user, err := getUser(sesh, dbpool)
@@ -98,6 +101,10 @@ func Middleware(handler *UploadAssetHandler) pssh.SSHServerMiddleware {
 					opts.help()
 					return nil
 				case "stats":
+					if err := opts.checkRead(""); err != nil {
+						opts.bail(err)
+						return err
+					}
 					err := opts.stats(cfg.MaxSize)
 					opts.bail(err)
 					return err
@@ -106,6 +113,10 @@ func Middleware(handler *UploadAssetHandler) pssh.SSHServerMiddleware {
 					opts.bail(err)
 					return err
 				case "cache-all":
+					if err := opts.Scopes.CheckFull("clearing every cache"); err != nil {
+						opts.bail(err)
+						return err
+					}
 					opts.Write = true
 					err := opts.cacheAll()
 					opts.notice()
@@ -133,6 +144,10 @@ func Middleware(handler *UploadAssetHandler) pssh.SSHServerMiddleware {
 
 			switch cmd {
 			case "fzf":
+				if err := opts.checkRead(projectName); err != nil {
+					opts.bail(err)
+					return err
+				}
 				err := opts.fzf(projectName)
 				opts.bail(err)
 				return err
@@ -152,6 +167,10 @@ func Middleware(handler *UploadAssetHandler) pssh.SSHServerMiddleware {
 					return err
 				}
 
+				if err := errors.Join(opts.checkDeploy(projectName), opts.checkRead(*linkTo)); err != nil {
+					opts.bail(err)
+					return err
+				}
 				err := opts.link(projectName, *linkTo)
 				opts.notice()
 				if err != nil {
@@ -165,11 +184,19 @@ func Middleware(handler *UploadAssetHandler) pssh.SSHServerMiddleware {
 				}
 				opts.Write = *write
 
+				if err := opts.checkDeploy(projectName); err != nil {
+					opts.bail(err)
+					return err
+				}
 				err := opts.unlink(projectName)
 				opts.notice()
 				opts.bail(err)
 				return err
 			case "depends":
+				if err := opts.checkRead(projectName); err != nil {
+					opts.bail(err)
+					return err
+				}
 				err := opts.depends(projectName)
 				opts.bail(err)
 				return err
@@ -203,6 +230,10 @@ func Middleware(handler *UploadAssetHandler) pssh.SSHServerMiddleware {
 				}
 				opts.Write = *write
 
+				if err := opts.checkDeploy(projectName); err != nil {
+					opts.bail(err)
+					return err
+				}
 				err := opts.rm(projectName)
 				opts.notice()
 				opts.bail(err)
@@ -214,6 +245,10 @@ func Middleware(handler *UploadAssetHandler) pssh.SSHServerMiddleware {
 				}
 				opts.Write = *write
 
+				if err := opts.checkDeploy(projectName); err != nil {
+					opts.bail(err)
+					return err
+				}
 				err := opts.cache(projectName)
 				opts.notice()
 				opts.bail(err)
@@ -226,6 +261,16 @@ func Middleware(handler *UploadAssetHandler) pssh.SSHServerMiddleware {
 					return nil
 				}
 				opts.Write = *write
+
+				// Forms belong to the account, so no project covers them.
+				check := opts.checkRead
+				if *rmForm && formName != "ls" {
+					check = opts.checkDeploy
+				}
+				if err := check(""); err != nil {
+					opts.bail(err)
+					return err
+				}
 
 				var err error
 				if formName == "ls" {
@@ -255,6 +300,10 @@ func Middleware(handler *UploadAssetHandler) pssh.SSHServerMiddleware {
 				}
 				opts.Write = *write
 
+				if err := opts.Scopes.CheckFull("setting an acl"); err != nil {
+					opts.bail(err)
+					return err
+				}
 				if !slices.Contains([]string{"public", "pubkeys", "pico", "http-pass", "http-basic"}, *aclType) {
 					err := fmt.Errorf(
 						"acl type must be one of the following: [public, pubkeys, pico, http-pass, http-basic], found %s",

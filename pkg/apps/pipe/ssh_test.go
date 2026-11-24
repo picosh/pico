@@ -260,7 +260,7 @@ func NewTestSSHServer(t *testing.T) *TestSSHServer {
 	pubsub := psub.NewMulticast(logger)
 	handler := NewCliHandler(logger, dbpool, pubsub, cfg)
 
-	sshAuth := shared.NewSshAuthHandler(dbpool, logger, "pipe")
+	sshAuth := shared.NewSshAuthHandler(dbpool, logger, "pipe", rolePub, roleSub)
 
 	server, err := pssh.NewSSHServerWithConfig(
 		ctx,

@@ -7,6 +7,7 @@ import (
 	"syscall"
 
 	"github.com/picosh/pico/pkg/db/postgres"
+	"github.com/picosh/pico/pkg/postfs"
 	"github.com/picosh/pico/pkg/pssh"
 	"github.com/picosh/pico/pkg/send/auth"
 	"github.com/picosh/pico/pkg/send/list"
@@ -14,6 +15,7 @@ import (
 	"github.com/picosh/pico/pkg/send/protocols/rsync"
 	"github.com/picosh/pico/pkg/send/protocols/scp"
 	"github.com/picosh/pico/pkg/send/protocols/sftp"
+	"github.com/picosh/pico/pkg/send/scoped"
 	"github.com/picosh/pico/pkg/shared"
 )
 
@@ -36,7 +38,8 @@ func StartSshServer() {
 
 	handler := NewUploadHandler(cfg, dbh)
 
-	sshAuth := shared.NewSshAuthHandler(dbh, logger, "feeds")
+	sshAuth := shared.NewSshAuthHandler(dbh, logger, "feeds", postfs.RoleRead, postfs.RoleWrite)
+	files := scoped.NewHandler(handler, postfs.ScopeRules)
 
 	// Create a new SSH server
 	server, err := pssh.NewSSHServerWithConfig(
@@ -49,16 +52,16 @@ func StartSshServer() {
 		"ssh_data/term_info_ed25519",
 		sshAuth.PubkeyAuthHandler,
 		[]pssh.SSHServerMiddleware{
-			pipe.Middleware(handler, ".txt"),
-			list.Middleware(handler),
-			scp.Middleware(handler),
-			rsync.Middleware(handler),
-			auth.Middleware(handler),
+			pipe.Middleware(files, ".txt"),
+			list.Middleware(files),
+			scp.Middleware(files),
+			rsync.Middleware(files),
+			auth.Middleware(files),
 			Middleware(dbh, cfg),
 			pssh.LogMiddleware(handler, dbh),
 		},
 		[]pssh.SSHServerMiddleware{
-			sftp.Middleware(handler),
+			sftp.Middleware(files),
 			pssh.LogMiddleware(handler, dbh),
 		},
 		nil,

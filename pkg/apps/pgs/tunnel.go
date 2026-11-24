@@ -7,6 +7,7 @@ import (
 
 	"github.com/picosh/pico/pkg/db"
 	"github.com/picosh/pico/pkg/pssh"
+	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/pico/pkg/shared/router"
 	"golang.org/x/crypto/ssh"
 )
@@ -61,6 +62,22 @@ func tunnelRequester(cfg *Config, pubkey, asUser string) (*db.User, error) {
 		return nil, fmt.Errorf("find user to impersonate: %w", err)
 	}
 	return impersonated, nil
+}
+
+// checkTunnelScopes limits a tunnel to the projects its connection's scopes
+// cover. Scopes name the account's own projects, so reaching anyone else's
+// takes a scope on everything.
+func checkTunnelScopes(scopes shared.Scopes, asUser string, owner, requester *db.User, project *db.Project) error {
+	if asUser != "" {
+		if err := scopes.CheckFull("impersonation"); err != nil {
+			return err
+		}
+	}
+	name := project.Name
+	if owner.ID != requester.ID {
+		name = ""
+	}
+	return scopes.Check("reading", name, roleRead, roleDeploy)
 }
 
 func CreateHttpHandler(cfg *Config) CtxHttpBridge {
@@ -118,6 +135,11 @@ func CreateHttpHandler(cfg *Config) CtxHttpBridge {
 		log = log.With(
 			"requester", requester.Name,
 		)
+
+		if err := checkTunnelScopes(shared.SessionScopes(ctx), asUser, owner, requester, project); err != nil {
+			log.Error("tunnel scopes", "err", err)
+			return http.HandlerFunc(router.UnauthorizedHandler)
+		}
 
 		publicKey, _, _, _, err := ssh.ParseAuthorizedKey([]byte(pubkey))
 		if err != nil {

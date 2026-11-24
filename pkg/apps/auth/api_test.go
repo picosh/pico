@@ -2,6 +2,8 @@ package auth
 
 import (
 	"bytes"
+	"crypto/ed25519"
+	"crypto/rand"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -18,6 +20,7 @@ import (
 	"github.com/picosh/pico/pkg/db/stub"
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/pico/pkg/shared/router"
+	"golang.org/x/crypto/ssh"
 )
 
 var testUserID = "user-1"
@@ -235,6 +238,69 @@ func TestKeyWithoutPlus(t *testing.T) {
 			}
 
 			if body := res.Body.String(); !strings.Contains(body, c.want) {
+				t.Errorf("body = %s, want %s", body, c.want)
+			}
+		})
+	}
+}
+
+func TestKeyScopes(t *testing.T) {
+	_, caKey, err := ed25519.GenerateKey(rand.Reader)
+	bail(err)
+	ca, err := ssh.NewSignerFromKey(caKey)
+	bail(err)
+
+	cases := []struct {
+		name       string
+		principals []string
+		query      string
+		token      string
+		addr       string
+		status     int
+		want       string
+	}{
+		{name: "scoped", principals: []string{"picd:deploy:blog", "picd:read"}, query: "&scopes=1", token: "123", status: 200, want: `"scopes":[{"role":"deploy","resource":"blog"},{"role":"read"}]`},
+		{name: "scoped with report", principals: []string{"picd:deploy:blog"}, query: "&scopes=1&report=1", token: "123", status: 200, want: `"space_access":true,"scopes":[{"role":"deploy","resource":"blog"}]`},
+		{name: "scoped without scopes", principals: []string{"picd:deploy:blog"}, token: "123", status: 400},
+		{name: "scoped without the token", principals: []string{"picd:deploy:blog"}, query: "&scopes=1", status: 400},
+		{name: "another space's scopes", principals: []string{"pgs:deploy:blog"}, query: "&scopes=1", token: "123", status: 400},
+		{name: "full", principals: []string{"picd", "picd:deploy:blog"}, query: "&scopes=1", token: "123", status: 200},
+		{name: "address refused", principals: []string{"picd:deploy:blog"}, query: "&scopes=1", token: "123", addr: "192.0.2.1:22", status: 401},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			cert := &ssh.Certificate{
+				Key:             ca.PublicKey(),
+				CertType:        ssh.UserCert,
+				ValidPrincipals: c.principals,
+				ValidBefore:     ssh.CertTimeInfinity,
+			}
+			if c.addr != "" {
+				cert.CriticalOptions = map[string]string{"source-address": "198.51.100.0/24"}
+			}
+			bail(cert.SignCert(rand.Reader, ca))
+
+			jso, err := json.Marshal(sishData{
+				Username:      testUsername,
+				PublicKey:     string(ssh.MarshalAuthorizedKey(cert)),
+				RemoteAddress: c.addr,
+			})
+			bail(err)
+
+			request := httptest.NewRequest("POST", mkpath("/key?space=picd"+c.query), bytes.NewReader(jso))
+			if c.token != "" {
+				request.Header.Add("Authorization", "Bearer "+c.token)
+			}
+			res := httptest.NewRecorder()
+			authMux(setupTest()).ServeHTTP(res, request)
+
+			if res.Code != c.status {
+				t.Fatalf("status = %d, want %d", res.Code, c.status)
+			}
+
+			body := res.Body.String()
+			if !strings.Contains(body, c.want) || (c.want == "" && strings.Contains(body, "scopes")) {
 				t.Errorf("body = %s, want %s", body, c.want)
 			}
 		})

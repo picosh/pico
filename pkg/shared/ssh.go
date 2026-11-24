@@ -1,9 +1,11 @@
 package shared
 
 import (
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net"
+	"slices"
 	"strings"
 
 	"github.com/picosh/pico/pkg/db"
@@ -16,14 +18,45 @@ type SshAuthHandler struct {
 	DB        db.AuthDB
 	Logger    *slog.Logger
 	Principal string
+	// ScopeRoles are the roles a cert limited to part of the service may
+	// have. Without any, such certs are refused.
+	ScopeRoles []string
 }
 
-func NewSshAuthHandler(dbh db.AuthDB, logger *slog.Logger, principal string) *SshAuthHandler {
+// NewSshAuthHandler authenticates a service's users. Services that enforce
+// SessionScopes name the roles scopes may have.
+func NewSshAuthHandler(dbh db.AuthDB, logger *slog.Logger, principal string, scopeRoles ...string) *SshAuthHandler {
 	return &SshAuthHandler{
-		DB:        dbh,
-		Logger:    logger,
-		Principal: principal,
+		DB:         dbh,
+		Logger:     logger,
+		Principal:  principal,
+		ScopeRoles: scopeRoles,
 	}
+}
+
+// verify checks key, accepting scoped certs if the service enforces them.
+func (r *SshAuthHandler) verify(conn ssh.ConnMetadata, key ssh.PublicKey) (*AuthedPubkey, error) {
+	if len(r.ScopeRoles) == 0 {
+		return PubkeyCertVerify(key, r.Principal)
+	}
+
+	authed, err := PubkeyCertVerifyScoped(key, r.Principal)
+	if err != nil {
+		return nil, err
+	}
+	if !authed.Scopes.Limited() {
+		return authed, nil
+	}
+
+	for _, scope := range authed.Scopes {
+		if !slices.Contains(r.ScopeRoles, scope.Role) {
+			return nil, fmt.Errorf("ssh-cert scope role %q not valid, use %s", scope.Role, strings.Join(r.ScopeRoles, " or "))
+		}
+	}
+	if strings.HasPrefix(conn.User(), adminPrefix) {
+		return nil, fmt.Errorf("ssh-cert with scopes can't start admin sessions")
+	}
+	return authed, nil
 }
 
 type AuthedPubkey struct {
@@ -33,6 +66,8 @@ type AuthedPubkey struct {
 	// CriticalOptions holds a cert's source-address restriction, which the
 	// caller enforces against the client's address.
 	CriticalOptions map[string]string
+	// Scopes limit a cert to part of the service. Nil doesn't.
+	Scopes Scopes
 }
 
 const sourceAddressOption = "source-address"
@@ -43,43 +78,43 @@ var certChecker = &ssh.CertChecker{
 	SupportedCriticalOptions: []string{sourceAddressOption},
 }
 
+// PubkeyCertVerify returns the account key behind key: for a cert, the CA key
+// that signed it. The cert must name the service or admin.
 func PubkeyCertVerify(key ssh.PublicKey, srcPrincipal string) (*AuthedPubkey, error) {
-	origPubkey := KeyForKeyText(key)
-	authed := &AuthedPubkey{
-		OrigPubkey: origPubkey,
-		Pubkey:     origPubkey,
-		Identity:   "pubkey",
-	}
-
 	cert, ok := key.(*ssh.Certificate)
-	if ok {
-		if cert.CertType != ssh.UserCert {
-			return nil, fmt.Errorf("ssh-cert has type %d", cert.CertType)
-		}
-
-		principal := ""
-		for _, princ := range cert.ValidPrincipals {
-			if princ == "admin" || princ == srcPrincipal {
-				principal = princ
-				break
-			}
-		}
-		if principal == "" {
-			return nil, fmt.Errorf("ssh-cert principals not valid")
-		}
-
-		// The account is found by the CA key, so the cert must be signed by it.
-		if err := certChecker.CheckCert(principal, cert); err != nil {
-			return nil, fmt.Errorf("ssh-cert invalid: %w", err)
-		}
-
-		authed.Pubkey = KeyForKeyText(cert.SignatureKey)
-		authed.Identity = cert.KeyId
-		authed.CriticalOptions = cert.CriticalOptions
-		return authed, nil
+	if !ok {
+		origPubkey := KeyForKeyText(key)
+		return &AuthedPubkey{
+			OrigPubkey: origPubkey,
+			Pubkey:     origPubkey,
+			Identity:   "pubkey",
+		}, nil
 	}
 
-	return authed, nil
+	principal := certPrincipal(cert, srcPrincipal)
+	if principal == "" {
+		return nil, fmt.Errorf("ssh-cert principals not valid")
+	}
+
+	return verifyCert(cert, principal)
+}
+
+func verifyCert(cert *ssh.Certificate, principal string) (*AuthedPubkey, error) {
+	if cert.CertType != ssh.UserCert {
+		return nil, fmt.Errorf("ssh-cert has type %d", cert.CertType)
+	}
+
+	// The account is found by the CA key, so the cert must be signed by it.
+	if err := certChecker.CheckCert(principal, cert); err != nil {
+		return nil, fmt.Errorf("ssh-cert invalid: %w", err)
+	}
+
+	return &AuthedPubkey{
+		OrigPubkey:      KeyForKeyText(cert),
+		Pubkey:          KeyForKeyText(cert.SignatureKey),
+		Identity:        cert.KeyId,
+		CriticalOptions: cert.CriticalOptions,
+	}, nil
 }
 
 // CheckSourceAddress enforces a cert's source-address restriction on a client
@@ -121,7 +156,7 @@ func (r *SshAuthHandler) PubkeyAuthHandler(conn ssh.ConnMetadata, key ssh.Public
 	log := r.Logger
 	var user *db.User
 	var err error
-	authed, err := PubkeyCertVerify(key, r.Principal)
+	authed, err := r.verify(conn, key)
 	if err != nil {
 		return nil, err
 	}
@@ -181,6 +216,14 @@ func (r *SshAuthHandler) PubkeyAuthHandler(conn ssh.ConnMetadata, key ssh.Public
 			"pubkey":   authed.Pubkey,
 			"identity": authed.Identity,
 		},
+	}
+
+	if authed.Scopes.Limited() {
+		scopes, err := json.Marshal(authed.Scopes)
+		if err != nil {
+			return nil, err
+		}
+		perms.Extensions[scopesExtension] = string(scopes)
 	}
 
 	if impID != "" {

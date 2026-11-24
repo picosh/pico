@@ -13,6 +13,7 @@ import (
 	"github.com/picosh/pico/pkg/send/protocols/rsync"
 	"github.com/picosh/pico/pkg/send/protocols/scp"
 	"github.com/picosh/pico/pkg/send/protocols/sftp"
+	"github.com/picosh/pico/pkg/send/scoped"
 	"github.com/picosh/pico/pkg/shared"
 	"github.com/picosh/pico/pkg/tunkit"
 )
@@ -29,7 +30,8 @@ func createSshServer(cfg *Config, ctx context.Context, cacheClearingQueue chan s
 		ctx,
 	)
 
-	sshAuth := shared.NewSshAuthHandler(cfg.DB, logger, "pgs")
+	sshAuth := shared.NewSshAuthHandler(cfg.DB, logger, "pgs", roleRead, roleDeploy)
+	files := scoped.NewHandler(handler, uploadRules)
 
 	webTunnel := &tunkit.WebTunnelHandler{
 		Logger:      logger,
@@ -47,16 +49,16 @@ func createSshServer(cfg *Config, ctx context.Context, cacheClearingQueue chan s
 		"ssh_data/term_info_ed25519",
 		sshAuth.PubkeyAuthHandler,
 		[]pssh.SSHServerMiddleware{
-			pipe.Middleware(handler, ""),
-			list.Middleware(handler),
-			scp.Middleware(handler),
-			rsync.Middleware(handler),
-			auth.Middleware(handler),
+			pipe.Middleware(files, ""),
+			list.Middleware(files),
+			scp.Middleware(files),
+			rsync.Middleware(files),
+			auth.Middleware(files),
 			Middleware(handler),
 			pssh.LogMiddleware(handler, handler.Cfg.DB),
 		},
 		[]pssh.SSHServerMiddleware{
-			sftp.Middleware(handler),
+			sftp.Middleware(files),
 			pssh.LogMiddleware(handler, handler.Cfg.DB),
 		},
 		map[string]pssh.SSHServerChannelMiddleware{

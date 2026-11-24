@@ -54,6 +54,22 @@ type Cmd struct {
 	Width   int
 	Height  int
 	Cfg     *Config
+	// Scopes limit which projects the session's commands reach.
+	Scopes shared.Scopes
+}
+
+// readable leaves out the projects the session's scopes don't cover.
+func (c *Cmd) readable(projects []*db.Project) []*db.Project {
+	if !c.Scopes.Limited() {
+		return projects
+	}
+	covered := []*db.Project{}
+	for _, project := range projects {
+		if c.Scopes.Allows(project.Name, roleRead, roleDeploy) {
+			covered = append(covered, project)
+		}
+	}
+	return covered
 }
 
 func (c *Cmd) output(out string) {
@@ -305,6 +321,7 @@ func (c *Cmd) ls() error {
 	if err != nil {
 		return err
 	}
+	projects = c.readable(projects)
 
 	if len(projects) == 0 {
 		c.output("no projects found")
@@ -430,6 +447,7 @@ func (c *Cmd) depends(projectName string) error {
 		return err
 	}
 
+	projects = c.readable(projects)
 	if len(projects) == 0 {
 		out := fmt.Sprintf("no projects linked to (%s)", projectName)
 		c.output(out)
@@ -457,6 +475,9 @@ func (c *Cmd) prune(prefix string, keepNumLatest int) error {
 	if err != nil {
 		return err
 	}
+	projects = slices.DeleteFunc(projects, func(project *db.Project) bool {
+		return !c.Scopes.Allows(project.Name, roleDeploy)
+	})
 
 	if len(projects) == 0 {
 		c.output(fmt.Sprintf("no projects found matching prefix (%s)", prefix))

@@ -74,7 +74,9 @@ func (img *ImgProxy) GetSig(ppath []byte) string {
 }
 
 func (img *ImgProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	dataURL := fmt.Sprintf("local:///%s", img.filepath)
+	// imgproxy decodes the URL's path, so an unescaped one could climb out of
+	// the bucket.
+	dataURL := (&url.URL{Scheme: "local", Path: "/" + img.filepath}).String()
 	imgProxyURL := img.url
 	processOpts := img.opts.String()
 	processPath := fmt.Sprintf(

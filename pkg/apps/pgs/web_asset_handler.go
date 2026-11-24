@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -33,6 +34,12 @@ type ApiAssetHandler struct {
 func hasProtocol(url string) bool {
 	isFullUrl := strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://")
 	return isFullUrl
+}
+
+// inProject reports whether an object is one of the project's. Projects share
+// their account's bucket.
+func (h *ApiAssetHandler) inProject(object string) bool {
+	return strings.HasPrefix(path.Clean("/"+object), path.Clean("/"+h.ProjectDir)+"/")
 }
 
 func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -89,18 +96,25 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	attempts := []string{}
 	for _, fp := range routes {
 		logger.Info("attempting to serve route", "route", fp.Filepath, "status", fp.Status, "query", fp.Query)
-		destUrl, err := url.Parse(fp.Filepath)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+		// Other routes name objects, which needn't be valid URLs.
+		var destUrl *url.URL
+		if checkIsRedirect(fp.Status) || hasProtocol(fp.Filepath) {
+			var err error
+			if destUrl, err = url.Parse(fp.Filepath); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			destUrl.RawQuery = r.URL.RawQuery
 		}
-		destUrl.RawQuery = r.URL.RawQuery
 
 		if checkIsRedirect(fp.Status) {
 			// hack: check to see if there's an index file in the requested directory
 			// before redirecting, this saves a hop that will just end up a 404
 			if !hasProtocol(fp.Filepath) && strings.HasSuffix(fp.Filepath, "/") {
 				next := filepath.Join(h.ProjectDir, fp.Filepath, "index.html")
+				if !h.inProject(next) {
+					continue
+				}
 				if _, err := h.Cfg.Storage.StatObject(h.Bucket, next); err != nil {
 					continue
 				}
@@ -135,11 +149,15 @@ func (h *ApiAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		fpath := fp.Filepath
+		if !h.inProject(fpath) {
+			logger.Error("route is outside the project", "route", fpath)
+			continue
+		}
 		attempts = append(attempts, fpath)
 		logger = logger.With("object", fpath)
 
 		imgproxy := storage.NewImgProxy(fmt.Sprintf("%s/%s", h.Bucket.Name, fpath), h.ImgProcessOpts)
-		err = imgproxy.CanServe()
+		err := imgproxy.CanServe()
 		if err == nil {
 			logger.Info("serving image with imgproxy")
 			imgproxy.ServeHTTP(w, r)
