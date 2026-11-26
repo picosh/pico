@@ -22,11 +22,25 @@ func getUser(s *pssh.SSHServerConnSession, dbpool db.DB) (*db.User, error) {
 		return nil, fmt.Errorf("key not found")
 	}
 
-	key := shared.KeyForKeyText(s.PublicKey())
-
-	user, err := dbpool.FindUserByKey(s.User(), key)
-	if err != nil {
-		return nil, err
+	user := pssh.GetUser(s)
+	if user == nil {
+		if perms := s.Permissions(); perms != nil {
+			if userID := perms.Extensions["user_id"]; userID != "" {
+				var err error
+				user, err = dbpool.FindUser(userID)
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+	}
+	if user == nil {
+		key := shared.KeyForKeyText(s.PublicKey())
+		var err error
+		user, err = dbpool.FindUserByKey(s.User(), key)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if user.Name == "" {

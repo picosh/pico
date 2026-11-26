@@ -130,15 +130,17 @@ func (h *UploadHandler) GetLogger(s *pssh.SSHServerConnSession) *slog.Logger {
 }
 
 func (h *UploadHandler) Validate(s *pssh.SSHServerConnSession) error {
-	var err error
-	key, err := sendutils.KeyText(s)
-	if err != nil {
-		return fmt.Errorf("key not found")
-	}
+	user := pssh.GetUser(s)
+	if user == nil {
+		key, err := sendutils.KeyText(s)
+		if err != nil {
+			return fmt.Errorf("key not found")
+		}
 
-	user, err := h.DBPool.FindUserByKey(s.User(), key)
-	if err != nil {
-		return err
+		user, err = h.DBPool.FindUserByKey(s.User(), key)
+		if err != nil {
+			return err
+		}
 	}
 
 	if user.Name == "" {
