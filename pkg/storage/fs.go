@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"io/fs"
@@ -8,31 +9,108 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/renameio/v2"
 	"github.com/picosh/pico/pkg/send/utils"
 	"github.com/picosh/pico/pkg/shared/mime"
+	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 )
 
 var KB = 1000
 var MB = KB * 1000
 
-// https://stackoverflow.com/a/32482941
-func dirSize(path string) (int64, error) {
-	var size int64
-	err := filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
+// dirSizeSlots caps the extra goroutines reading directories and lstatting
+// files across every dirSize call in the process. On a network filesystem
+// each of those waits on a round trip, so a serial walk is slow, but
+// concurrent uploads must not multiply the load.
+var dirSizeSlots = semaphore.NewWeighted(32)
+
+// dirSizeStatChunk is how many entries one worker lstats at a time.
+const dirSizeStatChunk = 64
+
+// dirSize sums the lstat sizes of everything under root except directories,
+// without following symlinks.
+func dirSize(root string) (int64, error) {
+	return walkSize(root, dirSizeSlots)
+}
+
+func walkSize(root string, slots *semaphore.Weighted) (int64, error) {
+	info, err := os.Lstat(root)
+	if err != nil {
+		return 0, err
+	}
+	if !info.IsDir() {
+		return info.Size(), nil
+	}
+
+	var size atomic.Int64
+	g, ctx := errgroup.WithContext(context.Background())
+
+	// With every slot taken, run it here, so each walk still makes progress
+	// and never blocks on another walk's slots.
+	spawn := func(f func() error) error {
+		if !slots.TryAcquire(1) {
+			return f()
+		}
+		g.Go(func() error {
+			defer slots.Release(1)
+			return f()
+		})
+		return nil
+	}
+
+	sumFiles := func(files []fs.DirEntry) error {
+		for _, entry := range files {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			info, err := entry.Info()
+			if err != nil {
+				return err
+			}
+			size.Add(info.Size())
+		}
+		return nil
+	}
+
+	var walk func(dir string) error
+	walk = func(dir string) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		entries, err := os.ReadDir(dir)
 		if err != nil {
 			return err
 		}
-		if !info.IsDir() {
-			size += info.Size()
+		var files []fs.DirEntry
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				files = append(files, entry)
+				continue
+			}
+			sub := filepath.Join(dir, entry.Name())
+			if err := spawn(func() error { return walk(sub) }); err != nil {
+				return err
+			}
 		}
-		return err
-	})
+		// Each lstat can be a round trip too, so a large directory is
+		// split across workers.
+		for chunk := range slices.Chunk(files, dirSizeStatChunk) {
+			if err := spawn(func() error { return sumFiles(chunk) }); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
 
-	return size, err
+	g.Go(func() error { return walk(root) })
+	err = g.Wait()
+	return size.Load(), err
 }
 
 // legacyKeepDir is the marker pgs used to write to keep empty directories.

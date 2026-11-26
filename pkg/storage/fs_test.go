@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"fmt"
 	"io"
 	"io/fs"
 	"log/slog"
@@ -13,6 +14,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/picosh/pico/pkg/send/utils"
+	"golang.org/x/sync/semaphore"
 )
 
 func TestFsAdapter(t *testing.T) {
@@ -295,5 +297,78 @@ func TestFsAdapterStaysInBucket(t *testing.T) {
 	}
 	if list, err := st.ListObjects(mine, "../other/", true); err != nil || len(list) != 0 {
 		t.Fatalf("ListObjects listed another bucket: %v %v", list, err)
+	}
+}
+
+func TestFsDirSize(t *testing.T) {
+	root := t.TempDir()
+	outside := filepath.Join(t.TempDir(), "big")
+	if err := os.WriteFile(outside, make([]byte, 1<<20), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// More directories than slots, nested, and one directory with more
+	// files than a stat chunk.
+	var want int64
+	for i := range 96 {
+		dir := filepath.Join(root, fmt.Sprintf("p%d", i), "a", "b")
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		for j, d := range []string{dir, filepath.Dir(dir)} {
+			n := i*10 + j + 1
+			if err := os.WriteFile(filepath.Join(d, "f"), make([]byte, n), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			want += int64(n)
+		}
+	}
+	flat := filepath.Join(root, "flat")
+	if err := os.Mkdir(flat, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for i := range dirSizeStatChunk*3 + 5 {
+		if err := os.WriteFile(filepath.Join(flat, fmt.Sprintf("f%d", i)), make([]byte, i), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		want += int64(i)
+	}
+	link := filepath.Join(root, "p0", "link")
+	if err := os.Symlink(outside, link); err != nil {
+		t.Fatal(err)
+	}
+	want += int64(len(outside))
+
+	// With no slots every directory and chunk is walked inline.
+	for _, n := range []int64{0, 4, 64} {
+		got, err := walkSize(root, semaphore.NewWeighted(n))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != want {
+			t.Fatalf("%d slots: dirSize = %d, want %d", n, got, want)
+		}
+	}
+
+	// Concurrent walks share the slots without blocking each other.
+	shared := semaphore.NewWeighted(2)
+	errs := make(chan error, 8)
+	for range 8 {
+		go func() {
+			got, err := walkSize(root, shared)
+			if err == nil && got != want {
+				err = fmt.Errorf("shared slots: dirSize = %d, want %d", got, want)
+			}
+			errs <- err
+		}()
+	}
+	for range 8 {
+		if err := <-errs; err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if _, err := dirSize(filepath.Join(root, "missing")); !os.IsNotExist(err) {
+		t.Fatalf("missing root: err = %v, want not exist", err)
 	}
 }
