@@ -946,11 +946,23 @@ var (
 // A "/raw/{slug...}" pattern would redirect "/raw" away from a post named raw.
 func (web *webRouter) pathRoute(w http.ResponseWriter, r *http.Request) {
 	path := r.PathValue("path")
+
+	// remove trailing `/` suffix and 301 redirect as part of best practices
+	if strings.HasSuffix(path, "/") {
+		nextUrl := fmt.Sprintf("/%s", strings.TrimSuffix(path, "/"))
+		if r.URL.RawQuery != "" {
+			nextUrl = fmt.Sprintf("%s?%s", nextUrl, r.URL.RawQuery)
+		}
+		http.Redirect(w, r, nextUrl, http.StatusMovedPermanently)
+		return
+	}
+
 	if slug, ok := strings.CutPrefix(path, "raw/"); ok && slug != "" {
 		r.SetPathValue("slug", slug)
 		web.postRawHandler(w, r)
 		return
 	}
+
 	for _, ext := range []string{".md", ".gmi"} {
 		if slug, ok := strings.CutSuffix(path, ext); ok && slug != "" {
 			r.SetPathValue("slug", slug)
