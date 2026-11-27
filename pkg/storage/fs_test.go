@@ -327,7 +327,7 @@ func TestFsDirSize(t *testing.T) {
 	if err := os.Mkdir(flat, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	for i := range dirSizeStatChunk*3 + 5 {
+	for i := range walkChunk*3 + 5 {
 		if err := os.WriteFile(filepath.Join(flat, fmt.Sprintf("f%d", i)), make([]byte, i), 0o644); err != nil {
 			t.Fatal(err)
 		}
@@ -370,5 +370,141 @@ func TestFsDirSize(t *testing.T) {
 
 	if _, err := dirSize(filepath.Join(root, "missing")); !os.IsNotExist(err) {
 		t.Fatalf("missing root: err = %v, want not exist", err)
+	}
+}
+
+// walkDirList is how ListObjects listed recursively with filepath.WalkDir,
+// kept to check the parallel walk against.
+func walkDirList(root string) ([]utils.VirtualFile, error) {
+	var files []utils.VirtualFile
+	err := filepath.WalkDir(root, func(s string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.Name() == legacyKeepDir {
+			return nil
+		}
+		info, err := d.Info()
+		if err != nil {
+			return nil
+		}
+		fname := strings.TrimPrefix(strings.TrimPrefix(s, root), "/")
+		if fname == "" {
+			return nil
+		}
+		files = append(files, utils.VirtualFile{
+			FName:    fname,
+			FIsDir:   info.IsDir(),
+			FSize:    info.Size(),
+			FModTime: info.ModTime(),
+		})
+		return nil
+	})
+	return files, err
+}
+
+func TestFsListTreeMatchesWalkDir(t *testing.T) {
+	root := t.TempDir()
+	write := func(rel string, n int) {
+		t.Helper()
+		p := filepath.Join(root, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, make([]byte, n), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Names where sorting whole paths differs from WalkDir's order.
+	for i, rel := range []string{
+		"a", "a-b/x", "a.b", "b/a/z", "b/a-z", "b/a/y/q", "c/" + legacyKeepDir,
+		"d/" + legacyKeepDir + "/inner", "e/E", "e/e", "e/é",
+	} {
+		write(rel, i+1)
+	}
+	for i := range walkChunk*2 + 3 {
+		write(fmt.Sprintf("flat/%03d", i), i)
+		write(fmt.Sprintf("tree/%d/f", i), i)
+	}
+	if err := os.Symlink(filepath.Join(root, "b"), filepath.Join(root, "link")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(root, "empty"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	want, err := walkDirList(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range []int64{0, 4, 32} {
+		got, err := listTree(root, semaphore.NewWeighted(n))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Fatalf("%d slots: listTree differs from WalkDir (-want +got):\n%s", n, diff)
+		}
+	}
+
+	// A symlinked or regular-file root has nothing below it, as with WalkDir.
+	for _, r := range []string{filepath.Join(root, "link"), filepath.Join(root, "a")} {
+		got, err := listTree(r, semaphore.NewWeighted(4))
+		if err != nil || len(got) != 0 {
+			t.Fatalf("listTree(%s) = %v, %v; want nothing", r, got, err)
+		}
+	}
+
+	entries, err := os.ReadDir(filepath.Join(root, "flat"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var wantFlat []utils.VirtualFile
+	for _, d := range entries {
+		info, err := d.Info()
+		if err != nil {
+			t.Fatal(err)
+		}
+		wantFlat = append(wantFlat, utils.VirtualFile{FName: info.Name(), FSize: info.Size(), FModTime: info.ModTime()})
+	}
+	for _, n := range []int64{0, 4, 32} {
+		if diff := cmp.Diff(wantFlat, listEntries(entries, semaphore.NewWeighted(n))); diff != "" {
+			t.Fatalf("%d slots: listEntries differs (-want +got):\n%s", n, diff)
+		}
+	}
+}
+
+func TestFsListObjectsUnreadableDir(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root reads any directory")
+	}
+	st, err := NewStorageFS(slog.Default(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := st.UpsertBucket("main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	locked := filepath.Join(b.Path, "p", "locked")
+	if err := os.MkdirAll(locked, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(b.Path, "p", "ok.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(locked, 0); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chmod(locked, 0o755) }()
+
+	// As with WalkDir, an unreadable directory collapses the listing to the
+	// listed directory itself.
+	got, err := st.ListObjects(b, "p/", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || !got[0].IsDir() {
+		t.Fatalf("ListObjects = %v, want only the listed directory", got)
 	}
 }

@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -24,19 +25,94 @@ import (
 var KB = 1000
 var MB = KB * 1000
 
-// dirSizeSlots caps the extra goroutines reading directories and lstatting
-// files across every dirSize call in the process. On a network filesystem
-// each of those waits on a round trip, so a serial walk is slow, but
-// concurrent uploads must not multiply the load.
-var dirSizeSlots = semaphore.NewWeighted(32)
+// walkSlots caps the extra goroutines reading directories and lstatting
+// entries across every walk in the process. On a network filesystem each of
+// those waits on a round trip, so a serial walk is slow, but concurrent
+// uploads must not multiply the load.
+var walkSlots = semaphore.NewWeighted(32)
 
-// dirSizeStatChunk is how many entries one worker lstats at a time.
-const dirSizeStatChunk = 64
+// walkChunk is how many entries one worker lstats at a time, so a large
+// directory is spread across workers too.
+const walkChunk = 64
+
+// slotGroup runs work on a free slot, or inline when every slot is taken, so
+// each walk still makes progress and never waits on another walk's slots.
+type slotGroup struct {
+	g     *errgroup.Group
+	ctx   context.Context
+	slots *semaphore.Weighted
+}
+
+func newSlotGroup(slots *semaphore.Weighted) *slotGroup {
+	g, ctx := errgroup.WithContext(context.Background())
+	return &slotGroup{g: g, ctx: ctx, slots: slots}
+}
+
+func (s *slotGroup) Go(f func() error) error {
+	if !s.slots.TryAcquire(1) {
+		return f()
+	}
+	s.g.Go(func() error {
+		defer s.slots.Release(1)
+		return f()
+	})
+	return nil
+}
+
+func (s *slotGroup) Wait() error { return s.g.Wait() }
+
+// walkTree calls visit for every entry below the directory root with its
+// slash-separated path relative to root, concurrently and in no order.
+// Directories are descended without following symlinks. The first error from
+// reading a directory or from visit stops the walk.
+func walkTree(root string, slots *semaphore.Weighted, visit func(rel string, d fs.DirEntry) error) error {
+	sg := newSlotGroup(slots)
+
+	visitAll := func(dir string, entries []fs.DirEntry) error {
+		for _, d := range entries {
+			if err := sg.ctx.Err(); err != nil {
+				return err
+			}
+			if err := visit(path.Join(dir, d.Name()), d); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	var walk func(rel string) error
+	walk = func(rel string) error {
+		if err := sg.ctx.Err(); err != nil {
+			return err
+		}
+		entries, err := os.ReadDir(filepath.Join(root, filepath.FromSlash(rel)))
+		if err != nil {
+			return err
+		}
+		for _, d := range entries {
+			if d.IsDir() {
+				sub := path.Join(rel, d.Name())
+				if err := sg.Go(func() error { return walk(sub) }); err != nil {
+					return err
+				}
+			}
+		}
+		for chunk := range slices.Chunk(entries, walkChunk) {
+			if err := sg.Go(func() error { return visitAll(rel, chunk) }); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	sg.g.Go(func() error { return walk("") })
+	return sg.Wait()
+}
 
 // dirSize sums the lstat sizes of everything under root except directories,
 // without following symlinks.
 func dirSize(root string) (int64, error) {
-	return walkSize(root, dirSizeSlots)
+	return walkSize(root, walkSlots)
 }
 
 func walkSize(root string, slots *semaphore.Weighted) (int64, error) {
@@ -49,68 +125,116 @@ func walkSize(root string, slots *semaphore.Weighted) (int64, error) {
 	}
 
 	var size atomic.Int64
-	g, ctx := errgroup.WithContext(context.Background())
-
-	// With every slot taken, run it here, so each walk still makes progress
-	// and never blocks on another walk's slots.
-	spawn := func(f func() error) error {
-		if !slots.TryAcquire(1) {
-			return f()
+	err = walkTree(root, slots, func(_ string, d fs.DirEntry) error {
+		if d.IsDir() {
+			return nil
 		}
-		g.Go(func() error {
-			defer slots.Release(1)
-			return f()
-		})
-		return nil
-	}
-
-	sumFiles := func(files []fs.DirEntry) error {
-		for _, entry := range files {
-			if err := ctx.Err(); err != nil {
-				return err
-			}
-			info, err := entry.Info()
-			if err != nil {
-				return err
-			}
-			size.Add(info.Size())
-		}
-		return nil
-	}
-
-	var walk func(dir string) error
-	walk = func(dir string) error {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		entries, err := os.ReadDir(dir)
+		info, err := d.Info()
 		if err != nil {
 			return err
 		}
-		var files []fs.DirEntry
-		for _, entry := range entries {
-			if !entry.IsDir() {
-				files = append(files, entry)
-				continue
-			}
-			sub := filepath.Join(dir, entry.Name())
-			if err := spawn(func() error { return walk(sub) }); err != nil {
-				return err
-			}
-		}
-		// Each lstat can be a round trip too, so a large directory is
-		// split across workers.
-		for chunk := range slices.Chunk(files, dirSizeStatChunk) {
-			if err := spawn(func() error { return sumFiles(chunk) }); err != nil {
-				return err
-			}
-		}
+		size.Add(info.Size())
 		return nil
+	})
+	return size.Load(), err
+}
+
+// listTree lists everything below root in filepath.WalkDir order, leaving out
+// entries that can't be lstatted. A root that isn't a directory, a symlink
+// included, has nothing below it.
+func listTree(root string, slots *semaphore.Weighted) ([]utils.VirtualFile, error) {
+	info, err := os.Lstat(root)
+	if err != nil {
+		return nil, err
+	}
+	if !info.IsDir() {
+		return nil, nil
 	}
 
-	g.Go(func() error { return walk(root) })
-	err = g.Wait()
-	return size.Load(), err
+	var mu sync.Mutex
+	var files []utils.VirtualFile
+	err = walkTree(root, slots, func(rel string, d fs.DirEntry) error {
+		if d.Name() == legacyKeepDir {
+			return nil
+		}
+		info, err := d.Info()
+		if err != nil {
+			return nil
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		files = append(files, utils.VirtualFile{
+			FName:    rel,
+			FIsDir:   info.IsDir(),
+			FSize:    info.Size(),
+			FModTime: info.ModTime(),
+		})
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	slices.SortFunc(files, func(a, b utils.VirtualFile) int {
+		return compareWalkOrder(a.FName, b.FName)
+	})
+	return files, nil
+}
+
+// compareWalkOrder orders slash-separated paths the way filepath.WalkDir
+// visits them: a directory before its contents, names sorted within each.
+func compareWalkOrder(a, b string) int {
+	for {
+		aseg, arest, amore := strings.Cut(a, "/")
+		bseg, brest, bmore := strings.Cut(b, "/")
+		if c := strings.Compare(aseg, bseg); c != 0 {
+			return c
+		}
+		switch {
+		case !amore && !bmore:
+			return 0
+		case !amore:
+			return -1
+		case !bmore:
+			return 1
+		}
+		a, b = arest, brest
+	}
+}
+
+// listEntries lstats entries across slots, keeping their order and leaving
+// out the ones that can't be lstatted.
+func listEntries(entries []fs.DirEntry, slots *semaphore.Weighted) []utils.VirtualFile {
+	infos := make([]fs.FileInfo, len(entries))
+	sg := newSlotGroup(slots)
+	for lo := 0; lo < len(entries); lo += walkChunk {
+		hi := min(lo+walkChunk, len(entries))
+		_ = sg.Go(func() error {
+			for i := lo; i < hi; i++ {
+				if entries[i].Name() == legacyKeepDir {
+					continue
+				}
+				if info, err := entries[i].Info(); err == nil {
+					infos[i] = info
+				}
+			}
+			return nil
+		})
+	}
+	_ = sg.Wait()
+
+	var files []utils.VirtualFile
+	for _, info := range infos {
+		if info == nil {
+			continue
+		}
+		files = append(files, utils.VirtualFile{
+			FName:    info.Name(),
+			FIsDir:   info.IsDir(),
+			FSize:    info.Size(),
+			FModTime: info.ModTime(),
+		})
+	}
+	return files
 }
 
 // legacyKeepDir is the marker pgs used to write to keep empty directories.
@@ -325,31 +449,7 @@ func (s *StorageFS) ListObjects(bucket Bucket, dir string, recursive bool) ([]os
 	var files []utils.VirtualFile
 
 	if recursive {
-		err = filepath.WalkDir(fpath, func(s string, d fs.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
-			if d.Name() == legacyKeepDir {
-				return nil
-			}
-			info, err := d.Info()
-			if err != nil {
-				return nil
-			}
-			fname := strings.TrimPrefix(s, fpath)
-			if fname == "" {
-				return nil
-			}
-			// rsync does not expect prefixed `/` so without this `rsync --delete` is borked
-			fname = strings.TrimPrefix(fname, "/")
-			files = append(files, utils.VirtualFile{
-				FName:    fname,
-				FIsDir:   info.IsDir(),
-				FSize:    info.Size(),
-				FModTime: info.ModTime(),
-			})
-			return nil
-		})
+		files, err = listTree(fpath, walkSlots)
 		if err != nil {
 			fileList = append(fileList, info)
 			return fileList, nil
@@ -360,22 +460,7 @@ func (s *StorageFS) ListObjects(bucket Bucket, dir string, recursive bool) ([]os
 			fileList = append(fileList, info)
 			return fileList, nil
 		}
-		for _, d := range fls {
-			if d.Name() == legacyKeepDir {
-				continue
-			}
-			info, err := d.Info()
-			if err != nil {
-				continue
-			}
-			fp := info.Name()
-			files = append(files, utils.VirtualFile{
-				FName:    fp,
-				FIsDir:   info.IsDir(),
-				FSize:    info.Size(),
-				FModTime: info.ModTime(),
-			})
-		}
+		files = listEntries(fls, walkSlots)
 	}
 
 	for _, f := range files {
